@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { X, Dumbbell, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/toast-provider'
 import { ExerciseThumbnail } from '@/components/ui/optimized-image'
 
 interface Exercise {
@@ -38,6 +39,7 @@ const restTimeOptions = [
 ]
 
 export default function ExerciseSetForm({ isOpen, onClose, onSuccess, exercise, templateId }: ExerciseSetFormProps) {
+  const { addToast } = useToast()
   const [formData, setFormData] = useState({
     sets: 3,
     reps: '10',
@@ -102,7 +104,7 @@ export default function ExerciseSetForm({ isOpen, onClose, onSuccess, exercise, 
       onClose()
     } catch (error) {
       console.error('Error adding exercise to template:', error)
-      alert('Error adding exercise. Please try again.')
+      addToast({ title: 'Error adding exercise. Please try again.', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

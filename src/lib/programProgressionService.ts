@@ -289,9 +289,10 @@ export class ProgramProgressionService {
         client_id: clientId,
         program_assignment_id: programAssignmentId,
         week_number: rule.week_number ?? 1,
-        set_entry_id: rule.set_entry_id ?? null,
-        set_type: rule.set_type ?? null,
-        set_order: rule.set_order ?? null,
+        block_id: rule.block_id ?? null,
+        block_type: rule.block_type ?? null,
+        block_order: rule.block_order ?? null,
+        block_name: rule.block_name ?? null,
         exercise_id: rule.exercise_id ?? null,
         exercise_order: rule.exercise_order ?? null,
         exercise_letter: rule.exercise_letter ?? null,
@@ -385,16 +386,23 @@ export class ProgramProgressionService {
         if (blockIds.length === 0) {
           return []
         }
-        query = query.in('set_entry_id', blockIds)
+        query = query.in('block_id', blockIds)
       }
       
       const { data, error } = await query
         .order('week_number')
-        .order('set_order')
+        .order('block_order')
         .order('exercise_order')
 
       if (error) throw error
-      return (data || []) as ProgramProgressionRule[]
+      // Map client table columns (block_id, block_type, block_order) to shape expected by buildBlocksFromRules
+      const rows = (data || []) as any[]
+      return rows.map((r) => ({
+        ...r,
+        set_entry_id: r.block_id ?? r.set_entry_id,
+        set_type: r.block_type ?? r.set_type ?? '',
+        set_order: r.block_order ?? r.set_order ?? 0,
+      })) as ProgramProgressionRule[]
     } catch (error) {
       console.error('❌ Error fetching client progression rules:', error)
       return []

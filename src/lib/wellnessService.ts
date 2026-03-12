@@ -1,7 +1,8 @@
 /**
  * Daily wellness check-in service.
  * Manages daily_wellness_logs (sleep, stress, soreness, steps, notes).
- * Legacy fields (energy_level, mood_rating, motivation_level) remain in DB but are not used in UI.
+ * Legacy fields (energy_level, mood_rating, motivation_level) remain in DB but are not used in UI
+ * and are intentionally excluded from the form for brevity.
  */
 
 import { supabase } from "./supabase";

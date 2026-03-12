@@ -1,0 +1,341 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { ClientGlassCard } from "@/components/client-ui";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  Play,
+  Loader2,
+  Coffee,
+  ChevronLeft,
+  FileText,
+} from "lucide-react";
+import type { ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
+import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
+import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+
+const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const SET_TYPE_LABELS: Record<string, string> = {
+  straight_set: "Straight Set",
+  superset: "Superset",
+  giant_set: "Giant Set",
+  drop_set: "Drop Set",
+  cluster_set: "Cluster Set",
+  rest_pause: "Rest Pause",
+  pre_exhaustion: "Pre-Exhaustion",
+  amrap: "AMRAP",
+  emom: "EMOM",
+  tabata: "Tabata",
+  for_time: "For Time",
+  hr_sets: "HR Sets",
+};
+
+export type PreviewDayStatus = "today" | "completed" | "missed" | "upcoming" | "rest";
+
+export interface WorkoutDayPreviewProps {
+  day: ProgramWeekDayCard | null;
+  status: PreviewDayStatus;
+  templateId: string | null;
+  workoutName: string;
+  dayLabel: string;
+  estimatedDuration: number;
+  scheduleId: string | null;
+  onStartWorkout: (scheduleId: string) => void;
+  onClose?: () => void;
+  isStarting: boolean;
+  startingScheduleId: string | null;
+  clientId: string | undefined;
+}
+
+export function WorkoutDayPreview({
+  day,
+  status,
+  templateId,
+  workoutName,
+  dayLabel,
+  estimatedDuration,
+  scheduleId,
+  onStartWorkout,
+  onClose,
+  isStarting,
+  startingScheduleId,
+  clientId,
+}: WorkoutDayPreviewProps) {
+  const [blocks, setBlocks] = useState<WorkoutSetEntry[] | null>(null);
+  const [loading, setLoading] = useState(!!templateId);
+  const [error, setError] = useState<string | null>(null);
+  const [workoutLogId, setWorkoutLogId] = useState<string | null>(null);
+
+  const loadBlocks = useCallback(async () => {
+    if (!templateId) {
+      setBlocks(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+      const data = await WorkoutBlockService.getWorkoutBlocks(templateId);
+      setBlocks(data ?? []);
+    } catch (e) {
+      console.error("[WorkoutDayPreview] loadBlocks failed:", e);
+      setError("Couldn't load workout details");
+      setBlocks(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [templateId]);
+
+  useEffect(() => {
+    if (status === "rest" || !templateId) {
+      setBlocks(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    loadBlocks();
+  }, [templateId, status, loadBlocks]);
+
+  // Fetch workout log id for completed days (View Log link)
+  useEffect(() => {
+    if (status !== "completed" || !scheduleId || !clientId) {
+      setWorkoutLogId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("workout_logs")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("program_schedule_id", scheduleId)
+          .not("completed_at", "is", null)
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!cancelled && data?.id) setWorkoutLogId(data.id);
+      } catch {
+        if (!cancelled) setWorkoutLogId(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, scheduleId, clientId]);
+
+  const totalExercises = blocks?.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0) ?? 0;
+  const canStart = scheduleId && status !== "rest" && status !== "completed";
+  const isStartingThis = isStarting && startingScheduleId === scheduleId;
+
+  const cardClass = cn(
+    "rounded-xl overflow-hidden transition-colors",
+    status === "completed" && "bg-green-50/50 dark:bg-green-900/10",
+    status === "missed" && "bg-amber-50/50 dark:bg-amber-900/10",
+    status === "upcoming" && "opacity-90",
+    status === "rest" && "bg-[color:var(--fc-surface-sunken)]"
+  );
+
+  if (status === "rest") {
+    return (
+      <ClientGlassCard className={cn("p-6", cardClass)}>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1 text-sm fc-text-dim hover:fc-text-primary mb-4"
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+        )}
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center bg-[color:var(--fc-glass-highlight)] mb-4">
+            <Coffee className="w-7 h-7 fc-text-dim" />
+          </div>
+          <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-lg bg-[color:var(--fc-glass-highlight)] fc-text-dim mb-2">
+            Rest Day
+          </span>
+          <p className="text-base font-semibold fc-text-primary mb-1">Rest Day</p>
+          <p className="text-sm fc-text-dim">Rest and recover — no workout scheduled</p>
+        </div>
+      </ClientGlassCard>
+    );
+  }
+
+  return (
+    <ClientGlassCard className={cn("p-6", cardClass)}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0 flex-1">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 text-sm fc-text-dim hover:fc-text-primary mb-2"
+              aria-label="Back"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
+          <p className="text-xs fc-text-dim mb-0.5">{dayLabel}</p>
+          <h3 className="text-lg font-bold fc-text-primary truncate">{workoutName}</h3>
+          <div className="flex items-center gap-2 mt-2">
+            <StatusBadge status={status} />
+          </div>
+        </div>
+      </div>
+
+      {/* Content: loading / error / exercise list */}
+      <div className="min-h-[120px] max-h-[320px] overflow-y-auto">
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
+          </div>
+        )}
+        {error && !loading && (
+          <div className="py-6 text-center">
+            <p className="text-sm fc-text-dim mb-3">{error}</p>
+            <Button variant="outline" size="sm" onClick={loadBlocks}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && blocks && blocks.length > 0 && (
+          <ul className="space-y-4">
+            {blocks.map((block) => (
+              <li key={block.id} className="space-y-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider fc-text-dim">
+                  {SET_TYPE_LABELS[block.set_type] ?? block.set_type}
+                </span>
+                {(block.exercises ?? []).map((ex) => {
+                  const sets = ex.sets ?? block.total_sets ?? 0;
+                  const reps = ex.reps ?? block.reps_per_set ?? "—";
+                  const weight = ex.weight_kg != null ? ` · ${ex.weight_kg} kg` : "";
+                  const rest = (ex.rest_seconds ?? block.rest_seconds) != null
+                    ? ` · ${(ex.rest_seconds ?? block.rest_seconds)}s rest`
+                    : "";
+                  return (
+                    <div
+                      key={ex.id}
+                      className="flex items-baseline gap-2 text-sm py-1 border-b border-[color:var(--fc-glass-border)] last:border-0"
+                    >
+                      <span className="font-medium fc-text-primary shrink-0">
+                        {ex.exercise_letter ? `${ex.exercise_letter}. ` : ""}
+                        {ex.exercise?.name ?? "Exercise"}
+                      </span>
+                      <span className="fc-text-dim text-xs shrink-0">
+                        {sets} × {reps}{weight}{rest}
+                      </span>
+                    </div>
+                  );
+                })}
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && !error && blocks && blocks.length === 0 && (
+          <p className="text-sm fc-text-dim py-4 text-center">No exercises in this workout.</p>
+        )}
+      </div>
+
+      {/* Footer */}
+      {!loading && !error && status !== "completed" && (
+        <p className="text-xs fc-text-dim mt-3">
+          {totalExercises} exercise{totalExercises !== 1 ? "s" : ""} · ~{estimatedDuration || 45} min
+        </p>
+      )}
+      {status === "completed" && workoutLogId && (
+        <a
+          href={`/client/progress/workout-logs/${workoutLogId}`}
+          className="inline-flex items-center gap-1.5 text-sm text-[color:var(--fc-accent-cyan)] hover:underline mt-3"
+        >
+          <FileText className="w-4 h-4" />
+          View Log
+        </a>
+      )}
+
+      {/* Action buttons */}
+      <div className="mt-6 flex flex-col gap-2">
+        {status === "today" && canStart && (
+          <Button
+            onClick={() => scheduleId && onStartWorkout(scheduleId)}
+            disabled={isStartingThis}
+            className="w-full h-12 rounded-xl font-bold"
+            style={{ background: "var(--fc-accent-cyan)" }}
+          >
+            {isStartingThis ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 fill-current" />
+                Start Workout
+              </>
+            )}
+          </Button>
+        )}
+        {status === "upcoming" && canStart && (
+          <Button
+            onClick={() => scheduleId && onStartWorkout(scheduleId)}
+            disabled={isStartingThis}
+            variant="fc-primary"
+            className="w-full h-12 rounded-xl font-bold"
+          >
+            {isStartingThis ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 fill-current" />
+                Start Workout
+              </>
+            )}
+          </Button>
+        )}
+        {status === "missed" && canStart && (
+          <Button
+            variant="outline"
+            onClick={() => scheduleId && onStartWorkout(scheduleId)}
+            disabled={isStartingThis}
+            className="w-full h-12 rounded-xl font-semibold border-2 border-amber-500 text-amber-700 dark:text-amber-400 dark:border-amber-400"
+          >
+            {isStartingThis ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              "Start Missed Workout"
+            )}
+          </Button>
+        )}
+      </div>
+    </ClientGlassCard>
+  );
+}
+
+function StatusBadge({ status }: { status: PreviewDayStatus }) {
+  if (status === "rest") return null;
+  const config = {
+    today: { label: "Today", className: "bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)]" },
+    completed: { label: "Completed", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+    missed: { label: "Missed", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+    upcoming: { label: "Upcoming", className: "bg-[color:var(--fc-glass-highlight)] fc-text-dim" },
+  }[status];
+  return (
+    <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-lg", config.className)}>
+      {config.label}
+    </span>
+  );
+}

@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/toast-provider";
 import {
   uploadPhoto,
   getPhotosForDate,
@@ -46,6 +47,7 @@ function formatDate(dateStr: string): string {
 }
 
 function ProgressPhotosPageContent() {
+  const { addToast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -167,7 +169,7 @@ function ProgressPhotosPageContent() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      addToast({ title: "Please select an image file", variant: "warning" });
       return;
     }
 
@@ -207,7 +209,7 @@ function ProgressPhotosPageContent() {
     );
 
     if (photosToUpload.length === 0) {
-      alert("Please take at least one photo");
+      addToast({ title: "Please take at least one photo", variant: "warning" });
       return;
     }
 
@@ -241,7 +243,7 @@ function ProgressPhotosPageContent() {
       setNotes("");
     } catch (error) {
       console.error("Error saving photos:", error);
-      alert("Failed to save photos. Please try again.");
+      addToast({ title: "Failed to save photos. Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -258,13 +260,13 @@ function ProgressPhotosPageContent() {
       }
     } catch (error) {
       console.error("Error deleting photo:", error);
-      alert("Failed to delete photo");
+      addToast({ title: "Failed to delete photo", variant: "destructive" });
     }
   };
 
   const startComparison = () => {
     if (timeline.length < 2) {
-      alert("Need at least 2 photo dates to compare");
+      addToast({ title: "Need at least 2 photo dates to compare", variant: "warning" });
       return;
     }
     setComparisonMode(true);

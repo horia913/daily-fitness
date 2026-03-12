@@ -88,6 +88,16 @@ interface LiveWorkoutBlockExecutorProps {
   onPlateCalculatorClick?: () => void;
   /** Called whenever the active exercise changes (by exercise_id). Used to trigger per-exercise data fetches in the parent. */
   onExerciseChanged?: (exerciseId: string) => void;
+  /** Called when log-set returns new_achievements (e.g. PR-triggered). Parent can show AchievementUnlockModal. */
+  onAchievementsUnlocked?: (achievements: Array<{
+    templateId: string;
+    templateName: string;
+    templateIcon: string;
+    tier: string | null;
+    description: string;
+    nextTier: unknown;
+    currentMetricValue: number;
+  }>) => void;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -114,6 +124,7 @@ export default function LiveWorkoutBlockExecutor({
   previousPerformanceMap,
   onPlateCalculatorClick,
   onExerciseChanged,
+  onAchievementsUnlocked,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
   const { ensureFreshSession, user: authUser } = useAuth();
@@ -685,6 +696,10 @@ export default function LiveWorkoutBlockExecutor({
                 variant: "default",
                 duration: 3000,
               });
+            }
+
+            if (Array.isArray(result.new_achievements) && result.new_achievements.length > 0 && onAchievementsUnlocked) {
+              onAchievementsUnlocked(result.new_achievements);
             }
 
             return {

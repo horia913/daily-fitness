@@ -989,7 +989,7 @@ export default function WorkoutTemplateForm({
 
     switch (exercise.exercise_type) {
       case "tabata":
-        return "Tabata Circuit";
+        return "Tabata";
       case "amrap":
         return "AMRAP";
       case "emom":

@@ -61,13 +61,24 @@ function getPillarLabel(pillar: string): string {
 
 function getPillarAccentColor(pillar: string): string {
   const map: Record<string, string> = {
-    training: "var(--fc-accent-cyan)",
+    training: "var(--fc-domain-workouts)",
     nutrition: "var(--fc-domain-meals)",
-    checkins: "var(--fc-status-warning)",
-    lifestyle: "var(--fc-accent-purple)",
+    checkins: "var(--fc-accent-purple)",
+    lifestyle: "var(--fc-status-warning)",
     general: "var(--fc-domain-neutral)",
   };
   return map[pillar] ?? "var(--fc-domain-neutral)";
+}
+
+function getPillarTintClass(pillar: string): string {
+  const map: Record<string, string> = {
+    training: "bg-blue-50/30 dark:bg-blue-900/10",
+    nutrition: "bg-emerald-50/30 dark:bg-emerald-900/10",
+    checkins: "bg-purple-50/30 dark:bg-purple-900/10",
+    lifestyle: "bg-amber-50/30 dark:bg-amber-900/10",
+    general: "bg-gray-50/20 dark:bg-gray-800/10",
+  };
+  return map[pillar] ?? "bg-gray-50/20 dark:bg-gray-800/10";
 }
 
 function getTrajectoryStatusTag(goal: Goal): { label: string; className: string } {
@@ -138,11 +149,12 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
     );
   }
 
-  /* Trajectory card */
+  /* Trajectory card — one source for background: pillar tint only (no fc-glass) so tint is visible */
   const accentColor = getPillarAccentColor(goal.pillar);
+  const pillarTint = getPillarTintClass(goal.pillar);
   return (
     <div
-      className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] border-l-[3px] p-6 transition-all duration-200 fc-hover-rise flex flex-col justify-between hover:border-[color:var(--fc-glass-border-strong)] hover:shadow-[var(--fc-shadow-card)]"
+      className={`fc-card rounded-2xl border border-[color:var(--fc-glass-border)] border-l-[3px] p-6 transition-all duration-200 fc-hover-rise flex flex-col justify-between hover:border-[color:var(--fc-glass-border-strong)] hover:shadow-[var(--fc-shadow-card)] ${pillarTint}`}
       style={{ borderLeftColor: accentColor }}
     >
       <div>

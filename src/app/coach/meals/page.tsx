@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,6 +89,7 @@ interface MealPlanAssignment {
 export default function CoachMealsPage() {
   const { user } = useAuth();
   const { getThemeStyles, performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const theme = getThemeStyles();
 
   const [activeTab, setActiveTab] = useState("meal-plans");
@@ -298,9 +300,9 @@ export default function CoachMealsPage() {
     } catch (error: unknown) {
       console.error("Error adding food:", error);
       if (error instanceof Error && error.message === "timeout") {
-        alert("Request took too long. Check your connection and try again.");
+        addToast({ title: "Request took too long. Check your connection and try again.", variant: "destructive" });
       } else {
-        alert("Could not add food. Please try again.");
+        addToast({ title: "Could not add food. Please try again.", variant: "destructive" });
       }
     } finally {
       setLoading(false);
@@ -369,7 +371,7 @@ export default function CoachMealsPage() {
   const handleAssignMealPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !assignmentForm.client_id || !assignmentForm.meal_plan_id) {
-      alert("Please select both a client and a meal plan");
+      addToast({ title: "Please select both a client and a meal plan", variant: "destructive" });
       return;
     }
 
@@ -434,10 +436,10 @@ export default function CoachMealsPage() {
       // Reload data to show new assignment
       loadData();
 
-      alert("Meal plan assigned successfully!");
+      addToast({ title: "Meal plan assigned successfully!", variant: "default" });
     } catch (error) {
       console.error("Error assigning meal plan:", error);
-      alert("Error assigning meal plan. Please try again.");
+      addToast({ title: "Error assigning meal plan. Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -458,10 +460,10 @@ export default function CoachMealsPage() {
       // Reload data to remove the assignment
       loadData();
 
-      alert("Meal plan unassigned successfully!");
+      addToast({ title: "Meal plan unassigned successfully!", variant: "default" });
     } catch (error) {
       console.error("Error unassigning meal plan:", error);
-      alert("Error unassigning meal plan. Please try again.");
+      addToast({ title: "Error unassigning meal plan. Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -548,10 +550,10 @@ export default function CoachMealsPage() {
 
       if (error) throw error;
       loadData();
-      alert("Meal plan duplicated successfully!");
+      addToast({ title: "Meal plan duplicated successfully!", variant: "default" });
     } catch (error) {
       console.error("Error duplicating meal plan:", error);
-      alert("Error duplicating meal plan. Please try again.");
+      addToast({ title: "Error duplicating meal plan. Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }

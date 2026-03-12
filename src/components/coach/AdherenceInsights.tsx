@@ -1,3 +1,8 @@
+/**
+ * @deprecated This component uses mock data and is not rendered anywhere in the app as of March 2026.
+ * Replace with real adherence/trend data if reused, or remove.
+ */
+
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,7 +50,7 @@ export default function AdherenceInsights({ insights }: AdherenceInsightsProps) 
   const { getThemeStyles } = useTheme()
   const theme = getThemeStyles()
 
-  // Mock insights data - replace with actual data
+  // Not rendered in app as of March 2026; uses mock data.
   const mockInsights: Insight[] = [
     {
       id: '1',

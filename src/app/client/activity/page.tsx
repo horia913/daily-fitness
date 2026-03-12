@@ -8,11 +8,10 @@ import {
   ClientPageShell,
   ClientGlassCard,
   SectionHeader,
-  PrimaryButton,
-  SecondaryButton,
 } from "@/components/client-ui";
-import { Activity, ArrowLeft, Plus } from "lucide-react";
+import { Activity, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function ActivityLogPage() {
   const { performanceSettings } = useTheme();
@@ -34,14 +33,12 @@ export default function ActivityLogPage() {
 
           <section>
             <SectionHeader title="Activities" />
-            <ClientGlassCard className="p-12 text-center">
-              <Activity className="w-14 h-14 fc-text-dim mx-auto mb-4 opacity-50" />
-              <p className="fc-text-primary font-medium mb-2">No activities logged yet.</p>
-              <p className="text-sm fc-text-dim mb-6">Log your sports, cardio, and manual activities here when this feature is available.</p>
-              <SecondaryButton disabled className="opacity-70 cursor-not-allowed">
-                <Plus className="w-4 h-4 mr-2" />
-                Log Activity — Coming soon
-              </SecondaryButton>
+            <ClientGlassCard className="p-12">
+              <EmptyState
+                icon={Activity}
+                title="No activities yet"
+                description="Your activity log will appear here"
+              />
             </ClientGlassCard>
           </section>
         </ClientPageShell>

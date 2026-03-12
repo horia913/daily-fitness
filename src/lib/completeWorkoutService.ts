@@ -67,6 +67,10 @@ export interface CompleteWorkoutResult {
     programScheduleId?: string
     unlockedWeekMax?: number
   } | null
+  /** Newly unlocked achievements (for UI modal) */
+  newAchievements: import('@/lib/achievementService').NewlyUnlockedAchievement[]
+  /** Rank improvements for leaderboard toasts */
+  leaderboardRankChanges: import('@/lib/leaderboardPopulationService').LeaderboardRankChange[]
 }
 
 // ============================================================================
@@ -112,6 +116,8 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       workoutLog,
       totals: { sets: 0, reps: 0, weight: 0, duration_minutes: 0 },
       programProgression: null,
+      newAchievements: [],
+      leaderboardRankChanges: [],
     }
   }
 
@@ -266,6 +272,8 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
                 programScheduleId,
                 unlockedWeekMax: lockErr.unlockedWeekMax,
               },
+              newAchievements: [],
+              leaderboardRankChanges: [],
             }
           }
           throw lockErr
@@ -368,12 +376,43 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     console.error('[completeWorkoutService] Failed to sync goals (non-blocking):', syncError)
   }
 
+  const newAchievements: import('@/lib/achievementService').NewlyUnlockedAchievement[] = []
   try {
     const { AchievementService } = await import('@/lib/achievementService')
-    await AchievementService.checkAndUnlockAchievements(clientId, 'workout_count')
-    await AchievementService.checkAndUnlockAchievements(clientId, 'streak_weeks')
+    const [workoutNew, streakNew, volumeNew] = await Promise.all([
+      AchievementService.checkAndUnlockAchievements(clientId, 'workout_count'),
+      AchievementService.checkAndUnlockAchievements(clientId, 'streak_weeks'),
+      AchievementService.checkAndUnlockAchievements(clientId, 'total_volume'),
+    ])
+    const seen = new Set<string>()
+    for (const a of [...workoutNew, ...streakNew, ...volumeNew]) {
+      const key = `${a.templateId}:${a.tier ?? 'single'}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        newAchievements.push(a)
+      }
+    }
+    if (programProgression?.status === 'program_completed' && programProgression?.programAssignmentId) {
+      const programNew = await AchievementService.checkAndUnlockAchievements(clientId, 'program_completion')
+      for (const a of programNew) {
+        const key = `${a.templateId}:${a.tier ?? 'single'}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          newAchievements.push(a)
+        }
+      }
+    }
   } catch (achievementError) {
     console.error('[completeWorkoutService] Failed to check achievements (non-blocking):', achievementError)
+  }
+
+  let leaderboardRankChanges: import('@/lib/leaderboardPopulationService').LeaderboardRankChange[] = []
+  try {
+    const { updateLeaderboardForClient } = await import('@/lib/leaderboardPopulationService')
+    const result = await updateLeaderboardForClient(clientId, undefined, supabaseAdmin)
+    leaderboardRankChanges = result.rankChanges
+  } catch (leaderboardError) {
+    console.error('[completeWorkoutService] Failed to update leaderboard (non-blocking):', leaderboardError)
   }
 
   // ========================================================================
@@ -390,5 +429,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       duration_minutes: totalDurationMinutes,
     },
     programProgression,
+    newAchievements,
+    leaderboardRankChanges,
   }
 }

@@ -802,7 +802,7 @@ export default function ClientComplianceDetailComponent({
                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
                   <BarChart3 className={`w-10 h-10 ${theme.textSecondary}`} />
                 </div>
-                <h3 className={`text-xl font-semibold ${theme.text} mb-3`}>Reports Coming Soon</h3>
+                <h3 className={`text-xl font-semibold ${theme.text} mb-3`}>Reports</h3>
                 <p className={`${theme.textSecondary} mb-6 max-w-md mx-auto`}>
                   Detailed compliance reports with charts, trends, and actionable insights will be available here
                 </p>

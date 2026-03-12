@@ -1,6 +1,8 @@
 /**
  * Progress Photos Service
- * Manages progress photos: upload, retrieve, delete, comparison
+ * Client progress-photos timeline: upload by (client_id, photo_date, photo_type).
+ * Writes to table progress_photos and Storage path {clientId}/{dateStr}/{type}.jpg.
+ * Used by: weekly check-in flow, client progress/photos page, coach ClientProgressView.
  */
 
 import { supabase } from "./supabase";

@@ -24,10 +24,12 @@ export function GlassCard({
 }: GlassCardProps) {
   const [isPressed, setIsPressed] = useState(false);
 
+  // When parent passes a custom background (e.g. bg-*), omit default background so Tailwind wins (one source per property)
+  const hasCustomBg = typeof className === "string" && /\bbg-/.test(className);
   const blurValue =
     intensity != null ? `${intensity}px` : "var(--fc-blur-card)";
   const baseStyle: React.CSSProperties = {
-    background: "var(--fc-glass-base)",
+    ...(!hasCustomBg && { background: "var(--fc-glass-base)" }),
     border: `1px solid ${borderColor ?? "var(--fc-glass-border)"}`,
     borderRadius: "var(--fc-radius-lg)",
     boxShadow: "var(--fc-shadow-card)",

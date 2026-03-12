@@ -268,13 +268,15 @@ export async function GET(_req: NextRequest) {
 
     const averageEnergy =
       energyValues.length > 0
-        ? energyValues.reduce((sum, val) => sum + val, 0) / energyValues.length
-        : 0
+        ? Math.round(
+            (energyValues.reduce((sum, val) => sum + val, 0) / energyValues.length) * 10
+          ) / 10
+        : null
 
     const wellnessOverview = {
       checkedInToday: checkedInToday.length,
       totalClients: clientsRows.length,
-      averageEnergy: Math.round(averageEnergy * 10) / 10,
+      averageEnergy, // null when no data (do not show 0 for missing legacy energy_level)
       highStressCount: highStressClients.length,
       highStressClients,
       inactiveClients: inactiveClients.slice(0, 10),

@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
@@ -88,6 +89,7 @@ interface Client {
 
 export default function CoachClipCards() {
   const { getThemeStyles, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
   
   const [clipcardTypes, setClipcardTypes] = useState<ClipCardType[]>([])
@@ -190,7 +192,7 @@ export default function CoachClipCards() {
 
       if (error) {
         console.error('Error creating clipcard type:', error)
-        alert('Database tables not set up yet. Please run the database-clipcards.sql script first.')
+        addToast({ title: 'Database tables not set up yet. Please run the database-clipcards.sql script first.', variant: 'destructive' })
         return
       }
 
@@ -199,7 +201,7 @@ export default function CoachClipCards() {
       loadData()
     } catch (error) {
       console.error('Error creating clipcard type:', error)
-      alert('Error creating clipcard type. Please try again.')
+      addToast({ title: 'Error creating clipcard type. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -216,7 +218,7 @@ export default function CoachClipCards() {
 
       if (error) {
         console.error('Error creating clipcard:', error)
-        alert('Database tables not set up yet. Please run the database-clipcards.sql script first.')
+        addToast({ title: 'Database tables not set up yet. Please run the database-clipcards.sql script first.', variant: 'destructive' })
         return
       }
 
@@ -226,7 +228,7 @@ export default function CoachClipCards() {
       loadData()
     } catch (error) {
       console.error('Error creating clipcard:', error)
-      alert('Error creating clipcard. Please try again.')
+      addToast({ title: 'Error creating clipcard. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -243,14 +245,14 @@ export default function CoachClipCards() {
 
       if (error) {
         console.error('Error deleting clipcard type:', error)
-        alert('Error deleting package. Please try again.')
+        addToast({ title: 'Error deleting package. Please try again.', variant: 'destructive' })
         return
       }
 
       loadData()
     } catch (error) {
       console.error('Error deleting clipcard type:', error)
-      alert('Error deleting package. Please try again.')
+      addToast({ title: 'Error deleting package. Please try again.', variant: 'destructive' })
     }
   }
 

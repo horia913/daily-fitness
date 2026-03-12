@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -49,6 +50,7 @@ function ClientDetailContent() {
   const router = useRouter();
   const { user } = useAuth();
   const { getSemanticColor, performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const clientId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -334,7 +336,7 @@ function ClientDetailContent() {
                   } else if (email) {
                     window.open(`mailto:${email}`, "_blank");
                   } else {
-                    alert("No phone number or email available for this client.");
+                    addToast({ title: "No phone number or email available for this client.", variant: "destructive" });
                   }
                 }}
               >
@@ -365,7 +367,7 @@ function ClientDetailContent() {
               items.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href}>
+                  <Link key={`${section}-${item.label}`} href={item.href}>
                     <GlassCard
                       elevation={2}
                       className="fc-glass fc-card p-4 flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"

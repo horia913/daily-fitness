@@ -17,12 +17,13 @@ interface ScoreBreakdownProps {
 export function ScoreBreakdown({ scores }: ScoreBreakdownProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const safe = (v: number | null | undefined) => Math.min(100, Math.max(0, Number(v) || 0));
   const breakdownItems = [
-    { label: "Workouts", value: scores.workout, color: "var(--fc-domain-workouts)" },
-    { label: "Program", value: scores.program, color: "var(--fc-accent-purple)" },
-    { label: "Check-ins", value: scores.checkin, color: "var(--fc-accent-cyan)" },
-    { label: "Goals", value: scores.goals, color: "var(--fc-status-success)" },
-    { label: "Nutrition", value: scores.nutrition, color: "var(--fc-domain-meals)" },
+    { label: "Workouts", value: safe(scores.workout), color: "var(--fc-domain-workouts)" },
+    { label: "Program", value: safe(scores.program), color: "var(--fc-accent-purple)" },
+    { label: "Check-ins", value: safe(scores.checkin), color: "var(--fc-accent-cyan)" },
+    { label: "Goals", value: safe(scores.goals), color: "var(--fc-status-success)" },
+    { label: "Nutrition", value: safe(scores.nutrition), color: "var(--fc-domain-meals)" },
   ];
 
   return (
@@ -66,7 +67,7 @@ export function ScoreBreakdown({ scores }: ScoreBreakdownProps) {
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{
-                    width: `${item.value}%`,
+                    width: `${Math.min(100, Math.max(0, item.value))}%`,
                     background: item.color,
                   }}
                 />

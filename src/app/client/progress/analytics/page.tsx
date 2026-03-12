@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSearchParams } from "next/navigation";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   Target,
   Calendar,
   Search,
+  Timer,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -32,7 +34,7 @@ import {
 } from "@/lib/strengthAnalytics";
 import { ExerciseProgressionChart } from "@/components/progress/ExerciseProgressionChart";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { getWeeklyVolume, type VolumeStats } from "@/lib/volumeAnalytics";
+import { getWeeklyVolume, getWorkoutsWithVolumeForSleepAnalysis, type VolumeStats, type WorkoutWithVolumeForSleep } from "@/lib/volumeAnalytics";
 import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { VolumeTrendChart } from "@/components/progress/VolumeTrendChart";
 import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
@@ -40,6 +42,18 @@ import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
 interface WorkoutFrequencyData {
   week: string;
   count: number;
+}
+
+interface DurationTrendWeek {
+  weekLabel: string;
+  avgDuration: number;
+  workoutCount: number;
+}
+
+interface DurationTrendData {
+  weeklyData: DurationTrendWeek[];
+  thisWeekAvg: number;
+  overallAvg: number;
 }
 
 interface BodyCompositionData {
@@ -51,9 +65,11 @@ interface BodyCompositionData {
 function AnalyticsPageContent() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
+  const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [workoutFrequency, setWorkoutFrequency] = useState<WorkoutFrequencyData[]>([]);
+  const [durationTrend, setDurationTrend] = useState<DurationTrendData | null>(null);
   const [bodyComposition, setBodyComposition] = useState<BodyCompositionData[]>([]);
   const [goalCompletion, setGoalCompletion] = useState({ completed: 0, total: 0 });
   const [timeRange, setTimeRange] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("3M");
@@ -61,6 +77,7 @@ function AnalyticsPageContent() {
   // Volume and wellness state
   const [volumeStats, setVolumeStats] = useState<VolumeStats | null>(null);
   const [wellnessStats, setWellnessStats] = useState<WellnessStats | null>(null);
+  const [workoutsForSleepAnalysis, setWorkoutsForSleepAnalysis] = useState<WorkoutWithVolumeForSleep[]>([]);
 
   // Strength progression state (1RM + charts)
   const [topProgressions, setTopProgressions] = useState<ExerciseProgression[]>([]);
@@ -72,6 +89,16 @@ function AnalyticsPageContent() {
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cross-link: open strength section with exercise expanded when ?exerciseId= is present
+  const exerciseIdFromUrl = searchParams.get("exerciseId");
+  useEffect(() => {
+    if (!exerciseIdFromUrl || !user?.id) return;
+    setExpandedExerciseId(exerciseIdFromUrl);
+    loadExerciseProgressionForExpand(exerciseIdFromUrl);
+    const el = document.getElementById("strength-exercises");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [exerciseIdFromUrl, user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -108,11 +135,13 @@ function AnalyticsPageContent() {
     try {
       await Promise.all([
         loadWorkoutFrequency(),
+        loadDurationTrend(),
         loadStrengthProgressions(),
         loadBodyComposition(),
         loadGoalCompletion(),
         loadVolumeStats(),
         loadWellnessStats(),
+        loadWorkoutsForSleepAnalysis(),
       ]);
     } catch (error) {
       console.error("Error loading analytics data:", error);
@@ -280,6 +309,66 @@ function AnalyticsPageContent() {
     }
   };
 
+  const loadDurationTrend = async () => {
+    if (!user?.id) return;
+    try {
+      const twelveWeeksAgo = new Date();
+      twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 12 * 7);
+      const { data: logs, error } = await supabase
+        .from("workout_logs")
+        .select("total_duration_minutes, completed_at")
+        .eq("client_id", user.id)
+        .not("completed_at", "is", null)
+        .gte("completed_at", twelveWeeksAgo.toISOString())
+        .order("completed_at", { ascending: true });
+      if (error) throw error;
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekKeys: string[] = [];
+      const weekMap = new Map<string, { sum: number; count: number }>();
+      for (let i = 11; i >= 0; i--) {
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + diffToMonday - i * 7);
+        monday.setHours(0, 0, 0, 0);
+        const key = monday.toISOString().split("T")[0];
+        weekKeys.push(key);
+        weekMap.set(key, { sum: 0, count: 0 });
+      }
+      logs?.forEach((log) => {
+        const d = new Date(log.completed_at);
+        const day = d.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        const mon = new Date(d);
+        mon.setDate(d.getDate() + diff);
+        mon.setHours(0, 0, 0, 0);
+        const key = mon.toISOString().split("T")[0];
+        const entry = weekMap.get(key);
+        if (entry) {
+          entry.sum += Number(log.total_duration_minutes) || 0;
+          entry.count += 1;
+        }
+      });
+      const weeklyData: DurationTrendWeek[] = weekKeys.map((key) => {
+        const e = weekMap.get(key)!;
+        const avg = e.count > 0 ? Math.round(e.sum / e.count) : 0;
+        const monday = new Date(key);
+        const weekLabel = monday.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return { weekLabel, avgDuration: avg, workoutCount: e.count };
+      });
+      const thisWeekKey = weekKeys[weekKeys.length - 1];
+      const thisWeekEntry = weekMap.get(thisWeekKey)!;
+      const thisWeekAvg = thisWeekEntry.count > 0 ? Math.round(thisWeekEntry.sum / thisWeekEntry.count) : 0;
+      const totalSum = weeklyData.reduce((s, w) => s + w.avgDuration * w.workoutCount, 0);
+      const totalCount = weeklyData.reduce((s, w) => s + w.workoutCount, 0);
+      const overallAvg = totalCount > 0 ? Math.round(totalSum / totalCount) : 0;
+      setDurationTrend({ weeklyData, thisWeekAvg, overallAvg });
+    } catch (error) {
+      console.error("Error loading duration trend:", error);
+      setDurationTrend(null);
+    }
+  };
+
   const loadVolumeStats = async () => {
     if (!user?.id) return;
     try {
@@ -299,6 +388,17 @@ function AnalyticsPageContent() {
     } catch (error) {
       console.error("Error loading wellness stats:", error);
       setWellnessStats(null);
+    }
+  };
+
+  const loadWorkoutsForSleepAnalysis = async () => {
+    if (!user?.id) return;
+    try {
+      const list = await getWorkoutsWithVolumeForSleepAnalysis(user.id, 30);
+      setWorkoutsForSleepAnalysis(list);
+    } catch (error) {
+      console.error("Error loading workouts for sleep analysis:", error);
+      setWorkoutsForSleepAnalysis([]);
     }
   };
 
@@ -324,6 +424,154 @@ function AnalyticsPageContent() {
       ? bodyComposition[bodyComposition.length - 1].bodyFat
       : null;
 
+  // Recovery insight: last 4 weeks volume + wellness (soreness/sleep) grouped by week
+  const recoveryInsight = useMemo(() => {
+    const fourWeeksVolume = volumeStats?.weeklyData?.slice(-4) ?? [];
+    const dailyWellness = wellnessStats?.dailyData ?? [];
+    if (fourWeeksVolume.length < 2) return { insight: null, chartData: [], notEnoughData: true };
+
+    const getWeekStartStr = (dateStr: string): string => {
+      const d = new Date(dateStr + "T12:00:00");
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().split("T")[0];
+    };
+
+    const weekWellnessMap = new Map<
+      string,
+      { sorenessSum: number; sorenessN: number; sleepSum: number; sleepN: number }
+    >();
+    dailyWellness.forEach((d) => {
+      const key = getWeekStartStr(d.date);
+      const cur = weekWellnessMap.get(key) ?? {
+        sorenessSum: 0,
+        sorenessN: 0,
+        sleepSum: 0,
+        sleepN: 0,
+      };
+      if (d.sorenessLevel != null) {
+        cur.sorenessSum += d.sorenessLevel;
+        cur.sorenessN += 1;
+      }
+      if (d.sleepQuality != null) {
+        cur.sleepSum += d.sleepQuality;
+        cur.sleepN += 1;
+      }
+      weekWellnessMap.set(key, cur);
+    });
+
+    const chartData = fourWeeksVolume.map((w) => {
+      const ww = weekWellnessMap.get(w.weekStart);
+      const avgSoreness =
+        ww && ww.sorenessN > 0 ? ww.sorenessSum / ww.sorenessN : null;
+      const avgSleep =
+        ww && ww.sleepN > 0 ? ww.sleepSum / ww.sleepN : null;
+      return {
+        weekStart: w.weekStart,
+        volume: w.totalVolume,
+        avgSoreness,
+        avgSleep,
+      };
+    });
+
+    const week1 = chartData[0];
+    const week4 = chartData[chartData.length - 1];
+    const vol1 = week1?.volume ?? 0;
+    const vol4 = week4?.volume ?? 0;
+    const sore1 = week1?.avgSoreness ?? null;
+    const sore4 = week4?.avgSoreness ?? null;
+
+    const volChange = vol1 > 0 ? (vol4 - vol1) / vol1 : 0;
+    const volumeUp = volChange > 0.05;
+    const volumeDown = volChange < -0.05;
+    const volumeStable = !volumeUp && !volumeDown;
+
+    const sorenessUp =
+      sore1 != null && sore4 != null && sore4 > sore1 + 0.2;
+    const sorenessDown =
+      sore1 != null && sore4 != null && sore4 < sore1 - 0.2;
+    const sorenessStable =
+      sore1 == null || sore4 == null || (!sorenessUp && !sorenessDown);
+
+    let insight: string;
+    if (volumeUp && (sorenessDown || sorenessStable))
+      insight =
+        "Great recovery adaptation — your body is handling the increased load well";
+    else if (volumeUp && sorenessUp)
+      insight =
+        "Recovery may need attention — soreness is rising with volume. Consider a deload or extra rest";
+    else if (volumeStable && sorenessStable)
+      insight =
+        "Consistent training and recovery — you're in a good rhythm";
+    else if (volumeDown)
+      insight = "Training volume decreased this week";
+    else
+      insight =
+        "Consistent training and recovery — you're in a good rhythm";
+
+    return {
+      insight,
+      chartData,
+      notEnoughData: false,
+    };
+  }, [volumeStats, wellnessStats]);
+
+  // Sleep vs Performance: last 30 days, good sleep (≥4) vs poor (≤2), avg volume per workout
+  const sleepVsPerformanceInsight = useMemo(() => {
+    const sleepByDate = new Map<string, number>();
+    wellnessStats?.dailyData?.forEach((d) => {
+      if (d.sleepQuality != null) sleepByDate.set(d.date, d.sleepQuality);
+    });
+
+    const withSleep = workoutsForSleepAnalysis.filter(
+      (w) => sleepByDate.has(w.previousNightDate)
+    );
+    if (withSleep.length < 5)
+      return {
+        message:
+          "Log more sleep data to see how it affects your training",
+        percentDiff: null,
+      };
+
+    const goodSleep = withSleep.filter(
+      (w) => (sleepByDate.get(w.previousNightDate) ?? 0) >= 4
+    );
+    const poorSleep = withSleep.filter(
+      (w) => (sleepByDate.get(w.previousNightDate) ?? 0) <= 2
+    );
+
+    const avgVolume = (arr: WorkoutWithVolumeForSleep[]) =>
+      arr.length > 0
+        ? arr.reduce((s, w) => s + w.volume, 0) / arr.length
+        : 0;
+
+    const goodAvg = avgVolume(goodSleep);
+    const poorAvg = avgVolume(poorSleep);
+    const clearCorrelation =
+      poorAvg > 0 && goodAvg >= poorAvg * 1.1;
+
+    let message: string;
+    if (goodSleep.length >= 5 && poorSleep.length >= 1 && clearCorrelation) {
+      const pct = Math.round(((goodAvg - poorAvg) / poorAvg) * 100);
+      message = `Your best workouts happen after quality sleep — averaging ${pct}% more volume on well-rested days`;
+    } else if (withSleep.length >= 5) {
+      message =
+        "Your performance stays consistent regardless of sleep — impressive resilience";
+    } else {
+      message =
+        "Log more sleep data to see how it affects your training";
+    }
+
+    return {
+      message,
+      percentDiff:
+        poorAvg > 0 && goodAvg >= poorAvg * 1.1
+          ? Math.round(((goodAvg - poorAvg) / poorAvg) * 100)
+          : null,
+    };
+  }, [wellnessStats, workoutsForSleepAnalysis]);
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
@@ -333,7 +581,7 @@ function AnalyticsPageContent() {
           <div className="flex flex-col gap-6">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -372,6 +620,12 @@ function AnalyticsPageContent() {
                   <Search className="mr-2 h-4 w-4" />
                   All Exercises
                 </a>
+                <Link
+                  href="/client/progress/personal-records"
+                  className="fc-btn fc-btn-ghost shrink-0 inline-flex items-center"
+                >
+                  View all PRs
+                </Link>
               </div>
             </div>
           </div>
@@ -380,7 +634,7 @@ function AnalyticsPageContent() {
         {loadError ? (
           <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
             <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-            <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+            <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
           </div>
         ) : loading ? (
           <div className="animate-pulse space-y-4 p-4 pb-32">
@@ -511,6 +765,55 @@ function AnalyticsPageContent() {
                 </p>
               )}
             </div>
+
+            {/* Workout Duration Trend */}
+            {durationTrend && durationTrend.weeklyData.length > 0 && (
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/80">
+                    <Timer className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                      Avg Workout Duration
+                    </h2>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      This week: {durationTrend.thisWeekAvg} min (avg: {durationTrend.overallAvg} min)
+                    </p>
+                  </div>
+                </div>
+                <div className="relative h-48">
+                  <div className="absolute inset-0 flex items-end justify-between gap-1">
+                    {durationTrend.weeklyData.map((week, index) => {
+                      const maxDur = Math.max(...durationTrend.weeklyData.map((w) => w.avgDuration), 1);
+                      const height = (week.avgDuration / maxDur) * 100;
+                      return (
+                        <div
+                          key={index}
+                          className="flex-1 flex flex-col items-center gap-2 min-w-0"
+                        >
+                          <div className="w-full flex flex-col items-center">
+                            <span className="mb-1 text-xs font-medium text-[color:var(--fc-text-primary)]">
+                              {week.avgDuration}
+                            </span>
+                            <div
+                              className="w-full rounded-t-md bg-[color:var(--fc-domain-workouts)] transition-all duration-300 hover:opacity-80"
+                              style={{
+                                height: `${Math.max(height, week.avgDuration > 0 ? 8 : 0)}%`,
+                                minHeight: week.avgDuration > 0 ? "16px" : "0",
+                              }}
+                            />
+                          </div>
+                          <span className="text-center text-[10px] text-[color:var(--fc-text-dim)] truncate w-full">
+                            {week.weekLabel}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Strength Progress — Top 3 + 1RM card + Exercise browser */}
             {(topProgressions.length > 0 || trainedExercises.length > 0) && (
@@ -668,6 +971,149 @@ function AnalyticsPageContent() {
             {wellnessStats && wellnessStats.dailyData.length > 0 && (
               <WellnessTrendChart wellnessStats={wellnessStats} />
             )}
+
+            {/* Recovery Insight Card — last 4 weeks volume vs soreness */}
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-[0_10px_20px_rgba(139,92,246,0.25)]">
+                  <Dumbbell className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    Recovery Insight
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Training load vs recovery (last 4 weeks)
+                  </p>
+                </div>
+              </div>
+              {recoveryInsight.notEnoughData ? (
+                <p className="py-4 text-sm text-[color:var(--fc-text-dim)]">
+                  Not enough data yet — keep logging to see recovery insights.
+                </p>
+              ) : (
+                <>
+                  <p className="mb-4 text-[color:var(--fc-text-primary)]">
+                    {recoveryInsight.insight}
+                  </p>
+                  {recoveryInsight.chartData.length > 0 && (
+                    <div className="relative overflow-x-auto">
+                      <svg
+                        width="100%"
+                        height={140}
+                        viewBox="0 0 400 140"
+                        className="min-w-[280px]"
+                      >
+                        <defs>
+                          <linearGradient id="recoveryBar" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="rgb(139, 92, 246)" stopOpacity="0.9" />
+                            <stop offset="100%" stopColor="rgb(99, 102, 241)" stopOpacity="0.6" />
+                          </linearGradient>
+                        </defs>
+                        {(() => {
+                          const data = recoveryInsight.chartData;
+                          const maxVol = Math.max(...data.map((w) => w.volume), 1);
+                          const pad = { left: 40, right: 20, top: 20, bottom: 28 };
+                          const w = 400 - pad.left - pad.right;
+                          const h = 140 - pad.top - pad.bottom;
+                          const barW = w / data.length - 8;
+                          const maxSore = 5;
+                          const hasSoreness = data.some((w) => w.avgSoreness != null);
+                          return (
+                            <>
+                              {data.map((week, i) => {
+                                const x = pad.left + (i / data.length) * w + 4;
+                                const barH = (week.volume / maxVol) * h;
+                                const y = pad.top + h - barH;
+                                const weekLabel = new Date(week.weekStart + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                return (
+                                  <g key={week.weekStart}>
+                                    <rect
+                                      x={x}
+                                      y={y}
+                                      width={barW}
+                                      height={Math.max(barH, 4)}
+                                      fill="url(#recoveryBar)"
+                                      rx="4"
+                                    />
+                                    <text
+                                      x={x + barW / 2}
+                                      y={140 - 8}
+                                      textAnchor="middle"
+                                      className="text-xs fill-[color:var(--fc-text-dim)]"
+                                    >
+                                      {weekLabel}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                              {hasSoreness && (
+                                <polyline
+                                  points={data
+                                    .map((week, i) => {
+                                      if (week.avgSoreness == null) return null;
+                                      const x = pad.left + (i / data.length) * w + 4 + barW / 2;
+                                      const y = pad.top + h - (week.avgSoreness / maxSore) * h;
+                                      return `${x},${y}`;
+                                    })
+                                    .filter((p): p is string => p != null)
+                                    .join(" ")}
+                                  fill="none"
+                                  stroke="rgb(245, 158, 11)"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              )}
+                              {hasSoreness && data.map((week, i) => {
+                                if (week.avgSoreness == null) return null;
+                                const x = pad.left + (i / data.length) * w + 4 + barW / 2;
+                                const y = pad.top + h - (week.avgSoreness / maxSore) * h;
+                                return (
+                                  <circle
+                                    key={week.weekStart}
+                                    cx={x}
+                                    cy={y}
+                                    r="4"
+                                    fill="rgb(245, 158, 11)"
+                                    stroke="white"
+                                    strokeWidth="1.5"
+                                  />
+                                );
+                              })}
+                            </>
+                          );
+                        })()}
+                      </svg>
+                      <div className="mt-1 flex justify-center gap-4 text-xs text-[color:var(--fc-text-dim)]">
+                        <span>Bar: volume</span>
+                        <span>Line: avg soreness (1–5)</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Sleep vs Performance Insight Card */}
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="mb-2 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-[0_10px_20px_rgba(14,165,233,0.25)]">
+                  <BarChart3 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    Sleep vs Performance
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    How rest affects your workouts (last 30 days)
+                  </p>
+                </div>
+              </div>
+              <p className="text-[color:var(--fc-text-primary)]">
+                {sleepVsPerformanceInsight.message}
+              </p>
+            </div>
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (

@@ -30,8 +30,29 @@ export function ChallengeCard({
     return "Recomp Challenge";
   };
 
+  const getCardStatusClasses = () => {
+    if (challenge.status === "completed") {
+      return "border-l-4 border-gray-400 dark:border-gray-500 bg-gray-50/30 dark:bg-gray-800/10 opacity-80";
+    }
+    if (isParticipating) {
+      return "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10";
+    }
+    if (challenge.status === "active") {
+      return "border-l-4 border-green-500 bg-green-50/30 dark:bg-green-900/10";
+    }
+    return "border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10";
+  };
+
+  const getTypeBadgeClasses = () => {
+    if (challenge.challenge_type === "coach_challenge") {
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    }
+    return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400";
+  };
+
+  /* One source for background: status classes only (no fc-glass) so status tint is visible */
   return (
-    <div className="p-6 fc-glass fc-card fc-accent-challenges fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)]">
+    <div className={`p-6 fc-card fc-accent-challenges fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] ${getCardStatusClasses()}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -40,7 +61,7 @@ export function ChallengeCard({
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="fc-pill fc-pill-glass fc-text-challenges">
+              <span className={`fc-pill px-2.5 py-0.5 rounded text-xs font-semibold ${getTypeBadgeClasses()}`}>
                 {getChallengeTypeLabel()}
               </span>
             </div>

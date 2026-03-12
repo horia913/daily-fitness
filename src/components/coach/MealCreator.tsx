@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Plus, X, ChefHat } from 'lucide-react'
 import { MealPlanService, Food } from '@/lib/mealPlanService'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface MealCreatorProps {
   mealPlanId: string
@@ -17,6 +18,7 @@ interface SelectedFood extends Food {
 }
 
 export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreatorProps) {
+  const { addToast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
   const [availableFoods, setAvailableFoods] = useState<Food[]>([])
   const [selectedFoods, setSelectedFoods] = useState<SelectedFood[]>([])
@@ -158,7 +160,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
       onClose()
     } catch (error) {
       console.error('Error saving meal:', error)
-      alert('Error saving meal. Please try again.')
+      addToast({ title: 'Error saving meal. Please try again.', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

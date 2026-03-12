@@ -533,16 +533,9 @@ export default function EnhancedWorkoutTemplateManager({
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#E8E9F3" }}>
+    <div className="min-h-screen bg-[color:var(--fc-bg-deep)]">
       {/* Enhanced Header */}
-      <div
-        style={{
-          padding: "24px 20px",
-          backgroundColor: "#E8E9F3",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
+      <div className="relative overflow-hidden p-6 sm:py-6 sm:px-5">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl"></div>
@@ -563,28 +556,13 @@ export default function EnhancedWorkoutTemplateManager({
                   justifyContent: "center",
                 }}
               >
-                <Dumbbell
-                  style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                />
+                <Dumbbell className="w-8 h-8 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h1
-                  style={{
-                    fontSize: "28px",
-                    fontWeight: "700",
-                    color: "#1A1A1A",
-                    marginBottom: "8px",
-                  }}
-                >
+                <h1 className="text-[28px] font-bold text-[color:var(--fc-text-primary)] mb-2">
                   Workout Templates
                 </h1>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: "#6B7280",
-                  }}
-                >
+                <p className="text-sm font-normal text-[color:var(--fc-text-dim)]">
                   Create and manage exercise blueprints
                 </p>
               </div>
@@ -607,12 +585,12 @@ export default function EnhancedWorkoutTemplateManager({
               <Button
                 onClick={() => setShowCreateForm(true)}
                 style={{
-                  backgroundColor: "#6C5CE7",
+                  backgroundColor: "var(--fc-accent-purple)",
                   borderRadius: "20px",
                   padding: "16px 32px",
                   fontSize: "16px",
                   fontWeight: "600",
-                  color: "#FFFFFF",
+                  color: "var(--fc-text-inverse)",
                 }}
               >
                 <Plus className="w-4 h-4" />
@@ -623,167 +601,66 @@ export default function EnhancedWorkoutTemplateManager({
 
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-                minHeight: "120px",
-              }}
-            >
+            <div className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 min-h-[120px] shadow-sm">
               <div className="flex flex-col items-center text-center gap-3">
                 <div
+                  className="w-14 h-14 rounded-[18px] flex items-center justify-center"
                   style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
                     background:
                       "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  <BookOpen
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                  <BookOpen className="w-8 h-8 text-white" />
                 </div>
-                <div style={{ width: "100%", overflow: "hidden" }}>
-                  <p
-                    style={{
-                      fontSize: "40px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.1",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="w-full overflow-hidden">
+                  <p className="text-4xl font-extrabold leading-tight m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-primary)]">
                     {templates.length}
                   </p>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <p className="text-sm font-normal m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-dim)]">
                     Templates
                   </p>
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-                minHeight: "120px",
-              }}
-            >
+            <div className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 min-h-[120px] shadow-sm">
               <div className="flex flex-col items-center text-center gap-3">
                 <div
+                  className="w-14 h-14 rounded-[18px] flex items-center justify-center"
                   style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
                     background:
                       "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  <Dumbbell
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                  <Dumbbell className="w-8 h-8 text-white" />
                 </div>
-                <div style={{ width: "100%", overflow: "hidden" }}>
-                  <p
-                    style={{
-                      fontSize: "40px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.1",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="w-full overflow-hidden">
+                  <p className="text-4xl font-extrabold leading-tight m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-primary)]">
                     {templates.reduce(
                       (sum, t) => sum + (t.exercises?.length || 0),
                       0
                     )}
                   </p>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <p className="text-sm font-normal m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-dim)]">
                     Exercises
                   </p>
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-                minHeight: "120px",
-              }}
-            >
+            <div className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 min-h-[120px] shadow-sm">
               <div className="flex flex-col items-center text-center gap-3">
                 <div
+                  className="w-14 h-14 rounded-[18px] flex items-center justify-center"
                   style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
                     background:
                       "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  <Clock
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                  <Clock className="w-8 h-8 text-white" />
                 </div>
-                <div style={{ width: "100%", overflow: "hidden" }}>
-                  <p
-                    style={{
-                      fontSize: "40px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.1",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="w-full overflow-hidden">
+                  <p className="text-4xl font-extrabold leading-tight m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-primary)]">
                     {templates.length > 0
                       ? Math.round(
                           templates.reduce(
@@ -794,79 +671,32 @@ export default function EnhancedWorkoutTemplateManager({
                       : 0}
                     m
                   </p>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <p className="text-sm font-normal m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-dim)]">
                     Avg Duration
                   </p>
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-                minHeight: "120px",
-              }}
-            >
+            <div className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 min-h-[120px] shadow-sm">
               <div className="flex flex-col items-center text-center gap-3">
                 <div
+                  className="w-14 h-14 rounded-[18px] flex items-center justify-center"
                   style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
                     background:
                       "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  <TrendingUp
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                  <TrendingUp className="w-8 h-8 text-white" />
                 </div>
-                <div style={{ width: "100%", overflow: "hidden" }}>
-                  <p
-                    style={{
-                      fontSize: "40px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.1",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="w-full overflow-hidden">
+                  <p className="text-4xl font-extrabold leading-tight m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-primary)]">
                     {templates.reduce(
                       (sum, t) => sum + (t.usage_count || 0),
                       0
                     )}
                   </p>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                      margin: "0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <p className="text-sm font-normal m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[color:var(--fc-text-dim)]">
                     Total Usage
                   </p>
                 </div>
@@ -877,18 +707,10 @@ export default function EnhancedWorkoutTemplateManager({
       </div>
 
       {/* Main Content */}
-      <div style={{ padding: "24px 20px" }}>
+      <div className="p-6 sm:py-6 sm:px-5">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Enhanced Search and Filters */}
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "24px",
-              padding: "24px",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-              marginBottom: "20px",
-            }}
-          >
+          <div className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 shadow-sm">
             <div className="space-y-6">
               {/* Search Bar */}
               <div className="relative">
@@ -901,9 +723,9 @@ export default function EnhancedWorkoutTemplateManager({
                     paddingLeft: "48px",
                     height: "48px",
                     borderRadius: "16px",
-                    border: "2px solid #E5E7EB",
+                    border: "2px solid var(--fc-glass-border)",
                     fontSize: "16px",
-                    backgroundColor: "#FFFFFF",
+                    backgroundColor: "var(--fc-surface-card)",
                   }}
                 />
               </div>
@@ -918,8 +740,8 @@ export default function EnhancedWorkoutTemplateManager({
                     style={{
                       height: "48px",
                       borderRadius: "16px",
-                      border: "2px solid #E5E7EB",
-                      backgroundColor: "#FFFFFF",
+                      border: "2px solid var(--fc-glass-border)",
+                      backgroundColor: "var(--fc-surface-card)",
                     }}
                   >
                     <SelectValue placeholder="Difficulty" />
@@ -955,8 +777,8 @@ export default function EnhancedWorkoutTemplateManager({
                     style={{
                       height: "48px",
                       borderRadius: "16px",
-                      border: "2px solid #E5E7EB",
-                      backgroundColor: "#FFFFFF",
+                      border: "2px solid var(--fc-glass-border)",
+                      backgroundColor: "var(--fc-surface-card)",
                     }}
                   >
                     <SelectValue placeholder="Duration" />
@@ -979,8 +801,8 @@ export default function EnhancedWorkoutTemplateManager({
                     style={{
                       height: "48px",
                       borderRadius: "16px",
-                      border: "2px solid #E5E7EB",
-                      backgroundColor: "#FFFFFF",
+                      border: "2px solid var(--fc-glass-border)",
+                      backgroundColor: "var(--fc-surface-card)",
                     }}
                   >
                     <SelectValue placeholder="Sort by" />
@@ -1083,13 +905,11 @@ export default function EnhancedWorkoutTemplateManager({
           {/* Empty State */}
           {filteredAndSortedTemplates.length === 0 && (
             <div
+              className="bg-[color:var(--fc-surface-card)] rounded-3xl p-6 mb-5 text-center shadow-sm"
               style={{
-                backgroundColor: "#FFFFFF",
                 borderRadius: "24px",
                 padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                 marginBottom: "20px",
-                textAlign: "center",
               }}
             >
               <div className="relative mb-6">
@@ -1102,7 +922,7 @@ export default function EnhancedWorkoutTemplateManager({
                 style={{
                   fontSize: "24px",
                   fontWeight: "700",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   marginBottom: "12px",
                 }}
               >
@@ -1114,7 +934,7 @@ export default function EnhancedWorkoutTemplateManager({
                 style={{
                   fontSize: "16px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   marginBottom: "32px",
                   maxWidth: "400px",
                   margin: "0 auto 32px auto",
@@ -1127,12 +947,12 @@ export default function EnhancedWorkoutTemplateManager({
               <Button
                 onClick={() => setShowCreateForm(true)}
                 style={{
-                  backgroundColor: "#6C5CE7",
+                  backgroundColor: "var(--fc-accent-purple)",
                   borderRadius: "20px",
                   padding: "16px 32px",
                   fontSize: "16px",
                   fontWeight: "600",
-                  color: "#FFFFFF",
+                  color: "var(--fc-text-inverse)",
                 }}
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -1206,25 +1026,19 @@ export default function EnhancedWorkoutTemplateManager({
           }}
         >
           <div
+            className="bg-[color:var(--fc-surface-card)] rounded-3xl border border-[color:var(--fc-glass-border)] shadow-md w-full max-h-[80vh] overflow-hidden"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "24px",
-              border: "1px solid #E5E7EB",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
               maxWidth: "28rem",
-              width: "100%",
-              maxHeight: "80vh",
-              overflow: "hidden",
             }}
           >
-            <div style={{ padding: "24px", borderBottom: "1px solid #E5E7EB" }}>
+            <div style={{ padding: "24px", borderBottom: "1px solid var(--fc-glass-border)" }}>
               <div className="flex items-center justify-between">
                 <div>
                   <h2
                     style={{
                       fontSize: "20px",
                       fontWeight: "700",
-                      color: "#1A1A1A",
+                      color: "var(--fc-text-primary)",
                     }}
                   >
                     Assign Workout Template
@@ -1233,7 +1047,7 @@ export default function EnhancedWorkoutTemplateManager({
                     style={{
                       fontSize: "14px",
                       fontWeight: "400",
-                      color: "#6B7280",
+                      color: "var(--fc-text-dim)",
                       marginTop: "4px",
                     }}
                   >
@@ -1271,7 +1085,7 @@ export default function EnhancedWorkoutTemplateManager({
                     style={{
                       fontSize: "14px",
                       fontWeight: "400",
-                      color: "#6B7280",
+                      color: "var(--fc-text-dim)",
                     }}
                   >
                     You don&apos;t have any active clients to assign this
@@ -1295,9 +1109,9 @@ export default function EnhancedWorkoutTemplateManager({
                             padding: "12px",
                             borderRadius: "16px",
                             border: isSelected
-                              ? "2px solid #4CAF50"
-                              : "2px solid #E5E7EB",
-                            backgroundColor: isSelected ? "#F0FDF4" : "#FFFFFF",
+                              ? "2px solid var(--fc-status-success)"
+                              : "2px solid var(--fc-glass-border)",
+                            backgroundColor: isSelected ? "color-mix(in srgb, var(--fc-status-success) 20%, transparent)" : "var(--fc-surface-card)",
                             cursor: "pointer",
                             transition: "all 0.2s",
                           }}
@@ -1325,9 +1139,9 @@ export default function EnhancedWorkoutTemplateManager({
                               height: "20px",
                               borderRadius: "4px",
                               border: "2px solid",
-                              borderColor: isSelected ? "#4CAF50" : "#D1D5DB",
+                              borderColor: isSelected ? "var(--fc-status-success)" : "var(--fc-glass-border)",
                               backgroundColor: isSelected
-                                ? "#4CAF50"
+                                ? "var(--fc-status-success)"
                                 : "transparent",
                               transition: "all 0.2s",
                             }}
@@ -1351,7 +1165,7 @@ export default function EnhancedWorkoutTemplateManager({
                               style={{
                                 fontSize: "16px",
                                 fontWeight: "600",
-                                color: "#1A1A1A",
+                                color: "var(--fc-text-primary)",
                               }}
                             >
                               {client.profiles?.first_name}{" "}
@@ -1361,7 +1175,7 @@ export default function EnhancedWorkoutTemplateManager({
                               style={{
                                 fontSize: "14px",
                                 fontWeight: "400",
-                                color: "#6B7280",
+                                color: "var(--fc-text-dim)",
                               }}
                             >
                               {client.profiles?.email}
@@ -1393,14 +1207,14 @@ export default function EnhancedWorkoutTemplateManager({
                       alignItems: "center",
                       justifyContent: "space-between",
                       paddingTop: "16px",
-                      borderTop: "1px solid #E5E7EB",
+                      borderTop: "1px solid var(--fc-glass-border)",
                     }}
                   >
                     <div
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                       }}
                     >
                       {selectedClients.length} client
@@ -1450,12 +1264,12 @@ export default function EnhancedWorkoutTemplateManager({
                         }}
                         disabled={selectedClients.length === 0}
                         style={{
-                          backgroundColor: "#6C5CE7",
+                          backgroundColor: "var(--fc-accent-purple)",
                           borderRadius: "20px",
                           padding: "12px 24px",
                           fontSize: "14px",
                           fontWeight: "600",
-                          color: "#FFFFFF",
+                          color: "var(--fc-text-inverse)",
                         }}
                       >
                         Assign Template
@@ -1572,7 +1386,7 @@ function WorkoutTemplateCard({
   return (
     <div
       style={{
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "var(--fc-surface-card)",
         borderRadius: "24px",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
         overflow: "hidden",
@@ -1605,7 +1419,7 @@ function WorkoutTemplateCard({
               }}
             >
               <CategoryIcon
-                style={{ width: "24px", height: "24px", color: "#FFFFFF" }}
+                className="w-6 h-6 text-white"
               />
             </div>
           </div>
@@ -1621,29 +1435,13 @@ function WorkoutTemplateCard({
             }}
           >
             <Badge
-              style={{
-                backgroundColor:
-                  template.difficulty_level === "beginner"
-                    ? "#D1FAE5"
-                    : template.difficulty_level === "intermediate"
-                    ? "#FEF3C7"
-                    : "#FEE2E2",
-                color:
-                  template.difficulty_level === "beginner"
-                    ? "#065F46"
-                    : template.difficulty_level === "intermediate"
-                    ? "#92400E"
-                    : "#991B1B",
-                borderRadius: "12px",
-                padding: "4px 10px",
-                fontSize: "12px",
-                fontWeight: "600",
-                border: "0",
-                maxWidth: "100%",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
+              className={`max-w-full whitespace-nowrap overflow-hidden text-ellipsis rounded-xl px-2.5 py-1 text-xs font-semibold border-0 ${
+                template.difficulty_level === "beginner"
+                  ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                  : template.difficulty_level === "intermediate"
+                  ? "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200"
+                  : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+              }`}
             >
               {template.difficulty_level}
             </Badge>
@@ -1660,21 +1458,13 @@ function WorkoutTemplateCard({
             }}
           >
             <div
-              className="flex items-center gap-1.5"
-              style={{
-                padding: "6px 10px",
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                backdropFilter: "blur(10px)",
-                borderRadius: "12px",
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                maxWidth: "100%",
-              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 backdrop-blur-md rounded-xl max-w-full bg-white/90 dark:bg-black/20 shadow-sm"
             >
               <Clock
                 style={{
                   width: "14px",
                   height: "14px",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   flexShrink: 0,
                 }}
               />
@@ -1682,7 +1472,7 @@ function WorkoutTemplateCard({
                 style={{
                   fontSize: "12px",
                   fontWeight: "600",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1698,16 +1488,16 @@ function WorkoutTemplateCard({
           <div
             style={{
               padding: "16px",
-              backgroundColor: "#F9FAFB",
+              backgroundColor: "var(--fc-glass-highlight)",
               borderRadius: "16px",
-              border: "2px solid #E5E7EB",
+              border: "2px solid var(--fc-glass-border)",
             }}
           >
             <h3
               style={{
                 fontSize: "18px",
                 fontWeight: "700",
-                color: "#1A1A1A",
+                color: "var(--fc-text-primary)",
                 marginBottom: "8px",
               }}
             >
@@ -1717,7 +1507,7 @@ function WorkoutTemplateCard({
               style={{
                 fontSize: "14px",
                 fontWeight: "600",
-                color: "#6C5CE7",
+                color: "var(--fc-accent-purple)",
                 marginBottom: "8px",
                 display: "block",
               }}
@@ -1730,7 +1520,7 @@ function WorkoutTemplateCard({
                 style={{
                   fontSize: "14px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   marginTop: "12px",
                 }}
               >
@@ -1745,9 +1535,9 @@ function WorkoutTemplateCard({
               className="flex flex-col items-center"
               style={{
                 padding: "16px",
-                backgroundColor: "#DBEAFE",
+                backgroundColor: "var(--fc-status-info)",
                 borderRadius: "16px",
-                border: "2px solid #93C5FD",
+                border: "2px solid var(--fc-glass-border)",
               }}
             >
               <Dumbbell
@@ -1755,14 +1545,14 @@ function WorkoutTemplateCard({
                   width: "24px",
                   height: "24px",
                   marginBottom: "8px",
-                  color: "#2196F3",
+                  color: "var(--fc-accent-blue)",
                 }}
               />
               <span
                 style={{
                   fontSize: "20px",
                   fontWeight: "700",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                 }}
               >
                 {template.exercises?.length || 0}
@@ -1771,7 +1561,7 @@ function WorkoutTemplateCard({
                 style={{
                   fontSize: "12px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                 }}
               >
                 exercises
@@ -1781,9 +1571,9 @@ function WorkoutTemplateCard({
               className="flex flex-col items-center"
               style={{
                 padding: "16px",
-                backgroundColor: "#D1FAE5",
+                backgroundColor: "var(--fc-status-success)",
                 borderRadius: "16px",
-                border: "2px solid #6EE7B7",
+                border: "2px solid var(--fc-glass-border)",
               }}
             >
               <Users
@@ -1791,14 +1581,14 @@ function WorkoutTemplateCard({
                   width: "24px",
                   height: "24px",
                   marginBottom: "8px",
-                  color: "#4CAF50",
+                  color: "var(--fc-status-success)",
                 }}
               />
               <span
                 style={{
                   fontSize: "20px",
                   fontWeight: "700",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                 }}
               >
                 {assignmentCount}
@@ -1807,7 +1597,7 @@ function WorkoutTemplateCard({
                 style={{
                   fontSize: "12px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                 }}
               >
                 clients
@@ -1817,9 +1607,9 @@ function WorkoutTemplateCard({
               className="flex flex-col items-center"
               style={{
                 padding: "16px",
-                backgroundColor: "#FEF3C7",
+                backgroundColor: "var(--fc-status-warning)",
                 borderRadius: "16px",
-                border: "2px solid #FDE68A",
+                border: "2px solid var(--fc-glass-border)",
               }}
             >
               <Star
@@ -1827,14 +1617,14 @@ function WorkoutTemplateCard({
                   width: "24px",
                   height: "24px",
                   marginBottom: "8px",
-                  color: "#FFE082",
+                  color: "var(--fc-status-warning)",
                 }}
               />
               <span
                 style={{
                   fontSize: "20px",
                   fontWeight: "700",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                 }}
               >
                 {template.rating || 0}
@@ -1843,7 +1633,7 @@ function WorkoutTemplateCard({
                 style={{
                   fontSize: "12px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                 }}
               >
                 rating
@@ -1854,7 +1644,7 @@ function WorkoutTemplateCard({
           {/* Actions */}
           <div
             className="flex items-center gap-2"
-            style={{ paddingTop: "12px", borderTop: "2px solid #E5E7EB" }}
+            style={{ paddingTop: "12px", borderTop: "2px solid var(--fc-glass-border)" }}
           >
             <Button
               size="sm"
@@ -1862,14 +1652,9 @@ function WorkoutTemplateCard({
                 e.stopPropagation();
                 onOpenBuilder();
               }}
-              className="flex-1 text-white"
+              className="flex-1 text-white rounded-[20px] py-3 px-4 text-sm font-semibold shadow-sm"
               style={{
-                borderRadius: "20px",
-                padding: "12px 16px",
-                fontSize: "14px",
-                fontWeight: "600",
                 background: "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
               }}
             >
               <Settings className="w-3.5 h-3.5 mr-1.5" />
@@ -1885,8 +1670,8 @@ function WorkoutTemplateCard({
               style={{
                 borderRadius: "20px",
                 padding: "10px",
-                border: "2px solid #4CAF50",
-                color: "#4CAF50",
+                border: "2px solid var(--fc-status-success)",
+                color: "var(--fc-status-success)",
                 backgroundColor: "transparent",
               }}
               className="hover:bg-green-50"
@@ -1903,7 +1688,7 @@ function WorkoutTemplateCard({
               style={{
                 borderRadius: "20px",
                 padding: "10px",
-                border: "2px solid #E5E7EB",
+                border: "2px solid var(--fc-glass-border)",
                 backgroundColor: "transparent",
               }}
             >
@@ -1919,7 +1704,7 @@ function WorkoutTemplateCard({
               style={{
                 borderRadius: "20px",
                 padding: "10px",
-                border: "2px solid #E5E7EB",
+                border: "2px solid var(--fc-glass-border)",
                 backgroundColor: "transparent",
               }}
             >
@@ -1935,8 +1720,8 @@ function WorkoutTemplateCard({
               style={{
                 borderRadius: "20px",
                 padding: "10px",
-                border: "2px solid #EF4444",
-                color: "#EF4444",
+                border: "2px solid var(--fc-status-error)",
+                color: "var(--fc-status-error)",
                 backgroundColor: "transparent",
               }}
               className="hover:bg-red-50"

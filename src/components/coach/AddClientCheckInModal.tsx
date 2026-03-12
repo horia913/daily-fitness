@@ -5,7 +5,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createMeasurement } from "@/lib/measurementService";
+import { upsertMeasurement } from "@/lib/measurementService";
 
 interface AddClientCheckInModalProps {
   isOpen: boolean;
@@ -40,7 +40,7 @@ export function AddClientCheckInModal({
     }
     setSaving(true);
     try {
-      const result = await createMeasurement({
+      const result = await upsertMeasurement({
         client_id: clientId,
         coach_id: coachId,
         measured_date: measuredDate,

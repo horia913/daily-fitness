@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { 
@@ -46,6 +47,7 @@ const categoryIcons = {
 
 export default function ExerciseCategories() {
   const { isDark, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const router = useRouter()
   
   const [categories, setCategories] = useState<ExerciseCategory[]>([])
@@ -115,7 +117,7 @@ export default function ExerciseCategories() {
       setCategories(categories.filter(category => category.id !== categoryId))
     } catch (error) {
       console.error('Error deleting category:', error)
-      alert('Error deleting category. Make sure no exercises are using it.')
+      addToast({ title: 'Error deleting category. Make sure no exercises are using it.', variant: 'destructive' })
     }
   }
 

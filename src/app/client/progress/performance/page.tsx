@@ -19,6 +19,7 @@ import {
   PerformanceTest,
 } from "@/lib/performanceTestService";
 import { LogPerformanceTestModal } from "@/components/client/LogPerformanceTestModal";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type TestType = "1km_run" | "step_test";
 
@@ -380,6 +381,16 @@ function PerformancePageContent() {
           <section className="space-y-4">
             <h3 className="text-lg font-semibold fc-text-primary px-1">Historical logs</h3>
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden">
+              {currentTests.length === 0 ? (
+                <div className="p-8">
+                  <EmptyState
+                    icon={Timer}
+                    title="No performance tests"
+                    description="Log a test to track improvement"
+                    action={{ label: "Log test", onClick: () => setShowLogModal(true) }}
+                  />
+                </div>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
@@ -391,13 +402,7 @@ function PerformancePageContent() {
                     </tr>
                   </thead>
                   <tbody className="text-sm font-mono">
-                    {currentTests.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="p-8 text-center fc-text-subtle">
-                          No tests logged yet. Tap + to log one.
-                        </td>
-                      </tr>
-                    ) : (
+                    {
                       currentTests.map((test, index) => {
                         const prev = currentTests[index + 1];
                         const trend = getHistoryTrend(test, prev, selectedType);
@@ -444,11 +449,11 @@ function PerformancePageContent() {
                             </td>
                           </tr>
                         );
-                      })
-                    )}
+                      })}
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           </section>
         </main>

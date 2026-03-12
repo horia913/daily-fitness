@@ -14,6 +14,7 @@ import {
   ReferenceValue,
 } from "@/lib/mobilityReferenceValues";
 import { ProgressPhotoStorage } from "@/lib/progressPhotoStorage";
+import { useToast } from "@/components/ui/toast-provider";
 import Image from "next/image";
 
 interface MobilityFormFieldsProps {
@@ -31,6 +32,7 @@ export default function MobilityFormFields({
   clientId,
   recordId,
 }: MobilityFormFieldsProps) {
+  const { addToast } = useToast();
   const theme = {
     text: "fc-text-primary",
     textSecondary: "fc-text-subtle",
@@ -74,7 +76,7 @@ export default function MobilityFormFields({
       });
     } catch (error) {
       console.error("Error uploading photos:", error);
-      alert("Error uploading photos. Please try again.");
+      addToast({ title: "Error uploading photos. Please try again.", variant: "destructive" });
     } finally {
       setUploadingPhotos(false);
       // Reset input
@@ -106,7 +108,7 @@ export default function MobilityFormFields({
       });
     } catch (error) {
       console.error("Error deleting photo:", error);
-      alert("Error deleting photo. Please try again.");
+      addToast({ title: "Error deleting photo. Please try again.", variant: "destructive" });
     }
   };
 

@@ -21,10 +21,13 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
 import NotificationTriggers from "@/lib/notificationTriggers";
 import { PersonalRecordsService } from "@/lib/progressTrackingService";
 import { fetchApi } from "@/lib/apiClient";
 import { withTimeout } from "@/lib/withTimeout";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface WorkoutAssignment {
   id: string;
@@ -119,6 +122,7 @@ export default function WorkoutComplete() {
   const params = useParams();
   const router = useRouter();
   const assignmentId = params.id as string;
+  const { addToast } = useToast();
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
   const [resolvedAssignmentId, setResolvedAssignmentId] = useState<string | null>(
@@ -148,6 +152,8 @@ export default function WorkoutComplete() {
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [storedDurationMinutes, setStoredDurationMinutes] = useState<number | undefined>(undefined);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
 
   // Guard: prevent updateWorkoutTotals from running more than once per page load
   const completionDoneRef = useRef(false);
@@ -322,7 +328,7 @@ export default function WorkoutComplete() {
       // workout. Creating one here would cause duplicates on refresh/retry.
       if (!workoutLogId) {
         console.error("❌ No workout_log found for assignment:", effectiveAssignmentId);
-        setLoadError("Could not find workout data. Please go back and try again.");
+        setLoadError("Could not find workout data. Your sets may already be saved — try Retry or go back to Training.");
         setLoading(false);
         return;
       }
@@ -352,13 +358,57 @@ export default function WorkoutComplete() {
                 session_id: workoutSessionIdOverride,
               }),
             }),
-            15000,
+            30000,
             "timeout"
           );
 
           if (completeResponse.ok) {
             const result = await completeResponse.json();
             const updatedLog = result.workout_log || workoutLog;
+
+            const rawNew = result.new_achievements ?? [];
+            if (rawNew.length > 0) {
+              const tierToRarity = (tier: string | null): Achievement["rarity"] => {
+                if (!tier) return "uncommon";
+                if (tier === "platinum") return "epic";
+                if (tier === "gold") return "rare";
+                if (tier === "silver") return "uncommon";
+                return "common";
+              };
+              const mapped: Achievement[] = rawNew.map((a: any) => ({
+                id: a.templateId ?? a.template_id,
+                name: a.templateName ?? a.template_name ?? "Achievement",
+                description: a.description ?? (a.nextTier ? `Next: ${a.nextTier?.label} — ${a.currentMetricValue ?? 0}/${a.nextTier?.threshold ?? 0}` : ""),
+                icon: a.templateIcon ?? a.template_icon ?? "🏆",
+                rarity: tierToRarity(a.tier),
+                unlocked: true,
+              }));
+              setNewAchievementsQueue(mapped);
+              setAchievementModalIndex(0);
+            }
+
+            const rankChanges = result.leaderboard_rank_changes ?? [];
+            if (rankChanges.length > 0) {
+              const typeLabel = (t: string) => {
+                if (t === "pr_1rm") return "1RM";
+                if (t === "pr_3rm") return "3RM";
+                if (t === "pr_5rm") return "5RM";
+                if (t === "bw_multiple") return "BW Multiple";
+                if (t === "tonnage_week") return "Weekly Tonnage";
+                if (t === "tonnage_month") return "Monthly Tonnage";
+                if (t === "tonnage_all_time") return "All-Time Tonnage";
+                return t;
+              };
+              for (const c of rankChanges) {
+                const label = [c.exercise_name, typeLabel(c.type)].filter(Boolean).join(" ");
+                addToast({
+                  title: "Leaderboard",
+                  description: `You moved up to #${c.new_rank} in ${label}!`,
+                  variant: "success",
+                  duration: 4000,
+                });
+              }
+            }
 
             if (updatedLog) {
               const apiTotals = result.totals || {
@@ -447,9 +497,11 @@ export default function WorkoutComplete() {
       }
     } catch (error: any) {
       console.error("❌ Error in updateWorkoutTotals:", error);
+      const isTimeout =
+        error?.message === "timeout" || error?.message?.includes("Timeout") || error?.message?.includes("took longer than");
       setLoadError(
-        error?.message === "timeout"
-          ? "Completing workout took too long. Please try again."
+        isTimeout
+          ? "Completing workout took too long. Your sets are saved — try Retry or go back to Training."
           : (error?.message || "Failed to complete workout")
       );
       setLoading(false);
@@ -746,7 +798,8 @@ export default function WorkoutComplete() {
       return result;
     } catch (error: any) {
       console.error("Error loading assignment:", error);
-      setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load workout"));
+      const isTimeoutErr = error?.message === "timeout" || error?.message?.includes("Timeout") || error?.message?.includes("took longer than");
+      setLoadError(isTimeoutErr ? "Loading took too long. Please try again." : (error?.message || "Failed to load workout"));
       return null;
     } finally {
       setLoading(false);
@@ -1363,8 +1416,10 @@ export default function WorkoutComplete() {
                       })
                       .catch((err) => {
                         console.error("Error loading assignment:", err);
-                        setLoadError(err?.message === "timeout" ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
-                      });
+                        const isTimeoutErr = err?.message === "timeout" || err?.message?.includes("Timeout") || err?.message?.includes("took longer than");
+                        setLoadError(isTimeoutErr ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
+                      })
+                      .finally(() => setLoading(false));
                   }}
                 >
                   Retry
@@ -1449,7 +1504,7 @@ export default function WorkoutComplete() {
                   <Trophy className="w-10 h-10" style={{ color: "var(--fc-status-success)" }} />
                 </div>
                 <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--fc-status-success)" }}>
-                  <CheckCircle className="w-3.5 h-3.5 text-black" />
+                  <CheckCircle className="w-3.5 h-3.5 text-[color:var(--fc-text-primary)]" />
                 </div>
               </div>
               <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-1">Workout Complete</h1>
@@ -1673,6 +1728,21 @@ export default function WorkoutComplete() {
               </div>
             </div>
           </ClientPageShell>
+
+          {newAchievementsQueue.length > 0 && (
+            <AchievementUnlockModal
+              achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+              visible={achievementModalIndex < newAchievementsQueue.length}
+              onClose={() => {
+                if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                  setAchievementModalIndex((i) => i + 1);
+                } else {
+                  setNewAchievementsQueue([]);
+                  setAchievementModalIndex(0);
+                }
+              }}
+            />
+          )}
       </AnimatedBackground>
     </ProtectedRoute>
   );

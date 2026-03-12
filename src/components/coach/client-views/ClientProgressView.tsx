@@ -25,7 +25,7 @@ import {
 import {
   BodyMeasurement,
   getClientMeasurements,
-  getLatestMeasurement,
+  getFirstMeasurement,
 } from "@/lib/measurementService";
 import {
   getPhotoTimeline,
@@ -33,6 +33,35 @@ import {
   ProgressPhoto,
 } from "@/lib/progressPhotoService";
 import { AddClientCheckInModal } from "@/components/coach/AddClientCheckInModal";
+import { WellnessTrendsCard } from "@/components/client/WellnessTrendsCard";
+
+function getWeekStartMonday(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d);
+  monday.setDate(diff);
+  return monday.toISOString().split("T")[0];
+}
+
+/** For "since start": weight/waist/body fat — decrease is improving. Muscle mass — increase is improving. */
+function formatSinceStart(
+  current: number,
+  start: number,
+  unit: string,
+  lowerIsBetter: boolean
+): { text: string; improving: boolean } {
+  const diff = current - start;
+  const pct = start !== 0 ? ((diff / start) * 100).toFixed(1) : "";
+  const improving = lowerIsBetter ? diff < 0 : diff > 0;
+  const arrow = diff < 0 ? "▼" : diff > 0 ? "▲" : "—";
+  const delta = diff < 0 ? Math.abs(diff).toFixed(1) : diff > 0 ? `+${diff.toFixed(1)}` : "—";
+  const suffix = pct ? ` (${pct}%)` : "";
+  return {
+    text: diff === 0 ? "—" : `${arrow} ${delta} ${unit}${suffix}`,
+    improving,
+  };
+}
 
 interface ClientProgressViewProps {
   clientId: string;
@@ -49,6 +78,7 @@ export default function ClientProgressView({ clientId, coachId: coachIdProp }: C
   const [wellnessStats, setWellnessStats] = useState<CompletionStats | null>(null);
   const [photoTimeline, setPhotoTimeline] = useState<{ date: string; types: string[]; weight_kg?: number | null }[]>([]);
   const [comparisonPhotos, setComparisonPhotos] = useState<{ before: ProgressPhoto[]; after: ProgressPhoto[] } | null>(null);
+  const [firstMeasurement, setFirstMeasurement] = useState<BodyMeasurement | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showAddCheckInModal, setShowAddCheckInModal] = useState(false);
 
@@ -59,18 +89,23 @@ export default function ClientProgressView({ clientId, coachId: coachIdProp }: C
       const start28 = new Date();
       start28.setDate(start28.getDate() - 27);
       const start28Str = start28.toISOString().split("T")[0];
+      const start90 = new Date();
+      start90.setDate(start90.getDate() - 89);
+      const start90Str = start90.toISOString().split("T")[0];
 
-      const [measurementsData, logs, stats, timeline] = await Promise.all([
+      const [measurementsData, logs, stats, timeline, first] = await Promise.all([
         getClientMeasurements(clientId, 12),
-        getLogRange(clientId, start28Str, today),
+        getLogRange(clientId, start90Str, today),
         getCompletionStats(clientId, 7),
         getPhotoTimeline(clientId),
+        getFirstMeasurement(clientId),
       ]);
 
       setMeasurements(measurementsData);
       setWellnessLogs(logs);
       setWellnessStats(stats);
       setPhotoTimeline(timeline);
+      setFirstMeasurement(first ?? null);
 
       if (timeline.length >= 2) {
         const photos = await getComparisonPhotos(clientId, timeline[timeline.length - 1].date, timeline[0].date);
@@ -121,6 +156,29 @@ export default function ClientProgressView({ clientId, coachId: coachIdProp }: C
     }
     return byWeek;
   }, [wellnessLogs]);
+
+  const weekStart = useMemo(() => getWeekStartMonday(), []);
+  const weekDays = useMemo(() => {
+    const start = new Date(weekStart + "T12:00:00");
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d.toISOString().split("T")[0];
+    });
+  }, [weekStart]);
+  const lastWeekStart = useMemo(() => {
+    const d = new Date(weekStart + "T12:00:00");
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  }, [weekStart]);
+  const lastWeekDays = useMemo(() => {
+    const start = new Date(lastWeekStart + "T12:00:00");
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d.toISOString().split("T")[0];
+    });
+  }, [lastWeekStart]);
 
   if (loading) {
     return (
@@ -224,6 +282,57 @@ export default function ClientProgressView({ clientId, coachId: coachIdProp }: C
         )}
       </div>
 
+      {/* Since they started — only when we have first + current and they differ */}
+      {firstMeasurement && current && (current.id !== firstMeasurement.id || current.measured_date !== firstMeasurement.measured_date) && (
+        <div className="mb-6 p-4 rounded-xl bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30">
+          <h3 className="text-base font-semibold fc-text-primary mb-3">Since they started</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[280px] text-sm">
+              <thead>
+                <tr className="border-b border-[color:var(--fc-glass-border)]">
+                  <th className="text-left py-2 pr-4 fc-text-subtle font-medium">Metric</th>
+                  <th className="text-right py-2 px-2 fc-text-subtle">Start</th>
+                  <th className="text-right py-2 px-2 fc-text-primary">Current</th>
+                  <th className="text-right py-2 pl-2 fc-text-subtle">Change</th>
+                </tr>
+              </thead>
+              <tbody className="fc-text-primary">
+                {current.weight_kg != null && firstMeasurement.weight_kg != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Weight</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.weight_kg.toFixed(1)} kg</td>
+                    <td className="text-right py-2 px-2 font-mono">{current.weight_kg.toFixed(1)} kg</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(current.weight_kg, firstMeasurement.weight_kg, "kg", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(current.weight_kg, firstMeasurement.weight_kg, "kg", true).text}
+                    </td>
+                  </tr>
+                )}
+                {current.body_fat_percentage != null && firstMeasurement.body_fat_percentage != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Body fat</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.body_fat_percentage.toFixed(1)}%</td>
+                    <td className="text-right py-2 px-2 font-mono">{current.body_fat_percentage.toFixed(1)}%</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(current.body_fat_percentage, firstMeasurement.body_fat_percentage, "%", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(current.body_fat_percentage, firstMeasurement.body_fat_percentage, "%", true).text}
+                    </td>
+                  </tr>
+                )}
+                {current.waist_circumference != null && firstMeasurement.waist_circumference != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Waist</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.waist_circumference.toFixed(1)} cm</td>
+                    <td className="text-right py-2 px-2 font-mono">{current.waist_circumference.toFixed(1)} cm</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(current.waist_circumference, firstMeasurement.waist_circumference, "cm", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(current.waist_circumference, firstMeasurement.waist_circumference, "cm", true).text}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Progress Photos side-by-side */}
       {comparisonPhotos && (comparisonPhotos.before.length > 0 || comparisonPhotos.after.length > 0) && (
         <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
@@ -297,7 +406,16 @@ export default function ClientProgressView({ clientId, coachId: coachIdProp }: C
         </div>
       )}
 
-      {/* Wellness Trends */}
+      {/* Wellness Trends (same ranges as client check-ins page) */}
+      <WellnessTrendsCard
+        logRange={wellnessLogs}
+        weekStart={weekStart}
+        weekDays={weekDays}
+        lastWeekStart={lastWeekStart}
+        lastWeekDays={lastWeekDays}
+      />
+
+      {/* Wellness trend (4 weeks) */}
       {wellnessByWeek.some((w) => w.sleep.length > 0 || w.stress.length > 0) && (
         <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Wellness trend (4 weeks)</h3>

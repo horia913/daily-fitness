@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Daily check-in form for sleep, stress, soreness, steps, and notes.
+ * The daily_wellness_logs table also includes optional columns motivation_level,
+ * energy_level, and mood_rating; these are intentionally not collected here to keep check-ins brief.
+ */
+
 import React, { useState, useEffect, useCallback } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
 import {
@@ -10,10 +16,14 @@ import {
   getCheckinStreak,
   dbToUiScale,
 } from "@/lib/wellnessService";
+import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import { getLatestMeasurement } from "@/lib/measurementService";
 import { createMeasurement } from "@/lib/measurementService";
 import { Check, Pencil, ChevronDown, ChevronUp, Scale, Minus, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
+import { AchievementService } from "@/lib/achievementService";
 
 const MAX_NOTES = 500;
 
@@ -140,6 +150,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
   const [todayLog, setTodayLog] = useState<DailyWellnessLog | null>(initialTodayLog ?? null);
   const [loading, setLoading] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [successInsight, setSuccessInsight] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -160,6 +171,8 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
   const [notes, setNotes] = useState("");
   
   const [hasWeightToday, setHasWeightToday] = useState<boolean | null>(null);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [showWeightPrompt, setShowWeightPrompt] = useState(false);
   const [quickWeight, setQuickWeight] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
@@ -286,6 +299,81 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
           console.warn("Error loading weight after save:", weightErr);
         }
 
+        let currentStreak = 0;
+        try {
+          const newStreak = await getCheckinStreak(clientId);
+          currentStreak = newStreak;
+          setStreak(newStreak);
+        } catch (streakErr) {
+          console.warn("Error loading streak after save:", streakErr);
+        }
+
+        try {
+          const checkinNew = await AchievementService.checkAndUnlockAchievements(clientId, "checkin_streak");
+          if (checkinNew.length > 0) {
+            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
+              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
+            const mapped: Achievement[] = checkinNew.map((a) => ({
+              id: a.templateId,
+              name: a.templateName,
+              description: a.description ?? "",
+              icon: a.templateIcon ?? "🏆",
+              rarity: tierToRarity(a.tier),
+              unlocked: true,
+            }));
+            setNewAchievementsQueue((prev) => [...prev, ...mapped]);
+            setAchievementModalIndex(0);
+          }
+        } catch (achErr) {
+          console.warn("Error checking check-in achievements:", achErr);
+        }
+
+        try {
+          const todayStr = new Date().toISOString().split("T")[0];
+          const weekStartStr = getWeekStart();
+          const endThis = todayStr;
+          const startLast = new Date(weekStartStr + "T12:00:00");
+          startLast.setDate(startLast.getDate() - 7);
+          const endLast = new Date(weekStartStr + "T12:00:00");
+          endLast.setDate(endLast.getDate() - 1);
+          const [logsThisWeek, logsLastWeek] = await Promise.all([
+            getLogRange(clientId, weekStartStr, endThis),
+            getLogRange(clientId, startLast.toISOString().split("T")[0], endLast.toISOString().split("T")[0]),
+          ]);
+          const complete = (arr: DailyWellnessLog[]) =>
+            arr.filter((l) => l.sleep_hours != null && l.stress_level != null && l.soreness_level != null);
+          const avg = (arr: DailyWellnessLog[], field: "stress_level" | "soreness_level" | "sleep_hours") => {
+            const c = complete(arr);
+            if (c.length === 0) return null;
+            if (field === "sleep_hours") return c.reduce((s, l) => s + (l.sleep_hours ?? 0), 0) / c.length;
+            const scale = field === "stress_level" ? dbToUiScale : (v: number | null) => dbToUiScale(v);
+            const sum = c.reduce((s, l) => s + (scale(l[field]) ?? 0), 0);
+            return sum / c.length;
+          };
+          const stressThis = avg(logsThisWeek, "stress_level");
+          const stressLast = avg(logsLastWeek, "stress_level");
+          const sleepThis = avg(logsThisWeek, "sleep_hours");
+          const sleepLast = avg(logsLastWeek, "sleep_hours");
+          const sorenessThis = avg(logsThisWeek, "soreness_level");
+          const sorenessLast = avg(logsLastWeek, "soreness_level");
+          let insight: string | null = null;
+          if (stressThis != null && stressLast != null && stressThis < stressLast) {
+            insight = "Your stress is trending down this week — nice work!";
+          } else if (sleepThis != null && sleepLast != null && sleepThis > sleepLast) {
+            insight = "You're sleeping better this week — keep it up!";
+          } else if (sorenessThis != null && sorenessLast != null && sorenessThis < sorenessLast) {
+            insight = "Less sore than last week — recovery is on track.";
+          } else if (currentStreak >= 7) {
+            insight = "7+ days in a row! Consistency is your superpower.";
+          } else {
+            insight = "Every check-in counts. You're building a great habit.";
+          }
+          setSuccessInsight(insight);
+        } catch (insightErr) {
+          console.warn("Error loading success insight:", insightErr);
+          setSuccessInsight("Every check-in counts. You're building a great habit.");
+        }
+
         onSuccess?.();
       } else {
         setSubmitError("Save failed. Please try again.");
@@ -307,6 +395,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
     setShowSuccess(false);
     setSubmitSuccess(false);
     setSubmitError(null);
+    setSuccessInsight(null);
   };
 
   const handleQuickWeightSave = async () => {
@@ -323,6 +412,25 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
         setHasWeightToday(true);
         setShowWeightPrompt(false);
         setQuickWeight("");
+        try {
+          const weightNew = await AchievementService.checkAndUnlockAchievements(clientId, "weight_goal");
+          if (weightNew.length > 0) {
+            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
+              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
+            const mapped: Achievement[] = weightNew.map((a) => ({
+              id: a.templateId,
+              name: a.templateName,
+              description: a.description ?? "",
+              icon: a.templateIcon ?? "🏆",
+              rarity: tierToRarity(a.tier),
+              unlocked: true,
+            }));
+            setNewAchievementsQueue((prev) => [...prev, ...mapped]);
+            setAchievementModalIndex(0);
+          }
+        } catch (achErr) {
+          console.warn("Error checking weight goal achievements:", achErr);
+        }
       }
     } catch (err) {
       console.error("Error saving quick weight:", err);
@@ -426,24 +534,33 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
           {log?.sleep_hours != null && (
             <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
               <span className="text-sm fc-text-subtle">
-                😴 {log.sleep_hours}h ({getSleepQualityLabel(log.sleep_quality)})
+                😴 <span className={getWellnessValueColor(log.sleep_hours, "sleep_hours")}>{log.sleep_hours}h</span>
+                {log.sleep_quality != null && (
+                  <> (<span className={getWellnessValueColor(log.sleep_quality, "sleep_quality")}>{getSleepQualityLabel(log.sleep_quality)}</span>)</>
+                )}
               </span>
             </div>
           )}
-          {log?.stress_level != null && (
-            <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
-              <span className="text-sm fc-text-subtle">
-                😤 {getStressLabel(log.stress_level)} stress
-              </span>
-            </div>
-          )}
-          {log?.soreness_level != null && (
-            <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
-              <span className="text-sm fc-text-subtle">
-                💪 {getSorenessLabel(log.soreness_level)} soreness
-              </span>
-            </div>
-          )}
+          {log?.stress_level != null && (() => {
+            const uiVal = dbToUiScale(log.stress_level);
+            return uiVal != null ? (
+              <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
+                <span className="text-sm fc-text-subtle">
+                  😤 <span className={getWellnessValueColor(uiVal, "stress")}>{getStressLabel(log.stress_level)}</span> stress
+                </span>
+              </div>
+            ) : null;
+          })()}
+          {log?.soreness_level != null && (() => {
+            const uiVal = dbToUiScale(log.soreness_level);
+            return uiVal != null ? (
+              <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
+                <span className="text-sm fc-text-subtle">
+                  💪 <span className={getWellnessValueColor(uiVal, "soreness")}>{getSorenessLabel(log.soreness_level)}</span> soreness
+                </span>
+              </div>
+            ) : null;
+          })()}
           {log?.steps != null && (
             <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
               <span className="text-sm fc-text-subtle">
@@ -481,6 +598,16 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
             </div>
           );
         })()}
+        {successInsight && (
+          <p className="text-sm fc-text-primary mb-4">
+            {successInsight.startsWith("Your stress") && "📉 "}
+            {successInsight.startsWith("You're sleeping") && "😴 "}
+            {successInsight.startsWith("Less sore") && "💪 "}
+            {successInsight.startsWith("7+") && "🔥 "}
+            {successInsight.startsWith("Every check-in") && "✨ "}
+            {successInsight}
+          </p>
+        )}
         <p className="text-xs fc-text-subtle mb-4">Your coach can see this data.</p>
         
         {/* Optional: Quick weight prompt */}
@@ -535,6 +662,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
   }
 
   return (
+    <>
     <ClientGlassCard className="p-6">
       <header className="mb-6">
         <h2 className="text-[22px] font-bold fc-text-primary">Daily Check-in</h2>
@@ -646,11 +774,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
                   key={n}
                   type="button"
                   onClick={() => setSleepQuality(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2"
+                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
                   style={{
                     backgroundColor: selected ? color : `${color}30`,
                     borderColor: color,
-                    color: '#FFFFFF',
                   }}
                 >
                   <span className="text-lg font-bold">{n}</span>
@@ -688,11 +815,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
                   key={n}
                   type="button"
                   onClick={() => setStressLevel(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2"
+                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
                   style={{
                     backgroundColor: selected ? color : `${color}30`,
                     borderColor: color,
-                    color: '#FFFFFF',
                   }}
                 >
                   <span className="text-lg font-bold">{n}</span>
@@ -730,11 +856,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
                   key={n}
                   type="button"
                   onClick={() => setSorenessLevel(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2"
+                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
                   style={{
                     backgroundColor: selected ? color : `${color}30`,
                     borderColor: color,
-                    color: '#FFFFFF',
                   }}
                 >
                   <span className="text-lg font-bold">{n}</span>
@@ -946,5 +1071,21 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
         </button>
       </form>
     </ClientGlassCard>
+
+    {newAchievementsQueue.length > 0 && (
+      <AchievementUnlockModal
+        achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+        visible={achievementModalIndex < newAchievementsQueue.length}
+        onClose={() => {
+          if (achievementModalIndex < newAchievementsQueue.length - 1) {
+            setAchievementModalIndex((i) => i + 1);
+          } else {
+            setNewAchievementsQueue([]);
+            setAchievementModalIndex(0);
+          }
+        }}
+      />
+    )}
+    </>
   );
 }

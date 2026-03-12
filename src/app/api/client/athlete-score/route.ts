@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiAuth } from '@/lib/apiAuth'
-import { calculateAthleteScore, getLatestAthleteScore } from '@/lib/athleteScoreService'
+import { calculateAthleteScore, getLatestAthleteScore, getAthleteScoreHistory } from '@/lib/athleteScoreService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,16 +19,19 @@ export async function GET(request: NextRequest) {
     oneHourAgo.setHours(oneHourAgo.getHours() - 1)
 
     const latestScore = await getLatestAthleteScore(user.id, supabaseAdmin)
+    const scoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 12)
 
     // If score exists and was calculated within last hour, return it
     if (latestScore && new Date(latestScore.calculated_at) >= oneHourAgo) {
-      return NextResponse.json({ score: latestScore })
+      return NextResponse.json({ score: latestScore, scoreHistory })
     }
 
     // Otherwise, recalculate
     const newScore = await calculateAthleteScore(user.id, supabaseAdmin)
 
-    return NextResponse.json({ score: newScore })
+    // Re-fetch history so the just-calculated score is included
+    const updatedScoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 12)
+    return NextResponse.json({ score: newScore, scoreHistory: updatedScoreHistory })
   } catch (error: any) {
     console.error('[athlete-score API] Error:', error)
     

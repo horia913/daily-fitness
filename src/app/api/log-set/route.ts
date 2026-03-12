@@ -1018,6 +1018,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Step 6.6: After storing PRs, trigger achievement check and leaderboard update (non-blocking)
+    const newAchievements: Array<{
+      templateId: string
+      templateName: string
+      templateIcon: string
+      tier: string | null
+      description: string
+      nextTier: { tier: string; threshold: number; label: string } | null
+      currentMetricValue: number
+    }> = []
+    if (storedPRResults.length > 0) {
+      try {
+        const { AchievementService } = await import('@/lib/achievementService')
+        const unlocked = await AchievementService.checkAndUnlockAchievements(userId, 'pr_count')
+        for (const a of unlocked) {
+          newAchievements.push({
+            templateId: a.templateId,
+            templateName: a.templateName,
+            templateIcon: a.templateIcon,
+            tier: a.tier,
+            description: a.description,
+            nextTier: a.nextTier,
+            currentMetricValue: a.currentMetricValue,
+          })
+        }
+      } catch (achErr) {
+        console.error('Achievement check after PR (non-blocking):', achErr)
+      }
+      for (const stored of storedPRResults) {
+        try {
+          const { updateLeaderboardForClient } = await import('@/lib/leaderboardPopulationService')
+          await updateLeaderboardForClient(userId, stored.exercise_id, supabaseAdmin)
+        } catch (lbErr) {
+          console.error('Leaderboard update after PR (non-blocking):', lbErr)
+        }
+      }
+    }
+
     // Step 7: Return success (set logging succeeded, metrics update may have warnings)
     // Include set_log_id and workout_log_id at top level for RPE modal and Undo (set correction)
     const setLogId = insertedData?.id ?? null;
@@ -1045,6 +1083,7 @@ export async function POST(req: NextRequest) {
         message: prMessage,
         stored_prs: storedPRResults,
       },
+      new_achievements: newAchievements,
     }
 
     if (metricsError) {

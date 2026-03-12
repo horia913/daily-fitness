@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Button } from '@/components/ui/button'
@@ -71,6 +72,7 @@ function ClientProgramDetailsContent() {
   const params = useParams()
   const router = useRouter()
   const { performanceSettings } = useTheme()
+  const { addToast } = useToast()
   
   const clientId = params.id as string
   const programId = params.programId as string
@@ -238,10 +240,10 @@ function ClientProgramDetailsContent() {
       if (error) throw error
       
       setAssignment({ ...assignment, status: newStatus })
-      alert(`Program status updated to ${newStatus}`)
+      addToast({ title: `Program status updated to ${newStatus}`, variant: 'default' })
     } catch (error) {
       console.error('Error updating status:', error)
-      alert('Failed to update program status')
+      addToast({ title: 'Failed to update program status', variant: 'destructive' })
     }
   }
 
@@ -260,7 +262,7 @@ function ClientProgramDetailsContent() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Failed to skip day')
+        addToast({ title: data.error || 'Failed to skip day', variant: 'destructive' })
         return
       }
       // Update local state — move to skipped set
@@ -269,7 +271,7 @@ function ClientProgramDetailsContent() {
       setSkipReason('')
     } catch (err) {
       console.error('Error skipping day:', err)
-      alert('Unexpected error — please try again')
+      addToast({ title: 'Unexpected error — please try again', variant: 'destructive' })
     } finally {
       setSkipLoading(false)
     }

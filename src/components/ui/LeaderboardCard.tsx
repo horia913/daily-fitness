@@ -60,18 +60,10 @@ export function LeaderboardCard({
             <Trophy className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3
-              className="text-lg font-bold"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+            <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
               Leaderboard
             </h3>
-            <p
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
+            <p className="text-xs text-[color:var(--fc-text-dim)]">
               {calculatedTotalParticipants} athletes this week
             </p>
           </div>
@@ -199,19 +191,13 @@ function PodiumCard({
         )}
 
         {/* Medal Badge */}
-        <div
-          className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
-          style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}
-        >
+        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center bg-[color:var(--fc-surface-card)] shadow-md">
           <span className="text-sm">{medals[place - 1]}</span>
         </div>
       </div>
 
       {/* Name */}
-      <p
-        className="text-sm font-bold text-center mb-1 truncate w-full"
-        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-      >
+      <p className="text-sm font-bold text-center mb-1 truncate w-full text-[color:var(--fc-text-primary)]">
         {user.name}
       </p>
 
@@ -221,7 +207,7 @@ function PodiumCard({
           value={user.workoutCount}
           size="body"
           weight="bold"
-          color={isDark ? "#fff" : "#1A1A1A"}
+          color="var(--fc-text-primary)"
         />
         <span
           style={{
@@ -291,10 +277,7 @@ function LeaderboardRow({
     >
       {/* Rank */}
       <div className="w-8 text-center">
-        <span
-          className="text-lg font-bold"
-          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-        >
+        <span className="text-lg font-bold text-[color:var(--fc-text-primary)]">
           {user.rank}
         </span>
       </div>
@@ -319,10 +302,7 @@ function LeaderboardRow({
 
       {/* Name & Stats */}
       <div className="flex-1">
-        <p
-          className="text-sm font-semibold"
-          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-        >
+        <p className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
           {user.name} {isCurrentUser && "(YOU)"}
         </p>
         <div className="flex items-center gap-3 text-xs">

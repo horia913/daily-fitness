@@ -1,6 +1,6 @@
 /**
  * Achievements metrics per metric contract.
- * Source: achievements (client_id, title, achievement_type, achieved_date).
+ * Source: user_achievements + achievement_templates (unified).
  */
 
 import { supabase } from '../supabase'
@@ -11,6 +11,7 @@ export interface AchievementItem {
   title: string
   achievement_type: string
   achieved_date: string
+  tier?: string | null
 }
 
 export async function getAchievementsCount(
@@ -19,7 +20,7 @@ export async function getAchievementsCount(
 ): Promise<number> {
   if (clientIds.length === 0) return 0
   let q = supabase
-    .from('achievements')
+    .from('user_achievements')
     .select('id', { count: 'exact', head: true })
     .in('client_id', clientIds)
   if (period) {
@@ -37,11 +38,25 @@ export async function getAchievementsList(
   limit: number = 50
 ): Promise<AchievementItem[]> {
   const { data, error } = await supabase
-    .from('achievements')
-    .select('id, title, achievement_type, achieved_date')
+    .from('user_achievements')
+    .select(`
+      id,
+      achieved_date,
+      tier,
+      achievement_templates (
+        name,
+        achievement_type
+      )
+    `)
     .eq('client_id', clientId)
     .order('achieved_date', { ascending: false })
     .limit(limit)
   if (error || !data) return []
-  return data as AchievementItem[]
+  return (data as any[]).map((r) => ({
+    id: r.id,
+    title: r.achievement_templates?.name ?? 'Achievement',
+    achievement_type: r.achievement_templates?.achievement_type ?? '',
+    achieved_date: r.achieved_date,
+    tier: r.tier ?? null,
+  }))
 }

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/toast-provider";
 
 export type Pillar = "training" | "nutrition" | "lifestyle" | "checkins" | "general";
 
@@ -47,6 +48,7 @@ interface AddGoalModalProps {
 }
 
 export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalProps) {
+  const { addToast } = useToast();
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [targetValue, setTargetValue] = useState("");
@@ -65,7 +67,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
     try {
       const parsed = parseFloat(targetValue);
       if (isNaN(parsed)) {
-        alert("Please enter a valid number for target.");
+        addToast({ title: "Please enter a valid number for target.", variant: "warning" });
         return;
       }
 
@@ -96,7 +98,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
       onSuccess();
     } catch (error) {
       console.error("Error creating goal:", error);
-      alert("Failed to create goal. Please try again.");
+      addToast({ title: "Failed to create goal. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

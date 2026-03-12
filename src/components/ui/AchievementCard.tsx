@@ -13,6 +13,22 @@ export type AchievementRarity =
   | "epic"
   | "legendary";
 
+const RARITY_CARD_TINT: Record<AchievementRarity, string> = {
+  common: "bg-amber-50/30 dark:bg-amber-900/10",
+  uncommon: "bg-slate-50/30 dark:bg-slate-800/10",
+  rare: "bg-yellow-50/30 dark:bg-yellow-900/10",
+  epic: "bg-violet-50/30 dark:bg-violet-900/10",
+  legendary: "bg-rose-50/30 dark:bg-rose-900/10",
+};
+
+const RARITY_BADGE_CLASS: Record<AchievementRarity, string> = {
+  common: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  uncommon: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  rare: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  epic: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
+  legendary: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+};
+
 export interface Achievement {
   id: string;
   name: string;
@@ -46,7 +62,7 @@ export function AchievementCard({
         onPress={onClick}
         elevation={2}
         borderColor={rarity.color}
-        className={`p-4 relative overflow-hidden ${className}`}
+        className={`p-4 relative overflow-hidden ${RARITY_CARD_TINT[achievement.rarity]} ${className}`}
       >
         {/* Glow effect */}
         <div
@@ -82,11 +98,7 @@ export function AchievementCard({
                 </h4>
                 {/* Rarity badge */}
                 <span
-                  className="px-2 py-0.5 rounded text-xs font-semibold capitalize"
-                  style={{
-                    background: `${rarity.color}20`,
-                    color: rarity.color,
-                  }}
+                  className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${RARITY_BADGE_CLASS[achievement.rarity]}`}
                 >
                   {achievement.rarity}
                 </span>
@@ -131,7 +143,7 @@ export function AchievementCard({
     <GlassCard
       pressable={false}
       elevation={1}
-      className={`p-4 relative opacity-60 ${className}`}
+      className={`p-4 relative opacity-60 bg-gray-50/30 dark:bg-gray-800/20 ${className}`}
     >
       <div className="flex items-start gap-4">
         {/* Locked icon */}
@@ -159,16 +171,8 @@ export function AchievementCard({
             >
               {achievement.name}
             </h4>
-            {/* Rarity badge */}
-            <span
-              className="px-2 py-0.5 rounded text-xs font-semibold capitalize"
-              style={{
-                background: isDark
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.1)",
-                color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
-              }}
-            >
+            {/* Rarity badge (locked = muted) */}
+            <span className="px-2 py-0.5 rounded text-xs font-semibold capitalize bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
               {achievement.rarity}
             </span>
           </div>

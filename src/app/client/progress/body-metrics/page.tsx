@@ -22,10 +22,15 @@ import {
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BodyMeasurement } from "@/lib/measurementService";
+import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { getPhotosForDate } from "@/lib/progressPhotoService";
+import { getClientNutritionGoals, getNutritionComplianceTrend } from "@/lib/nutritionLogService";
 
 interface BodyMetric {
   date: string;
@@ -54,11 +59,16 @@ function BodyMetricsPageContent() {
   const [fullMeasurements, setFullMeasurements] = useState<BodyMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogModal, setShowLogModal] = useState(false);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [chartRange, setChartRange] = useState<"12M" | "6M" | "1M">("12M");
   const [activeTab, setActiveTab] = useState<"weight-bf" | "measurements">("weight-bf");
   const [latestDatePhotos, setLatestDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [previousDatePhotos, setPreviousDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [checkInGoals, setCheckInGoals] = useState<Array<{ id: string; title: string; target_value: number; target_unit: string | null }>>([]);
+  const [hasNutritionGoals, setHasNutritionGoals] = useState(false);
+  const [nutritionAdherence30, setNutritionAdherence30] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -95,9 +105,11 @@ function BodyMetricsPageContent() {
       const [
         { data: fullData, error: fullError },
         { data, error },
+        { data: goalsData },
       ] = await Promise.all([
         supabase.from("body_metrics").select("*").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: false }),
         supabase.from("body_metrics").select("measured_date, weight_kg, waist_circumference, body_fat_percentage").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: true }),
+        supabase.from("goals").select("id, title, target_value, target_unit").eq("client_id", user.id).eq("pillar", "checkins").eq("status", "active").not("target_value", "is", null),
       ]);
 
       if (fullError) {
@@ -118,6 +130,37 @@ function BodyMetricsPageContent() {
             bodyFat: m.body_fat_percentage ?? undefined,
           }))
         );
+      }
+
+      setCheckInGoals(
+        (goalsData || []).map((g) => ({
+          id: g.id,
+          title: g.title,
+          target_value: Number(g.target_value),
+          target_unit: g.target_unit ?? null,
+        }))
+      );
+
+      // Nutrition vs body: need goals + compliance for last 30 days (client-callable)
+      const goals = await getClientNutritionGoals(user.id);
+      setHasNutritionGoals(goals != null);
+      if (goals != null) {
+        const end30 = new Date();
+        const start30 = new Date();
+        start30.setDate(start30.getDate() - 30);
+        const startStr = start30.toISOString().split("T")[0];
+        const endStr = end30.toISOString().split("T")[0];
+        const trend = await getNutritionComplianceTrend(user.id, startStr, endStr);
+        const daysWithData = trend.filter((d) => d.compliance > 0).length;
+        const avgAdherence =
+          trend.length > 0
+            ? Math.round(
+                trend.reduce((s, d) => s + d.compliance, 0) / trend.length
+              )
+            : 0;
+        setNutritionAdherence30(daysWithData > 0 ? avgAdherence : null);
+      } else {
+        setNutritionAdherence30(null);
       }
     } catch (error) {
       console.error("Error loading body metrics:", error);
@@ -198,6 +241,54 @@ function BodyMetricsPageContent() {
 
   const latestDate = metrics.length > 0 ? metrics[metrics.length - 1].date : null;
 
+  // Nutrition vs body composition: last 30 days body_metrics + adherence
+  const bodyMetricsLast30 = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    return fullMeasurements
+      .filter((m) => m.measured_date >= cutoffStr)
+      .sort((a, b) => a.measured_date.localeCompare(b.measured_date));
+  }, [fullMeasurements]);
+
+  const nutritionVsBodyInsight = useMemo(() => {
+    if (!hasNutritionGoals || bodyMetricsLast30.length < 2 || nutritionAdherence30 == null)
+      return null;
+    const first = bodyMetricsLast30[0];
+    const last = bodyMetricsLast30[bodyMetricsLast30.length - 1];
+    const weightChange =
+      (last?.weight_kg ?? 0) - (first?.weight_kg ?? 0);
+    const highAdherence = nutritionAdherence30 >= 70;
+    const lowAdherence = nutritionAdherence30 < 50;
+    // "Goal direction": assume weight loss is common goal; if weight went down, trending toward goal
+    const weightTowardGoal = weightChange < 0;
+    const weightStable = Math.abs(weightChange) < 0.5;
+    const weightProgress = Math.abs(weightChange) >= 0.5;
+
+    let message: string;
+    if (highAdherence && weightTowardGoal)
+      message =
+        "Nutrition consistency is paying off — your body composition is moving in the right direction";
+    else if (highAdherence && weightStable)
+      message =
+        "You're eating consistently but weight is stable — this could mean body recomposition. Check circumferences and photos for the full picture";
+    else if (lowAdherence && !weightProgress)
+      message =
+        "Inconsistent nutrition may be limiting your results. Try hitting your targets more consistently this week";
+    else if (lowAdherence && weightProgress)
+      message =
+        "You're making progress even with inconsistent nutrition — imagine what consistent eating could do";
+    else
+      message =
+        "Nutrition consistency is paying off — your body composition is moving in the right direction";
+
+    return { message, weightChange, adherence: nutritionAdherence30 };
+  }, [
+    hasNutritionGoals,
+    bodyMetricsLast30,
+    nutritionAdherence30,
+  ]);
+
   // Check if there's circumference data to show Measurements tab
   const hasCircumferenceData = useMemo(() => {
     return fullMeasurements.some((m) => 
@@ -220,7 +311,7 @@ function BodyMetricsPageContent() {
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
             <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -258,7 +349,7 @@ function BodyMetricsPageContent() {
         <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+              <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
                 <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
               </Link>
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -304,25 +395,99 @@ function BodyMetricsPageContent() {
           </div>
         </div>
 
-        {metrics.length === 0 ? (
-          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-              <Scale className="h-10 w-10 fc-text-subtle" />
+        {/* Goal Progress (check-in goals with body-metric targets) */}
+        {checkInGoals.length > 0 && (() => {
+          const goalCards: React.ReactNode[] = [];
+          for (const goal of checkInGoals) {
+            const unit = (goal.target_unit || "").toLowerCase();
+            let current: number | null = null;
+            let label = "";
+            let lowerIsBetter = true;
+            if (unit === "kg" || unit === "weight") {
+              current = latest?.weight_kg ?? null;
+              label = "Weight";
+              lowerIsBetter = true;
+            } else if (unit === "%" || unit === "body_fat") {
+              current = latest?.body_fat_percentage ?? null;
+              label = "Body fat";
+              lowerIsBetter = true;
+            } else if (unit === "cm" || unit === "waist") {
+              current = latest?.waist_circumference ?? null;
+              label = "Waist";
+              lowerIsBetter = true;
+            } else continue;
+            const target = goal.target_value;
+            const reached = current != null && (lowerIsBetter ? current <= target : current >= target);
+            const progressPct = current != null && target > 0
+              ? (lowerIsBetter ? Math.min(100, (target / current) * 100) : Math.min(100, (current / target) * 100))
+              : 0;
+            const remaining = current != null && !reached
+              ? (lowerIsBetter ? (current - target).toFixed(1) : (target - current).toFixed(1))
+              : null;
+            goalCards.push(
+              <div key={goal.id} className="fc-surface p-4 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 fc-text-subtle" />
+                  <span className="font-semibold fc-text-primary">{goal.title}</span>
+                </div>
+                {latest == null ? (
+                  <p className="text-sm fc-text-dim">Log your first measurement to track progress toward your goal.</p>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="fc-text-subtle">Current {label}</span>
+                      <span className="font-mono fc-text-primary">{current != null ? (label === "Body fat" ? `${current.toFixed(1)}%` : `${current.toFixed(1)} ${label === "Weight" ? "kg" : "cm"}`) : "—"}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[color:var(--fc-glass-border)] overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[color:var(--fc-status-success)] transition-all"
+                        style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
+                      />
+                    </div>
+                    {reached ? (
+                      <p className="text-sm font-medium fc-text-success mt-2">Goal reached!</p>
+                    ) : remaining != null ? (
+                      <p className="text-sm fc-text-dim mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            );
+          }
+          return goalCards.length > 0 ? (
+            <section className="mb-8 space-y-4">
+              <h2 className="text-lg font-semibold fc-text-primary mb-3">Goal Progress</h2>
+              <div className="space-y-4">{goalCards}</div>
+            </section>
+          ) : null;
+        })()}
+
+        {/* Nutrition vs Body Composition insight — only if nutrition goals + ≥2 body metrics in 30d */}
+        {nutritionVsBodyInsight && (
+          <section className="mb-8">
+            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+              <div className="mb-2 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_10px_20px_rgba(245,158,11,0.25)]">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold fc-text-primary">Nutrition & Body Composition</h2>
+                  <p className="text-sm fc-text-dim">Last 30 days</p>
+                </div>
+              </div>
+              <p className="fc-text-primary">{nutritionVsBodyInsight.message}</p>
             </div>
-            <h2 className="mt-6 text-2xl font-semibold fc-text-primary">
-              No measurements yet
-            </h2>
-            <p className="mt-2 text-sm fc-text-dim">
-              Log weight, waist, and body fat to see trends over time.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowLogModal(true)}
-              className="fc-btn fc-btn-primary mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl"
-            >
-              <Plus className="h-5 w-5" />
-              Log first measurement
-            </button>
+          </section>
+        )}
+
+        {metrics.length === 0 ? (
+          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <EmptyState
+              icon={Scale}
+              title="No measurements yet"
+              description="Log your first measurement to start tracking"
+              action={{ label: "Log Measurement", onClick: () => setShowLogModal(true) }}
+            />
           </div>
         ) : (
           <main className="space-y-8">
@@ -426,6 +591,13 @@ function BodyMetricsPageContent() {
                       <span>{sparkData[0]?.weight.toFixed(1)} kg</span>
                       <span>{sparkData[sparkData.length - 1]?.weight.toFixed(1)} kg</span>
                     </div>
+                    {hasNutritionGoals && (
+                      <p className="mt-3 text-sm">
+                        <Link href="/client/nutrition" className="text-[color:var(--fc-accent)] hover:underline">
+                          How&apos;s your nutrition?
+                        </Link>
+                      </p>
+                    )}
                   </div>
                 );
               })()}
@@ -833,6 +1005,28 @@ function BodyMetricsPageContent() {
                           isDecreaseGood={false}
                         />
                       )}
+
+                      {/* Muscle mass */}
+                      {fullMeasurements.filter((m) => m.muscle_mass_kg != null).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Muscle mass"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.muscle_mass_kg ?? null}
+                          timeRange={chartRange}
+                          isDecreaseGood={false}
+                        />
+                      )}
+
+                      {/* Visceral fat */}
+                      {fullMeasurements.filter((m) => m.visceral_fat_level != null).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Visceral fat"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.visceral_fat_level ?? null}
+                          timeRange={chartRange}
+                          isDecreaseGood={true}
+                        />
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -856,12 +1050,13 @@ function BodyMetricsPageContent() {
                   const prev = historyNewestFirst[index + 1];
                   const delta = prev ? metric.weight - prev.weight : null;
                   const d = new Date(metric.date);
+                  const full = fullMeasurements.find((m) => m.measured_date === metric.date);
                   return (
                     <div
                       key={metric.date}
                       className="flex items-center justify-between p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
                     >
-                      <div className="flex items-center gap-4 min-w-0">
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
                         <div className="w-12 h-12 rounded-xl fc-glass flex flex-col items-center justify-center flex-shrink-0">
                           <span className="text-[10px] font-bold fc-text-subtle uppercase">
                             {d.toLocaleDateString("en-US", { month: "short" })}
@@ -879,6 +1074,9 @@ function BodyMetricsPageContent() {
                               .filter(Boolean)
                               .join(" · ") || "—"}
                           </p>
+                          {full?.notes?.trim() && (
+                            <p className="text-xs fc-text-dim mt-1 whitespace-pre-wrap break-words">{full.notes.trim()}</p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -924,6 +1122,35 @@ function BodyMetricsPageContent() {
           onClose={() => setShowLogModal(false)}
           onSuccess={() => loadMetricsData()}
           lastMeasurement={latest ?? undefined}
+          onAchievementsUnlocked={(raw) => {
+            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
+              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
+            const mapped: Achievement[] = raw.map((a) => ({
+              id: a.templateId,
+              name: a.templateName,
+              description: a.description ?? "",
+              icon: a.templateIcon ?? "🏆",
+              rarity: tierToRarity(a.tier),
+              unlocked: true,
+            }));
+            setNewAchievementsQueue(mapped);
+            setAchievementModalIndex(0);
+          }}
+        />
+      )}
+
+      {newAchievementsQueue.length > 0 && (
+        <AchievementUnlockModal
+          achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+          visible={achievementModalIndex < newAchievementsQueue.length}
+          onClose={() => {
+            if (achievementModalIndex < newAchievementsQueue.length - 1) {
+              setAchievementModalIndex((i) => i + 1);
+            } else {
+              setNewAchievementsQueue([]);
+              setAchievementModalIndex(0);
+            }
+          }}
         />
       )}
     </AnimatedBackground>

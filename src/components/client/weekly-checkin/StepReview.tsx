@@ -14,6 +14,7 @@ export interface WellnessSummary {
 interface StepReviewProps {
   bodyData: WeeklyCheckInBodyData;
   previousMeasurement: BodyMeasurement | null;
+  firstMeasurement: BodyMeasurement | null;
   wellnessThisWeek: WellnessSummary | null;
   wellnessLastWeek: WellnessSummary | null;
   notesToCoach: string;
@@ -31,9 +32,29 @@ function formatChange(current: number, previous: number): { text: string; improv
   return { text: "—", improving: true };
 }
 
+/** For "since start": weight/waist/body fat — decrease is improving. Muscle mass — increase is improving. */
+function formatSinceStart(
+  current: number,
+  start: number,
+  unit: string,
+  lowerIsBetter: boolean
+): { text: string; improving: boolean } {
+  const diff = current - start;
+  const pct = start !== 0 ? ((diff / start) * 100).toFixed(1) : "";
+  const improving = lowerIsBetter ? diff < 0 : diff > 0;
+  const arrow = diff < 0 ? "▼" : diff > 0 ? "▲" : "—";
+  const delta = diff < 0 ? Math.abs(diff).toFixed(1) : diff > 0 ? `+${diff.toFixed(1)}` : "—";
+  const suffix = pct ? ` (${pct}%)` : "";
+  return {
+    text: diff === 0 ? "—" : `${arrow} ${delta} ${unit}${suffix}`,
+    improving,
+  };
+}
+
 export function StepReview({
   bodyData,
   previousMeasurement,
+  firstMeasurement,
   wellnessThisWeek,
   wellnessLastWeek,
   notesToCoach,
@@ -122,6 +143,71 @@ export function StepReview({
           </tbody>
         </table>
       </div>
+
+      {/* Since you started */}
+      {firstMeasurement ? (
+        <div className="mb-6 p-4 rounded-xl bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30">
+          <h3 className="text-base font-semibold fc-text-primary mb-3">Since you started</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[280px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[color:var(--fc-glass-border)]">
+                  <th className="text-left py-2 pr-4 fc-text-subtle font-medium"></th>
+                  <th className="text-right py-2 px-2 fc-text-subtle">Start</th>
+                  <th className="text-right py-2 px-2 fc-text-primary font-medium">Now</th>
+                  <th className="text-right py-2 pl-2 fc-text-subtle">Change</th>
+                </tr>
+              </thead>
+              <tbody className="fc-text-primary">
+                {firstMeasurement.weight_kg != null && bodyData.weight_kg != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Weight</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.weight_kg.toFixed(1)} kg</td>
+                    <td className="text-right py-2 px-2 font-mono">{bodyData.weight_kg.toFixed(1)} kg</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(bodyData.weight_kg, firstMeasurement.weight_kg, "kg", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(bodyData.weight_kg, firstMeasurement.weight_kg, "kg", true).text}
+                    </td>
+                  </tr>
+                )}
+                {firstMeasurement.body_fat_percentage != null && bodyData.body_fat_percentage != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Body fat</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.body_fat_percentage.toFixed(1)}%</td>
+                    <td className="text-right py-2 px-2 font-mono">{bodyData.body_fat_percentage.toFixed(1)}%</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(bodyData.body_fat_percentage, firstMeasurement.body_fat_percentage, "%", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(bodyData.body_fat_percentage, firstMeasurement.body_fat_percentage, "%", true).text}
+                    </td>
+                  </tr>
+                )}
+                {firstMeasurement.waist_circumference != null && bodyData.waist_circumference != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Waist</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.waist_circumference.toFixed(1)} cm</td>
+                    <td className="text-right py-2 px-2 font-mono">{bodyData.waist_circumference.toFixed(1)} cm</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(bodyData.waist_circumference, firstMeasurement.waist_circumference, "cm", true).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(bodyData.waist_circumference, firstMeasurement.waist_circumference, "cm", true).text}
+                    </td>
+                  </tr>
+                )}
+                {firstMeasurement.muscle_mass_kg != null && bodyData.muscle_mass_kg != null && (
+                  <tr className="border-b border-[color:var(--fc-glass-border)]/50">
+                    <td className="py-2 pr-4 font-medium">Muscle mass</td>
+                    <td className="text-right py-2 px-2 font-mono">{firstMeasurement.muscle_mass_kg.toFixed(1)} kg</td>
+                    <td className="text-right py-2 px-2 font-mono">{bodyData.muscle_mass_kg.toFixed(1)} kg</td>
+                    <td className={`text-right py-2 pl-2 font-mono ${formatSinceStart(bodyData.muscle_mass_kg, firstMeasurement.muscle_mass_kg, "kg", false).improving ? "fc-text-success" : "fc-text-warning"}`}>
+                      {formatSinceStart(bodyData.muscle_mass_kg, firstMeasurement.muscle_mass_kg, "kg", false).text}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-6 p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+          <p className="text-sm fc-text-primary">This is your starting point! Future check-ins will show your progress from here.</p>
+        </div>
+      )}
 
       {notesEnabled && (
         <div className="mb-6">

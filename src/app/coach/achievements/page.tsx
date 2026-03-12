@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import { Card, CardContent } from '@/components/ui/card'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
@@ -169,6 +170,7 @@ const defaultTiers: AchievementTier[] = [
 
 export default function CoachAchievements() {
   const { getThemeStyles, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
   
   const [achievementTemplates, setAchievementTemplates] = useState<AchievementTemplate[]>([])
@@ -200,246 +202,47 @@ export default function CoachAchievements() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Load achievement templates with sample tiered data
-      setAchievementTemplates([
-        {
-          id: '1',
-          name: 'Workout Master',
-          description: 'Complete workouts and progress through the tiers',
-          icon: 'dumbbell',
-          type: 'milestone',
-          trigger_type: 'workout_count',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 1, points: 50 },
-            { tier: 'silver', value: 10, points: 100 },
-            { tier: 'gold', value: 50, points: 250 },
-            { tier: 'platinum', value: 100, points: 500 },
-            { tier: 'diamond', value: 500, points: 1000 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Streak Legend',
-          description: 'Maintain workout streaks',
-          icon: 'flame',
-          type: 'streak',
-          trigger_type: 'streak_days',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 3, points: 50 },
-            { tier: 'silver', value: 7, points: 100 },
-            { tier: 'gold', value: 30, points: 300 },
-            { tier: 'platinum', value: 90, points: 750 },
-            { tier: 'diamond', value: 365, points: 2000 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          name: 'Weight Loss Champion',
-          description: 'Progressive weight loss achievements',
-          icon: 'star',
-          type: 'goal',
-          trigger_type: 'weight_loss',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 2, points: 100 },
-            { tier: 'silver', value: 5, points: 200 },
-            { tier: 'gold', value: 10, points: 400 },
-            { tier: 'platinum', value: 20, points: 800 },
-            { tier: 'diamond', value: 50, points: 2000 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '4',
-          name: 'Nutrition Tracker',
-          description: 'Track your meals consistently',
-          icon: 'heart',
-          type: 'milestone',
-          trigger_type: 'meal_log_count',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 7, points: 50 },
-            { tier: 'silver', value: 30, points: 150 },
-            { tier: 'gold', value: 100, points: 400 },
-            { tier: 'platinum', value: 365, points: 1000 },
-            { tier: 'diamond', value: 1000, points: 2500 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '5',
-          name: 'Strength Gains',
-          description: 'Increase your maximum lift weight',
-          icon: 'crown',
-          type: 'personal_record',
-          trigger_type: 'strength_gain',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 10, points: 100 },
-            { tier: 'silver', value: 25, points: 200 },
-            { tier: 'gold', value: 50, points: 400 },
-            { tier: 'platinum', value: 100, points: 800 },
-            { tier: 'diamond', value: 200, points: 1500 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '6',
-          name: 'Cardio King',
-          description: 'Complete cardio workouts and build endurance',
-          icon: 'zap',
-          type: 'milestone',
-          trigger_type: 'workout_count',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 5, points: 50 },
-            { tier: 'silver', value: 25, points: 150 },
-            { tier: 'gold', value: 75, points: 350 },
-            { tier: 'platinum', value: 150, points: 700 },
-            { tier: 'diamond', value: 500, points: 1500 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '7',
-          name: 'Consistency Champion',
-          description: 'Stay consistent with your training schedule',
-          icon: 'target',
-          type: 'streak',
-          trigger_type: 'streak_days',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 5, points: 75 },
-            { tier: 'silver', value: 14, points: 150 },
-            { tier: 'gold', value: 60, points: 400 },
-            { tier: 'platinum', value: 180, points: 1000 },
-            { tier: 'diamond', value: 730, points: 3000 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '8',
-          name: 'Body Transformation',
-          description: 'Transform your body composition',
-          icon: 'trophy',
-          type: 'goal',
-          trigger_type: 'weight_loss',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 1, points: 50 },
-            { tier: 'silver', value: 3, points: 150 },
-            { tier: 'gold', value: 7, points: 350 },
-            { tier: 'platinum', value: 15, points: 750 },
-            { tier: 'diamond', value: 30, points: 1800 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '9',
-          name: 'Meal Prep Master',
-          description: 'Master your nutrition planning',
-          icon: 'shield',
-          type: 'milestone',
-          trigger_type: 'meal_log_count',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 14, points: 75 },
-            { tier: 'silver', value: 60, points: 200 },
-            { tier: 'gold', value: 180, points: 500 },
-            { tier: 'platinum', value: 500, points: 1200 },
-            { tier: 'diamond', value: 1500, points: 3000 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '10',
-          name: 'Power Lifter',
-          description: 'Dominate the weights and get stronger',
-          icon: 'medal',
-          type: 'personal_record',
-          trigger_type: 'strength_gain',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 5, points: 50 },
-            { tier: 'silver', value: 15, points: 150 },
-            { tier: 'gold', value: 35, points: 350 },
-            { tier: 'platinum', value: 75, points: 750 },
-            { tier: 'diamond', value: 150, points: 1800 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '11',
-          name: 'Dedication Master',
-          description: 'Show unwavering dedication to your fitness journey',
-          icon: 'sparkles',
-          type: 'streak',
-          trigger_type: 'streak_days',
-          is_tiered: true,
-          tiers: [
-            { tier: 'bronze', value: 10, points: 100 },
-            { tier: 'silver', value: 21, points: 200 },
-            { tier: 'gold', value: 45, points: 450 },
-            { tier: 'platinum', value: 120, points: 900 },
-            { tier: 'diamond', value: 500, points: 2500 },
-          ],
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '12',
-          name: 'Early Bird',
-          description: 'Complete your first morning workout',
-          icon: 'sparkles',
-          type: 'milestone',
-          trigger_type: 'custom',
-          is_tiered: false,
-          single_value: 1,
-          single_points: 75,
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '13',
-          name: 'Night Owl',
-          description: 'Complete your first evening workout',
-          icon: 'medal',
-          type: 'milestone',
-          trigger_type: 'custom',
-          is_tiered: false,
-          single_value: 1,
-          single_points: 75,
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '14',
-          name: 'Weekend Warrior',
-          description: 'Train hard on the weekends',
-          icon: 'shield',
-          type: 'milestone',
-          trigger_type: 'custom',
-          is_tiered: false,
-          single_value: 1,
-          single_points: 100,
-          is_active: true,
-          created_at: new Date().toISOString()
-        },
-      ])
+      // Load real achievement templates from DB
+      const { data: templatesData, error: templatesError } = await supabase
+        .from('achievement_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (templatesError) {
+        setAchievementTemplates([])
+      } else if (templatesData) {
+        const mapped: AchievementTemplate[] = templatesData.map((t: any) => {
+          const tiers: AchievementTier[] = []
+          if (t.is_tiered) {
+            if (t.tier_bronze_threshold != null) tiers.push({ tier: 'bronze', value: Number(t.tier_bronze_threshold), points: 50 })
+            if (t.tier_silver_threshold != null) tiers.push({ tier: 'silver', value: Number(t.tier_silver_threshold), points: 100 })
+            if (t.tier_gold_threshold != null) tiers.push({ tier: 'gold', value: Number(t.tier_gold_threshold), points: 250 })
+            if (t.tier_platinum_threshold != null) tiers.push({ tier: 'platinum', value: Number(t.tier_platinum_threshold), points: 500 })
+            tiers.push({ tier: 'diamond', value: tiers.length ? (tiers[tiers.length - 1]?.value ?? 0) * 5 : 500, points: 1000 })
+          }
+          const triggerType = (t.achievement_type === 'streak_weeks' ? 'streak_days' : t.achievement_type === 'pr_count' ? 'strength_gain' : t.achievement_type === 'weight_goal' ? 'weight_loss' : t.achievement_type) as AchievementTemplate['trigger_type']
+          const type = (t.category === 'streak' || t.achievement_type === 'streak_weeks' ? 'streak' : t.category === 'goal' || t.achievement_type === 'weight_goal' ? 'goal' : t.achievement_type === 'pr_count' ? 'personal_record' : 'milestone') as AchievementTemplate['type']
+          return {
+            id: t.id,
+            name: t.name,
+            description: t.description ?? '',
+            icon: t.icon ?? 'trophy',
+            type,
+            trigger_type: triggerType,
+            is_tiered: t.is_tiered ?? false,
+            tiers: tiers.length ? tiers : undefined,
+            single_value: t.single_threshold != null ? Number(t.single_threshold) : undefined,
+            single_points: 100,
+            is_active: t.is_active ?? true,
+            created_at: t.created_at ?? new Date().toISOString(),
+          }
+        })
+        setAchievementTemplates(mapped)
+      } else {
+        setAchievementTemplates([])
+      }
 
       // Load clients
       const { data: clientsData, error: clientsError } = await supabase
@@ -452,7 +255,7 @@ export default function CoachAchievements() {
         setClients([])
       } else if (clientsData && clientsData.length > 0) {
         const clientIds = clientsData.map(c => c.client_id)
-        
+
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email, avatar_url')
@@ -468,21 +271,12 @@ export default function CoachAchievements() {
         setClients(clientsWithProfiles)
 
         try {
-          const { data: achievementsData, error: achievementsError } = await supabase
-            .from('achievements')
-            .select('*')
-            .in('client_id', clientIds)
-            .order('achieved_at', { ascending: false })
-
-          if (achievementsError) {
+          const res = await fetch('/api/coach/achievements')
+          const json = await res.json()
+          if (res.ok && Array.isArray(json.clientAchievements)) {
+            setClientAchievements(json.clientAchievements)
+          } else {
             setClientAchievements([])
-          } else if (achievementsData) {
-            const achievementsWithClients = achievementsData.map(achievement => ({
-              ...achievement,
-              client: profilesData?.find(p => p.id === achievement.client_id)
-            }))
-
-            setClientAchievements(achievementsWithClients)
           }
         } catch {
           setClientAchievements([])
@@ -1035,7 +829,7 @@ export default function CoachAchievements() {
                 <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-2">
                   <Button 
                     onClick={() => {
-                      alert('Achievement template saved! Clients will now earn this achievement automatically as they progress.')
+                      addToast({ title: 'Achievement template saved! Clients will now earn this achievement automatically as they progress.', variant: 'default' })
                       setShowCreateTemplate(false)
                       setShowEditTemplate(false)
                     }}

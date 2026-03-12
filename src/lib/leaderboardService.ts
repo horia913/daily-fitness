@@ -3,6 +3,7 @@
  * Handles PR rankings, BW multiples, and tonnage leaderboards with privacy controls
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
 export interface LeaderboardEntry {
@@ -98,32 +99,61 @@ export async function getClientRank(
   }
 }
 
+/** Epley 1RM estimate: weight * (1 + reps/30) */
+function epley1RM(weight: number, reps: number): number {
+  if (reps <= 0) return weight;
+  return weight * (1 + reps / 30);
+}
+
 /**
- * Calculate PR from workout_set_logs
- * (For 1RM, 3RM, 5RM - uses actual logged sets, NOT e1RM)
+ * Calculate PR from workout_set_logs.
+ * For 1RM: best single rep or Epley estimate from heavier sets (reps > 1).
+ * For 3RM/5RM: best set with reps <= 3 / <= 5.
+ * @param client - optional Supabase client (e.g. service role for server-side)
  */
 export async function calculatePRForExercise(
   clientId: string,
   exerciseId: string,
-  repTarget: 1 | 3 | 5
+  repTarget: 1 | 3 | 5,
+  client?: SupabaseClient
 ): Promise<number | null> {
+  const db = client ?? supabase;
   try {
-    // Get best set matching rep count
-    const { data, error } = await supabase
+    const { data: sets, error } = await db
       .from('workout_set_logs')
       .select('weight, reps')
       .eq('client_id', clientId)
       .eq('exercise_id', exerciseId)
-      .eq('reps', repTarget)
-      .order('weight', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .not('weight', 'is', null)
+      .not('reps', 'is', null);
 
-    if (error || !data) {
-      return null;
+    if (error || !sets?.length) return null;
+
+    const weight = (r: { weight: number | null; reps: number | null }) => Number(r.weight) || 0;
+    const reps = (r: { weight: number | null; reps: number | null }) => Number(r.reps) || 0;
+
+    if (repTarget === 1) {
+      let best = 0;
+      for (const set of sets) {
+        const w = weight(set);
+        const r = reps(set);
+        if (r <= 0) continue;
+        const estimated = r === 1 ? w : epley1RM(w, r);
+        if (estimated > best) best = estimated;
+      }
+      return best > 0 ? Math.round(best * 10) / 10 : null;
     }
 
-    return data.weight;
+    const maxReps = repTarget === 3 ? 3 : 5;
+    const valid = sets.filter((s) => reps(s) <= maxReps && reps(s) >= 1);
+    if (valid.length === 0) return null;
+    const best = valid.reduce((a, s) => {
+      const w = weight(s);
+      const r = reps(s);
+      const e1rm = r === 1 ? w : epley1RM(w, r);
+      return e1rm > a ? e1rm : a;
+    }, 0);
+    return best > 0 ? Math.round(best * 10) / 10 : null;
   } catch (error) {
     console.error('Error calculating PR:', error);
     return null;
@@ -161,13 +191,16 @@ export async function calculateBWMultiple(
 }
 
 /**
- * Calculate tonnage for time window
+ * Calculate tonnage for time window.
+ * @param client - optional Supabase client (e.g. service role for server-side)
  */
 export async function calculateTonnage(
   clientId: string,
   timeWindow: TimeWindow,
-  exerciseId?: string
+  exerciseId?: string,
+  client?: SupabaseClient
 ): Promise<number> {
+  const db = client ?? supabase;
   try {
     let startDate: Date;
     const now = new Date();
@@ -186,7 +219,7 @@ export async function calculateTonnage(
         break;
     }
 
-    let query = supabase
+    let query = db
       .from('workout_set_logs')
       .select('weight, reps')
       .eq('client_id', clientId)

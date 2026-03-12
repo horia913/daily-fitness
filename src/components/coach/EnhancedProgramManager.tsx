@@ -546,7 +546,7 @@ export default function EnhancedProgramManager({
                               style={{
                                 fontSize: "16px",
                                 fontWeight: "600",
-                                color: "#1A1A1A",
+                                color: "var(--fc-text-primary)",
                               }}
                             >
                               {client.profiles?.first_name}{" "}
@@ -556,7 +556,7 @@ export default function EnhancedProgramManager({
                               style={{
                                 fontSize: "14px",
                                 fontWeight: "400",
-                                color: "#6B7280",
+                                color: "var(--fc-text-dim)",
                               }}
                             >
                               {client.profiles?.email}
@@ -620,14 +620,14 @@ export default function EnhancedProgramManager({
                       alignItems: "center",
                       justifyContent: "space-between",
                       paddingTop: "16px",
-                      borderTop: "1px solid #E5E7EB",
+                      borderTop: "1px solid var(--fc-glass-border)",
                     }}
                   >
                     <div
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                       }}
                     >
                       {selectedClients.length} client
@@ -672,12 +672,12 @@ export default function EnhancedProgramManager({
                         }}
                         disabled={selectedClients.length === 0}
                         style={{
-                          backgroundColor: "#6C5CE7",
+                          backgroundColor: "var(--fc-accent-purple)",
                           borderRadius: "20px",
                           padding: "12px 24px",
                           fontSize: "14px",
                           fontWeight: "600",
-                          color: "#FFFFFF",
+                          color: "var(--fc-text-inverse)",
                         }}
                       >
                         Assign Program
@@ -735,8 +735,8 @@ export default function EnhancedProgramManager({
               <Button
                 onClick={() => doAssignAndClose()}
                 style={{
-                  backgroundColor: "#6C5CE7",
-                  color: "#FFFFFF",
+                  backgroundColor: "var(--fc-accent-purple)",
+                  color: "var(--fc-text-inverse)",
                 }}
               >
                 Replace Program
@@ -746,16 +746,9 @@ export default function EnhancedProgramManager({
         </div>
       )}
 
-      <div style={{ minHeight: "100vh", backgroundColor: "#E8E9F3" }}>
+      <div className="min-h-screen bg-[color:var(--fc-bg-deep)]">
         {/* Enhanced Header */}
-        <div
-          style={{
-            padding: "24px 20px",
-            backgroundColor: "#E8E9F3",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
+        <div className="relative overflow-hidden p-6 sm:py-6 sm:px-5">
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-green-500/10 rounded-full blur-3xl"></div>
@@ -777,7 +770,7 @@ export default function EnhancedProgramManager({
                   }}
                 >
                   <BookOpen
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
+                    className="w-8 h-8 text-white"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -853,7 +846,7 @@ export default function EnhancedProgramManager({
                       style={{
                         width: "32px",
                         height: "32px",
-                        color: "#FFFFFF",
+                        color: "var(--fc-text-inverse)",
                       }}
                     />
                   </div>
@@ -916,7 +909,7 @@ export default function EnhancedProgramManager({
                       style={{
                         width: "32px",
                         height: "32px",
-                        color: "#FFFFFF",
+                        color: "var(--fc-text-inverse)",
                       }}
                     />
                   </div>
@@ -979,7 +972,7 @@ export default function EnhancedProgramManager({
                       style={{
                         width: "32px",
                         height: "32px",
-                        color: "#FFFFFF",
+                        color: "var(--fc-text-inverse)",
                       }}
                     />
                   </div>
@@ -1042,7 +1035,7 @@ export default function EnhancedProgramManager({
                       style={{
                         width: "32px",
                         height: "32px",
-                        color: "#FFFFFF",
+                        color: "var(--fc-text-inverse)",
                       }}
                     />
                   </div>
@@ -1641,7 +1634,7 @@ function ProgramDetailsModal({
                 }}
               >
                 <Calendar
-                  style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
+                  className="w-8 h-8 text-white"
                 />
               </div>
               <div>
@@ -1811,26 +1804,13 @@ function ProgramDetailsModal({
                 />
               </div>
               <Badge
-                style={{
-                  backgroundColor:
-                    program.difficulty_level === "beginner"
-                      ? "#D1FAE5"
-                      : program.difficulty_level === "intermediate"
-                      ? "#FEF3C7"
-                      : "#FEE2E2",
-                  color:
-                    program.difficulty_level === "beginner"
-                      ? "#065F46"
-                      : program.difficulty_level === "intermediate"
-                      ? "#92400E"
-                      : "#991B1B",
-                  borderRadius: "12px",
-                  padding: "4px 10px",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  border: "0",
-                  marginBottom: "8px",
-                }}
+                className={`mb-2 rounded-xl px-2.5 py-1 text-xs font-semibold border-0 ${
+                  program.difficulty_level === "beginner"
+                    ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                    : program.difficulty_level === "intermediate"
+                    ? "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200"
+                    : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                }`}
               >
                 {program.difficulty_level}
               </Badge>
@@ -1936,7 +1916,7 @@ function ProgramDetailsModal({
               style={{
                 fontSize: "20px",
                 fontWeight: "700",
-                color: "#1A1A1A",
+                color: "var(--fc-text-primary)",
                 marginBottom: "16px",
               }}
             >
@@ -2005,7 +1985,7 @@ function ProgramDetailsModal({
                                 style={{
                                   width: "24px",
                                   height: "24px",
-                                  color: "#FFFFFF",
+                                  color: "var(--fc-text-inverse)",
                                 }}
                               />
                             </div>
@@ -3126,7 +3106,7 @@ function ProgramCreateForm({
               }}
             >
               <Calendar
-                style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
+                className="w-8 h-8 text-white"
               />
             </div>
             <div className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">

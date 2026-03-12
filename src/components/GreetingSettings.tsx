@@ -149,7 +149,7 @@ export function GreetingSettings({ userId, isOpen, onClose, className = '' }: Gr
                 { key: 'showMotivation', label: 'Show Motivational Messages', description: 'Display daily motivation quotes' },
                 { key: 'showTimeContext', label: 'Show Time Context', description: 'Display current time period badge' },
                 { key: 'showQuickStats', label: 'Show Quick Stats', description: 'Display time and role information' },
-                { key: 'showWeather', label: 'Show Weather Info', description: 'Display weather information (coming soon)' }
+                { key: 'showWeather', label: 'Show Weather Info', description: 'Display weather when available' }
               ].map((option) => (
                 <div
                   key={option.key}

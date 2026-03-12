@@ -15,10 +15,12 @@ import { ChallengeCard } from "@/components/client/ChallengeCard";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { withTimeout } from "@/lib/withTimeout";
+import { useToast } from "@/components/ui/toast-provider";
 
 function ChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const router = useRouter();
 
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
@@ -84,15 +86,15 @@ function ChallengesPageContent() {
       const result = await joinChallenge(challenge.id, user.id, track || undefined);
       
       if (result) {
-        alert("Successfully joined challenge!");
+        addToast({ title: `You've joined ${challenge.name}! 💪`, variant: "success" });
         setShowJoinModal(false);
         loadChallenges(); // Refresh
       } else {
-        alert("Failed to join challenge");
+        addToast({ title: "Failed to join challenge", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error joining challenge:", error);
-      alert("Failed to join challenge");
+      addToast({ title: "Failed to join challenge", variant: "destructive" });
     } finally {
       setJoining(false);
     }

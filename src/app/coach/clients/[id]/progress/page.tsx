@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -11,15 +11,35 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import ClientProgressView from "@/components/coach/client-views/ClientProgressView";
 import { CheckInConfigEditor } from "@/components/coach/CheckInConfigEditor";
-import { ArrowLeft, TrendingUp } from "lucide-react";
+import { GenerateReportModal } from "@/components/coach/GenerateReportModal";
+import { exportBodyMetricsCsv } from "@/lib/exportBodyMetricsCsv";
+import { supabase } from "@/lib/supabase";
+import { ArrowLeft, TrendingUp, FileText, Download } from "lucide-react";
 import Link from "next/link";
 
 export default function ClientProgressPage() {
   const params = useParams();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [clientName, setClientName] = useState<string | undefined>();
 
   const clientId = params.id as string;
+
+  useEffect(() => {
+    if (!clientId) return;
+    supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", clientId)
+      .single()
+      .then(({ data }) => {
+        if (data)
+          setClientName(
+            `${(data as { first_name?: string }).first_name ?? ""} ${(data as { last_name?: string }).last_name ?? ""}`.trim()
+          );
+      });
+  }, [clientId]);
 
   if (authLoading) {
     return (
@@ -54,17 +74,47 @@ export default function ClientProgressPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
                   <TrendingUp className="w-6 h-6" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
                     Check-ins & Metrics
                   </h1>
                   <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    Check-ins, measurements, and photos.
+                    Scheduled check-ins, measurements, and photos.
                   </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setShowReportModal(true)}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Generate Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => exportBodyMetricsCsv(clientId, clientName)}
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Data
+                  </Button>
                 </div>
               </div>
             </div>
           </GlassCard>
+
+          {user?.id && (
+            <GenerateReportModal
+              open={showReportModal}
+              onClose={() => setShowReportModal(false)}
+              coachId={user.id}
+              clientId={clientId}
+              clientName={clientName}
+            />
+          )}
 
           <ClientProgressView clientId={clientId} />
 

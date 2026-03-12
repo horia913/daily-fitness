@@ -152,6 +152,33 @@ export async function getLatestMeasurement(
 }
 
 /**
+ * Get first (earliest) measurement for a client (for "since you started" progression)
+ */
+export async function getFirstMeasurement(
+  clientId: string
+): Promise<BodyMeasurement | null> {
+  try {
+    const { data, error } = await supabase
+      .from('body_metrics')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('measured_date', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching first measurement:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in getFirstMeasurement:', error);
+    return null;
+  }
+}
+
+/**
  * Get measurement for specific date
  */
 export async function getMeasurementForDate(
@@ -270,24 +297,22 @@ export async function upsertMeasurement(
   try {
     const existing = await getMeasurementForDate(measurement.client_id, measurement.measured_date);
     if (existing?.id) {
-      const updates: Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>> = {
-        weight_kg: measurement.weight_kg,
-        body_fat_percentage: measurement.body_fat_percentage,
-        muscle_mass_kg: measurement.muscle_mass_kg,
-        visceral_fat_level: measurement.visceral_fat_level,
-        left_arm_circumference: measurement.left_arm_circumference,
-        right_arm_circumference: measurement.right_arm_circumference,
-        torso_circumference: measurement.torso_circumference,
-        waist_circumference: measurement.waist_circumference,
-        hips_circumference: measurement.hips_circumference,
-        left_thigh_circumference: measurement.left_thigh_circumference,
-        right_thigh_circumference: measurement.right_thigh_circumference,
-        left_calf_circumference: measurement.left_calf_circumference,
-        right_calf_circumference: measurement.right_calf_circumference,
-        measurement_method: measurement.measurement_method,
-        notes: measurement.notes,
-      };
-      const sanitizedUpdates = sanitizeMeasurementPayload(updates as Record<string, unknown>) as Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>>;
+      // Merge: only include fields that are defined in the incoming payload so we don't overwrite existing values with null
+      const updatableKeys = [
+        'coach_id', 'weight_kg', 'body_fat_percentage', 'muscle_mass_kg', 'visceral_fat_level',
+        'left_arm_circumference', 'right_arm_circumference', 'torso_circumference',
+        'waist_circumference', 'hips_circumference', 'left_thigh_circumference',
+        'right_thigh_circumference', 'left_calf_circumference', 'right_calf_circumference',
+        'measurement_method', 'notes',
+      ] as const;
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const key of updatableKeys) {
+        const value = measurement[key];
+        if (value !== undefined) {
+          updates[key] = value;
+        }
+      }
+      const sanitizedUpdates = sanitizeMeasurementPayload(updates) as Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>>;
       return updateMeasurement(existing.id, sanitizedUpdates);
     }
     return createMeasurement(measurement);

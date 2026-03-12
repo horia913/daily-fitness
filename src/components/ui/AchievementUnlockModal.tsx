@@ -85,12 +85,12 @@ export function AchievementUnlockModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          className="absolute top-4 right-4 min-w-11 min-h-11 rounded-full flex items-center justify-center transition-all hover:scale-110 text-[color:var(--fc-text-primary)]"
           style={{
             background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
           }}
         >
-          <X className="w-4 h-4" style={{ color: isDark ? "#fff" : "#000" }} />
+          <X className="w-5 h-5" />
         </button>
 
         {/* Trophy animation */}
@@ -140,12 +140,11 @@ export function AchievementUnlockModal({
         {/* Rarity badge */}
         <div className="inline-block mb-4">
           <span
-            className="px-4 py-1.5 rounded-full text-sm font-bold capitalize"
+            className="px-4 py-1.5 rounded-full text-sm font-bold capitalize text-white"
             style={{
               background: `linear-gradient(135deg, ${rarity.gradient.join(
                 ", "
               )})`,
-              color: "#fff",
               boxShadow: `0 4px 12px ${rarity.glow}40`,
             }}
           >

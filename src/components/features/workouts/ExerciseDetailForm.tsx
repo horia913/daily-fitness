@@ -42,7 +42,7 @@ interface ExerciseDetailFormProps {
 const complexGroupLabels: Record<string, string> = {
   superset: "Superset Configuration",
   giant_set: "Giant Set Configuration",
-  tabata: "Tabata Circuit Configuration",
+  tabata: "Tabata Configuration",
   amrap: "AMRAP Configuration",
   emom: "EMOM Configuration",
   emom_reps: "EMOM Configuration",
@@ -810,7 +810,7 @@ export default function ExerciseDetailForm({
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
               <CloudLightning className="w-4 h-4 fc-text-workouts" />
-              Tabata Circuit Configuration
+              Tabata Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
               High-intensity interval training with multiple exercises - fixed

@@ -1081,7 +1081,7 @@ function NoPlanState({ onRefetch }: { onRefetch: () => void }) {
         <Button
           variant="fc-primary"
           onClick={() => {
-            addToast({ title: "Meal plan assignment coming soon", variant: "default" })
+            addToast({ title: "Meal plan assignment is not available yet", variant: "default" })
           }}
         >
           Assign meal plan

@@ -382,18 +382,19 @@ function ClientManagementContent() {
               {filteredClients.map((client) => {
                 const relative = formatRelativeTime(client.metrics.lastActive);
                 const programStatus = getProgramStatus(client.metrics.programStatus, client.metrics.programEndDate);
-                
+                const atRisk = needsAttention(client);
+                const isInactiveOrPending = client.status === "inactive" || client.status === "pending";
                 return (
                   <Link key={client.id} href={`/coach/clients/${client.id}`}>
                     <GlassCard
                       elevation={2}
-                      className="fc-glass fc-card overflow-hidden transition-all hover:scale-102 hover:shadow-2xl cursor-pointer"
+                      className={`fc-glass fc-card overflow-hidden transition-all hover:scale-102 hover:shadow-2xl cursor-pointer ${atRisk ? "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10" : ""} ${isInactiveOrPending ? "opacity-80" : ""}`}
                       borderColor={getStatusColor(client.status)}
                     >
                       {/* Status indicator bar */}
                       <div
-                        className="h-2"
-                        style={{ background: getStatusColor(client.status) }}
+                        className={`h-2 ${atRisk ? "bg-amber-500" : ""}`}
+                        style={!atRisk ? { background: getStatusColor(client.status) } : undefined}
                       />
 
                       <div className="p-6">
@@ -489,15 +490,14 @@ function ClientManagementContent() {
                 {filteredClients.map((client) => {
                   const relative = formatRelativeTime(client.metrics.lastActive);
                   const programStatus = getProgramStatus(client.metrics.programStatus, client.metrics.programEndDate);
-                  
+                  const atRisk = needsAttention(client);
+                  const isInactiveOrPending = client.status === "inactive" || client.status === "pending";
                   return (
                     <Link
                       key={client.id}
                       href={`/coach/clients/${client.id}`}
-                      className="flex items-center gap-4 p-4 rounded-lg transition-all hover:scale-[1.01] fc-glass-soft cursor-pointer block"
-                      style={{
-                        borderLeft: `4px solid ${getStatusColor(client.status)}`,
-                      }}
+                      className={`flex items-center gap-4 p-4 rounded-lg transition-all hover:scale-[1.01] fc-glass-soft cursor-pointer block ${atRisk ? "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10" : ""} ${isInactiveOrPending ? "opacity-80" : ""}`}
+                      style={!atRisk ? { borderLeft: `4px solid ${getStatusColor(client.status)}` } : undefined}
                     >
                       {/* Avatar */}
                       <div

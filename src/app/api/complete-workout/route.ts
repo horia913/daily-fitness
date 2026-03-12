@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
         already_completed: true,
         message: 'Workout was already completed',
         workout_log: result.workoutLog,
+        new_achievements: [],
+        leaderboard_rank_changes: [],
       }, { status: 200 })
     }
 
@@ -73,6 +75,13 @@ export async function POST(req: NextRequest) {
       success: true,
       workout_log: result.workoutLog,
       totals: result.totals,
+      new_achievements: result.newAchievements ?? [],
+      leaderboard_rank_changes: (result.leaderboardRankChanges ?? []).map((c: { exerciseName: string; leaderboardType: string; oldRank: number; newRank: number }) => ({
+        exercise_name: c.exerciseName,
+        type: c.leaderboardType,
+        old_rank: c.oldRank,
+        new_rank: c.newRank,
+      })),
     }
 
     // Include program progression info if available

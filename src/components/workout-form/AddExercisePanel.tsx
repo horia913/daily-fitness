@@ -866,7 +866,7 @@ export function AddExercisePanel({
                               className={`font-semibold ${theme?.text ?? ''} mb-3 flex flex-wrap items-center gap-2`}
                             >
                               <CloudLightning className="w-4 h-4 text-purple-600" />
-                              Tabata Circuit Configuration
+                              Tabata Configuration
                             </h4>
                             <p
                               className={`text-sm ${theme?.textSecondary ?? ''} mb-4`}

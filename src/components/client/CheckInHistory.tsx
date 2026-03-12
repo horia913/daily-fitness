@@ -7,6 +7,7 @@ import {
   MonthlyStats,
   dbToUiScale,
 } from "@/lib/wellnessService";
+import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -309,27 +310,36 @@ export function CheckInHistory({
               {selectedLog.sleep_hours != null && (
                 <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
                   <div className="text-xs fc-text-subtle">😴</div>
-                  <div className="text-xs font-semibold fc-text-primary">
-                    {selectedLog.sleep_hours}h ({getSleepQualityLabel(selectedLog.sleep_quality)})
+                  <div className={`text-xs font-semibold ${getWellnessValueColor(selectedLog.sleep_hours, "sleep_hours")}`}>
+                    {selectedLog.sleep_hours}h
+                    {selectedLog.sleep_quality != null && (
+                      <> ({getSleepQualityLabel(selectedLog.sleep_quality)})</>
+                    )}
                   </div>
                 </div>
               )}
-              {selectedLog.stress_level != null && (
-                <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
-                  <div className="text-xs fc-text-subtle">😤</div>
-                  <div className="text-xs font-semibold fc-text-primary">
-                    {getStressLabel(selectedLog.stress_level)}
+              {selectedLog.stress_level != null && (() => {
+                const uiVal = dbToUiScale(selectedLog.stress_level);
+                return uiVal != null ? (
+                  <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
+                    <div className="text-xs fc-text-subtle">😤</div>
+                    <div className={`text-xs font-semibold ${getWellnessValueColor(uiVal, "stress")}`}>
+                      {getStressLabel(selectedLog.stress_level)}
+                    </div>
                   </div>
-                </div>
-              )}
-              {selectedLog.soreness_level != null && (
-                <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
-                  <div className="text-xs fc-text-subtle">💪</div>
-                  <div className="text-xs font-semibold fc-text-primary">
-                    {getSorenessLabel(selectedLog.soreness_level)}
+                ) : null;
+              })()}
+              {selectedLog.soreness_level != null && (() => {
+                const uiVal = dbToUiScale(selectedLog.soreness_level);
+                return uiVal != null ? (
+                  <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
+                    <div className="text-xs fc-text-subtle">💪</div>
+                    <div className={`text-xs font-semibold ${getWellnessValueColor(uiVal, "soreness")}`}>
+                      {getSorenessLabel(selectedLog.soreness_level)}
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
               {selectedLog.steps != null && (
                 <div className="fc-glass-soft px-2 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)]">
                   <div className="text-xs fc-text-subtle">👟</div>
@@ -375,19 +385,28 @@ export function CheckInHistory({
                 <div className="flex flex-wrap gap-2 mb-2 text-xs fc-text-subtle">
                   {log.sleep_hours != null && (
                     <span>
-                      😴 {log.sleep_hours}h ({getSleepQualityLabel(log.sleep_quality)})
+                      😴 <span className={getWellnessValueColor(log.sleep_hours, "sleep_hours")}>{log.sleep_hours}h</span>
+                      {log.sleep_quality != null && (
+                        <> (<span className={getWellnessValueColor(log.sleep_quality, "sleep_quality")}>{getSleepQualityLabel(log.sleep_quality)}</span>)</>
+                      )}
                     </span>
                   )}
-                  {log.stress_level != null && (
-                    <span>
-                      😤 {getStressLabel(log.stress_level)}
-                    </span>
-                  )}
-                  {log.soreness_level != null && (
-                    <span>
-                      💪 {getSorenessLabel(log.soreness_level)}
-                    </span>
-                  )}
+                  {log.stress_level != null && (() => {
+                    const uiVal = dbToUiScale(log.stress_level);
+                    return uiVal != null ? (
+                      <span>
+                        😤 <span className={getWellnessValueColor(uiVal, "stress")}>{getStressLabel(log.stress_level)}</span>
+                      </span>
+                    ) : null;
+                  })()}
+                  {log.soreness_level != null && (() => {
+                    const uiVal = dbToUiScale(log.soreness_level);
+                    return uiVal != null ? (
+                      <span>
+                        💪 <span className={getWellnessValueColor(uiVal, "soreness")}>{getSorenessLabel(log.soreness_level)}</span>
+                      </span>
+                    ) : null;
+                  })()}
                   {log.steps != null && (
                     <span>
                       👟 {log.steps.toLocaleString()} steps

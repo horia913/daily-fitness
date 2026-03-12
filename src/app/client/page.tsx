@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell, ClientGlassCard } from "@/components/client-ui";
+import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { AthleteScoreRing } from "@/components/client-ui/AthleteScoreRing";
 import { ScoreBreakdown } from "@/components/client-ui/ScoreBreakdown";
@@ -34,6 +35,10 @@ import {
   dbToUiScale,
   DailyWellnessLog,
 } from "@/lib/wellnessService";
+import { getWellnessValueColor } from "@/lib/wellnessValueColors";
+import { useToast } from "@/components/ui/toast-provider";
+import { getMilestoneData } from "@/lib/progressStatsService";
+import { checkMilestoneToasts } from "@/lib/milestoneToasts";
 
 interface DashboardData {
   avatarUrl: string | null;
@@ -49,6 +54,18 @@ interface DashboardData {
     name?: string;
     weekNumber?: number;
     dayNumber?: number;
+  };
+  programProgress?: {
+    currentWeek: number;
+    totalWeeks: number;
+    completedCount: number;
+    totalSlots: number;
+    percent: number;
+  };
+  highlights?: {
+    prsThisMonth: number;
+    latestAchievement: { name: string; icon: string | null; tier: string | null } | null;
+    bestLeaderboardRank: { rank: number; exerciseName?: string | null } | null;
   };
 }
 
@@ -97,9 +114,11 @@ export default function ClientDashboard() {
   const { user, profile } = useAuth();
   const { performanceSettings } = useTheme();
   const router = useRouter();
+  const { addToast } = useToast();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [athleteScore, setAthleteScore] = useState<AthleteScore | null>(null);
+  const [scoreHistory, setScoreHistory] = useState<{ date: string; score: number }[]>([]);
   const [hasCheckInToday, setHasCheckInToday] = useState<boolean | null>(null);
   const [todayWellnessLog, setTodayWellnessLog] = useState<DailyWellnessLog | null>(null);
   const [checkinStreak, setCheckinStreak] = useState<number>(0);
@@ -156,6 +175,7 @@ export default function ClientDashboard() {
 
     const data = await fetchWithRetry();
     setAthleteScore(data.score || null);
+    setScoreHistory(Array.isArray(data.scoreHistory) ? data.scoreHistory : []);
   }, []);
 
   const fetchDashboardData = async () => {
@@ -252,13 +272,28 @@ export default function ClientDashboard() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id || !dataLoaded) return;
+    getMilestoneData(user.id)
+      .then((data) => {
+        checkMilestoneToasts(data, (opts) =>
+          addToast({
+            title: opts.title,
+            description: opts.description,
+            duration: opts.duration ?? 4000,
+            variant: (opts.variant as "success") || "default",
+          })
+        );
+      })
+      .catch(() => {});
+  }, [user?.id, dataLoaded, addToast]);
+
   const userName = dashboardData?.firstName || profile?.first_name || "there";
   const streak = dashboardData?.streak ?? 0;
   const weeklyProgress = dashboardData?.weeklyProgress ?? { current: 0, goal: 0 };
   const todaysWorkout = dashboardData?.todaysWorkout;
 
-  // Calculate program progress (simplified - would need program state)
-  const programProgress = 0; // TODO: Calculate from program state if available
+  const programProgressData = dashboardData?.programProgress;
 
   const getAvatarUrl = () => {
     if (dashboardData?.avatarUrl) return dashboardData.avatarUrl;
@@ -354,6 +389,53 @@ export default function ClientDashboard() {
                     />
                   </div>
                 )}
+
+                {/* Score trend sparkline */}
+                <div className="mt-4 w-full max-w-sm px-2">
+                  {scoreHistory.length >= 2 ? (
+                    <>
+                      <div className="h-10 w-full flex items-end justify-between gap-0.5" aria-hidden>
+                        {scoreHistory.map((point, i) => {
+                          const minS = Math.min(...scoreHistory.map((p) => p.score));
+                          const maxS = Math.max(...scoreHistory.map((p) => p.score));
+                          const range = maxS - minS || 1;
+                          const pct = ((point.score - minS) / range) * 100;
+                          return (
+                            <div
+                              key={point.date}
+                              className="flex-1 min-w-0 rounded-t bg-[var(--fc-accent)]/60 transition-all"
+                              style={{ height: `${Math.max(pct, 8)}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+                      {scoreHistory.length >= 2 && (() => {
+                        const first = scoreHistory[0].score;
+                        const last = scoreHistory[scoreHistory.length - 1].score;
+                        const diff = last - first;
+                        if (diff > 0) {
+                          return (
+                            <p className="text-xs fc-text-success mt-1 text-center">
+                              Up {diff} point{diff !== 1 ? "s" : ""} from 12 weeks ago
+                            </p>
+                          );
+                        }
+                        if (diff < 0) {
+                          return (
+                            <p className="text-xs fc-text-dim mt-1 text-center">
+                              {Math.abs(diff)} point{Math.abs(diff) !== 1 ? "s" : ""} from 12 weeks ago
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </>
+                  ) : (
+                    <p className="text-xs fc-text-dim text-center py-2">
+                      Score tracking started — trend will appear after 2 weeks.
+                    </p>
+                  )}
+                </div>
               </>
             )}
           </section>
@@ -396,7 +478,7 @@ export default function ClientDashboard() {
           {/* Section 5: Daily Check-in Card */}
           {hasCheckInToday === false && (
             <section className="mb-6">
-              <ClientGlassCard className="p-4">
+              <ClientGlassCard className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20">
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium fc-text-primary">
@@ -409,10 +491,10 @@ export default function ClientDashboard() {
                     </p>
                   </div>
                   <Link href="/client/check-ins">
-                    <button className="w-full fc-btn fc-btn-primary py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2">
+                    <Button variant="fc-primary" className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2">
                       Check in
                       <ChevronRight className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </Link>
                 </div>
               </ClientGlassCard>
@@ -421,7 +503,7 @@ export default function ClientDashboard() {
 
           {hasCheckInToday === true && todayWellnessLog && (
             <section className="mb-6">
-              <ClientGlassCard className="p-4">
+              <ClientGlassCard className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -436,27 +518,28 @@ export default function ClientDashboard() {
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs fc-text-subtle">
                     {todayWellnessLog.sleep_hours != null && (
-                      <span className="fc-text-primary">
-                        Sleep: {todayWellnessLog.sleep_hours}h ({getSleepQualityLabel(todayWellnessLog.sleep_quality)})
+                      <span>
+                        Sleep: <span className={getWellnessValueColor(todayWellnessLog.sleep_hours, "sleep_hours")}>{todayWellnessLog.sleep_hours}h</span>
+                        {todayWellnessLog.sleep_quality != null && (
+                          <> (<span className={getWellnessValueColor(todayWellnessLog.sleep_quality, "sleep_quality")}>{getSleepQualityLabel(todayWellnessLog.sleep_quality)}</span>)</>
+                        )}
                       </span>
                     )}
                     {todayWellnessLog.stress_level != null && (() => {
                       const uiValue = dbToUiScale(todayWellnessLog.stress_level);
-                      const stressColor = uiValue && uiValue >= 4 ? "fc-text-error" : "fc-text-primary";
-                      return (
-                        <span className={stressColor}>
-                          Stress: {uiValue}/5
+                      return uiValue != null ? (
+                        <span>
+                          Stress: <span className={getWellnessValueColor(uiValue, "stress")}>{uiValue}/5</span>
                         </span>
-                      );
+                      ) : null;
                     })()}
                     {todayWellnessLog.soreness_level != null && (() => {
                       const uiValue = dbToUiScale(todayWellnessLog.soreness_level);
-                      const sorenessColor = uiValue && uiValue >= 4 ? "fc-text-error" : "fc-text-primary";
-                      return (
-                        <span className={sorenessColor}>
-                          Soreness: {uiValue}/5
+                      return uiValue != null ? (
+                        <span>
+                          Soreness: <span className={getWellnessValueColor(uiValue, "soreness")}>{uiValue}/5</span>
                         </span>
-                      );
+                      ) : null;
                     })()}
                     {todayWellnessLog.steps != null && (
                       <span className="fc-text-primary">
@@ -485,7 +568,7 @@ export default function ClientDashboard() {
             <section className="mb-6">
               <div className="flex gap-3">
                 {/* Streak */}
-                <ClientGlassCard className="flex-1 p-3 text-center">
+                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
                     <Flame className="w-4 h-4 fc-text-warning" />
                     <span className="text-lg font-bold fc-text-primary">
@@ -496,9 +579,9 @@ export default function ClientDashboard() {
                 </ClientGlassCard>
 
                 {/* Weekly Progress */}
-                <ClientGlassCard className="flex-1 p-3 text-center">
+                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <Dumbbell className="w-4 h-4 fc-text-primary" />
+                    <Dumbbell className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     <span className="text-lg font-bold fc-text-primary">
                       {weeklyProgress.current}/{weeklyProgress.goal || 0}
                     </span>
@@ -507,20 +590,69 @@ export default function ClientDashboard() {
                 </ClientGlassCard>
 
                 {/* Program Progress */}
-                {programProgress > 0 && (
-                  <ClientGlassCard className="flex-1 p-3 text-center">
+                {programProgressData && programProgressData.totalSlots > 0 && (
+                  <ClientGlassCard className="flex-1 p-3 text-center min-w-0 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20">
                     <div className="flex items-center justify-center gap-1.5 mb-1">
-                      <BarChart3 className="w-4 h-4 fc-text-primary" />
-                      <span className="text-lg font-bold fc-text-primary">
-                        {programProgress}%
+                      <BarChart3 className="w-4 h-4 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+                      <span className="text-lg font-bold fc-text-primary truncate">
+                        Week {programProgressData.currentWeek} of {programProgressData.totalWeeks} ({programProgressData.percent}%)
                       </span>
                     </div>
-                    <p className="text-xs fc-text-dim">program</p>
+                    <div className="h-1.5 rounded-full bg-[var(--fc-glass-border)] overflow-hidden mt-1">
+                      <div
+                        className="h-full rounded-full bg-[var(--fc-accent)] transition-all"
+                        style={{ width: `${Math.min(100, programProgressData.percent)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs fc-text-dim mt-1">program</p>
                   </ClientGlassCard>
                 )}
               </div>
             </section>
           )}
+
+          {/* Highlights row: PRs this month, latest achievement, leaderboard rank */}
+          {dashboardData?.highlights &&
+            (dashboardData.highlights.prsThisMonth > 0 ||
+              dashboardData.highlights.latestAchievement != null ||
+              dashboardData.highlights.bestLeaderboardRank != null) && (
+            <section className="mb-6">
+              <div className="flex flex-wrap gap-2">
+                {dashboardData.highlights.prsThisMonth > 0 && (
+                  <span className="px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20">
+                    🏆 {dashboardData.highlights.prsThisMonth} PR{dashboardData.highlights.prsThisMonth === 1 ? '' : 's'} this month
+                  </span>
+                )}
+                {dashboardData.highlights.latestAchievement != null && (
+                  <span className="px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20">
+                    🎖️ Latest: {dashboardData.highlights.latestAchievement.name}
+                    {dashboardData.highlights.latestAchievement.tier
+                      ? ` — ${dashboardData.highlights.latestAchievement.tier}`
+                      : ''}
+                  </span>
+                )}
+                {dashboardData.highlights.bestLeaderboardRank != null && (
+                  <span className="px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border border-blue-400/30 bg-blue-50 dark:bg-blue-900/20">
+                    📊 #{dashboardData.highlights.bestLeaderboardRank.rank}
+                    {dashboardData.highlights.bestLeaderboardRank.exerciseName
+                      ? ` on ${dashboardData.highlights.bestLeaderboardRank.exerciseName} leaderboard`
+                      : ' leaderboard'}
+                  </span>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* View full progress link */}
+          <section className="mb-6">
+            <Link
+              href="/client/progress"
+              className="inline-flex items-center gap-2 text-sm font-medium fc-text-primary hover:fc-text-subtle transition-colors"
+            >
+              View full progress
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </section>
 
             </>
           )}
@@ -529,15 +661,16 @@ export default function ClientDashboard() {
           {error && (
             <ClientGlassCard className="p-6 text-center">
               <p className="text-sm fc-text-dim mb-4">{error}</p>
-              <button
+              <Button
+                variant="fc-secondary"
                 onClick={() => {
                   setError(null);
                   fetchAllData().then(() => setDataLoaded(true)).catch((err) => setError(err?.message || "Failed to load data"));
                 }}
-                className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm"
+                className="h-11 px-6 text-sm"
               >
                 Retry
-              </button>
+              </Button>
             </ClientGlassCard>
           )}
         </ClientPageShell>

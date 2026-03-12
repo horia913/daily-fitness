@@ -293,13 +293,14 @@ export default function WorkoutAssignmentModal({
 
   const handleAssignWorkouts = async () => {
     if (clients.length === 0) {
-      alert(
-        "No clients available. Please add clients before assigning workouts."
-      );
+      addToast({
+        title: "No clients available. Please add clients before assigning workouts.",
+        variant: "destructive",
+      });
       return;
     }
     if (selectedWorkouts.length === 0 || selectedClients.length === 0) {
-      alert("Please select at least one workout and one client");
+      addToast({ title: "Please select at least one workout and one client", variant: "warning" });
       return;
     }
 

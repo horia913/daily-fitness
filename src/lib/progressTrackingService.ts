@@ -449,6 +449,14 @@ export class PersonalRecordsService {
         // Don't fail the request, just log error
       }
 
+      // Update leaderboard for this exercise (non-blocking)
+      try {
+        const { updateLeaderboardForClient } = await import('./leaderboardPopulationService')
+        await updateLeaderboardForClient(clientId, record.exercise_id ?? undefined)
+      } catch (leaderboardError) {
+        console.error('Failed to update leaderboard (non-blocking):', leaderboardError)
+      }
+
       return data
     } catch (error) {
       console.error('Error upserting personal record:', error)
@@ -591,6 +599,23 @@ export class MobilityMetricsService {
 // ============================================
 // FMS ASSESSMENTS
 // ============================================
+// DB columns use no _score suffix (e.g. deep_squat, hurdle_step_left).
+// See Supabase schema: fms_assessments table.
+
+const FMS_SCORE_KEYS = [
+  'deep_squat',
+  'hurdle_step_left',
+  'hurdle_step_right',
+  'inline_lunge_left',
+  'inline_lunge_right',
+  'shoulder_mobility_left',
+  'shoulder_mobility_right',
+  'active_straight_leg_raise_left',
+  'active_straight_leg_raise_right',
+  'trunk_stability_pushup',
+  'rotary_stability_left',
+  'rotary_stability_right',
+] as const
 
 export interface FMSAssessment {
   id: string
@@ -598,18 +623,18 @@ export interface FMSAssessment {
   coach_id?: string
   assessed_date: string
   photos?: string[]
-  deep_squat_score?: number // 0-3
-  hurdle_step_left_score?: number
-  hurdle_step_right_score?: number
-  inline_lunge_left_score?: number
-  inline_lunge_right_score?: number
-  shoulder_mobility_left_score?: number
-  shoulder_mobility_right_score?: number
-  active_straight_leg_raise_left_score?: number
-  active_straight_leg_raise_right_score?: number
-  trunk_stability_pushup_score?: number
-  rotary_stability_left_score?: number
-  rotary_stability_right_score?: number
+  deep_squat?: number
+  hurdle_step_left?: number
+  hurdle_step_right?: number
+  inline_lunge_left?: number
+  inline_lunge_right?: number
+  shoulder_mobility_left?: number
+  shoulder_mobility_right?: number
+  active_straight_leg_raise_left?: number
+  active_straight_leg_raise_right?: number
+  trunk_stability_pushup?: number
+  rotary_stability_left?: number
+  rotary_stability_right?: number
   total_score?: number
   notes?: string
   created_at?: string
@@ -634,43 +659,30 @@ export class FMSAssessmentService {
     }
   }
 
-  // Create new FMS assessment
+  // Create new FMS assessment (DB columns: no _score suffix)
   static async createFMSAssessment(
     clientId: string,
     assessment: Partial<FMSAssessment>,
     coachId?: string
   ): Promise<FMSAssessment | null> {
     try {
-      // Calculate total score
-      const scores = [
-        assessment.deep_squat_score,
-        assessment.hurdle_step_left_score,
-        assessment.hurdle_step_right_score,
-        assessment.inline_lunge_left_score,
-        assessment.inline_lunge_right_score,
-        assessment.shoulder_mobility_left_score,
-        assessment.shoulder_mobility_right_score,
-        assessment.active_straight_leg_raise_left_score,
-        assessment.active_straight_leg_raise_right_score,
-        assessment.trunk_stability_pushup_score,
-        assessment.rotary_stability_left_score,
-        assessment.rotary_stability_right_score,
-      ].filter((score): score is number => score !== undefined && score !== null)
+      const totalScore = FMS_SCORE_KEYS.reduce((sum, key) => {
+        const v = assessment[key]
+        return sum + (v != null && typeof v === 'number' ? v : 0)
+      }, 0)
 
-      const totalScore = scores.reduce((sum, score) => sum + (score || 0), 0)
-
-      const insertData: any = {
+      const insertData: Record<string, unknown> = {
         client_id: clientId,
         coach_id: coachId,
         assessed_date: assessment.assessed_date || new Date().toISOString().split('T')[0],
         total_score: totalScore,
-        ...assessment,
       }
-      
-      // Only include photos if provided
-      if (assessment.photos !== undefined) {
-        insertData.photos = assessment.photos
+      for (const key of FMS_SCORE_KEYS) {
+        const v = assessment[key]
+        if (v !== undefined && v !== null) insertData[key] = v
       }
+      if (assessment.notes !== undefined) insertData.notes = assessment.notes
+      if (assessment.photos !== undefined) insertData.photos = assessment.photos
 
       const { data, error } = await supabase
         .from('fms_assessments')
@@ -686,42 +698,35 @@ export class FMSAssessmentService {
     }
   }
 
-  // Update FMS assessment
+  // Update FMS assessment (DB columns: no _score suffix)
   static async updateFMSAssessment(
     id: string,
     updates: Partial<FMSAssessment>
   ): Promise<FMSAssessment | null> {
     try {
-      // Recalculate total score if any scores changed
-      const scores = [
-        updates.deep_squat_score,
-        updates.hurdle_step_left_score,
-        updates.hurdle_step_right_score,
-        updates.inline_lunge_left_score,
-        updates.inline_lunge_right_score,
-        updates.shoulder_mobility_left_score,
-        updates.shoulder_mobility_right_score,
-        updates.active_straight_leg_raise_left_score,
-        updates.active_straight_leg_raise_right_score,
-        updates.trunk_stability_pushup_score,
-        updates.rotary_stability_left_score,
-        updates.rotary_stability_right_score,
-      ].filter((score): score is number => score !== undefined && score !== null)
+      const { data: existing } = await supabase
+        .from('fms_assessments')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-      if (scores.length > 0) {
-        const totalScore = scores.reduce((sum, score) => sum + (score || 0), 0)
-        updates.total_score = totalScore
-      }
+      const merged = { ...(existing as Record<string, unknown>), ...updates }
+      const totalScore = FMS_SCORE_KEYS.reduce((sum, key) => {
+        const v = merged[key]
+        return sum + (v != null && typeof v === 'number' ? v : 0)
+      }, 0)
 
-      const updateData: any = {
-        ...updates,
+      const updateData: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
+        total_score: totalScore,
       }
-      
-      // Only include photos if provided
-      if (updates.photos !== undefined) {
-        updateData.photos = updates.photos
+      for (const key of FMS_SCORE_KEYS) {
+        const v = updates[key]
+        if (v !== undefined && v !== null) updateData[key] = v
       }
+      if (updates.assessed_date !== undefined) updateData.assessed_date = updates.assessed_date
+      if (updates.notes !== undefined) updateData.notes = updates.notes
+      if (updates.photos !== undefined) updateData.photos = updates.photos
 
       const { data, error } = await supabase
         .from('fms_assessments')

@@ -18,6 +18,7 @@ import {
   User
 } from 'lucide-react'
 import WorkoutTemplateService, { ExerciseAlternative } from '@/lib/workoutTemplateService'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface Exercise {
   id: string
@@ -63,6 +64,7 @@ export default function ExerciseAlternativesModal({
   exercise,
   allExercises
 }: ExerciseAlternativesModalProps) {
+  const { addToast } = useToast()
   const [alternatives, setAlternatives] = useState<ExerciseAlternative[]>([])
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false) // Controls showing/hiding the form
@@ -97,7 +99,7 @@ export default function ExerciseAlternativesModal({
 
   const addAlternative = async () => {
     if (!selectedAlternativeId) {
-      alert('Please select an alternative exercise')
+      addToast({ title: 'Please select an alternative exercise', variant: 'destructive' })
       return
     }
 
@@ -130,7 +132,7 @@ export default function ExerciseAlternativesModal({
       setSearchTerm('')
     } catch (error) {
       console.error('Error adding alternative:', error)
-      alert(`Error adding alternative: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      addToast({ title: `Error adding alternative: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: 'destructive' })
     } finally {
       // Always reset the loading state
       setAddingInProgress(false)
@@ -146,11 +148,11 @@ export default function ExerciseAlternativesModal({
       if (success) {
         await loadAlternatives()
       } else {
-        alert('Failed to remove alternative')
+        addToast({ title: 'Failed to remove alternative', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Error removing alternative:', error)
-      alert('Error removing alternative')
+      addToast({ title: 'Error removing alternative', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

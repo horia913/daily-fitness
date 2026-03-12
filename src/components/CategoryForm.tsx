@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface CategoryFormProps {
   isOpen: boolean
@@ -52,6 +53,7 @@ const iconOptions = [
 ]
 
 export default function CategoryForm({ isOpen, onClose, onSuccess, category, colors }: CategoryFormProps) {
+  const { addToast } = useToast()
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
 
@@ -179,7 +181,7 @@ export default function CategoryForm({ isOpen, onClose, onSuccess, category, col
       }, 1500)
     } catch (error) {
       console.error('Error saving category:', error)
-      alert('Error saving category. Please try again.')
+      addToast({ title: 'Error saving category. Please try again.', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

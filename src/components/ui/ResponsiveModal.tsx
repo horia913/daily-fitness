@@ -133,12 +133,12 @@ export default function ResponsiveModal({
                   )}
                   <div>
                     {title && (
-                      <h2 className={`text-2xl font-bold ${theme.text}`} style={{ fontSize: '28px', fontWeight: '700', color: '#1A1A1A', marginBottom: '4px' }}>
+                      <h2 className="text-2xl font-bold fc-text-primary mb-1">
                         {title}
                       </h2>
                     )}
                     {subtitle && (
-                      <p className={`text-sm ${theme.textSecondary} mt-1`} style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>
+                      <p className="text-sm fc-text-dim mt-1">
                         {subtitle}
                       </p>
                     )}
@@ -148,8 +148,7 @@ export default function ResponsiveModal({
                   variant="ghost"
                   size="sm"
                   onClick={onClose}
-                  className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
-                  style={{ padding: '8px', borderRadius: '12px', backgroundColor: 'transparent', color: '#6B7280' }}
+                  className="min-w-11 min-h-11 p-2 rounded-xl transition-all duration-200 fc-text-dim hover:fc-text-primary fc-glass-soft hover:opacity-90"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />

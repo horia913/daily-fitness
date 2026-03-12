@@ -50,7 +50,7 @@ function formatWeekLabel(weekStart: string): string {
  * Calculate volume from a set log entry
  * Handles special block types (dropsets, supersets, etc.)
  */
-function calculateSetVolume(setLog: any): number {
+export function calculateSetVolume(setLog: any): number {
   const blockType = setLog.set_type;
 
   // Straight sets, rest-pause, cluster sets
@@ -382,6 +382,77 @@ export async function getVolumeByWorkout(
     );
   } catch (error) {
     console.error("Error loading volume by workout:", error);
+    return [];
+  }
+}
+
+export interface WorkoutWithVolumeForSleep {
+  workoutDate: string;
+  previousNightDate: string;
+  volume: number;
+}
+
+/** Get workouts in last N days with volume per workout for sleep-vs-performance analysis. */
+export async function getWorkoutsWithVolumeForSleepAnalysis(
+  clientId: string,
+  days: number = 30
+): Promise<WorkoutWithVolumeForSleep[]> {
+  try {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const { data: workoutLogs, error: logsError } = await supabase
+      .from("workout_logs")
+      .select("id, completed_at")
+      .eq("client_id", clientId)
+      .not("completed_at", "is", null)
+      .gte("completed_at", startDate.toISOString())
+      .lte("completed_at", endDate.toISOString())
+      .order("completed_at", { ascending: true });
+
+    if (logsError) throw logsError;
+    if (!workoutLogs || workoutLogs.length === 0) return [];
+
+    const logIds = workoutLogs.map((log) => log.id);
+
+    const { data: setLogs, error: setsError } = await supabase
+      .from("workout_set_logs")
+      .select(
+        "workout_log_id, set_type, weight, reps, dropset_initial_weight, dropset_initial_reps, dropset_final_weight, dropset_final_reps, superset_weight_a, superset_reps_a, superset_weight_b, superset_reps_b, giant_set_exercises, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_weight, preexhaust_compound_reps"
+      )
+      .in("workout_log_id", logIds);
+
+    if (setsError) throw setsError;
+
+    const workoutVolumeMap = new Map<string, number>();
+    const workoutDateMap = new Map<string, string>();
+
+    workoutLogs.forEach((log: any) => {
+      const d = new Date(log.completed_at);
+      const dateStr = d.toISOString().split("T")[0];
+      workoutDateMap.set(log.id, dateStr);
+      workoutVolumeMap.set(log.id, 0);
+    });
+
+    setLogs?.forEach((setLog) => {
+      const vol = workoutVolumeMap.get(setLog.workout_log_id);
+      if (vol === undefined) return;
+      workoutVolumeMap.set(setLog.workout_log_id, vol + calculateSetVolume(setLog));
+    });
+
+    const result: WorkoutWithVolumeForSleep[] = [];
+    workoutDateMap.forEach((workoutDate, logId) => {
+      const volume = workoutVolumeMap.get(logId) ?? 0;
+      const prev = new Date(workoutDate + "T12:00:00");
+      prev.setDate(prev.getDate() - 1);
+      const previousNightDate = prev.toISOString().split("T")[0];
+      result.push({ workoutDate, previousNightDate, volume });
+    });
+
+    return result.sort((a, b) => a.workoutDate.localeCompare(b.workoutDate));
+  } catch (error) {
+    console.error("Error loading workouts for sleep analysis:", error);
     return [];
   }
 }

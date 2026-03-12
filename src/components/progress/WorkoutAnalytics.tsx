@@ -21,7 +21,8 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ACHIEVEMENTS, getTierColor, getTierIcon, getAchievementTier, type AchievementTier } from '@/lib/achievements'
+import { getTierColor, getTierIcon, type AchievementTier } from '@/lib/achievements'
+import { AchievementService, type AchievementProgress } from '@/lib/achievementService'
 
 interface WorkoutAnalyticsProps {
   loading?: boolean
@@ -52,10 +53,11 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
     totalSets: 0
   })
   const [activityCalendar, setActivityCalendar] = useState<Array<{ day: number; hasWorkout: boolean }>>([])
-  const [recentPRs, setRecentPRs] = useState<Array<{ exercise: string; weight: number; reps: number; date: string }>>([])
+  const [recentPRs, setRecentPRs] = useState<Array<{ exercise: string; weight: number; reps: number; date: string; displayValue: string; improvementPercent?: number | null }>>([])
   const [onTheRise, setOnTheRise] = useState<Array<{ exercise: string; increase: string; trend: string }>>([])
   const [exerciseProgress, setExerciseProgress] = useState<Array<{ exercise: string; data: number[] }>>([])
   const [weeklyVolume, setWeeklyVolume] = useState<Array<{ week: string; volume: number }>>([])
+  const [achievementProgressList, setAchievementProgressList] = useState<AchievementProgress[]>([])
 
   useEffect(() => {
     if (user) {
@@ -65,10 +67,11 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
 
   const loadAnalyticsData = async () => {
     if (!user) return
-    
+
     setDataLoading(true)
     try {
-      await Promise.all([
+      const [progressList, ..._rest] = await Promise.all([
+        AchievementService.getAchievementProgress(user.id),
         loadStreak(),
         loadWorkoutFrequency(),
         loadTimeSpent(),
@@ -80,6 +83,8 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
         loadExerciseProgress(),
         loadWeeklyVolume()
       ])
+      const workoutCategories = ['workout', 'consistency', 'performance', 'volume']
+      setAchievementProgressList((progressList || []).filter((p) => workoutCategories.includes(p.template.category)))
     } catch (error) {
       console.error('Error loading workout analytics:', error)
     } finally {
@@ -403,12 +408,29 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       const date = new Date(pr.achieved_date)
       const daysAgo = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))
       const dateStr = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`
-      
+      const recordType = (pr as any).record_type as string | undefined
+      const recordValue = Number((pr as any).record_value) || 0
+      const recordUnit = (pr as any).record_unit || (recordType === 'weight' ? 'kg' : 'reps')
+      const improvementPercent = (pr as any).improvement_percentage != null ? Number((pr as any).improvement_percentage) : null
+      let displayValue: string
+      let weight = 0
+      let reps = 0
+      if (recordType === 'weight') {
+        weight = recordValue
+        displayValue = `${recordValue} ${recordUnit}`
+      } else if (recordType === 'reps') {
+        reps = recordValue
+        displayValue = `${recordValue} reps`
+      } else {
+        displayValue = `${recordValue} ${recordUnit}`
+      }
       return {
         exercise: exerciseName,
-        weight: pr.weight_kg || 0,
-        reps: pr.reps || 0,
-        date: dateStr
+        weight,
+        reps,
+        date: dateStr,
+        displayValue,
+        improvementPercent,
       }
     })
     
@@ -981,8 +1003,12 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold fc-text-primary">{pr.weight}kg</p>
-                      <p className="text-sm fc-text-subtle">{pr.reps} reps</p>
+                      <p className="text-2xl font-bold fc-text-primary">
+                        {pr.displayValue}
+                        {pr.improvementPercent != null && pr.improvementPercent > 0 && (
+                          <span className="text-sm font-normal fc-text-success ml-1">+{Math.round(pr.improvementPercent)}%</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1131,69 +1157,70 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
         </div>
         <div className="p-6 pt-0">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {/* Display ALL achievements with locked/unlocked states */}
-            {ACHIEVEMENTS.filter(a => a.category === 'activity' || a.category === 'performance' || a.category === 'volume').map((achievement) => {
-                // Determine user's current value for this achievement
-                let currentValue = 0
-                switch (achievement.id) {
-                  case 'the_regular': currentValue = userProgress.totalWorkouts; break
-                  case 'pr_breaker': currentValue = userProgress.totalPRs; break
-                  case 'streak_keeper': currentValue = userProgress.consecutiveWeeks; break
-                  case 'bench_press_club': currentValue = userProgress.benchPressMax; break
-                  case 'squat_club': currentValue = userProgress.squatMax; break
-                  case 'deadlift_club': currentValue = userProgress.deadliftMax; break
-                  case 'bodyweight_boss': currentValue = userProgress.pullupMax; break
-                  case 'volume_vanguard': currentValue = userProgress.singleWorkoutVolume; break
-                  case 'repetition_ruler': currentValue = userProgress.totalReps; break
-                  case 'the_workhorse': currentValue = userProgress.totalSets; break
-                  default: currentValue = 0
-                }
-
-                // Get tier info
-                const { tier, nextTier, nextThreshold } = getAchievementTier(achievement.id, currentValue)
-                const isUnlocked = tier !== null
-                const displayTier = tier || 'bronze'
-                const tierInfo = achievement.tiers[displayTier]
-                const tierIcon = isUnlocked ? getTierIcon(tier!) : '🔒'
-                const progress = nextThreshold ? (currentValue / nextThreshold) * 100 : 100
-                
-              return (
-                <div 
-                  key={achievement.id}
-                  onClick={() => setSelectedAchievement({ achievement, tier: displayTier, value: currentValue })}
-                  className={cn(
-                    "rounded-xl p-4 border text-center relative overflow-hidden cursor-pointer transition-all fc-hover-rise",
-                    isUnlocked ? "fc-glass-soft border-[color:var(--fc-glass-border)]" : "fc-glass-soft border-[color:var(--fc-glass-border)] opacity-60 grayscale"
-                  )}
-                >
-                  <div className="absolute top-2 right-2 text-lg">{tierIcon}</div>
-                  <div className={cn("text-3xl mb-1", !isUnlocked && "opacity-50")}>{achievement.icon}</div>
-                  <p className={`text-sm font-bold ${isUnlocked ? "fc-text-primary" : "fc-text-subtle"}`}>
-                    {achievement.name}
-                  </p>
-                  <p className="text-xs fc-text-subtle mb-1">
-                    {isUnlocked ? tierInfo.label : 'Locked'}
-                  </p>
-                  <div className="w-full fc-progress-track rounded-full h-1.5 mt-2">
-                    <div 
-                      className={cn(
-                        "h-full rounded-full transition-all duration-500",
-                        isUnlocked ? `bg-gradient-to-r ${getTierColor(tier!)}` : "bg-[color:var(--fc-glass-border)]"
-                      )}
-                      style={{ width: `${Math.min(progress, 100)}%` }}
-                    />
-                  </div>
-                  {!isUnlocked && nextThreshold && (
-                    <p className="text-xs fc-text-subtle mt-1">
-                      {currentValue}/{nextThreshold}
+            {achievementProgressList.map((p) => {
+                const { template, currentValue, progress, unlockedTiers, nextTier } = p
+                const isUnlocked = unlockedTiers.length > 0
+                const displayTier = (isUnlocked ? unlockedTiers[unlockedTiers.length - 1] : nextTier?.tier ?? 'bronze') as AchievementTier
+                const tierLabel = isUnlocked
+                  ? (template as any)[`tier_${displayTier}_label`] ?? displayTier
+                  : (nextTier?.label ?? 'Locked')
+                const tierIcon = isUnlocked ? getTierIcon(displayTier) : '🔒'
+                const nextThreshold = nextTier?.threshold
+                return (
+                  <div
+                    key={template.id}
+                    onClick={() => {
+                      const t = template as any
+                      setSelectedAchievement({
+                        achievement: {
+                          id: template.id,
+                          name: template.name,
+                          description: template.description ?? '',
+                          icon: template.icon ?? '🏆',
+                          tiers: {
+                            bronze: { threshold: Number(t.tier_bronze_threshold) || 0, label: t.tier_bronze_label ?? 'Bronze' },
+                            silver: { threshold: Number(t.tier_silver_threshold) || 0, label: t.tier_silver_label ?? 'Silver' },
+                            gold: { threshold: Number(t.tier_gold_threshold) || 0, label: t.tier_gold_label ?? 'Gold' },
+                            platinum: { threshold: Number(t.tier_platinum_threshold) || 0, label: t.tier_platinum_label ?? 'Platinum' }
+                          }
+                        },
+                        tier: displayTier,
+                        value: currentValue
+                      })
+                    }}
+                    className={cn(
+                      "rounded-xl p-4 border text-center relative overflow-hidden cursor-pointer transition-all fc-hover-rise",
+                      isUnlocked ? "fc-glass-soft border-[color:var(--fc-glass-border)]" : "fc-glass-soft border-[color:var(--fc-glass-border)] opacity-60 grayscale"
+                    )}
+                  >
+                    <div className="absolute top-2 right-2 text-lg">{tierIcon}</div>
+                    <div className={cn("text-3xl mb-1", !isUnlocked && "opacity-50")}>{template.icon ?? '🏆'}</div>
+                    <p className={`text-sm font-bold ${isUnlocked ? "fc-text-primary" : "fc-text-subtle"}`}>
+                      {template.name}
                     </p>
-                  )}
-                </div>
-              )
-            })}
+                    <p className="text-xs fc-text-subtle mb-1">
+                      {tierLabel}
+                    </p>
+                    <div className="w-full fc-progress-track rounded-full h-1.5 mt-2">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          isUnlocked ? `bg-gradient-to-r ${getTierColor(displayTier)}` : "bg-[color:var(--fc-glass-border)]"
+                        )}
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      />
+                    </div>
+                    {!isUnlocked && nextThreshold != null && (
+                      <p className="text-xs fc-text-subtle mt-1">
+                        {currentValue}/{nextThreshold}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
           </div>
           <p className="text-xs fc-text-subtle text-center mt-4">
-            💡 {ACHIEVEMENTS.filter(a => a.category === 'activity' || a.category === 'performance' || a.category === 'volume').length} total achievements • Tap any to view details
+            💡 {achievementProgressList.length} total achievements • Tap any to view details
           </p>
         </div>
       </div>

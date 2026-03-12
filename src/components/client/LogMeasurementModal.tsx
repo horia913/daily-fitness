@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Save, ChevronDown, ChevronUp } from "lucide-react";
-import { createMeasurement } from "@/lib/measurementService";
+import { upsertMeasurement } from "@/lib/measurementService";
 import type { BodyMeasurement } from "@/lib/measurementService";
+import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 
 interface LogMeasurementModalProps {
   clientId: string;
@@ -12,6 +13,8 @@ interface LogMeasurementModalProps {
   onSuccess: () => void;
   /** Pre-fill form from last check-in */
   lastMeasurement?: BodyMeasurement | null;
+  /** Called with newly unlocked achievements after save (e.g. weight_goal); parent can show AchievementUnlockModal */
+  onAchievementsUnlocked?: (achievements: NewlyUnlockedAchievement[]) => void;
 }
 
 export function LogMeasurementModal({
@@ -19,6 +22,7 @@ export function LogMeasurementModal({
   onClose,
   onSuccess,
   lastMeasurement,
+  onAchievementsUnlocked,
 }: LogMeasurementModalProps) {
   const [showFullMeasurements, setShowFullMeasurements] = useState(false);
   
@@ -81,7 +85,7 @@ export function LogMeasurementModal({
     try {
       const today = new Date().toISOString().split("T")[0];
       
-      const result = await createMeasurement({
+      const result = await upsertMeasurement({
         client_id: clientId,
         measured_date: today,
         weight_kg: parseFloat(weight),
@@ -104,6 +108,16 @@ export function LogMeasurementModal({
       if (!result) {
         setError("Failed to save measurement");
         return;
+      }
+
+      try {
+        const { AchievementService } = await import("@/lib/achievementService");
+        const weightNew = await AchievementService.checkAndUnlockAchievements(clientId, "weight_goal");
+        if (weightNew.length > 0 && onAchievementsUnlocked) {
+          onAchievementsUnlocked(weightNew);
+        }
+      } catch (achErr) {
+        console.warn("Error checking weight goal achievements:", achErr);
       }
 
       onSuccess();

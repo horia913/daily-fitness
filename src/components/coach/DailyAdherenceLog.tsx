@@ -1,3 +1,8 @@
+/**
+ * @deprecated This component uses mock data and is not rendered anywhere in the app as of March 2026.
+ * Replace with real queries (workout_logs, program_day_completions, etc.) if reused, or remove.
+ */
+
 'use client'
 
 import { useState } from 'react'
@@ -57,7 +62,7 @@ export default function DailyAdherenceLog({ clientId, clientName, dailyLogs }: D
   const theme = getThemeStyles()
   const [selectedDate, setSelectedDate] = useState<string>('')
 
-  // Mock daily log data - replace with actual data
+  // Not rendered in app as of March 2026; uses mock data.
   const mockDailyLogs: DailyLogEntry[] = [
     {
       date: '2024-01-14',

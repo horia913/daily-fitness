@@ -1,3 +1,8 @@
+/**
+ * PREFERRED: Use <Button> component for all new code.
+ * Legacy: Some pages use raw <button className="fc-btn ...">.
+ * Both are visually equivalent. Migrate legacy usage when touching those files.
+ */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";

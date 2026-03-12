@@ -7,7 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
-import { Droplet } from "lucide-react";
+import { Droplet, BarChart3, ChevronDown, ChevronUp, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -28,6 +28,7 @@ import {
   selectPlanForToday,
 } from "@/lib/mealCompletionService";
 import MealCardWithOptions from "@/components/client/MealCardWithOptions";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface NutritionData {
   calories: { consumed: number; goal: number };
@@ -140,6 +141,13 @@ function NutritionDashboardContent() {
   const [recentHistory, setRecentHistory] = useState<
     { label: string; date: string; calories: number; protein: number; completedCount: number }[]
   >([]);
+  /** Last 30 days for Nutrition Trends chart */
+  const [nutritionTrends, setNutritionTrends] = useState<
+    { date: string; calories: number; protein: number; carbs: number; fat: number; targetCalories?: number }[]
+  >([]);
+  const [nutritionTrendsTarget, setNutritionTrendsTarget] = useState<number | null>(null);
+  const [nutritionTrendsMetric, setNutritionTrendsMetric] = useState<"calories" | "protein" | "carbs" | "fat">("calories");
+  const [nutritionTrendsOpen, setNutritionTrendsOpen] = useState(false);
 
   const loadStartedAtRef = useRef<number | null>(null);
   const goalsSectionRef = useRef<HTMLDivElement>(null);
@@ -187,6 +195,7 @@ function NutritionDashboardContent() {
     if (loadId === loadGenerationRef.current) {
       loadWaterGoal();
       loadNutritionHistory(loadId);
+      loadNutritionTrends(loadId);
     }
   };
 
@@ -956,6 +965,92 @@ function NutritionDashboardContent() {
     }
   };
 
+  const loadNutritionTrends = async (loadId: number) => {
+    if (!user?.id) return;
+    const isCurrent = () => loadId === loadGenerationRef.current;
+    const today = new Date().toISOString().split("T")[0];
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const thirtyDaysAgo = d.toISOString().split("T")[0];
+    try {
+      const { data: completions } = await supabase
+        .from("meal_completions")
+        .select("date, completed_at, meal_id")
+        .eq("client_id", user.id)
+        .gte("date", thirtyDaysAgo)
+        .lte("date", today);
+      const allMealIds = [...new Set((completions || []).map((c: { meal_id: string }) => c.meal_id))];
+      const mealIdToMacros = new Map<string, { calories: number; protein: number; carbs: number; fat: number }>();
+      if (allMealIds.length > 0) {
+        const { data: mfi } = await supabase
+          .from("meal_food_items")
+          .select("meal_id, quantity, foods(calories_per_serving, serving_size, protein, carbs, fat)")
+          .in("meal_id", allMealIds);
+        for (const item of mfi || []) {
+          const row = item as {
+            meal_id: string;
+            quantity: number;
+            foods: { calories_per_serving?: number; serving_size?: number; protein?: number; carbs?: number; fat?: number } | null;
+          };
+          const f = row.foods;
+          const servingSize = f?.serving_size || 1;
+          const mult = row.quantity / servingSize;
+          const cal = ((f?.calories_per_serving || 0) * mult) || 0;
+          const prot = ((f?.protein || 0) * mult) || 0;
+          const carb = ((f?.carbs || 0) * mult) || 0;
+          const fatVal = ((f?.fat || 0) * mult) || 0;
+          const mid = row.meal_id;
+          const existing = mealIdToMacros.get(mid) || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+          mealIdToMacros.set(mid, {
+            calories: existing.calories + cal,
+            protein: existing.protein + prot,
+            carbs: existing.carbs + carb,
+            fat: existing.fat + fatVal,
+          });
+        }
+      }
+      const dateToData = new Map<string, { calories: number; protein: number; carbs: number; fat: number }>();
+      for (const c of completions || []) {
+        const row = c as { date?: string; completed_at: string; meal_id: string };
+        const dateStr = row.date || row.completed_at.split("T")[0];
+        const mid = row.meal_id;
+        const macros = mealIdToMacros.get(mid) || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+        const existing = dateToData.get(dateStr) || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+        dateToData.set(dateStr, {
+          calories: existing.calories + macros.calories,
+          protein: existing.protein + macros.protein,
+          carbs: existing.carbs + macros.carbs,
+          fat: existing.fat + macros.fat,
+        });
+      }
+      let targetCal: number | null = null;
+      try {
+        const { getClientNutritionGoals } = await import("@/lib/nutritionLogService");
+        const goals = await getClientNutritionGoals(user.id);
+        if (goals?.calories) targetCal = goals.calories;
+      } catch {
+        // ignore
+      }
+      if (targetCal != null && isCurrent()) setNutritionTrendsTarget(targetCal);
+      const sortedDates = Array.from(dateToData.keys()).sort();
+      const trendRows = sortedDates.map((dateStr) => {
+        const v = dateToData.get(dateStr)!;
+        return {
+          date: dateStr,
+          calories: Math.round(v.calories),
+          protein: Math.round(v.protein),
+          carbs: Math.round(v.carbs),
+          fat: Math.round(v.fat),
+          targetCalories: targetCal ?? undefined,
+        };
+      });
+      if (isCurrent()) setNutritionTrends(trendRows);
+    } catch (err) {
+      console.error("Error loading nutrition trends:", err);
+      if (isCurrent()) setNutritionTrends([]);
+    }
+  };
+
   const handleWaterGlassClick = async (targetGlasses: number) => {
     if (!user?.id || !waterGoalId) {
       // No goal configured, just update UI state
@@ -1159,14 +1254,12 @@ function NutritionDashboardContent() {
                 History
               </Link>
             </div>
-            <ClientGlassCard className="p-8 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <span className="text-4xl opacity-80">🍽️</span>
-                <p className="font-semibold fc-text-primary">No meal plan assigned yet</p>
-                <p className="text-sm fc-text-dim">
-                  Your coach will assign a meal plan when you&apos;re ready to start.
-                </p>
-              </div>
+            <ClientGlassCard className="p-8">
+              <EmptyState
+                icon={UtensilsCrossed}
+                title="No meal plan"
+                description="Ask your coach to assign a meal plan"
+              />
             </ClientGlassCard>
           </>
         ) : (
@@ -1257,12 +1350,16 @@ function NutritionDashboardContent() {
                 </div>
                 <div className="text-sm fc-text-dim space-y-1">
                   <p>
-                    <span className="font-mono font-medium fc-text-primary">
+                    <span className="font-mono font-medium text-blue-500 dark:text-blue-400">
                       {Math.round(nutritionData.calories.consumed)} / {nutritionData.calories.goal || "—"} kcal
                     </span>
                   </p>
-                  <p className="text-xs">
-                    P {Math.round(nutritionData.protein.consumed)}g · C {Math.round(nutritionData.carbs.consumed)}g · F {Math.round(nutritionData.fat.consumed)}g
+                  <p className="text-xs fc-text-dim">
+                    <span className="text-rose-500 dark:text-rose-400">P {Math.round(nutritionData.protein.consumed)}g</span>
+                    {" · "}
+                    <span className="text-amber-500 dark:text-amber-400">C {Math.round(nutritionData.carbs.consumed)}g</span>
+                    {" · "}
+                    <span className="text-purple-500 dark:text-purple-400">F {Math.round(nutritionData.fat.consumed)}g</span>
                     {nutritionData.protein.goal != null && (
                       <span className="fc-text-dim">
                         {" "}
@@ -1282,7 +1379,7 @@ function NutritionDashboardContent() {
                     <Droplet className="w-4 h-4 text-[color:var(--fc-accent-cyan)]" />
                     Water
                   </span>
-                  <span className="text-sm font-mono fc-text-primary shrink-0">
+                  <span className="text-sm font-mono text-cyan-500 dark:text-cyan-400 shrink-0">
                     {nutritionData.water.ml.toLocaleString()} / {nutritionData.water.goalMl > 0 ? nutritionData.water.goalMl.toLocaleString() : "—"} mL
                   </span>
                 </div>
@@ -1361,6 +1458,94 @@ function NutritionDashboardContent() {
             <p className="text-xs fc-text-dim text-center py-2">
               All portions are for raw/uncooked ingredients.
             </p>
+
+            {/* Nutrition Trends — collapsible */}
+            <section className="w-full">
+              <button
+                type="button"
+                onClick={() => setNutritionTrendsOpen((o) => !o)}
+                className="w-full fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 flex items-center justify-between gap-3 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
+                  <span className="font-semibold fc-text-primary">Nutrition Trends</span>
+                </div>
+                {nutritionTrendsOpen ? <ChevronUp className="w-5 h-5 fc-text-dim" /> : <ChevronDown className="w-5 h-5 fc-text-dim" />}
+              </button>
+              {nutritionTrendsOpen && (
+                <div className="fc-surface rounded-b-2xl border border-t-0 border-[color:var(--fc-surface-card-border)] p-4 mt-0">
+                  {nutritionTrends.length === 0 ? (
+                    <p className="text-sm fc-text-dim py-6 text-center">Start logging meals to see trends.</p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {(["calories", "protein", "carbs", "fat"] as const).map((m) => {
+                          const selectedBg =
+                            m === "calories"
+                              ? "bg-blue-500 dark:bg-blue-600 text-white"
+                              : m === "protein"
+                                ? "bg-rose-500 dark:bg-rose-600 text-white"
+                                : m === "carbs"
+                                  ? "bg-amber-500 dark:bg-amber-600 text-white"
+                                  : "bg-purple-500 dark:bg-purple-600 text-white";
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setNutritionTrendsMetric(m)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                nutritionTrendsMetric === m ? selectedBg : "fc-glass-soft fc-text-dim hover:fc-text-primary"
+                              }`}
+                            >
+                              {m === "calories" ? "Calories" : m === "protein" ? "Protein" : m === "carbs" ? "Carbs" : "Fat"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="relative h-40 flex items-end gap-0.5">
+                        {nutritionTrends.map((day) => {
+                          const val = day[nutritionTrendsMetric];
+                          const maxVal = Math.max(...nutritionTrends.map((d) => d[nutritionTrendsMetric]), 1);
+                          const height = (val / maxVal) * 100;
+                          const barClass =
+                            nutritionTrendsMetric === "calories"
+                              ? "bg-blue-500/70 dark:bg-blue-400/70"
+                              : nutritionTrendsMetric === "protein"
+                                ? "bg-rose-500/70 dark:bg-rose-400/70"
+                                : nutritionTrendsMetric === "carbs"
+                                  ? "bg-amber-500/70 dark:bg-amber-400/70"
+                                  : "bg-purple-500/70 dark:bg-purple-400/70";
+                          return (
+                            <div key={day.date} className="flex-1 min-w-0 flex flex-col items-center" title={`${day.date}: ${val}`}>
+                              <div
+                                className={`w-full rounded-t hover:opacity-90 transition-opacity ${barClass}`}
+                                style={{ height: `${Math.max(height, val > 0 ? 4 : 0)}%`, minHeight: val > 0 ? "4px" : "0" }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs fc-text-dim mt-2">
+                        Last 30 days · {nutritionTrendsMetric === "calories" ? "kcal" : "g"}
+                      </p>
+                      {(() => {
+                        const last7 = nutritionTrends.slice(-7);
+                        const weekAvg = last7.length > 0
+                          ? Math.round(last7.reduce((s, d) => s + d[nutritionTrendsMetric], 0) / last7.length)
+                          : 0;
+                        const target = nutritionTrendsMetric === "calories" ? nutritionTrendsTarget : null;
+                        return (
+                          <p className="text-sm fc-text-primary mt-1">
+                            This week avg: {weekAvg.toLocaleString()}{nutritionTrendsMetric === "calories" ? " cal" : " g"}
+                            {target != null && nutritionTrendsMetric === "calories" && ` (target: ${target.toLocaleString()})`}
+                          </p>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
+            </section>
           </>
         )}
 

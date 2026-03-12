@@ -34,6 +34,7 @@ interface WorkoutSet {
   exercise_id: string;
   weight: number | null;
   reps: number | null;
+  rpe?: number | null;
   set_number?: number | null;
   completed_at: string;
 
@@ -284,6 +285,7 @@ export default function WorkoutLogDetailPage() {
           exercise_id,
           weight,
           reps,
+          rpe,
           set_number,
           completed_at,
           dropset_initial_weight,
@@ -594,6 +596,7 @@ export default function WorkoutLogDetailPage() {
               • Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.amrap_total_reps || set.reps || 0}{" "}
               reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {set.amrap_target_reps && (
               <span className="ml-2 text-[color:var(--fc-text-dim)]">
@@ -638,6 +641,7 @@ export default function WorkoutLogDetailPage() {
               • Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.fortime_total_reps || set.reps || 0}{" "}
               reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {forTimeTaken && (
               <span className="ml-2 text-[color:var(--fc-text-dim)]">
@@ -661,6 +665,7 @@ export default function WorkoutLogDetailPage() {
               • Set {set.set_number || 1}:{" "}
               {set.dropset_initial_weight || set.weight || 0} kg ×{" "}
               {set.dropset_initial_reps || set.reps || 0}
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {set.dropset_final_weight !== null &&
               set.dropset_final_weight !== undefined && (
@@ -686,6 +691,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-semibold">
               • Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
           </div>
         );
@@ -698,6 +704,7 @@ export default function WorkoutLogDetailPage() {
               <span className="text-[color:var(--fc-domain-workouts)]">A:</span>{" "}
               {set.superset_weight_a || set.weight || 0} kg ×{" "}
               {set.superset_reps_a || set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {set.superset_weight_b !== null &&
               set.superset_weight_b !== undefined && (
@@ -739,6 +746,7 @@ export default function WorkoutLogDetailPage() {
           return (
             <div className="text-sm font-semibold">
               • Round {set.set_number || 1}: {set.weight || 0} kg × {set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </div>
           );
         }
@@ -749,6 +757,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-semibold">
               • Cluster {set.cluster_number || 1}, Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
           </div>
         );
@@ -760,6 +769,7 @@ export default function WorkoutLogDetailPage() {
               • Set {set.set_number || 1}:{" "}
               {set.rest_pause_initial_weight || set.weight || 0} kg ×{" "}
               {set.rest_pause_initial_reps || set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {set.rest_pause_reps_after !== null &&
               set.rest_pause_reps_after !== undefined && (
@@ -785,6 +795,7 @@ export default function WorkoutLogDetailPage() {
               <span className="text-[color:var(--fc-domain-workouts)]">A:</span>{" "}
               {set.preexhaust_isolation_weight || 0} kg ×{" "}
               {set.preexhaust_isolation_reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             <span className="mx-2">→</span>
             <span className="font-semibold">
@@ -809,6 +820,7 @@ export default function WorkoutLogDetailPage() {
               • Minute{" "}
               {set.emom_minute_number || set.set_number || 1}:{" "}
               {set.emom_total_reps_this_min || set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
             {emomDuration && (
               <span className="ml-2 text-[color:var(--fc-text-dim)]">
@@ -846,6 +858,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-semibold">
               • Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.reps || 0} reps
+              {set.rpe != null && ` @ RPE ${set.rpe}`}
             </span>
           </div>
         );
@@ -1096,7 +1109,7 @@ export default function WorkoutLogDetailPage() {
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
                 <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
               </div>
             </div>
           </div>
@@ -1174,7 +1187,7 @@ export default function WorkoutLogDetailPage() {
               <div className="flex items-center justify-between gap-4">
                 <Link
                   href="/client/progress/workout-logs"
-                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]"
+                  className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]"
                   aria-label="Back to logs"
                 >
                   <ChevronLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
@@ -1364,6 +1377,12 @@ export default function WorkoutLogDetailPage() {
                                       <div key={exercise.exercise_id}>
                                         <h4 className="mb-2 font-semibold text-[color:var(--fc-text-primary)]">
                                           {exercise.exercise_name}
+                                          <Link
+                                            href={`/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`}
+                                            className="ml-2 text-xs font-normal text-[color:var(--fc-accent)] hover:underline"
+                                          >
+                                            View progression
+                                          </Link>
                                         </h4>
                                         <div className="space-y-1 ml-4">
                                           {exercise.sets

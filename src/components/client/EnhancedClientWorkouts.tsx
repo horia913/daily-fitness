@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { supabase, ensureAuthenticated } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
 import { useNewWorkoutLoader } from "@/lib/featureFlags";
 import {
   Calendar,
@@ -144,6 +145,7 @@ export default function EnhancedClientWorkouts({
     useTheme();
   const { user, profile, session, signOut } = useAuth();
   const theme = getThemeStyles();
+  const { addToast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const perfMarksRef = useRef<{
@@ -1315,12 +1317,12 @@ export default function EnhancedClientWorkouts({
         // No assignment found for this standalone template — cannot start.
         // Do NOT push template ID as URL param: start/page.tsx cannot resolve it.
         console.warn('[EnhancedClientWorkouts] No workout_assignment found for template:', workout.templateId);
-        alert('No active assignment found for this workout. Ask your coach to assign it.');
+        addToast({ title: 'No active assignment found for this workout. Ask your coach to assign it.', variant: 'destructive' });
       }
     } catch (error) {
       console.error("Error finding assignment:", error);
       // Do NOT fall back to template ID — it is not a valid workout_assignment_id.
-      alert('Could not start workout. Please try again.');
+      addToast({ title: 'Could not start workout. Please try again.', variant: 'destructive' });
     }
   };
 

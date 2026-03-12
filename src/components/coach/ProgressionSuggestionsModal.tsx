@@ -379,7 +379,7 @@ export default function ProgressionSuggestionsModal({
                           • <strong>Straight Sets:</strong> Moderate loads, higher reps
                         </p>
                         <p>
-                          • <strong>Circuit:</strong> For endurance and conditioning
+                          • <strong>Tabata:</strong> For endurance and conditioning
                         </p>
                         <p>
                           • <strong>Time-Based Protocols:</strong> AMRAP, EMOM for

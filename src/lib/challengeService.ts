@@ -30,7 +30,7 @@ export interface ChallengeParticipant {
   challenge_id: string;
   client_id: string;
   selected_track?: 'fat_loss' | 'muscle_gain' | null;
-  status: 'registered' | 'active' | 'completed' | 'withdrawn';
+  status: 'registered' | 'active' | 'completed' | 'withdrawn' | 'invited';
   joined_at: string;
   total_score: number;
   final_rank?: number | null;
@@ -38,12 +38,16 @@ export interface ChallengeParticipant {
   award_notes?: string | null;
 }
 
+export type ScoringMethod =
+  | 'pr_improvement' | 'bw_multiple' | 'tonnage' | 'waist_delta' | 'muscle_gain_bw_multiple' | 'adherence_percentage'
+  | 'max_weight' | 'max_reps' | 'max_volume' | 'completion_count' | 'body_recomp_percentage' | 'custom';
+
 export interface ChallengeScoringCategory {
   id: string;
   challenge_id: string;
   category_name: string;
   exercise_id?: string | null;
-  scoring_method: 'pr_improvement' | 'bw_multiple' | 'tonnage' | 'waist_delta' | 'muscle_gain_bw_multiple' | 'adherence_percentage';
+  scoring_method: ScoringMethod;
   weight_percentage: number;
   created_at: string;
 }
@@ -90,14 +94,21 @@ export async function getActiveChallenges(): Promise<Challenge[]> {
 }
 
 /**
- * Get all challenges (for coaches - includes all statuses)
+ * Get all challenges (for coaches - includes all statuses).
+ * If createdBy is provided, filter to that coach's challenges.
  */
-export async function getAllChallenges(): Promise<Challenge[]> {
+export async function getAllChallenges(createdBy?: string): Promise<Challenge[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('challenges')
       .select('*')
       .order('start_date', { ascending: false });
+
+    if (createdBy) {
+      query = query.eq('created_by', createdBy);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching all challenges:', error);
@@ -108,6 +119,84 @@ export async function getAllChallenges(): Promise<Challenge[]> {
   } catch (error) {
     console.error('Error in getAllChallenges:', error);
     return [];
+  }
+}
+
+export interface CreateChallengePayload {
+  created_by: string;
+  name: string;
+  description?: string | null;
+  challenge_type: 'coach_challenge' | 'recomp_challenge';
+  start_date: string;
+  end_date: string;
+  max_participants?: number | null;
+  is_public: boolean;
+  requires_video_proof: boolean;
+  recomp_track?: 'fat_loss' | 'muscle_gain' | 'both' | null;
+  program_id?: string | null;
+  reward_description?: string | null;
+  reward_value?: string | null;
+  scoring_categories: Array<{
+    category_name: string;
+    exercise_id?: string | null;
+    scoring_method: ScoringMethod;
+    weight_percentage: number;
+  }>;
+}
+
+/**
+ * Create a new challenge and its scoring categories. Status is set to draft.
+ */
+export async function createChallenge(payload: CreateChallengePayload): Promise<Challenge | null> {
+  try {
+    const { data: challenge, error: challengeError } = await supabase
+      .from('challenges')
+      .insert({
+        created_by: payload.created_by,
+        name: payload.name,
+        description: payload.description ?? null,
+        challenge_type: payload.challenge_type,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        max_participants: payload.max_participants ?? null,
+        is_public: payload.is_public,
+        requires_video_proof: payload.requires_video_proof,
+        recomp_track: payload.recomp_track ?? null,
+        program_id: payload.program_id ?? null,
+        reward_description: payload.reward_description ?? null,
+        reward_value: payload.reward_value ?? null,
+        status: 'draft',
+      })
+      .select()
+      .single();
+
+    if (challengeError || !challenge) {
+      console.error('Error creating challenge:', challengeError);
+      return null;
+    }
+
+    if (payload.scoring_categories?.length) {
+      const categories = payload.scoring_categories.map((c) => ({
+        challenge_id: challenge.id,
+        category_name: c.category_name,
+        exercise_id: c.exercise_id ?? null,
+        scoring_method: c.scoring_method,
+        weight_percentage: c.weight_percentage ?? 100,
+      }));
+      const { error: catError } = await supabase
+        .from('challenge_scoring_categories')
+        .insert(categories);
+
+      if (catError) {
+        console.error('Error creating scoring categories:', catError);
+        // Challenge already created; could rollback or leave categories empty
+      }
+    }
+
+    return challenge;
+  } catch (error) {
+    console.error('Error in createChallenge:', error);
+    return null;
   }
 }
 
@@ -206,22 +295,298 @@ export async function getChallengeScoringCategories(challengeId: string): Promis
   }
 }
 
+/**
+ * Update challenge basic info (allowed when draft/active; active restricts to description, end_date, max_participants)
+ */
+export async function updateChallenge(
+  challengeId: string,
+  payload: Partial<Pick<Challenge, 'name' | 'description' | 'start_date' | 'end_date' | 'max_participants' | 'is_public' | 'requires_video_proof' | 'recomp_track' | 'program_id' | 'reward_description' | 'reward_value'>>
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('challenges')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', challengeId);
+    if (error) {
+      console.error('Error updating challenge:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error in updateChallenge:', error);
+    return false;
+  }
+}
+
+/**
+ * Replace scoring categories for a challenge (delete existing, insert new). Use when status is draft.
+ */
+export async function updateChallengeScoringCategories(
+  challengeId: string,
+  categories: Array<{ category_name: string; exercise_id?: string | null; scoring_method: ScoringMethod; weight_percentage: number }>
+): Promise<boolean> {
+  try {
+    const { error: delError } = await supabase
+      .from('challenge_scoring_categories')
+      .delete()
+      .eq('challenge_id', challengeId);
+    if (delError) {
+      console.error('Error deleting old categories:', delError);
+      return false;
+    }
+    if (categories.length) {
+      const rows = categories.map((c) => ({
+        challenge_id: challengeId,
+        category_name: c.category_name,
+        exercise_id: c.exercise_id ?? null,
+        scoring_method: c.scoring_method,
+        weight_percentage: c.weight_percentage ?? 100,
+      }));
+      const { error: insError } = await supabase.from('challenge_scoring_categories').insert(rows);
+      if (insError) {
+        console.error('Error inserting categories:', insError);
+        return false;
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Error in updateChallengeScoringCategories:', error);
+    return false;
+  }
+}
+
+/**
+ * Start challenge: set status to active.
+ */
+export async function startChallenge(challengeId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('challenges')
+      .update({ status: 'active', updated_at: new Date().toISOString() })
+      .eq('id', challengeId);
+    if (error) {
+      console.error('Error starting challenge:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error in startChallenge:', error);
+    return false;
+  }
+}
+
+/**
+ * Invite clients to a private challenge (creates challenge_participants with status 'invited').
+ */
+export async function inviteParticipants(challengeId: string, clientIds: string[]): Promise<boolean> {
+  try {
+    if (!clientIds.length) return true;
+    const rows = clientIds.map((client_id) => ({
+      challenge_id: challengeId,
+      client_id,
+      status: 'invited',
+    }));
+    const { error } = await supabase.from('challenge_participants').insert(rows);
+    if (error) {
+      console.error('Error inviting participants:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error in inviteParticipants:', error);
+    return false;
+  }
+}
+
+/**
+ * Accept an invitation (client): set status to registered/active.
+ */
+export async function acceptChallengeInvite(participantId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('challenge_participants')
+      .update({ status: 'registered', updated_at: new Date().toISOString() })
+      .eq('id', participantId);
+    if (error) {
+      console.error('Error accepting invite:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error in acceptChallengeInvite:', error);
+    return false;
+  }
+}
+
 // ============================================================================
 // Scoring Helpers
 // ============================================================================
 
 /**
- * Calculate participant score (to be run by backend job or coach trigger)
+ * Finalize challenge: recalc all scores, set status completed, assign final_rank and is_winner.
+ */
+export async function finalizeChallenge(challengeId: string): Promise<{ success: boolean; standings?: ChallengeParticipant[] }> {
+  try {
+    const participants = await getChallengeParticipants(challengeId);
+    for (const p of participants) {
+      const newScore = await calculateParticipantScore(p.id, challengeId);
+      await supabase
+        .from('challenge_participants')
+        .update({ total_score: newScore, updated_at: new Date().toISOString() })
+        .eq('id', p.id);
+    }
+    const { error: updateError } = await supabase
+      .from('challenges')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', challengeId);
+    if (updateError) {
+      console.error('Error finalizing challenge:', updateError);
+      return { success: false };
+    }
+    const updatedParticipants = await getChallengeParticipants(challengeId);
+    const sorted = [...updatedParticipants].sort((a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0));
+    let rank = 1;
+    for (const p of sorted) {
+      await supabase
+        .from('challenge_participants')
+        .update({ final_rank: rank, is_winner: rank === 1, updated_at: new Date().toISOString() })
+        .eq('id', p.id);
+      rank++;
+    }
+    const standings = await getChallengeParticipants(challengeId);
+    return { success: true, standings };
+  } catch (error) {
+    console.error('Error in finalizeChallenge:', error);
+    return { success: false };
+  }
+}
+
+/**
+ * Get approved submissions for a participant in a challenge (for scoring).
+ */
+async function getApprovedSubmissions(
+  participantId: string,
+  challengeId: string
+): Promise<ChallengeVideoSubmission[]> {
+  const { data, error } = await supabase
+    .from('challenge_video_submissions')
+    .select('*')
+    .eq('participant_id', participantId)
+    .eq('status', 'approved');
+  if (error || !data) return [];
+  const categoryIds = (await getChallengeScoringCategories(challengeId)).map((c) => c.id);
+  return data.filter((s: ChallengeVideoSubmission) => categoryIds.includes(s.scoring_category_id));
+}
+
+/**
+ * Count completed workouts for a participant during the challenge date range.
+ */
+async function getCompletedWorkoutCount(
+  clientId: string,
+  challengeId: string
+): Promise<number> {
+  const challenge = await getChallengeDetails(challengeId);
+  if (!challenge) return 0;
+  const start = new Date(challenge.start_date);
+  const end = new Date(challenge.end_date);
+  end.setHours(23, 59, 59, 999);
+  const { data, error } = await supabase
+    .from('workout_logs')
+    .select('id')
+    .eq('client_id', clientId)
+    .not('completed_at', 'is', null)
+    .gte('completed_at', start.toISOString())
+    .lte('completed_at', end.toISOString());
+  if (error) return 0;
+  return (data || []).length;
+}
+
+/**
+ * Body recomp score: e.g. weight delta (kg lost) or body fat change during challenge.
+ */
+async function getBodyRecompScore(
+  clientId: string,
+  challengeId: string
+): Promise<number> {
+  const challenge = await getChallengeDetails(challengeId);
+  if (!challenge) return 0;
+  const start = new Date(challenge.start_date);
+  const end = new Date(challenge.end_date);
+  const { data: metrics } = await supabase
+    .from('body_metrics')
+    .select('weight_kg, measured_date')
+    .eq('client_id', clientId)
+    .not('weight_kg', 'is', null)
+    .order('measured_date', { ascending: true });
+  if (!metrics?.length) return 0;
+  const atStart = metrics.filter((m: any) => new Date(m.measured_date) <= start);
+  const atEnd = metrics.filter((m: any) => new Date(m.measured_date) >= end);
+  const startWeight = atStart.length ? Number(atStart[atStart.length - 1].weight_kg) : Number(metrics[0].weight_kg);
+  const endWeight = atEnd.length ? Number(atEnd[0].weight_kg) : Number(metrics[metrics.length - 1].weight_kg);
+  const delta = startWeight - endWeight;
+  return Math.round(delta * 10) / 10;
+}
+
+/**
+ * Calculate participant total score from scoring categories and approved submissions / workout count / body recomp.
  */
 export async function calculateParticipantScore(
   participantId: string,
   challengeId: string
 ): Promise<number> {
-  // This would be a complex calculation based on scoring categories
-  // For now, return placeholder
-  console.log('Calculate score for participant:', participantId, 'in challenge:', challengeId);
-  return 0; // TODO: Implement full scoring logic
+  try {
+    const categories = await getChallengeScoringCategories(challengeId);
+    const approved = await getApprovedSubmissions(participantId, challengeId);
+    const { data: participantRow } = await supabase
+      .from('challenge_participants')
+      .select('client_id')
+      .eq('id', participantId)
+      .single();
+    const clientId = participantRow?.client_id;
+    if (!clientId) return 0;
+
+    let totalScore = 0;
+    for (const cat of categories) {
+      const sub = approved.find((s) => s.scoring_category_id === cat.id);
+      let categoryScore = 0;
+      const weightPct = (cat.weight_percentage ?? 0) / 100;
+
+      switch (cat.scoring_method) {
+        case 'max_weight':
+          categoryScore = sub ? Number(sub.claimed_weight) || 0 : 0;
+          break;
+        case 'max_reps':
+          categoryScore = sub ? Number(sub.claimed_reps) || 0 : 0;
+          break;
+        case 'max_volume':
+          categoryScore = sub ? (Number(sub.claimed_weight) || 0) * (Number(sub.claimed_reps) || 0) : 0;
+          break;
+        case 'completion_count':
+        case 'adherence_percentage':
+          categoryScore = await getCompletedWorkoutCount(clientId, challengeId);
+          break;
+        case 'body_recomp_percentage':
+        case 'waist_delta':
+          categoryScore = await getBodyRecompScore(clientId, challengeId);
+          break;
+        case 'custom':
+        case 'pr_improvement':
+        case 'bw_multiple':
+        case 'tonnage':
+        case 'muscle_gain_bw_multiple':
+        default:
+          categoryScore = sub ? Number(sub.claimed_weight) || 0 : 0;
+          break;
+      }
+      totalScore += categoryScore * weightPct;
+    }
+    return Math.round(totalScore * 100) / 100;
+  } catch (error) {
+    console.error('Error in calculateParticipantScore:', error);
+    return 0;
+  }
 }
+
 
 /**
  * Get client's challenges
@@ -391,7 +756,8 @@ export async function getPendingVideoSubmissions(
 }
 
 /**
- * Review (approve/reject) a video submission
+ * Review (approve/reject) a video submission.
+ * On approve: recalculates participant total_score and updates challenge_participants.
  */
 export async function reviewVideoSubmission(
   submissionId: string,
@@ -400,6 +766,17 @@ export async function reviewVideoSubmission(
   reviewNotes?: string
 ): Promise<boolean> {
   try {
+    const { data: submission, error: fetchErr } = await supabase
+      .from('challenge_video_submissions')
+      .select('participant_id')
+      .eq('id', submissionId)
+      .single();
+    if (fetchErr || !submission?.participant_id) {
+      console.error('Error fetching submission:', fetchErr);
+      return false;
+    }
+    const participantId = submission.participant_id;
+
     const { error } = await supabase
       .from('challenge_video_submissions')
       .update({
@@ -413,6 +790,21 @@ export async function reviewVideoSubmission(
     if (error) {
       console.error('Error reviewing submission:', error);
       return false;
+    }
+
+    if (status === 'approved') {
+      const { data: participant } = await supabase
+        .from('challenge_participants')
+        .select('challenge_id')
+        .eq('id', participantId)
+        .single();
+      if (participant?.challenge_id) {
+        const newScore = await calculateParticipantScore(participantId, participant.challenge_id);
+        await supabase
+          .from('challenge_participants')
+          .update({ total_score: newScore, updated_at: new Date().toISOString() })
+          .eq('id', participantId);
+      }
     }
 
     return true;
@@ -429,13 +821,23 @@ export async function getChallengeSubmissions(
   challengeId: string
 ): Promise<ChallengeVideoSubmission[]> {
   try {
+    const { data: participants, error: partError } = await supabase
+      .from('challenge_participants')
+      .select('id')
+      .eq('challenge_id', challengeId);
+
+    if (partError || !participants?.length) {
+      return [];
+    }
+
+    const participantIds = participants.map((p: { id: string }) => p.id);
     const { data, error } = await supabase
       .from('challenge_video_submissions')
       .select(`
         *,
-        participant:challenge_participants!participant_id(*)
+        participant:challenge_participants!participant_id(id, client_id, challenge_id)
       `)
-      .eq('participant.challenge_id', challengeId)
+      .in('participant_id', participantIds)
       .order('submitted_at', { ascending: false });
 
     if (error) {

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Trash2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import { type FoodLogEntry as FoodLogEntryType, updateEntry } from "@/lib/foodLogService";
 
 interface FoodLogEntryProps {
@@ -11,6 +12,7 @@ interface FoodLogEntryProps {
 }
 
 export function FoodLogEntry({ entry, onDelete }: FoodLogEntryProps) {
+  const { addToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [quantity, setQuantity] = useState(entry.quantity);
   const [saving, setSaving] = useState(false);
@@ -20,7 +22,7 @@ export function FoodLogEntry({ entry, onDelete }: FoodLogEntryProps) {
   
   const handleSave = async () => {
     if (quantity <= 0) {
-      alert('Quantity must be greater than 0');
+      addToast({ title: 'Quantity must be greater than 0', variant: 'warning' });
       return;
     }
     
@@ -32,7 +34,7 @@ export function FoodLogEntry({ entry, onDelete }: FoodLogEntryProps) {
       window.dispatchEvent(new CustomEvent('foodEntryUpdated'));
     } catch (error) {
       console.error('Error updating entry:', error);
-      alert('Failed to update entry');
+      addToast({ title: 'Failed to update entry', variant: 'destructive' });
     } finally {
       setSaving(false);
     }

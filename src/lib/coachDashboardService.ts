@@ -123,7 +123,7 @@ export interface ClientAlert {
   clientId: string;
   clientName: string;
   detail: string;
-  type: 'highStress' | 'highSoreness' | 'lowSleep' | 'noCheckIn3Days' | 'missedWorkouts' | 'programEnding' | 'noProgram' | 'noMealPlan';
+  type: 'highStress' | 'highSoreness' | 'lowSleep' | 'noCheckIn3Days' | 'missedWorkouts' | 'programEnding' | 'noProgram' | 'noMealPlan' | 'overdueCheckIn' | 'achievementUnlocked';
   severity: 'high' | 'medium' | 'low';
 }
 
@@ -169,6 +169,8 @@ export interface MorningBriefing {
     programEnding: ClientAlert[];
     noProgram: ClientAlert[];
     noMealPlan: ClientAlert[];
+    overdueCheckIn: ClientAlert[];
+    achievementUnlocked: ClientAlert[];
   };
   clientSummaries: ClientSummary[];
 }
@@ -301,6 +303,33 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         activeProgramMap.set(p.client_id, { id: p.id, end_date, program_id: p.program_id });
       }
     });
+
+    // Batch fetch program compliance data (current week, schedule, completions) for per-client %
+    const assignmentIdsForCompliance = Array.from(activeProgramMap.values()).map((p) => p.id);
+    const programIdsForCompliance = [...new Set(Array.from(activeProgramMap.values()).map((p) => p.program_id))];
+    let progressMap = new Map<string, number>();
+    let scheduleByProgram = new Map<string, Array<{ id: string; program_id: string; week_number: number; day_number: number }>>();
+    let completionRowsCompliance: Array<{ program_assignment_id: string; program_schedule_id: string }> = [];
+    if (assignmentIdsForCompliance.length > 0) {
+      const [
+        { data: progressRows },
+        { data: scheduleRows },
+        { data: completionRowsComp },
+      ] = await Promise.all([
+        db.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIdsForCompliance),
+        db.from('program_schedule').select('id, program_id, week_number, day_number').in('program_id', programIdsForCompliance).order('week_number', { ascending: true }).order('day_number', { ascending: true }),
+        db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', assignmentIdsForCompliance),
+      ]);
+      for (const r of progressRows ?? []) {
+        if (r.current_week_number != null) progressMap.set(r.program_assignment_id, r.current_week_number);
+      }
+      for (const s of scheduleRows ?? []) {
+        const list = scheduleByProgram.get(s.program_id) ?? [];
+        list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1 });
+        scheduleByProgram.set(s.program_id, list);
+      }
+      completionRowsCompliance = (completionRowsComp ?? []) as typeof completionRowsCompliance;
+    }
     const activeMealPlanSet = new Set((activeMealPlans || []).map((m) => m.client_id));
     const athleteScoreMap = new Map<string, number>();
     (athleteScores || []).forEach((s) => {
@@ -354,6 +383,47 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       checkinsByClient.get(log.client_id)!.add(log.log_date);
     });
 
+    // Batch fetch check-in configs and last body_metrics for overdueCheckIn alerts
+    let checkInConfigByClient = new Map<string, number>();
+    let lastBodyMetricDateByClient = new Map<string, string>();
+    if (activeClientIds.length > 0) {
+      const [configsRes, bodyMetricsRes] = await Promise.all([
+        db.from('check_in_configs').select('client_id, frequency_days').eq('coach_id', coachId),
+        db.from('body_metrics').select('client_id, measured_date').in('client_id', activeClientIds).order('measured_date', { ascending: false }),
+      ]);
+      const configs = (configsRes.data ?? []) as Array<{ client_id: string | null; frequency_days: number }>;
+      const clientSpecific = configs.filter((c) => c.client_id != null);
+      const defaultConfig = configs.find((c) => c.client_id == null);
+      const defaultFreq = defaultConfig?.frequency_days ?? 30;
+      for (const id of activeClientIds) {
+        const row = clientSpecific.find((c) => c.client_id === id);
+        checkInConfigByClient.set(id, row?.frequency_days ?? defaultFreq);
+      }
+      const bodyMetrics = (bodyMetricsRes.data ?? []) as Array<{ client_id: string; measured_date: string }>;
+      for (const row of bodyMetrics) {
+        if (!lastBodyMetricDateByClient.has(row.client_id)) {
+          const d = typeof row.measured_date === 'string' ? row.measured_date.split('T')[0] : row.measured_date;
+          lastBodyMetricDateByClient.set(row.client_id, d);
+        }
+      }
+    }
+
+    // Recent achievement unlocks (last 24h) for coach's clients
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    const recentAchievementsRes = await db
+      .from('user_achievements')
+      .select('id, client_id, tier, earned_at, achievement_templates(name)')
+      .in('client_id', allClientIds)
+      .gte('earned_at', twentyFourHoursAgo.toISOString())
+      .order('earned_at', { ascending: false });
+    type RecentAchievementRow = {
+      client_id: string;
+      tier: string | null;
+      achievement_templates: { name: string } | null;
+    };
+    const recentAchievements = (recentAchievementsRes.data ?? []) as unknown as Array<RecentAchievementRow>;
+
     // Calculate alerts and summaries
     const alerts: MorningBriefing['alerts'] = {
       noCheckIn3Days: [],
@@ -364,6 +434,20 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       programEnding: [],
       noProgram: [],
       noMealPlan: [],
+      overdueCheckIn: [],
+      achievementUnlocked: recentAchievements.map((r) => {
+        const profile = profilesMap.get(r.client_id);
+        const clientName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Client' : 'Client';
+        const name = r.achievement_templates?.name ?? 'Achievement';
+        const tierLabel = r.tier ? ` — ${r.tier.charAt(0).toUpperCase() + r.tier.slice(1)}` : '';
+        return {
+          clientId: r.client_id,
+          clientName,
+          detail: `Earned ${name}${tierLabel}`,
+          type: 'achievementUnlocked' as const,
+          severity: 'low' as const,
+        };
+      }),
     };
 
     const clientSummaries: ClientSummary[] = [];
@@ -555,6 +639,24 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         });
       }
 
+      // ALERT: Overdue scheduled check-in (has body_metrics before; now past frequency_days)
+      const lastMeasuredDate = lastBodyMetricDateByClient.get(clientId);
+      if (lastMeasuredDate) {
+        const frequencyDays = checkInConfigByClient.get(clientId) ?? 30;
+        const lastDate = new Date(lastMeasuredDate + 'T12:00:00Z');
+        const daysSinceLast = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSinceLast > frequencyDays) {
+          const overdueDays = daysSinceLast - frequencyDays;
+          alerts.overdueCheckIn.push({
+            clientId,
+            clientName,
+            detail: `Scheduled check-in overdue by ${overdueDays} day${overdueDays !== 1 ? 's' : ''}`,
+            type: 'overdueCheckIn',
+            severity: 'medium',
+          });
+        }
+      }
+
       // Calculate check-in compliance (days checked in / 7)
       const checkinDays = checkinsByClient.get(clientId)?.size || 0;
       const checkinCompliance = (checkinDays / 7) * 100;
@@ -563,9 +665,20 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         clientsWithCheckins++;
       }
 
-      // Program compliance (simplified - would need programStateService for accurate calculation)
-      // For now, we'll leave it null and let the UI handle it
-      const programCompliance = null; // TODO: Calculate from program_day_completions
+      // Per-client program compliance: completed this week / total scheduled this week (reuse program from above)
+      let programCompliance: number | null = null;
+      if (program) {
+        const assignmentId = program.id;
+        const programId = program.program_id;
+        const currentWeek = progressMap.get(assignmentId) ?? 1;
+        const slots = scheduleByProgram.get(programId) ?? [];
+        const scheduleIdsThisWeek = slots.filter((s) => s.week_number === currentWeek).map((s) => s.id);
+        const total = scheduleIdsThisWeek.length;
+        const completedThisWeek = completionRowsCompliance.filter(
+          (c) => c.program_assignment_id === assignmentId && scheduleIdsThisWeek.includes(c.program_schedule_id)
+        ).length;
+        programCompliance = total > 0 ? Math.round((completedThisWeek / total) * 100) : 0;
+      }
 
       clientSummaries.push({
         clientId,
@@ -635,6 +748,8 @@ function getEmptyBriefing(): MorningBriefing {
       programEnding: [],
       noProgram: [],
       noMealPlan: [],
+      overdueCheckIn: [],
+      achievementUnlocked: [],
     },
     clientSummaries: [],
   };
@@ -656,9 +771,11 @@ export function sortAlertsByPriority(alerts: ClientAlert[]): ClientAlert[] {
       lowSleep: 2,
       noCheckIn3Days: 3,
       missedWorkouts: 4,
-      programEnding: 5,
-      noProgram: 6,
-      noMealPlan: 7,
+      overdueCheckIn: 5,
+      programEnding: 6,
+      noProgram: 7,
+      noMealPlan: 8,
+      achievementUnlocked: 9,
     };
     return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
   });

@@ -133,6 +133,30 @@ export async function getLatestAthleteScore(
 }
 
 /**
+ * Get athlete score history for sparkline (e.g. last 12 data points)
+ */
+export async function getAthleteScoreHistory(
+  clientId: string,
+  supabase: SupabaseClient,
+  limit = 12
+): Promise<{ date: string; score: number }[]> {
+  const { data, error } = await supabase
+    .from('athlete_scores')
+    .select('score, calculated_at')
+    .eq('client_id', clientId)
+    .order('calculated_at', { ascending: false })
+    .limit(limit)
+
+  if (error || !data) return []
+  return data
+    .map((row) => ({
+      date: (row.calculated_at as string).split('T')[0],
+      score: row.score as number,
+    }))
+    .reverse()
+}
+
+/**
  * Calculate workout completion score (40% weight)
  * Score = (completed workouts / expected workouts) * 100
  * If no workouts expected, score = 50 (neutral)

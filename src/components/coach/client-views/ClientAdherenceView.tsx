@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { BarChart3, CheckCircle, XCircle, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { getPeriodBounds } from '@/lib/metrics/period'
+import { getNutritionCompliance } from '@/lib/metrics/nutrition'
+import { getClientNutritionGoals, getNutritionComplianceTrend } from '@/lib/nutritionLogService'
 
 interface ClientAdherenceViewProps {
   clientId: string
@@ -12,7 +15,8 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
   const [loading, setLoading] = useState(true)
   const [adherenceData, setAdherenceData] = useState({
     workoutAdherence: 0,
-    nutritionAdherence: 0,
+    nutritionAdherence: null as number | null,
+    hasNutritionGoals: false,
     weeklyAverage: 0,
     thisWeek: { completed: 0, missed: 0, total: 0 }
   })
@@ -21,45 +25,97 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
     let cancelled = false
     async function load() {
       try {
-        const { data: assignments } = await supabase
-          .from('program_assignments')
-          .select('id, program_id')
-          .eq('client_id', clientId)
-          .eq('status', 'active')
-          .limit(1)
-        const assignment = assignments?.[0]
-        if (!assignment || cancelled) return
+        const [assignmentsRes, mealPlanRes, goalsRes] = await Promise.all([
+          supabase
+            .from('program_assignments')
+            .select('id, program_id')
+            .eq('client_id', clientId)
+            .eq('status', 'active')
+            .limit(1),
+          supabase
+            .from('meal_plan_assignments')
+            .select('id')
+            .eq('client_id', clientId)
+            .eq('is_active', true)
+            .limit(1),
+          supabase
+            .from('goals')
+            .select('id')
+            .eq('client_id', clientId)
+            .eq('pillar', 'nutrition')
+            .eq('status', 'active')
+            .limit(1)
+        ])
 
-        const { data: progress } = await supabase
-          .from('program_progress')
-          .select('current_week_number')
-          .eq('program_assignment_id', assignment.id)
-          .single()
-        const weekNum = progress?.current_week_number ?? 1
-        const { data: slots } = await supabase
-          .from('program_schedule')
-          .select('id')
-          .eq('program_id', assignment.program_id)
-          .eq('week_number', weekNum)
-        const assigned = slots?.length ?? 0
-        const { data: completions } = await supabase
-          .from('program_day_completions')
-          .select('id, program_schedule_id, program_schedule!inner(week_number)')
-          .eq('program_assignment_id', assignment.id)
-        const completedInWeek = (completions || []).filter((c: any) => (c.program_schedule?.week_number ?? 0) === weekNum).length
-        const completed = Math.min(assigned, completedInWeek)
+        const assignment = assignmentsRes.data?.[0]
+        const hasMealPlan = (mealPlanRes.data?.length ?? 0) > 0
+        const hasNutritionGoals = (goalsRes.data?.length ?? 0) > 0 || false
+
+        let workoutAdherence = 0
+        let weeklyAverage = 0
+        let thisWeek = { completed: 0, missed: 0, total: 0 }
+
+        if (assignment && !cancelled) {
+          const { data: progress } = await supabase
+            .from('program_progress')
+            .select('current_week_number')
+            .eq('program_assignment_id', assignment.id)
+            .single()
+          const weekNum = progress?.current_week_number ?? 1
+          const { data: slots } = await supabase
+            .from('program_schedule')
+            .select('id')
+            .eq('program_id', assignment.program_id)
+            .eq('week_number', weekNum)
+          const assigned = slots?.length ?? 0
+          const { data: completions } = await supabase
+            .from('program_day_completions')
+            .select('id, program_schedule_id, program_schedule!inner(week_number)')
+            .eq('program_assignment_id', assignment.id)
+          const completedInWeek = (completions || []).filter((c: { program_schedule?: { week_number?: number } | { week_number?: number }[] }) => {
+            const ps = (c as { program_schedule?: { week_number?: number } | { week_number?: number }[] }).program_schedule
+            const weekNumVal = Array.isArray(ps) ? ps[0]?.week_number : ps?.week_number
+            return (weekNumVal ?? 0) === weekNum
+          }).length
+          const completed = Math.min(assigned, completedInWeek)
+          workoutAdherence = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
+          weeklyAverage = workoutAdherence
+          thisWeek = { completed, missed: Math.max(0, assigned - completed), total: assigned }
+        }
+
+        let nutritionAdherence: number | null = null
+        if (hasMealPlan || hasNutritionGoals) {
+          const period = getPeriodBounds('this_week')
+          if (hasMealPlan) {
+            const result = await getNutritionCompliance(clientId, period, 'this_week')
+            if (!cancelled) nutritionAdherence = result.ratePercent
+          } else {
+            const startStr = period.start.slice(0, 10)
+            const endDate = new Date(period.end)
+            endDate.setUTCDate(endDate.getUTCDate() - 1)
+            const endStr = endDate.toISOString().slice(0, 10)
+            const trend = await getNutritionComplianceTrend(clientId, startStr, endStr)
+            if (!cancelled && trend.length > 0) {
+              const sum = trend.reduce((s, d) => s + d.compliance, 0)
+              nutritionAdherence = Math.round(sum / trend.length)
+            }
+          }
+        }
+
         if (!cancelled) {
           setAdherenceData({
-            workoutAdherence: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
-            nutritionAdherence: 0,
-            weeklyAverage: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
-            thisWeek: { completed, missed: Math.max(0, assigned - completed), total: assigned }
+            workoutAdherence,
+            nutritionAdherence,
+            hasNutritionGoals: hasMealPlan || hasNutritionGoals,
+            weeklyAverage,
+            thisWeek
           })
         }
       } catch (err) {
         if (!cancelled) setAdherenceData({
           workoutAdherence: 0,
-          nutritionAdherence: 0,
+          nutritionAdherence: null,
+          hasNutritionGoals: false,
           weeklyAverage: 0,
           thisWeek: { completed: 0, missed: 0, total: 0 }
         })
@@ -97,10 +153,21 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
             <BarChart3 className="w-5 h-5" />
           </div>
-          <p className="text-3xl font-bold fc-text-primary leading-tight">
-            {adherenceData.nutritionAdherence}%
-          </p>
-          <p className="text-sm fc-text-dim">Nutrition Adherence</p>
+          {adherenceData.nutritionAdherence != null ? (
+            <>
+              <p className="text-3xl font-bold fc-text-primary leading-tight">
+                {adherenceData.nutritionAdherence}%
+              </p>
+              <p className="text-sm fc-text-dim">Nutrition Adherence</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium fc-text-subtle leading-tight">
+                No nutrition goals set
+              </p>
+              <p className="text-sm fc-text-dim">Nutrition Adherence</p>
+            </>
+          )}
         </div>
 
         <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">

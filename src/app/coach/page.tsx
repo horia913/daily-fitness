@@ -22,6 +22,7 @@ import {
   Search,
   Flame,
   Utensils,
+  Trophy,
 } from "lucide-react";
 import { type MorningBriefing, type ClientAlert, sortAlertsByPriority } from "@/lib/coachDashboardService";
 
@@ -110,9 +111,11 @@ function CoachDashboardContent() {
       ...alerts.lowSleep,
       ...alerts.noCheckIn3Days,
       ...alerts.missedWorkouts,
+      ...alerts.overdueCheckIn,
       ...alerts.programEnding,
       ...alerts.noProgram,
       ...alerts.noMealPlan,
+      ...alerts.achievementUnlocked,
     ];
     // Sort by severity (high → medium → low)
     return sortAlertsByPriority(allAlerts);
@@ -290,28 +293,50 @@ function CoachDashboardContent() {
                             return <Flag className="w-4 h-4" />;
                           case "noMealPlan":
                             return <Utensils className="w-4 h-4" />;
+                          case "overdueCheckIn":
+                            return <ClipboardCheck className="w-4 h-4" />;
+                          case "achievementUnlocked":
+                            return <Trophy className="w-4 h-4" />;
                           default:
                             return <AlertTriangle className="w-4 h-4" />;
                         }
                       };
 
-                      const getAlertColor = () => {
+                      const getAlertSeverity = () => {
                         if (["highStress", "highSoreness", "lowSleep"].includes(alert.type)) {
-                          return "var(--fc-status-error)";
+                          return "high";
                         }
-                        if (["noCheckIn3Days", "missedWorkouts"].includes(alert.type)) {
-                          return "var(--fc-status-warning)";
+                        if (["noCheckIn3Days", "missedWorkouts", "overdueCheckIn"].includes(alert.type)) {
+                          return "medium";
                         }
-                        return "var(--fc-accent-cyan)";
+                        return "low";
                       };
+                      const severity = getAlertSeverity();
+                      const borderClass =
+                        severity === "high"
+                          ? "border-l-4 border-red-500"
+                          : severity === "medium"
+                            ? "border-l-4 border-amber-500"
+                            : "border-l-4 border-blue-500";
+                      const bgClass =
+                        severity === "high"
+                          ? "bg-red-50/50 dark:bg-red-900/10"
+                          : severity === "medium"
+                            ? "bg-amber-50/50 dark:bg-amber-900/10"
+                            : "bg-blue-50/50 dark:bg-blue-900/10";
+                      const iconColorClass =
+                        severity === "high"
+                          ? "text-red-500 dark:text-red-400"
+                          : severity === "medium"
+                            ? "text-amber-500 dark:text-amber-400"
+                            : "text-blue-500 dark:text-blue-400";
 
                       return (
                         <Link key={`${alert.clientId}-${idx}`} href={`/coach/clients/${alert.clientId}`}>
                           <div
-                            className="fc-surface rounded-xl p-4 flex items-center gap-3 transition-all hover:translate-y-[-1px] cursor-pointer"
-                            style={{ borderLeft: `4px solid ${getAlertColor()}` }}
+                            className={`fc-surface rounded-xl p-4 flex items-center gap-3 transition-all hover:translate-y-[-1px] cursor-pointer ${borderClass} ${bgClass}`}
                           >
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center fc-surface-elevated" style={{ color: getAlertColor() }}>
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center fc-surface-elevated ${iconColorClass}`}>
                               {getAlertIcon()}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -397,7 +422,7 @@ function CoachDashboardContent() {
                                   <div className="w-2 h-2 rounded-full" style={{ background: "var(--fc-status-success)" }} title="Trained today" />
                                 )}
                                 {client.checkedInToday && (
-                                  <div className="w-2 h-2 rounded-full" style={{ background: "var(--fc-accent-cyan)" }} title="Checked in today" />
+                                  <div className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400" title="Checked in today" />
                                 )}
                               </div>
                             </div>
@@ -443,7 +468,7 @@ function CoachDashboardContent() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href="/coach/clients"
-                    className="fc-btn fc-btn-secondary fc-press h-10 px-4 text-sm inline-flex items-center gap-2"
+                    className="fc-btn fc-btn-secondary fc-press h-11 px-4 text-sm inline-flex items-center gap-2"
                   >
                     <Users className="w-4 h-4" />
                     View Clients

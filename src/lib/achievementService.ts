@@ -53,6 +53,17 @@ export interface AchievementProgress {
   status: 'locked' | 'in_progress' | 'unlocked'
 }
 
+/** Enriched achievement for UI (modal, API response) */
+export interface NewlyUnlockedAchievement {
+  templateId: string
+  templateName: string
+  templateIcon: string
+  tier: string | null
+  description: string
+  nextTier: { tier: string; threshold: number; label: string } | null
+  currentMetricValue: number
+}
+
 // ============================================================================
 // ACHIEVEMENT SERVICE
 // ============================================================================
@@ -98,6 +109,22 @@ export class AchievementService {
   }
 
   /**
+   * Normalize achievement type (admin/seed may use different names)
+   */
+  private static normalizeAchievementType(achievementType: string): string {
+    if (achievementType === 'streak' || achievementType === 'streak_weeks') return 'streak_weeks'
+    if (achievementType === 'personal_record' || achievementType === 'pr_count') return 'pr_count'
+    if (achievementType === 'volume' || achievementType === 'total_volume') return 'total_volume'
+    if (achievementType === 'leaderboard_rank') return 'leaderboard_rank'
+    return achievementType
+  }
+
+  /** True when lower metric value is better (e.g. leaderboard rank) */
+  private static isInvertedComparison(achievementType: string): boolean {
+    return this.normalizeAchievementType(achievementType) === 'leaderboard_rank'
+  }
+
+  /**
    * Get current metric value for an achievement type
    */
   static async getCurrentMetricValue(
@@ -105,7 +132,8 @@ export class AchievementService {
     achievementType: string
   ): Promise<number> {
     try {
-      switch (achievementType) {
+      const type = this.normalizeAchievementType(achievementType)
+      switch (type) {
         case 'workout_count': {
           const { count, error } = await supabase
             .from('workout_logs')
@@ -143,9 +171,45 @@ export class AchievementService {
         }
 
         case 'total_volume': {
-          // Sum total volume from workout_logs (would need volume calculation)
-          // For now, return 0 - would need to calculate from workout_set_logs
-          return 0
+          const { data: setRows, error } = await supabase
+            .from('workout_set_logs')
+            .select('weight, reps')
+            .eq('client_id', clientId)
+          if (error) throw error
+          const total = (setRows || []).reduce(
+            (sum, r) => sum + (Number(r.weight) || 0) * (Number(r.reps) || 0),
+            0
+          )
+          return Math.round(total)
+        }
+
+        case 'checkin_streak': {
+          const { getCheckinStreak } = await import('@/lib/wellnessService')
+          return await getCheckinStreak(clientId)
+        }
+
+        case 'weight_goal': {
+          const { data: metrics, error } = await supabase
+            .from('body_metrics')
+            .select('weight_kg, measured_date')
+            .eq('client_id', clientId)
+            .not('weight_kg', 'is', null)
+            .order('measured_date', { ascending: true })
+          if (error || !metrics?.length) return 0
+          const firstWeight = Number(metrics[0].weight_kg) || 0
+          const latestWeight = Number(metrics[metrics.length - 1].weight_kg) || 0
+          const lost = firstWeight - latestWeight
+          return lost > 0 ? Math.round(lost * 10) / 10 : 0
+        }
+
+        case 'leaderboard_rank': {
+          const { data: rows, error } = await supabase
+            .from('leaderboard_entries')
+            .select('rank')
+            .eq('client_id', clientId)
+          if (error || !rows?.length) return 999
+          const minRank = Math.min(...rows.map((r: { rank: number }) => Number(r.rank) || 999))
+          return minRank
         }
 
         default:
@@ -196,15 +260,18 @@ export class AchievementService {
             label: string | null
           }>
 
-          // Find next tier to unlock
-          const nextTier = tiers.find(
-            t => currentValue < t.threshold && !unlockedTiers.includes(t.name)
-          ) || null
+          const inverted = this.isInvertedComparison(template.achievement_type)
+          // Find next tier to unlock (normal: need currentValue >= threshold; inverted: need currentValue <= threshold)
+          const nextTier = inverted
+            ? tiers.find(t => !unlockedTiers.includes(t.name) && currentValue > t.threshold) || null
+            : tiers.find(t => currentValue < t.threshold && !unlockedTiers.includes(t.name)) || null
 
-          // Calculate overall progress (based on highest tier)
+          // Calculate overall progress (inverted: lower value is better, e.g. rank)
           const highestTier = tiers[tiers.length - 1]
           const progress = highestTier
-            ? Math.min((currentValue / highestTier.threshold) * 100, 100)
+            ? inverted
+              ? (currentValue <= highestTier.threshold ? 100 : Math.min((highestTier.threshold / currentValue) * 100, 100))
+              : Math.min((currentValue / highestTier.threshold) * 100, 100)
             : 0
 
           // Determine status
@@ -260,11 +327,14 @@ export class AchievementService {
   static async checkAndUnlockAchievements(
     clientId: string,
     achievementType: string
-  ): Promise<UserAchievement[]> {
+  ): Promise<NewlyUnlockedAchievement[]> {
     try {
-      // Get relevant templates
+      // Get relevant templates (match canonical type so both 'streak' and 'streak_weeks' work)
       const templates = await this.getTemplates()
-      const relevantTemplates = templates.filter(t => t.achievement_type === achievementType)
+      const canonicalType = this.normalizeAchievementType(achievementType)
+      const relevantTemplates = templates.filter(
+        t => this.normalizeAchievementType(t.achievement_type) === canonicalType
+      )
 
       if (relevantTemplates.length === 0) {
         return []
@@ -301,8 +371,11 @@ export class AchievementService {
 
           for (const tier of tiers) {
             const alreadyUnlocked = unlockedMap.get(template.id)?.has(tier.name) || false
+            const meetsThreshold = this.isInvertedComparison(achievementType)
+              ? currentValue <= tier.threshold
+              : currentValue >= tier.threshold
 
-            if (!alreadyUnlocked && currentValue >= tier.threshold) {
+            if (!alreadyUnlocked && meetsThreshold) {
               // Unlock this tier
               const unlockedAchievement = await this.unlockAchievement(
                 clientId,
@@ -325,8 +398,11 @@ export class AchievementService {
           // Non-tiered achievement
           const threshold = template.single_threshold || 0
           const alreadyUnlocked = unlockedMap.get(template.id)?.has('single') || false
+          const meetsThreshold = this.isInvertedComparison(achievementType)
+            ? currentValue <= threshold
+            : currentValue >= threshold
 
-          if (!alreadyUnlocked && currentValue >= threshold) {
+          if (!alreadyUnlocked && meetsThreshold) {
             const unlockedAchievement = await this.unlockAchievement(
               clientId,
               template.id,
@@ -341,7 +417,40 @@ export class AchievementService {
         }
       }
 
-      return newlyUnlocked
+      // Build enriched list for UI/API
+      const tiersForTemplate = (t: AchievementTemplate) =>
+        [
+          { name: 'bronze', threshold: t.tier_bronze_threshold, label: t.tier_bronze_label },
+          { name: 'silver', threshold: t.tier_silver_threshold, label: t.tier_silver_label },
+          { name: 'gold', threshold: t.tier_gold_threshold, label: t.tier_gold_label },
+          { name: 'platinum', threshold: t.tier_platinum_threshold, label: t.tier_platinum_label },
+        ].filter((x): x is { name: string; threshold: number; label: string | null } => x.threshold != null)
+
+      const enriched: NewlyUnlockedAchievement[] = newlyUnlocked
+        .map((ua) => {
+          const template = relevantTemplates.find((t) => t.id === ua.achievement_template_id)
+          if (!template) return null
+          const tiers = tiersForTemplate(template)
+          const currentTierIndex = tiers.findIndex((x) => x.name === (ua.tier ?? 'single'))
+          const nextTierEntry =
+            currentTierIndex >= 0 && currentTierIndex < tiers.length - 1
+              ? tiers[currentTierIndex + 1]
+              : null
+          const nextTier = nextTierEntry
+            ? { tier: nextTierEntry.name, threshold: nextTierEntry.threshold, label: nextTierEntry.label ?? nextTierEntry.name }
+            : null
+          return {
+            templateId: template.id,
+            templateName: template.name,
+            templateIcon: template.icon ?? '🏆',
+            tier: ua.tier,
+            description: template.description ?? '',
+            nextTier,
+            currentMetricValue: currentValue,
+          }
+        })
+        .filter((x): x is NewlyUnlockedAchievement => x != null)
+      return enriched
     } catch (error) {
       console.error(`Error checking and unlocking achievements for ${achievementType}:`, error)
       return []
@@ -386,6 +495,26 @@ export class AchievementService {
       }
 
       console.log(`Achievement unlocked! template=${templateId}, tier=${tier}, value=${metricValue}`)
+
+      // Fire-and-forget: push + email notification (do not block or fail unlock)
+      ;(async () => {
+        try {
+          const { data: template } = await supabase
+            .from('achievement_templates')
+            .select('name, icon')
+            .eq('id', templateId)
+            .single()
+          const name = template?.name ?? 'Achievement'
+          const tierLabel = tier ? ` — ${tier.charAt(0).toUpperCase() + tier.slice(1)}` : ''
+          const achievementName = `${name}${tierLabel}!`
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+          const { notifyAchievementEarned } = await import('@/lib/notificationHelpers')
+          await notifyAchievementEarned(clientId, achievementName, appUrl)
+        } catch (notifyErr) {
+          console.warn('Achievement notification failed (non-blocking):', notifyErr)
+        }
+      })()
+
       return data
     } catch (error) {
       console.error('Error unlocking achievement:', error)

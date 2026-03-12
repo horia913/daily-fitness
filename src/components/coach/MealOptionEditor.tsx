@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import { 
   MealPlanService,
   type MealOption,
@@ -63,6 +64,7 @@ export default function MealOptionEditor({
   onOptionsChange 
 }: MealOptionEditorProps) {
   const { isDark, getThemeStyles } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
 
   // State
@@ -134,7 +136,7 @@ export default function MealOptionEditor({
     console.log('[handleAddOption] Button clicked, current options:', options.length)
     
     if (options.length >= MAX_OPTIONS) {
-      alert(`Maximum ${MAX_OPTIONS} options allowed per meal.`)
+      addToast({ title: `Maximum ${MAX_OPTIONS} options allowed per meal.`, variant: 'destructive' })
       return
     }
 
@@ -153,7 +155,7 @@ export default function MealOptionEditor({
       setExpandedOption(newOption.id)
     } catch (error) {
       console.error('[handleAddOption] Error creating option:', error)
-      alert('Failed to create option. Please try again.')
+      addToast({ title: 'Failed to create option. Please try again.', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -161,7 +163,7 @@ export default function MealOptionEditor({
 
   const handleDeleteOption = async (optionId: string) => {
     if (options.length <= 1) {
-      alert('Cannot delete the only option. A meal must have at least one option.')
+      addToast({ title: 'Cannot delete the only option. A meal must have at least one option.', variant: 'destructive' })
       return
     }
 
@@ -176,11 +178,11 @@ export default function MealOptionEditor({
       if (success) {
         await loadOptions()
       } else {
-        alert('Failed to delete option. Please try again.')
+        addToast({ title: 'Failed to delete option. Please try again.', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Error deleting option:', error)
-      alert('Failed to delete option. Please try again.')
+      addToast({ title: 'Failed to delete option. Please try again.', variant: 'destructive' })
     } finally {
       setSaving(false)
     }

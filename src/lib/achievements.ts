@@ -1,6 +1,10 @@
 /**
  * COMPREHENSIVE ACHIEVEMENT SYSTEM
  * Tiered achievement definitions and tracking logic
+ *
+ * @deprecated ACHIEVEMENTS array is deprecated in favor of achievement_templates (DB).
+ * Use AchievementService.getTemplates() and getAchievementProgress() for analytics.
+ * getTierColor, getTierIcon, getAchievementTier, getAchievementProgress helpers remain for UI.
  */
 
 export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'platinum'

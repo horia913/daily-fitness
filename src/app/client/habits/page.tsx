@@ -40,6 +40,10 @@ export default function ClientHabitsPage() {
   const [habits, setHabits] = useState<HabitAssignment[]>([])
   const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set())
   const [showAnalytics, setShowAnalytics] = useState(false)
+  /** Last 90 days: date string -> number of habits completed that day */
+  const [heatmapData, setHeatmapData] = useState<Map<string, number>>(new Map())
+  /** Last 30 days: { daysWithCompletion, totalDays } for completion rate */
+  const [completionRate30, setCompletionRate30] = useState<{ daysWithCompletion: number; totalDays: number }>({ daysWithCompletion: 0, totalDays: 30 })
 
   useEffect(() => {
     if (user) {
@@ -79,8 +83,37 @@ export default function ClientHabitsPage() {
 
       if (!assignments || assignments.length === 0) {
         setHabits([])
+        setHeatmapData(new Map())
+        setCompletionRate30({ daysWithCompletion: 0, totalDays: 30 })
         return
       }
+
+      // 90-day heatmap: habit_logs by client_id
+      const ninetyDaysAgo = new Date()
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+      const ninetyStr = ninetyDaysAgo.toISOString().split('T')[0]
+      const { data: allLogs } = await supabase
+        .from('habit_logs')
+        .select('log_date')
+        .eq('client_id', user.id)
+        .gte('log_date', ninetyStr)
+      const dateToCount = new Map<string, number>()
+      for (const row of allLogs || []) {
+        const d = (row as { log_date: string }).log_date
+        dateToCount.set(d, (dateToCount.get(d) || 0) + 1)
+      }
+      setHeatmapData(dateToCount)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29)
+      const thirtyStr = thirtyDaysAgo.toISOString().split('T')[0]
+      let daysWithCompletion = 0
+      for (let i = 0; i < 30; i++) {
+        const d = new Date()
+        d.setDate(d.getDate() - i)
+        const dateStr = d.toISOString().split('T')[0]
+        if (dateToCount.get(dateStr)) daysWithCompletion++
+      }
+      setCompletionRate30({ daysWithCompletion, totalDays: 30 })
 
       // Get today's habit logs
       const assignmentIds = assignments.map(a => a.id)
@@ -383,6 +416,50 @@ export default function ClientHabitsPage() {
             </div>
           </header>
 
+          {/* Habit completion heatmap — only when client has habits */}
+          {habits.length > 0 && (
+            <section className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6">
+              <h2 className="text-lg font-semibold fc-text-primary mb-2 flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5" />
+                Completion overview
+              </h2>
+              <p className="text-sm fc-text-dim mb-3">Last 90 days</p>
+              <div className="grid grid-cols-7 gap-[3px] mb-3" style={{ width: 'min(100%, 280px)' }}>
+                {(() => {
+                  const today = new Date().toISOString().split('T')[0]
+                  const days: string[] = []
+                  for (let i = 89; i >= 0; i--) {
+                    const d = new Date()
+                    d.setDate(d.getDate() - i)
+                    days.push(d.toISOString().split('T')[0])
+                  }
+                  const maxCount = Math.max(...Array.from(heatmapData.values()), 1)
+                  return days.map((dateStr) => {
+                    const count = heatmapData.get(dateStr) || 0
+                    const intensity = maxCount > 0 ? count / maxCount : 0
+                    const isToday = dateStr === today
+                    return (
+                      <div
+                        key={dateStr}
+                        className="w-3 h-3 rounded-sm flex-shrink-0"
+                        style={{
+                          backgroundColor: intensity === 0
+                            ? 'var(--fc-glass-highlight, #e5e7eb)'
+                            : `rgba(34, 197, 94, ${0.3 + intensity * 0.7})`,
+                          border: isToday ? '2px solid var(--fc-accent, #3b82f6)' : 'none',
+                        }}
+                        title={`${dateStr}: ${count} habit${count !== 1 ? 's' : ''} completed`}
+                      />
+                    )
+                  })
+                })()}
+              </div>
+              <p className="text-sm fc-text-dim">
+                Completion rate: {completionRate30.totalDays > 0 ? Math.round((completionRate30.daysWithCompletion / completionRate30.totalDays) * 100) : 0}% ({completionRate30.daysWithCompletion} of {completionRate30.totalDays} days)
+              </p>
+            </section>
+          )}
+
           {/* Section: Today's checklist + habit cards */}
           <section className="space-y-6">
             <h2 className="text-xl font-semibold fc-text-primary mb-4 flex items-center gap-2">
@@ -505,13 +582,13 @@ export default function ClientHabitsPage() {
             <div className="h-20 bg-gradient-to-t from-[color:var(--fc-bg-base)] to-transparent" aria-hidden />
             <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between gap-4 -mt-14 pb-6 pointer-events-auto">
               <div className="fc-glass fc-card rounded-full border border-[color:var(--fc-glass-border)] p-1.5 flex items-center gap-1 shadow-lg">
-                <Link href="/client" className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Dashboard">
+                <Link href="/client" className="fc-glass-soft min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Dashboard">
                   <LayoutGrid className="w-5 h-5" />
                 </Link>
                 <span className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]" aria-label="Habits (current)">
                   <CheckCircle className="w-5 h-5" />
                 </span>
-                <button type="button" onClick={() => { setShowAnalytics(a => !a) }} className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Weekly performance">
+                <button type="button" onClick={() => { setShowAnalytics(a => !a) }} className="fc-glass-soft min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Weekly performance">
                   <BarChart3 className="w-5 h-5" />
                 </button>
               </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -13,15 +14,18 @@ import { ArrowLeft, Trophy, Plus, Users, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Challenge, getAllChallenges } from "@/lib/challengeService";
+import { CreateChallengeModal } from "@/components/coach/CreateChallengeModal";
 
 function CoachChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { getSemanticColor, performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const router = useRouter();
 
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "active" | "completed">("all");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const challengesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,7 +116,7 @@ function CoachChallengesPageContent() {
               History
             </Button>
             <Button
-              onClick={() => alert("Create challenge feature - integrate with createChallenge service")}
+              onClick={() => setCreateModalOpen(true)}
               className="fc-btn fc-btn-primary rounded-xl"
             >
               <Plus className="w-5 h-5 mr-2" />
@@ -165,7 +169,7 @@ function CoachChallengesPageContent() {
                 Create your first challenge to get started
               </p>
               <Button
-                onClick={() => alert("Create challenge feature")}
+                onClick={() => setCreateModalOpen(true)}
                 className="fc-btn fc-btn-primary"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -230,13 +234,24 @@ function CoachChallengesPageContent() {
         </section>
 
         <Button
-          onClick={() => alert("Create challenge feature")}
+          onClick={() => setCreateModalOpen(true)}
           className="fixed bottom-8 right-8 z-50 h-14 w-14 rounded-2xl fc-btn-primary shadow-lg"
           size="icon"
           aria-label="Create challenge"
         >
           <Plus className="w-6 h-6" />
         </Button>
+
+        <CreateChallengeModal
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreateSuccess={(challengeId) => {
+            setCreateModalOpen(false);
+            loadChallenges();
+            router.push(`/coach/challenges/${challengeId}`);
+          }}
+          coachId={user?.id ?? ""}
+        />
       </div>
     </AnimatedBackground>
   );

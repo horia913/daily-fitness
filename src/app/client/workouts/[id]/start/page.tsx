@@ -47,6 +47,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { fetchApi } from "@/lib/apiClient";
 import { useToast } from "@/components/ui/toast-provider";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
 import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
 import { WorkoutProgressBar } from "@/components/client/workout-execution/ui/WorkoutProgressBar";
 import {
@@ -133,6 +135,7 @@ export default function LiveWorkout() {
   const [isLastBlockComplete, setIsLastBlockComplete] = useState(false);
   const [isCompletingWorkout, setIsCompletingWorkout] = useState(false);
   const isCompletingWorkoutRef = useRef(false);
+  const completionStartedAtRef = useRef<number | null>(null);
   const [workoutStats, setWorkoutStats] = useState({
     totalTime: 0,
     exercisesCompleted: 0,
@@ -161,6 +164,10 @@ export default function LiveWorkout() {
   // Last-session weight per exercise (earliest set in most recent completed workout)
   const [lastSessionWeightByExerciseId, setLastSessionWeightByExerciseId] =
     useState<Record<string, number>>({});
+
+  // Achievements unlocked during workout (e.g. from PR via log-set)
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
 
   // Progression suggestions state
   const [progressionSuggestions, setProgressionSuggestions] = useState<
@@ -2578,6 +2585,14 @@ export default function LiveWorkout() {
       return;
     }
 
+    // Last set of this exercise — skip rest timer, go to next exercise
+    if (isExerciseComplete) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSet(1);
+      setIsLoggingSet(false);
+      return;
+    }
+
     setRestTime(currentExercise.rest_seconds || 60);
     setShowRestTimer(true);
     setIsLoggingSet(false);
@@ -2767,6 +2782,14 @@ export default function LiveWorkout() {
       return;
     }
 
+    // Last set of this exercise — skip rest timer, go to next exercise
+    if (isExerciseComplete) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSet(1);
+      setIsLoggingSet(false);
+      return;
+    }
+
     // Start rest timer
     setRestTime(currentExercise.rest_seconds || 60);
     setShowRestTimer(true);
@@ -2911,6 +2934,14 @@ export default function LiveWorkout() {
       return;
     }
 
+    // Last set of this exercise — skip rest timer, go to next exercise
+    if (isExerciseComplete) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSet(1);
+      setIsLoggingSet(false);
+      return;
+    }
+
     // Start rest timer
     setRestTime(currentExercise.rest_seconds || 60);
     setShowRestTimer(true);
@@ -2989,16 +3020,22 @@ export default function LiveWorkout() {
       return;
     }
 
-    // Save weight and reps before resetting
+    // Save weight and reps before resetting (used for DB save in both branches)
     const loggedWeight = currentSetData.weight;
     const loggedReps = currentSetData.reps;
 
-    // Start rest timer
-    setRestTime(currentExercise.rest_seconds || 60);
-    setShowRestTimer(true);
-
-    // Reset form data for next set
-    setCurrentSetData({ weight: 0, reps: 0 });
+    // Last set of this exercise — skip rest timer, go to next exercise
+    if (isExerciseComplete) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSet(1);
+      setIsLoggingSet(false);
+      setCurrentSetData({ weight: 0, reps: 0 });
+    } else {
+      // More sets in this exercise — show rest timer
+      setRestTime(currentExercise.rest_seconds || 60);
+      setShowRestTimer(true);
+      setCurrentSetData({ weight: 0, reps: 0 });
+    }
 
     // BACKGROUND DATABASE SAVE
     try {
@@ -3141,9 +3178,17 @@ export default function LiveWorkout() {
       return;
     }
 
-    // Start rest timer
-    setRestTime(current.rest_seconds || 60);
-    setShowRestTimer(true);
+    // Last set of this exercise — skip rest timer, go to next exercise
+    if (isExerciseComplete) {
+      setCurrentExerciseIndex(currentExerciseIndex + 1);
+      setCurrentSet(1);
+      setIsLoggingSet(false);
+      // Background save continues below
+    } else {
+      // Start rest timer
+      setRestTime(current.rest_seconds || 60);
+      setShowRestTimer(true);
+    }
 
     // Background save - Log each exercise in the giant set individually
     try {
@@ -3282,6 +3327,7 @@ export default function LiveWorkout() {
     // Double-submit guard: prevent concurrent runs (inside function, not only button)
     if (isCompletingWorkoutRef.current) return;
     isCompletingWorkoutRef.current = true;
+    completionStartedAtRef.current = Date.now();
     setIsCompletingWorkout(true);
 
     const completeTargetId = assignment?.id || assignmentId;
@@ -3329,7 +3375,7 @@ export default function LiveWorkout() {
         durationMinutes,
       });
 
-      // Store duration in localStorage to pass to complete page
+      // Store duration in localStorage to pass to complete page (sync — do this first)
       // Guard against storage failures (e.g., private mode)
       try {
         localStorage.setItem(
@@ -3358,40 +3404,34 @@ export default function LiveWorkout() {
         localStorage.setItem("workoutSessionIdForComplete", sessionId);
       }
 
-      try {
-        // Update workout session (if exists)
-        if (sessionId && isUuid(sessionId)) {
-          console.log("💾 Updating workout session:", sessionId);
-          await supabase
-            .from("workout_sessions")
-            .update({
-              completed_at: new Date().toISOString(),
-              status: "completed",
-            })
-            .eq("id", sessionId);
-        } else if (sessionId) {
-          console.warn(
-            "⚠️ Skipping workout_sessions update - non-UUID sessionId",
-            sessionId,
-          );
-        }
-
-        // Don't update assignment status here - let the complete page handle it
-        // This ensures markWorkoutComplete() is called, which updates totals
-      } catch (dbError) {
-        console.error("❌ Database error in completeWorkout:", dbError);
-        // Continue anyway - navigation is more important
-      }
-
-      // Navigate to completion page
-      // The complete page will handle updating assignment status and totals
+      // Navigate immediately so user never gets stuck if tab is backgrounded.
+      // The complete page will call /api/complete-workout and update totals.
       console.log(
         "🧭 Navigating to complete page:",
         `/client/workouts/${completeTargetId}/complete`,
       );
       router.push(`/client/workouts/${completeTargetId}/complete`);
-      // Do NOT reset isCompletingWorkout here — keep the button disabled
-      // while navigation is in progress. The 15s timeout is the safety net.
+
+      // Update workout session in background — do not await so tab backgrounding doesn't block navigation
+      if (sessionId && isUuid(sessionId)) {
+        console.log("💾 Updating workout session (background):", sessionId);
+        supabase
+          .from("workout_sessions")
+          .update({
+            completed_at: new Date().toISOString(),
+            status: "completed",
+          })
+          .eq("id", sessionId)
+          .then(() => {})
+          .catch((dbError) => {
+            console.warn("⚠️ workout_sessions update failed (non-blocking):", dbError);
+          });
+      } else if (sessionId) {
+        console.warn(
+          "⚠️ Skipping workout_sessions update - non-UUID sessionId",
+          sessionId,
+        );
+      }
     } catch (error) {
       console.error("❌ Error in completeWorkout:", error);
       addToast({
@@ -3402,9 +3442,30 @@ export default function LiveWorkout() {
     } finally {
       clearTimeout(spinnerTimeout);
       isCompletingWorkoutRef.current = false;
+      completionStartedAtRef.current = null;
       setIsCompletingWorkout(false);
     }
   };
+
+  // When user returns to tab after leaving during "Complete workout", reset button if stuck >20s
+  React.useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!isCompletingWorkoutRef.current || !completionStartedAtRef.current) return;
+      const elapsed = Date.now() - completionStartedAtRef.current;
+      if (elapsed < 20000) return;
+      isCompletingWorkoutRef.current = false;
+      completionStartedAtRef.current = null;
+      setIsCompletingWorkout(false);
+      addToast({
+        title: "Still here?",
+        description: "Tap Complete Workout again to finish, or open the completion link from your history.",
+        variant: "destructive",
+      });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
 
   const currentExercise = exercises[currentExerciseIndex];
   const targetReps = currentExercise?.reps || "0";
@@ -3451,7 +3512,7 @@ export default function LiveWorkout() {
   const [emomTotalLeft, setEmomTotalLeft] = useState(0);
   const [emomRepActive, setEmomRepActive] = useState(false);
   const [emomRepTimeLeft, setEmomRepTimeLeft] = useState(0);
-  // Tabata/Circuit state
+  // Tabata state
   const [intervalActive, setIntervalActive] = useState(false);
   const [intervalPhase, setIntervalPhase] = useState<
     "work" | "rest" | "rest_after_set"
@@ -3560,7 +3621,7 @@ export default function LiveWorkout() {
     if (intervalPhaseLeft !== 0 || !intervalActive || !showTimerModal) return;
     if (currentType !== "tabata") return;
 
-    // Time reached zero - transition to next state (tabata uses tabata_sets; fallback to circuit_sets for legacy data)
+    // Time reached zero - transition to next state (tabata_sets; fallback to circuit_sets for legacy data)
     const circuitSets = currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets;
     if (!circuitSets || !Array.isArray(circuitSets)) return;
 
@@ -4092,6 +4153,25 @@ export default function LiveWorkout() {
                       )
                     }
                     onPlateCalculatorClick={() => setShowPlateCalculator(true)}
+                    onAchievementsUnlocked={(achievements) => {
+                      const tierToRarity = (tier: string | null): Achievement["rarity"] => {
+                        if (!tier) return "uncommon";
+                        if (tier === "platinum") return "epic";
+                        if (tier === "gold") return "rare";
+                        if (tier === "silver") return "uncommon";
+                        return "common";
+                      };
+                      const mapped: Achievement[] = achievements.map((a) => ({
+                        id: a.templateId,
+                        name: a.templateName ?? "Achievement",
+                        description: a.description ?? (a.nextTier ? `Next: ${(a.nextTier as { label?: string })?.label} — ${a.currentMetricValue ?? 0}/${(a.nextTier as { threshold?: number })?.threshold ?? 0}` : ""),
+                        icon: a.templateIcon ?? "🏆",
+                        rarity: tierToRarity(a.tier),
+                        unlocked: true,
+                      }));
+                      setNewAchievementsQueue((prev) => [...prev, ...mapped]);
+                      setAchievementModalIndex(0);
+                    }}
                   />
                   {/* Complete Workout Button - Only show on last block when complete */}
                   {isLastBlockComplete &&
@@ -4661,7 +4741,7 @@ export default function LiveWorkout() {
                                   <div className="text-xl font-bold fc-text-primary">
                                     {currentType === "tabata"
                                       ? "Tabata"
-                                      : "Circuit"}{" "}
+                                      : "Tabata"}{" "}
                                     Details
                                   </div>
                                   <div className="text-sm fc-text-dim">
@@ -4974,7 +5054,7 @@ export default function LiveWorkout() {
                               className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             >
                               <Clock className="w-5 h-5 mr-2" /> Start{" "}
-                              {currentType === "tabata" ? "Tabata" : "Circuit"}
+                              Tabata
                             </Button>
                           </div>
                         ) : (
@@ -7119,6 +7199,21 @@ export default function LiveWorkout() {
               </div>
             </div>
           </div>
+        )}
+
+        {newAchievementsQueue.length > 0 && (
+          <AchievementUnlockModal
+            achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+            visible={achievementModalIndex < newAchievementsQueue.length}
+            onClose={() => {
+              if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                setAchievementModalIndex((i) => i + 1);
+              } else {
+                setNewAchievementsQueue([]);
+                setAchievementModalIndex(0);
+              }
+            }}
+          />
         )}
 
         {/* Exercise Image Modal */}

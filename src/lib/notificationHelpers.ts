@@ -132,3 +132,117 @@ export async function notifyGoalReached(
   })
 }
 
+// Challenge notifications
+
+const appUrl = typeof window !== 'undefined' ? (window as any).__NEXT_PUBLIC_APP_URL ?? '' : (process.env.NEXT_PUBLIC_APP_URL ?? '')
+
+export async function notifyChallengeCreated(
+  clientIds: string[],
+  challengeName: string,
+  startDate: string,
+  baseUrl: string = appUrl
+) {
+  if (!clientIds.length) return
+  return sendNotification({
+    userIds: clientIds,
+    title: 'New challenge',
+    message: `New challenge: ${challengeName} starts ${startDate}. Join now.`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyChallengeInvitation(
+  clientId: string,
+  challengeName: string,
+  baseUrl: string = appUrl
+) {
+  return sendNotification({
+    userIds: [clientId],
+    title: 'Challenge invitation',
+    message: `Your coach invited you to ${challengeName}. Tap to join.`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyChallengeStarted(
+  clientIds: string[],
+  challengeName: string,
+  baseUrl: string = appUrl
+) {
+  if (!clientIds.length) return
+  return sendNotification({
+    userIds: clientIds,
+    title: 'Challenge started',
+    message: `${challengeName} has started! Good luck!`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyVideoApproved(
+  clientId: string,
+  categoryName: string,
+  score: string,
+  baseUrl: string = appUrl
+) {
+  return sendNotification({
+    userIds: [clientId],
+    title: 'Submission approved',
+    message: `Your ${categoryName} submission was approved! Score: ${score}`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyVideoRejected(
+  clientId: string,
+  categoryName: string,
+  baseUrl: string = appUrl
+) {
+  return sendNotification({
+    userIds: [clientId],
+    title: 'Submission needs revision',
+    message: `Your ${categoryName} submission needs revision. Check coach feedback.`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyChallengeEnded(
+  clientId: string,
+  challengeName: string,
+  rank: number,
+  baseUrl: string = appUrl
+) {
+  return sendNotification({
+    userIds: [clientId],
+    title: 'Challenge ended',
+    message: `${challengeName} has ended! You finished #${rank}.`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+
+export async function notifyChallengeWon(
+  clientId: string,
+  challengeName: string,
+  baseUrl: string = appUrl
+) {
+  return sendNotification({
+    userIds: [clientId],
+    title: 'You won! 🏆',
+    message: `Congratulations! You won ${challengeName}!`,
+    url: `${baseUrl}/client/challenges`,
+    sendPush: true,
+    sendEmail: false
+  })
+}
+

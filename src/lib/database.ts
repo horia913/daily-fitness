@@ -338,17 +338,28 @@ export class DatabaseService {
     }
   }
 
-  // Achievement functions
+  // Achievement functions (unified on user_achievements + achievement_templates)
   static async getRecentAchievements(clientId: string): Promise<Achievement[]> {
     try {
-      // Ensure user is authenticated before querying
       await ensureAuthenticated()
-      
+
       const { data, error } = await supabase
-        .from('achievements')
-        .select('*')
+        .from('user_achievements')
+        .select(`
+          id,
+          client_id,
+          achieved_date,
+          tier,
+          metric_value,
+          achievement_templates (
+            name,
+            description,
+            icon,
+            category
+          )
+        `)
         .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
+        .order('achieved_date', { ascending: false })
         .limit(5)
 
       if (error) {
@@ -356,7 +367,17 @@ export class DatabaseService {
         return []
       }
 
-      return data || []
+      const rows = data || []
+      const template = (r: any) => r.achievement_templates as { name: string; description?: string; icon?: string; category?: string } | null
+      return rows.map((r: any) => ({
+        id: r.id,
+        client_id: r.client_id,
+        title: template(r)?.name ?? 'Achievement',
+        description: template(r)?.description ?? undefined,
+        type: 'milestone' as const,
+        value: r.tier ? `${r.tier}` : undefined,
+        created_at: r.achieved_date ?? new Date().toISOString().split('T')[0],
+      }))
     } catch (error) {
       console.error('Unexpected error fetching achievements:', error)
       return []

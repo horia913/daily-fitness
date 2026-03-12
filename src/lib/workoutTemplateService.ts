@@ -1467,7 +1467,9 @@ export class WorkoutTemplateService {
             is_customized: false,
           }
         })
-        const { error } = await supabase.from('program_day_assignments').insert(rows)
+        const { error } = await supabase
+          .from('program_day_assignments')
+          .upsert(rows, { onConflict: 'program_assignment_id,day_number' })
         if (error) {
           console.error('Error copying program days to assignment:', error)
         }

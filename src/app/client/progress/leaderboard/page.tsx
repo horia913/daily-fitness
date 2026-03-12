@@ -13,6 +13,7 @@ import Link from "next/link";
 import { getLeaderboard, LeaderboardEntry, LeaderboardType, TimeWindow } from "@/lib/leaderboardService";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 // Lift set configurations
 const LIFT_SETS = {
@@ -361,14 +362,12 @@ function LeaderboardPageContent() {
               <div className="animate-spin w-10 h-10 border-4 border-[color:var(--fc-accent-cyan)] border-t-transparent rounded-full mx-auto"></div>
             </div>
           ) : leaderboardData.length === 0 ? (
-            <div className="text-center py-12">
-              <Trophy className="w-16 h-16 mx-auto mb-4 text-[color:var(--fc-text-subtle)]" />
-              <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                No data yet for this exercise
-              </p>
-              <p className="text-sm mt-2 text-[color:var(--fc-text-dim)]">
-                Be the first to log a workout.
-              </p>
+            <div className="py-12">
+              <EmptyState
+                icon={Trophy}
+                title="No leaderboard data yet"
+                description="Complete workouts to see your ranking"
+              />
             </div>
           ) : (
             <div className="space-y-3">

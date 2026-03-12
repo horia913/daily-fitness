@@ -2,11 +2,13 @@
 
 import React from "react";
 import { ClientGlassCard } from "@/components/client-ui";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { OverdueSlotCard } from "@/lib/programWeekStateBuilder";
 
 interface OverdueWorkoutsProps {
   overdueSlots: OverdueSlotCard[];
+  /** Called when user taps a slot — opens workout day preview (missed state) */
+  onOpenPreview: (slot: OverdueSlotCard) => void;
   onComplete: (scheduleId: string) => void;
   isStarting: boolean;
   startingScheduleId: string | null;
@@ -14,6 +16,7 @@ interface OverdueWorkoutsProps {
 
 export function OverdueWorkouts({
   overdueSlots,
+  onOpenPreview,
   onComplete,
   isStarting,
   startingScheduleId,
@@ -68,43 +71,28 @@ export function OverdueWorkouts({
         </div>
 
         <div className="space-y-3">
-          {overdueSlots.map((slot) => {
-            const isStartingThis = isStarting && startingScheduleId === slot.scheduleId;
-            return (
-              <div
-                key={slot.scheduleId}
-                className="flex items-center justify-between gap-4 p-3 rounded-lg"
-                style={{ background: "var(--fc-surface-sunken)" }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg">🔴</span>
-                    <span className="text-sm font-semibold fc-text-primary">
-                      {slot.dayLabel}: {slot.workoutName}
-                    </span>
-                  </div>
-                  <p className="text-xs fc-text-dim">
-                    Was scheduled for {formatScheduledDate(slot.dayOfWeek)}
-                  </p>
+          {overdueSlots.map((slot) => (
+            <button
+              key={slot.scheduleId}
+              type="button"
+              onClick={() => onOpenPreview(slot)}
+              className="w-full flex items-center justify-between gap-4 p-3 rounded-lg text-left hover:opacity-90 transition-opacity"
+              style={{ background: "var(--fc-surface-sunken)" }}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">🔴</span>
+                  <span className="text-sm font-semibold fc-text-primary">
+                    {slot.dayLabel}: {slot.workoutName}
+                  </span>
                 </div>
-                <button
-                  onClick={() => onComplete(slot.scheduleId)}
-                  disabled={isStartingThis}
-                  className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold fc-text-primary hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: "color-mix(in srgb, var(--fc-status-warning) 15%, transparent)",
-                    border: "1px solid color-mix(in srgb, var(--fc-status-warning) 30%, transparent)",
-                  }}
-                >
-                  {isStartingThis ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Complete Now →"
-                  )}
-                </button>
+                <p className="text-xs fc-text-dim">
+                  Was scheduled for {formatScheduledDate(slot.dayOfWeek)}
+                </p>
               </div>
-            );
-          })}
+              <span className="text-xs font-medium fc-text-dim shrink-0">View →</span>
+            </button>
+          ))}
         </div>
       </ClientGlassCard>
     </div>

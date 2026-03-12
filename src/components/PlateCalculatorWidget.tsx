@@ -94,7 +94,7 @@ export function PlateCalculatorWidget({
             height: `${Math.max(6, plate.weight * 0.6)}px`,
             backgroundColor: plate.color,
             borderRadius: '2px',
-            border: '1px solid #374151'
+            border: '1px solid var(--fc-glass-border)'
           }}
         >
           {plate.weight}

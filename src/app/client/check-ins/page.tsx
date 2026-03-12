@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
+import { Button } from "@/components/ui/button";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,11 @@ import { CheckInHistory } from "@/components/client/CheckInHistory";
 import { WeeklyCheckInCard } from "@/components/client/WeeklyCheckInCard";
 import { ThisWeekStrip } from "@/components/client/ThisWeekStrip";
 import { WeeklyComparison } from "@/components/client/WeeklyComparison";
+import { WellnessTrendsCard } from "@/components/client/WellnessTrendsCard";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
+import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import Link from "next/link";
 import { BarChart3, Camera, Activity, Scale } from "lucide-react";
 import {
@@ -60,6 +65,8 @@ export default function ClientCheckInsPage() {
   const [pillarGoals, setPillarGoals] = useState<Array<{ id: string; title: string; target_value?: number; current_value?: number; target_unit?: string; progress_percentage?: number; target_date?: string; status: string }>>([]);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [historyKey, setHistoryKey] = useState(0);
 
   const fetchCheckInData = useCallback(async (): Promise<CheckInPageData> => {
@@ -270,9 +277,9 @@ export default function ClientCheckInsPage() {
           {dataError && (
             <ClientGlassCard className="mb-6 p-4 flex items-center justify-between gap-3 rounded-xl border border-[color:var(--fc-status-error)]">
               <p className="text-sm fc-text-error">{dataError}</p>
-              <button onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press text-sm shrink-0 min-h-[44px] min-w-[44px]">
+              <Button variant="fc-secondary" onClick={() => window.location.reload()} className="text-sm shrink-0 min-h-[44px] min-w-[44px]">
                 Retry
-              </button>
+              </Button>
             </ClientGlassCard>
           )}
 
@@ -316,6 +323,18 @@ export default function ClientCheckInsPage() {
                     previous={previousBody}
                     wellnessThisWeek={thisWeekLogs}
                     wellnessLastWeek={lastWeekLogs}
+                  />
+                </section>
+              )}
+
+              {!dataLoading && (
+                <section className="mb-8">
+                  <WellnessTrendsCard
+                    logRange={logRange}
+                    weekStart={weekStart}
+                    weekDays={weekDays}
+                    lastWeekStart={lastWeekStart}
+                    lastWeekDays={lastWeekDays}
                   />
                 </section>
               )}
@@ -445,6 +464,35 @@ export default function ClientCheckInsPage() {
               onSuccess={() => {
                 setShowLogModal(false);
                 setHistoryKey(Date.now());
+              }}
+              onAchievementsUnlocked={(raw) => {
+                const tierToRarity = (tier: string | null): Achievement["rarity"] =>
+                  !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
+                const mapped: Achievement[] = raw.map((a) => ({
+                  id: a.templateId,
+                  name: a.templateName,
+                  description: a.description ?? "",
+                  icon: a.templateIcon ?? "🏆",
+                  rarity: tierToRarity(a.tier),
+                  unlocked: true,
+                }));
+                setNewAchievementsQueue(mapped);
+                setAchievementModalIndex(0);
+              }}
+            />
+          )}
+
+          {newAchievementsQueue.length > 0 && (
+            <AchievementUnlockModal
+              achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+              visible={achievementModalIndex < newAchievementsQueue.length}
+              onClose={() => {
+                if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                  setAchievementModalIndex((i) => i + 1);
+                } else {
+                  setNewAchievementsQueue([]);
+                  setAchievementModalIndex(0);
+                }
               }}
             />
           )}

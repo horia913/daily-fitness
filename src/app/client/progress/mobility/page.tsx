@@ -23,13 +23,16 @@ import {
   Save,
 } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/toast-provider";
 import {
   MobilityMetricsService,
   MobilityMetric,
 } from "@/lib/progressTrackingService";
 import MobilityFormFields from "@/components/progress/MobilityFormFields";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function MobilityMetricsPage() {
+  const { addToast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -114,7 +117,7 @@ export default function MobilityMetricsPage() {
       }
     } catch (error) {
       console.error("Error saving mobility metrics:", error);
-      alert("Error saving assessment. Please try again.");
+      addToast({ title: "Error saving assessment. Please try again.", variant: "destructive" });
     }
   };
 
@@ -161,6 +164,75 @@ export default function MobilityMetricsPage() {
     return acc;
   }, new Set<string>());
 
+  /** Get a single numeric value for progression display per assessment type */
+  const getRepresentativeValue = (m: MobilityMetric): number | null => {
+    switch (m.assessment_type) {
+      case "shoulder": {
+        const l = m.left_shoulder_flexion ?? m.left_shoulder_abduction;
+        const r = m.right_shoulder_flexion ?? m.right_shoulder_abduction;
+        if (l != null && r != null) return Math.round((l + r) / 2);
+        return l ?? r ?? null;
+      }
+      case "hip": {
+        const l = m.left_hip_straight_leg_raise ?? m.left_hip_knee_to_chest;
+        const r = m.right_hip_straight_leg_raise ?? m.right_hip_knee_to_chest;
+        if (l != null && r != null) return Math.round((l + r) / 2);
+        return l ?? r ?? null;
+      }
+      case "ankle": {
+        const left = (m as any).left_ankle_dorsiflexion ?? (m as any).left_foot_dorsiflexion;
+        const right = (m as any).right_ankle_dorsiflexion ?? (m as any).right_foot_dorsiflexion;
+        if (left != null && right != null) return Math.round((Number(left) + Number(right)) / 2);
+        return left != null ? Number(left) : right != null ? Number(right) : null;
+      }
+      case "spine":
+        return (m.forward_lean ?? (m as any).toe_touch) ?? null;
+      case "overall":
+        return (m as any).overall_score ?? null;
+      default:
+        return null;
+    }
+  };
+
+  const progressionByType = (() => {
+    const byType = new Map<string, MobilityMetric[]>();
+    for (const m of metrics) {
+      const t = m.assessment_type || "overall";
+      if (!byType.has(t)) byType.set(t, []);
+      byType.get(t)!.push(m);
+    }
+    const result: { type: string; first: MobilityMetric; latest: MobilityMetric; firstVal: number; latestVal: number; firstDate: string }[] = [];
+    for (const [type, list] of byType) {
+      if (list.length < 2) continue;
+      const sorted = [...list].sort((a, b) => a.assessed_date.localeCompare(b.assessed_date));
+      const first = sorted[0];
+      const latest = sorted[sorted.length - 1];
+      const firstVal = getRepresentativeValue(first);
+      const latestVal = getRepresentativeValue(latest);
+      if (firstVal != null && latestVal != null) {
+        result.push({
+          type,
+          first,
+          latest,
+          firstVal,
+          latestVal,
+          firstDate: first.assessed_date,
+        });
+      }
+    }
+    return result;
+  })();
+
+  const singleAssessmentTypes = (() => {
+    const byType = new Map<string, MobilityMetric[]>();
+    for (const m of metrics) {
+      const t = m.assessment_type || "overall";
+      if (!byType.has(t)) byType.set(t, []);
+      byType.get(t)!.push(m);
+    }
+    return Array.from(byType.entries()).filter(([, list]) => list.length === 1).map(([type]) => type);
+  })();
+
   if (loadError) {
     return (
       <ProtectedRoute>
@@ -169,7 +241,7 @@ export default function MobilityMetricsPage() {
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -211,7 +283,7 @@ export default function MobilityMetricsPage() {
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -238,6 +310,47 @@ export default function MobilityMetricsPage() {
           {/* Metrics List */}
           {metrics.length > 0 ? (
             <>
+              {/* Mobility Progress summary */}
+              {(progressionByType.length > 0 || singleAssessmentTypes.length > 0) && (
+                <div className="mt-6 fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
+                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">Mobility Progress</h2>
+                  <div className="space-y-3">
+                    {progressionByType.map(({ type, firstVal, latestVal, firstDate }) => {
+                      const change = latestVal - firstVal;
+                      const improved = change > 0;
+                      const isOverall = type === "overall";
+                      const suffix = isOverall ? "" : "°";
+                      return (
+                        <div
+                          key={type}
+                          className="flex flex-wrap items-center justify-between gap-2 fc-glass-soft p-3 rounded-xl border border-[color:var(--fc-glass-border)]"
+                        >
+                          <span className="capitalize font-medium text-[color:var(--fc-text-primary)]">{type}</span>
+                          <span className="text-sm font-mono">
+                            {firstVal}{suffix} → {latestVal}{suffix}
+                            {change !== 0 && (
+                              <span className={improved ? "fc-text-success ml-1" : "fc-text-subtle ml-1"}>
+                                {improved ? "▲" : "▼"} {change > 0 ? "+" : ""}{change}{suffix} since {new Date(firstDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                            )}
+                            {change === 0 && <span className="fc-text-subtle ml-1">No change ({latestVal}{suffix})</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {singleAssessmentTypes.map((type) => (
+                      <div
+                        key={type}
+                        className="flex flex-wrap items-center justify-between gap-2 fc-glass-soft p-3 rounded-xl border border-[color:var(--fc-glass-border)]"
+                      >
+                        <span className="capitalize font-medium text-[color:var(--fc-text-primary)]">{type}</span>
+                        <span className="text-sm fc-text-dim">1 assessment — log another to track progress.</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                   <div className="flex items-center gap-3">
@@ -316,7 +429,7 @@ export default function MobilityMetricsPage() {
                         <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10" onClick={() => startEdit(metric)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10 text-[color:var(--fc-status-error)]" onClick={() => handleDelete(metric.id)}>
+                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-11 w-11 text-[color:var(--fc-status-error)]" onClick={() => handleDelete(metric.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -446,20 +559,13 @@ export default function MobilityMetricsPage() {
               </div>
             </>
           ) : (
-            <div className="mt-6 fc-surface p-10 text-center">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[color:var(--fc-glass-highlight)]">
-                <Activity className="h-10 w-10 text-[color:var(--fc-text-subtle)]" />
-              </div>
-              <h3 className="mt-6 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                No assessments yet
-              </h3>
-              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
-                Start tracking mobility scores to monitor improvements over time.
-              </p>
-              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary mt-6">
-                <Plus className="mr-2 h-5 w-5" />
-                Add First Assessment
-              </Button>
+            <div className="mt-6 fc-surface p-10">
+              <EmptyState
+                icon={Activity}
+                title="No mobility assessments"
+                description="Add your first assessment"
+                action={{ label: "Add Assessment", onClick: () => setShowAddModal(true) }}
+              />
             </div>
           )}
 

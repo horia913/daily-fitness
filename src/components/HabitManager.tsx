@@ -39,6 +39,7 @@ import {
 } from '@/lib/habitTracker'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface HabitManagerProps {
   isOpen: boolean
@@ -57,6 +58,7 @@ export default function HabitManagerComponent({
   coachId,
   editingHabit 
 }: HabitManagerProps) {
+  const { addToast } = useToast()
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
 
@@ -218,7 +220,7 @@ export default function HabitManagerComponent({
       onClose()
     } catch (error) {
       console.error('Error adding habit:', error)
-      alert('Error adding habit. Please try again.')
+      addToast({ title: 'Error adding habit. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -273,7 +275,7 @@ export default function HabitManagerComponent({
       }, 1500)
     } catch (error) {
       console.error('Error adding custom habit:', error)
-      alert('Error adding custom habit. Please try again.')
+      addToast({ title: 'Error adding custom habit. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -305,7 +307,7 @@ export default function HabitManagerComponent({
       }, 1500)
     } catch (error) {
       console.error('Error updating habit:', error)
-      alert('Error updating habit. Please try again.')
+      addToast({ title: 'Error updating habit. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -807,7 +809,7 @@ export default function HabitManagerComponent({
                         <div className={`p-6 rounded-2xl ${theme.gradient} ${theme.shadow} w-24 h-24 mx-auto mb-6 flex items-center justify-center`}>
                           <Users className="w-12 h-12 text-white" />
                         </div>
-                        <h3 className={`text-2xl font-bold ${theme.text} mb-4`}>Bulk Assignment Coming Soon</h3>
+                        <h3 className={`text-2xl font-bold ${theme.text} mb-4`}>Bulk assignment</h3>
                         <p className={`${theme.textSecondary} text-lg mb-8 max-w-md mx-auto`}>
                           This feature will allow you to assign multiple habits to multiple clients at once for efficient habit management.
                         </p>

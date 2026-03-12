@@ -7,11 +7,15 @@ import { useRouter } from "next/navigation";
 import { StepBodyMetrics } from "./StepBodyMetrics";
 import { StepPhotos } from "./StepPhotos";
 import { StepReview, type WellnessSummary } from "./StepReview";
+import { ProgressMomentCard } from "./ProgressMomentCard";
 import type { WeeklyCheckInBodyData, WeeklyCheckInPhotoFiles } from "./WeeklyCheckInFlowTypes";
 import type { WeeklyCheckInFlowProps } from "./WeeklyCheckInFlowTypes";
-import { getClientMeasurements, upsertMeasurement } from "@/lib/measurementService";
+import { getClientMeasurements, getFirstMeasurement, upsertMeasurement } from "@/lib/measurementService";
 import { uploadPhoto } from "@/lib/progressPhotoService";
 import { getLogRange, dbToUiScale } from "@/lib/wellnessService";
+import { AchievementService } from "@/lib/achievementService";
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import type { Achievement } from "@/components/ui/AchievementCard";
 
 function emptyBodyData(): WeeklyCheckInBodyData {
   return {
@@ -66,10 +70,17 @@ export function WeeklyCheckInFlow({
   const [notesToCoach, setNotesToCoach] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [showProgressMoment, setShowProgressMoment] = useState(false);
+  const [progressMomentHeadline, setProgressMomentHeadline] = useState("");
+  const [progressMomentFirstDate, setProgressMomentFirstDate] = useState<string | null>(null);
 
   const [previousMeasurement, setPreviousMeasurement] = useState<typeof lastMeasurement>(null);
+  const [firstMeasurement, setFirstMeasurement] = useState<typeof lastMeasurement>(null);
   const [wellnessThisWeek, setWellnessThisWeek] = useState<WellnessSummary | null>(null);
   const [wellnessLastWeek, setWellnessLastWeek] = useState<WellnessSummary | null>(null);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [achievementModalIndex, setAchievementModalIndex] = useState(0);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -91,13 +102,15 @@ export function WeeklyCheckInFlow({
     const endLast = new Date(startThis);
     endLast.setDate(endLast.getDate() - 1);
     const load = async () => {
-      const [measurements, logsThis, logsLast] = await Promise.all([
+      const [measurements, first, logsThis, logsLast] = await Promise.all([
         getClientMeasurements(clientId, 2),
+        getFirstMeasurement(clientId),
         getLogRange(clientId, startThis.toISOString().split("T")[0], today),
         getLogRange(clientId, startLast.toISOString().split("T")[0], endLast.toISOString().split("T")[0]),
       ]);
       if (!cancelled) {
         setPreviousMeasurement(measurements[1] ?? null);
+        setFirstMeasurement(first);
         setWellnessThisWeek(computeWellnessSummary(logsThis));
         setWellnessLastWeek(computeWellnessSummary(logsLast));
       }
@@ -156,7 +169,57 @@ export function WeeklyCheckInFlow({
       }
       if (mountedRef.current) {
         onComplete();
-        router.push("/client/check-ins");
+        try {
+          const weightNew = await AchievementService.checkAndUnlockAchievements(clientId, "weight_goal");
+          if (weightNew.length > 0) {
+            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
+              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
+            const mapped: Achievement[] = weightNew.map((a) => ({
+              id: a.templateId,
+              name: a.templateName,
+              description: a.description ?? "",
+              icon: a.templateIcon ?? "🏆",
+              rarity: tierToRarity(a.tier),
+              unlocked: true,
+            }));
+            setNewAchievementsQueue(mapped);
+            setAchievementModalIndex(0);
+          }
+        } catch (achErr) {
+          console.warn("Error checking weight goal achievements:", achErr);
+        }
+        const isFirst = !firstMeasurement;
+        if (isFirst) {
+          setProgressMomentHeadline("First check-in logged! Your journey starts now.");
+          setProgressMomentFirstDate(null);
+        } else {
+          const current = bodyData;
+          const first = firstMeasurement;
+          type Candidate = { label: string; pct: number; text: string };
+          const candidates: Candidate[] = [];
+          if (first.weight_kg != null && current.weight_kg != null && first.weight_kg > 0) {
+            const diff = first.weight_kg - current.weight_kg;
+            const pct = (diff / first.weight_kg) * 100;
+            if (diff > 0) candidates.push({ label: "Weight", pct, text: `You've lost ${diff.toFixed(1)} kg since you started!` });
+            else if (diff < 0) candidates.push({ label: "Weight", pct, text: `You've gained ${Math.abs(diff).toFixed(1)} kg since you started.` });
+          }
+          if (first.body_fat_percentage != null && current.body_fat_percentage != null && first.body_fat_percentage > 0) {
+            const diff = first.body_fat_percentage - current.body_fat_percentage;
+            const pct = (diff / first.body_fat_percentage) * 100;
+            if (diff > 0) candidates.push({ label: "Body fat", pct, text: `Your body fat is down ${diff.toFixed(1)}% since you started!` });
+          }
+          if (first.waist_circumference != null && current.waist_circumference != null && first.waist_circumference > 0) {
+            const diff = first.waist_circumference - current.waist_circumference;
+            const pct = (diff / first.waist_circumference) * 100;
+            if (diff > 0) candidates.push({ label: "Waist", pct, text: `Your waist is down ${diff.toFixed(1)} cm since you started!` });
+          }
+          const best = candidates.length > 0
+            ? candidates.reduce((a, b) => (Math.abs(a.pct) > Math.abs(b.pct) ? a : b))
+            : null;
+          setProgressMomentHeadline(best?.text ?? "Check-in saved. Keep up the great work!");
+          setProgressMomentFirstDate(first.measured_date ?? null);
+        }
+        setShowProgressMoment(true);
       }
     } catch (e) {
       console.error("Submit error:", e);
@@ -164,7 +227,7 @@ export function WeeklyCheckInFlow({
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
-  }, [clientId, bodyData, photoFiles, notesToCoach, onComplete, router]);
+  }, [clientId, bodyData, photoFiles, notesToCoach, onComplete, router, firstMeasurement]);
 
   const photosEnabled = config?.photos_enabled ?? true;
   const notesEnabled = config?.notes_to_coach_enabled ?? true;
@@ -179,7 +242,9 @@ export function WeeklyCheckInFlow({
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold fc-text-primary">Monthly Check-In</h1>
+          <h1 className="text-2xl font-bold fc-text-primary">
+            Scheduled Check-In{config?.frequency_days ? ` · ${config.frequency_days === 7 ? "Weekly" : config.frequency_days === 14 ? "Every 2 weeks" : config.frequency_days === 30 ? "Monthly" : `Every ${config.frequency_days} days`}` : ""}
+          </h1>
           <p className="text-sm fc-text-dim">Step {step} of 3</p>
         </div>
       </div>
@@ -209,6 +274,7 @@ export function WeeklyCheckInFlow({
         <StepReview
           bodyData={bodyData}
           previousMeasurement={previousMeasurement ?? null}
+          firstMeasurement={firstMeasurement ?? null}
           wellnessThisWeek={wellnessThisWeek}
           wellnessLastWeek={wellnessLastWeek}
           notesToCoach={notesToCoach}
@@ -220,6 +286,40 @@ export function WeeklyCheckInFlow({
       )}
 
       {submitError && <p className="text-sm fc-text-error">{submitError}</p>}
+
+      {showProgressMoment && (
+        <ProgressMomentCard
+          clientId={clientId}
+          isFirstCheckIn={!firstMeasurement}
+          headline={progressMomentHeadline}
+          firstDate={progressMomentFirstDate}
+          onContinue={() => {
+            setShowProgressMoment(false);
+            if (newAchievementsQueue.length > 0) {
+              setShowAchievementModal(true);
+            } else {
+              router.push("/client/check-ins");
+            }
+          }}
+        />
+      )}
+
+      {showAchievementModal && newAchievementsQueue.length > 0 && (
+        <AchievementUnlockModal
+          achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+          visible={achievementModalIndex < newAchievementsQueue.length}
+          onClose={() => {
+            if (achievementModalIndex < newAchievementsQueue.length - 1) {
+              setAchievementModalIndex((i) => i + 1);
+            } else {
+              setNewAchievementsQueue([]);
+              setAchievementModalIndex(0);
+              setShowAchievementModal(false);
+              router.push("/client/check-ins");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

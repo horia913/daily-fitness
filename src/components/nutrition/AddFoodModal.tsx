@@ -148,20 +148,6 @@ export default function AddFoodModal({
             >
               Food
             </button>
-            <button
-              type="button"
-              disabled
-              className="px-3 py-1.5 text-sm rounded-lg fc-text-dim opacity-60 cursor-not-allowed"
-            >
-              Recipes (Coming soon)
-            </button>
-            <button
-              type="button"
-              disabled
-              className="px-3 py-1.5 text-sm rounded-lg fc-text-dim opacity-60 cursor-not-allowed"
-            >
-              Favorites (Coming soon)
-            </button>
           </div>
 
           {/* Results */}

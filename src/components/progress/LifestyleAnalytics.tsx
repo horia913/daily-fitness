@@ -24,7 +24,8 @@ import {
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
-import { ACHIEVEMENTS, getTierColor, getTierIcon, getAchievementTier, type AchievementTier } from '@/lib/achievements'
+import { getTierColor, getTierIcon, type AchievementTier } from '@/lib/achievements'
+import { AchievementService, type AchievementProgress } from '@/lib/achievementService'
 import { supabase } from '@/lib/supabase'
 
 interface LifestyleAnalyticsProps {
@@ -53,6 +54,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
   const theme = getThemeStyles()
   const [selectedAchievement, setSelectedAchievement] = useState<{ achievement: any; tier: AchievementTier; value: number } | null>(null)
   const [nutritionWeek, setNutritionWeek] = useState<{ dateStr: string; dayLabel: string; hasMeals: boolean }[]>([])
+  const [achievementProgressList, setAchievementProgressList] = useState<AchievementProgress[]>([])
 
   const loadNutritionWeek = useCallback(async () => {
     const weekDays = getThisWeekDays()
@@ -83,6 +85,14 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
   useEffect(() => {
     loadNutritionWeek()
   }, [loadNutritionWeek])
+
+  useEffect(() => {
+    if (!user?.id) return
+    AchievementService.getAchievementProgress(user.id).then((list) => {
+      const lifestyleCategories = ['transformation', 'wellness', 'lifestyle']
+      setAchievementProgressList((list || []).filter((p) => lifestyleCategories.includes(p.template.category)))
+    }).catch(() => setAchievementProgressList([]))
+  }, [user?.id])
 
   // Sample user progress data - In production, fetch from database
   const userProgress = {
@@ -396,60 +406,64 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
           </CardHeader>
           <CardContent className="p-6 pt-0">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {/* Display ALL lifestyle achievements with locked/unlocked states */}
-              {ACHIEVEMENTS.filter(a => a.category === 'transformation' || a.category === 'lifestyle').map((achievement) => {
-                // Determine user's current value for this achievement
-                let currentValue = 0
-                switch (achievement.id) {
-                  case 'weight_goal': currentValue = userProgress.weightGoalProgress; break
-                  case 'measurement_milestone': currentValue = userProgress.totalCmLost; break
-                  case 'body_recomposition': currentValue = userProgress.bodyRecompCheckins; break
-                  case 'hydration_habit': currentValue = userProgress.hydrationStreak; break
-                  case 'sleep_specialist': currentValue = userProgress.sleepStreak; break
-                  case 'nutrition_warrior': currentValue = userProgress.nutritionStreak; break
-                  case 'recovery_specialist': currentValue = userProgress.recoverySessionsLogged; break
-                  default: currentValue = 0
-                }
-
-                // Get tier info
-                const { tier, nextTier, nextThreshold } = getAchievementTier(achievement.id, currentValue)
-                const isUnlocked = tier !== null
-                const displayTier = tier || 'bronze'
-                const tierInfo = achievement.tiers[displayTier]
-                const tierIcon = isUnlocked ? getTierIcon(tier!) : '🔒'
-                const progress = nextThreshold ? (currentValue / nextThreshold) * 100 : 100
-                
+              {achievementProgressList.map((p) => {
+                const { template, currentValue, progress, unlockedTiers, nextTier } = p
+                const isUnlocked = unlockedTiers.length > 0
+                const displayTier = (isUnlocked ? unlockedTiers[unlockedTiers.length - 1] : nextTier?.tier ?? 'bronze') as AchievementTier
+                const tierLabel = isUnlocked
+                  ? (template as any)[`tier_${displayTier}_label`] ?? displayTier
+                  : (nextTier?.label ?? 'Locked')
+                const tierIcon = isUnlocked ? getTierIcon(displayTier) : '🔒'
+                const nextThreshold = nextTier?.threshold
                 return (
-                  <div 
-                    key={achievement.id}
-                    onClick={() => setSelectedAchievement({ achievement, tier: displayTier, value: currentValue })}
+                  <div
+                    key={template.id}
+                    onClick={() => {
+                      const t = template as any
+                      setSelectedAchievement({
+                        achievement: {
+                          id: template.id,
+                          name: template.name,
+                          description: template.description ?? '',
+                          icon: template.icon ?? '🏆',
+                          tiers: {
+                            bronze: { threshold: Number(t.tier_bronze_threshold) || 0, label: t.tier_bronze_label ?? 'Bronze' },
+                            silver: { threshold: Number(t.tier_silver_threshold) || 0, label: t.tier_silver_label ?? 'Silver' },
+                            gold: { threshold: Number(t.tier_gold_threshold) || 0, label: t.tier_gold_label ?? 'Gold' },
+                            platinum: { threshold: Number(t.tier_platinum_threshold) || 0, label: t.tier_platinum_label ?? 'Platinum' }
+                          }
+                        },
+                        tier: displayTier,
+                        value: currentValue
+                      })
+                    }}
                     className={cn(
                       "rounded-xl p-4 border-2 text-center relative overflow-hidden cursor-pointer transition-all hover:scale-105 hover:shadow-lg",
-                      isUnlocked && tier === 'platinum' && "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-900/30 dark:to-blue-900/30 border-cyan-300 dark:border-cyan-700",
-                      isUnlocked && tier === 'gold' && "bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 border-yellow-300 dark:border-yellow-700",
-                      isUnlocked && tier === 'silver' && "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-slate-300 dark:border-slate-600",
-                      isUnlocked && tier === 'bronze' && "bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 border-amber-300 dark:border-amber-700",
+                      isUnlocked && displayTier === 'platinum' && "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-900/30 dark:to-blue-900/30 border-cyan-300 dark:border-cyan-700",
+                      isUnlocked && displayTier === 'gold' && "bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 border-yellow-300 dark:border-yellow-700",
+                      isUnlocked && displayTier === 'silver' && "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-slate-300 dark:border-slate-600",
+                      isUnlocked && displayTier === 'bronze' && "bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 border-amber-300 dark:border-amber-700",
                       !isUnlocked && `${isDark ? 'bg-slate-800/30' : 'bg-slate-100'} border-slate-300 dark:border-slate-700 opacity-60 grayscale`
                     )}
                   >
                     <div className="absolute top-2 right-2 text-lg">{tierIcon}</div>
-                    <div className={cn("text-3xl mb-1", !isUnlocked && "opacity-50")}>{achievement.icon}</div>
+                    <div className={cn("text-3xl mb-1", !isUnlocked && "opacity-50")}>{template.icon ?? '🏆'}</div>
                     <p className={`text-sm font-bold ${isUnlocked ? theme.text : theme.textSecondary}`}>
-                      {achievement.name}
+                      {template.name}
                     </p>
                     <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                      {isUnlocked ? tierInfo.label : 'Locked'}
+                      {tierLabel}
                     </p>
                     <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                      <div 
+                      <div
                         className={cn(
                           "h-full rounded-full transition-all duration-500",
-                          isUnlocked ? `bg-gradient-to-r ${getTierColor(tier!)}` : "bg-slate-400 dark:bg-slate-600"
+                          isUnlocked ? `bg-gradient-to-r ${getTierColor(displayTier)}` : "bg-slate-400 dark:bg-slate-600"
                         )}
                         style={{ width: `${Math.min(progress, 100)}%` }}
                       />
                     </div>
-                    {!isUnlocked && nextThreshold && (
+                    {!isUnlocked && nextThreshold != null && (
                       <p className={`text-xs ${theme.textSecondary} mt-1`}>
                         {currentValue}/{nextThreshold}
                       </p>
@@ -459,7 +473,7 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
               })}
             </div>
             <p className={`text-xs ${theme.textSecondary} text-center mt-4`}>
-              💡 {ACHIEVEMENTS.filter(a => a.category === 'transformation' || a.category === 'lifestyle').length} total achievements • Tap any to view details
+              💡 {achievementProgressList.length} total achievements • Tap any to view details
             </p>
           </CardContent>
         </Card>

@@ -63,6 +63,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { getTodayLog, getCompletionStats, getLogRange } from '@/lib/wellnessService'
 import AnalyticsNav from '@/components/coach/AnalyticsNav'
+import { GenerateReportModal } from '@/components/coach/GenerateReportModal'
+import { exportBodyMetricsCsv } from '@/lib/exportBodyMetricsCsv'
 import { supabase } from '@/lib/supabase'
 
 interface ClientProgress {
@@ -135,6 +137,7 @@ export default function CoachProgress() {
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
   const [clientGroup, setClientGroup] = useState<string>('all')
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['adherence', 'workouts', 'strength'])
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const loadingRef = useRef(false)
   const didLoadRef = useRef(false)
@@ -1142,9 +1145,7 @@ export default function CoachProgress() {
                             <Button
                               variant="outline"
                               className="w-full rounded-xl py-3"
-                              onClick={() => {
-                                addToast({ title: 'Generate Progress Report coming soon', variant: 'default' })
-                              }}
+                              onClick={() => setShowReportModal(true)}
                             >
                               <BarChart3 className="w-4 h-4 mr-2" />
                               Generate Progress Report
@@ -1558,8 +1559,13 @@ export default function CoachProgress() {
                                   <Button
                                     variant="outline"
                                     className="rounded-xl h-12"
+                                    disabled={!selectedClient}
+                                    title={!selectedClient ? 'Select a client in Client Details to export' : undefined}
                                     onClick={() => {
-                                      addToast({ title: 'Export Data coming soon', variant: 'default' })
+                                      if (selectedClient) {
+                                        const name = clientProgress.find(c => c.id === selectedClient)?.name
+                                        exportBodyMetricsCsv(selectedClient, name)
+                                      }
                                     }}
                                   >
                                     <Download className="w-4 h-4 mr-2" />
@@ -1948,6 +1954,16 @@ export default function CoachProgress() {
           </div>
         </div>
         </div>
+
+        {user?.id && (
+          <GenerateReportModal
+            open={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            coachId={user.id}
+            clientId={null}
+            clientList={clientProgress.map(c => ({ id: c.id, name: c.name }))}
+          />
+        )}
       </AnimatedBackground>
     </ProtectedRoute>
   )

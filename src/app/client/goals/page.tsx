@@ -53,6 +53,7 @@ import {
   Archive,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GoalCard } from "@/components/goals/GoalCard";
@@ -254,6 +255,7 @@ const PRESET_GOALS: PresetGoal[] = [
 ];
 
 export default function ClientGoals() {
+  const { addToast } = useToast();
   const { user } = useAuth();
   const { performanceSettings, isDark, getSemanticColor } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -530,7 +532,7 @@ export default function ClientGoals() {
     targetDate?: string
   ) => {
     if (!user || !targetValue) {
-      alert("Please enter a target value");
+      addToast({ title: "Please enter a target value", variant: "warning" });
       return;
     }
 
@@ -576,10 +578,10 @@ export default function ClientGoals() {
       });
 
       await loadGoals();
-      alert("Goal created successfully!");
+      addToast({ title: "Goal created successfully!", variant: "success" });
     } catch (error) {
       console.error("Error creating goal from preset:", error);
-      alert("Failed to create goal. Please try again.");
+      addToast({ title: "Failed to create goal. Please try again.", variant: "destructive" });
     }
   };
 
@@ -591,7 +593,7 @@ export default function ClientGoals() {
     e.preventDefault();
 
     if (!user || !customForm.targetValue) {
-      alert("Please enter a target value");
+      addToast({ title: "Please enter a target value", variant: "warning" });
       return;
     }
 
@@ -605,7 +607,7 @@ export default function ClientGoals() {
       } else {
         parsedValue = parseFloat(customForm.targetValue);
         if (isNaN(parsedValue)) {
-          alert("Please enter a valid number");
+          addToast({ title: "Please enter a valid number", variant: "warning" });
           return;
         }
       }
@@ -669,13 +671,13 @@ export default function ClientGoals() {
         targetDate: "",
         priority: "high",
       });
-      alert("Goal created successfully!");
+      addToast({ title: "Goal created successfully!", variant: "success" });
     } catch (error: any) {
       console.error("Error creating goal:", error);
       const errorMessage =
         error?.message ||
         "Failed to create goal. Please check the console for details.";
-      alert(`Failed to create goal: ${errorMessage}`);
+      addToast({ title: `Failed to create goal: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -726,7 +728,7 @@ export default function ClientGoals() {
       await loadGoals();
     } catch (error) {
       console.error("Error updating goal progress:", error);
-      alert("Failed to update progress. Please try again.");
+      addToast({ title: "Failed to update progress. Please try again.", variant: "destructive" });
     }
   };
 

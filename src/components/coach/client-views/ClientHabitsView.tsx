@@ -38,35 +38,30 @@ export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
   const loadHabits = async () => {
     try {
       setLoading(true)
-      
-      // Get client's active habit assignments
+
+      // Fetch assignments without embed to avoid RLS/500 on habit_assignments+habits join
       const { data: assignments, error: assignmentsError } = await supabase
         .from('habit_assignments')
-        .select(`
-          id,
-          habit_id,
-          start_date,
-          habits(
-            name,
-            description,
-            frequency_type,
-            target_days,
-            icon
-          )
-        `)
+        .select('id, habit_id, start_date')
         .eq('client_id', clientId)
         .eq('is_active', true)
 
-      if (assignmentsError) throw assignmentsError
-
-      if (!assignments || assignments.length === 0) {
+      if (assignmentsError || !assignments || assignments.length === 0) {
         setHabits([])
         setLoading(false)
         return
       }
 
+      // Fetch habit details in a separate query (coach can read their habits)
+      const habitIds = [...new Set(assignments.map((a: { habit_id: string }) => a.habit_id))]
+      const { data: habitsRows } = await supabase
+        .from('habits')
+        .select('id, name, description, frequency_type, target_days, icon')
+        .in('id', habitIds)
+      const habitMap = new Map((habitsRows ?? []).map((h: { id: string; name?: string; description?: string; frequency_type?: string; target_days?: number; icon?: string }) => [h.id, h]))
+
       // Get habit logs for last 30 days for analytics
-      const assignmentIds = assignments.map(a => a.id)
+      const assignmentIds = assignments.map((a: { id: string }) => a.id)
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const startDate = thirtyDaysAgo.toISOString().split('T')[0]
@@ -91,10 +86,11 @@ export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
         .in('assignment_id', assignmentIds)
         .gte('log_date', weekStartDate)
 
+      type HabitRow = { id: string; name?: string; description?: string; frequency_type?: string; target_days?: number; icon?: string }
       // Process each habit assignment
       const habitsData: HabitData[] = await Promise.all(
-        assignments.map(async (assignment: any) => {
-          const habit = assignment.habits
+        assignments.map(async (assignment: { id: string; habit_id: string }) => {
+          const habit: HabitRow = habitMap.get(assignment.habit_id) ?? { id: assignment.habit_id }
           const assignmentLogs = (logs || []).filter(l => l.assignment_id === assignment.id)
           const weekAssignmentLogs = (weekLogs || []).filter(l => l.assignment_id === assignment.id)
 

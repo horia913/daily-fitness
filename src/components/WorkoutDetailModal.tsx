@@ -39,6 +39,7 @@ import {
   restoreBackgroundScroll,
 } from "@/lib/mobile-compatibility";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast, type ToastData } from "@/components/ui/toast-provider";
 
 interface WorkoutTemplate {
   id: string;
@@ -355,7 +356,8 @@ const updateExercise = async (
     rest_seconds: number;
     notes: string;
   }) => void,
-  loadWorkoutDetailsFn: () => Promise<void>
+  loadWorkoutDetailsFn: () => Promise<void>,
+  addToast: (toast: Omit<ToastData, "id">) => void
 ) => {
   if (!editingExercise || !newExercise.exercise_id) return;
 
@@ -389,7 +391,7 @@ const updateExercise = async (
     setShowAddExercise(false);
   } catch (error) {
     console.error("Error updating exercise:", error);
-    alert("Failed to update exercise. Please try again.");
+    addToast({ title: "Failed to update exercise. Please try again.", variant: "destructive" });
   }
 };
 
@@ -397,7 +399,8 @@ const saveWorkout = async (
   template: WorkoutTemplate | null,
   workoutExercises: WorkoutExercise[],
   onWorkoutUpdated: (() => void) | undefined,
-  onClose: () => void
+  onClose: () => void,
+  addToast: (toast: Omit<ToastData, "id">) => void
 ) => {
   if (!template) return;
 
@@ -466,20 +469,21 @@ const saveWorkout = async (
       }
     }
 
-    alert("Workout saved successfully!");
+    addToast({ title: "Workout saved successfully!", variant: "success" });
     if (onWorkoutUpdated) {
       onWorkoutUpdated();
     }
     onClose();
   } catch (error) {
     console.error("Error saving workout:", error);
-    alert("Error saving workout");
+    addToast({ title: "Error saving workout", variant: "destructive" });
   }
 };
 
 const duplicateWorkout = async (
   template: WorkoutTemplate | null,
-  onWorkoutUpdated: (() => void) | undefined
+  onWorkoutUpdated: (() => void) | undefined,
+  addToast: (toast: Omit<ToastData, "id">) => void
 ) => {
   if (!template) return;
 
@@ -541,11 +545,11 @@ const duplicateWorkout = async (
       }
     }
 
-    alert("Workout duplicated successfully!");
+    addToast({ title: "Workout duplicated successfully!", variant: "success" });
     onWorkoutUpdated?.();
   } catch (error) {
     console.error("Error duplicating workout:", error);
-    alert("Failed to duplicate workout. Please try again.");
+    addToast({ title: "Failed to duplicate workout. Please try again.", variant: "destructive" });
   }
 };
 
@@ -559,6 +563,7 @@ export default function WorkoutDetailModal({
   template,
   onWorkoutUpdated,
 }: WorkoutDetailModalProps) {
+  const { addToast } = useToast();
   const { isDark, getThemeStyles } = useTheme();
   const theme = getThemeStyles();
 
@@ -721,7 +726,7 @@ export default function WorkoutDetailModal({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => duplicateWorkout(template, onWorkoutUpdated)}
+                    onClick={() => duplicateWorkout(template, onWorkoutUpdated, addToast)}
                     className="flex items-center gap-2"
                   >
                     <Copy className="w-4 h-4" />
@@ -1027,7 +1032,8 @@ export default function WorkoutDetailModal({
                                   setShowAddExercise,
                                   setEditingExercise,
                                   setNewExercise,
-                                  loadWorkoutDetailsFn
+                                  loadWorkoutDetailsFn,
+                                  addToast
                                 )
                             : () =>
                                 addExercise(

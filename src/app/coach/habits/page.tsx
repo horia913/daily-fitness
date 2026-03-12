@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -64,6 +65,7 @@ import { supabase } from '@/lib/supabase'
 export default function CoachHabitsManagement() {
   const { user } = useAuth()
   const { getThemeStyles, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
 
   // State management
@@ -467,10 +469,10 @@ export default function CoachHabitsManagement() {
 
       resetForm()
       setCreateDialogOpen(false)
-      alert('Habit template created successfully!')
+      addToast({ title: 'Habit template created successfully!', variant: 'default' })
     } catch (error) {
       console.error('Error creating habit:', error)
-      alert('Error creating habit template')
+      addToast({ title: 'Error creating habit template', variant: 'destructive' })
     }
   }
 
@@ -512,10 +514,10 @@ export default function CoachHabitsManagement() {
       setHabits(prev => prev.map(h => h.id === editingHabit.id ? updatedHabit : h))
       resetForm()
       setCreateDialogOpen(false)
-      alert('Habit template updated successfully!')
+      addToast({ title: 'Habit template updated successfully!', variant: 'default' })
     } catch (error) {
       console.error('Error updating habit:', error)
-      alert('Error updating habit template')
+      addToast({ title: 'Error updating habit template', variant: 'destructive' })
     }
   }
 
@@ -524,10 +526,10 @@ export default function CoachHabitsManagement() {
 
     try {
       setHabits(prev => prev.filter(h => h.id !== habitId))
-      alert('Habit template deleted successfully!')
+      addToast({ title: 'Habit template deleted successfully!', variant: 'default' })
     } catch (error) {
       console.error('Error deleting habit:', error)
-      alert('Error deleting habit template')
+      addToast({ title: 'Error deleting habit template', variant: 'destructive' })
     }
   }
 
@@ -540,7 +542,7 @@ export default function CoachHabitsManagement() {
       updated_at: new Date().toISOString()
     }
     setHabits(prev => [duplicatedHabit, ...prev])
-    alert('Habit template duplicated successfully!')
+    addToast({ title: 'Habit template duplicated successfully!', variant: 'default' })
   }
 
   const openEditDialog = (habit: Habit) => {
@@ -579,12 +581,12 @@ export default function CoachHabitsManagement() {
 
     try {
       // In a real app, this would create a UserHabit record
-      alert(`Habit "${selectedHabitForAssign.name}" assigned to client successfully!`)
+      addToast({ title: `Habit "${selectedHabitForAssign.name}" assigned to client successfully!`, variant: 'default' })
       setAssignDialogOpen(false)
       setSelectedHabitForAssign(null)
     } catch (error) {
       console.error('Error assigning habit:', error)
-      alert('Error assigning habit to client')
+      addToast({ title: 'Error assigning habit to client', variant: 'destructive' })
     }
   }
 
@@ -659,7 +661,7 @@ export default function CoachHabitsManagement() {
 
   const confirmAssignment = async () => {
     if (selectedHabits.length === 0 || selectedClients.length === 0) {
-      alert('Please select at least one habit and one client')
+      addToast({ title: 'Please select at least one habit and one client', variant: 'destructive' })
       return
     }
 
@@ -671,11 +673,11 @@ export default function CoachHabitsManagement() {
         return client ? `${client.first_name} ${client.last_name}` : ''
       }).join(', ')
       
-      alert(`Successfully assigned ${selectedHabits.length} habit(s) to ${selectedClients.length} client(s)!`)
+      addToast({ title: `Successfully assigned ${selectedHabits.length} habit(s) to ${selectedClients.length} client(s)!`, variant: 'default' })
       resetAssignment()
     } catch (error) {
       console.error('Error assigning habits:', error)
-      alert('Error assigning habits to clients')
+      addToast({ title: 'Error assigning habits to clients', variant: 'destructive' })
     }
   }
 

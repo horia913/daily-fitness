@@ -34,66 +34,25 @@ import {
 } from "@/lib/progressTrackingService";
 import { supabase } from "@/lib/supabase";
 import { ProgressPhotoStorage } from "@/lib/progressPhotoStorage";
-import { X, Upload } from "lucide-react";
+import { useToast } from "@/components/ui/toast-provider";
+import { X, Upload, ClipboardList } from "lucide-react";
 import Image from "next/image";
+import { EmptyState } from "@/components/ui/EmptyState";
 
+// DB columns use no _score suffix (e.g. deep_squat, hurdle_step_left)
 const FMS_TESTS = [
-  { key: "deep_squat_score", label: "Deep Squat", maxScore: 3 },
-  {
-    key: "hurdle_step_left_score",
-    label: "Hurdle Step (Left)",
-    maxScore: 3,
-  },
-  {
-    key: "hurdle_step_right_score",
-    label: "Hurdle Step (Right)",
-    maxScore: 3,
-  },
-  {
-    key: "inline_lunge_left_score",
-    label: "Inline Lunge (Left)",
-    maxScore: 3,
-  },
-  {
-    key: "inline_lunge_right_score",
-    label: "Inline Lunge (Right)",
-    maxScore: 3,
-  },
-  {
-    key: "shoulder_mobility_left_score",
-    label: "Shoulder Mobility (Left)",
-    maxScore: 3,
-  },
-  {
-    key: "shoulder_mobility_right_score",
-    label: "Shoulder Mobility (Right)",
-    maxScore: 3,
-  },
-  {
-    key: "active_straight_leg_raise_left_score",
-    label: "Active Straight Leg Raise (Left)",
-    maxScore: 3,
-  },
-  {
-    key: "active_straight_leg_raise_right_score",
-    label: "Active Straight Leg Raise (Right)",
-    maxScore: 3,
-  },
-  {
-    key: "trunk_stability_pushup_score",
-    label: "Trunk Stability Push-up",
-    maxScore: 3,
-  },
-  {
-    key: "rotary_stability_left_score",
-    label: "Rotary Stability (Left)",
-    maxScore: 3,
-  },
-  {
-    key: "rotary_stability_right_score",
-    label: "Rotary Stability (Right)",
-    maxScore: 3,
-  },
+  { key: "deep_squat", label: "Deep Squat", maxScore: 3 },
+  { key: "hurdle_step_left", label: "Hurdle Step (Left)", maxScore: 3 },
+  { key: "hurdle_step_right", label: "Hurdle Step (Right)", maxScore: 3 },
+  { key: "inline_lunge_left", label: "Inline Lunge (Left)", maxScore: 3 },
+  { key: "inline_lunge_right", label: "Inline Lunge (Right)", maxScore: 3 },
+  { key: "shoulder_mobility_left", label: "Shoulder Mobility (Left)", maxScore: 3 },
+  { key: "shoulder_mobility_right", label: "Shoulder Mobility (Right)", maxScore: 3 },
+  { key: "active_straight_leg_raise_left", label: "Active Straight Leg Raise (Left)", maxScore: 3 },
+  { key: "active_straight_leg_raise_right", label: "Active Straight Leg Raise (Right)", maxScore: 3 },
+  { key: "trunk_stability_pushup", label: "Trunk Stability Push-up", maxScore: 3 },
+  { key: "rotary_stability_left", label: "Rotary Stability (Left)", maxScore: 3 },
+  { key: "rotary_stability_right", label: "Rotary Stability (Right)", maxScore: 3 },
 ];
 
 export default function FMSAssessmentPage() {
@@ -102,6 +61,7 @@ export default function FMSAssessmentPage() {
   const clientId = params.id as string;
   const { user, loading: authLoading } = useAuth();
   const { getThemeStyles, performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const theme = getThemeStyles();
 
   const [loading, setLoading] = useState(true);
@@ -259,7 +219,7 @@ export default function FMSAssessmentPage() {
       });
     } catch (error) {
       console.error("Error uploading photos:", error);
-      alert("Error uploading photos. Please try again.");
+      addToast({ title: "Error uploading photos. Please try again.", variant: "destructive" });
     } finally {
       setUploadingPhotos(false);
       event.target.value = "";
@@ -292,7 +252,7 @@ export default function FMSAssessmentPage() {
       });
     } catch (error) {
       console.error("Error deleting photo:", error);
-      alert("Error deleting photo. Please try again.");
+      addToast({ title: "Error deleting photo. Please try again.", variant: "destructive" });
     }
   };
 
@@ -527,19 +487,13 @@ export default function FMSAssessmentPage() {
             </div>
           ) : (
             <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl">
-              <CardContent className="p-12 text-center">
-                <ClipboardCheck className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
-                <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
-                  No assessments yet
-                </h3>
-                <p className={`${theme.textSecondary} mb-6`}>
-                  Conduct a Functional Movement Screen assessment for this
-                  client
-                </p>
-                <Button className="fc-btn fc-btn-primary" onClick={() => setShowAddModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create First Assessment
-                </Button>
+              <CardContent className="p-12">
+                <EmptyState
+                  icon={ClipboardList}
+                  title="No FMS assessments"
+                  description="Create the first assessment for this client"
+                  action={{ label: "New Assessment", onClick: () => setShowAddModal(true) }}
+                />
               </CardContent>
             </GlassCard>
           )}

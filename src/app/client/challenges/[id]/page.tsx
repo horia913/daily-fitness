@@ -9,22 +9,40 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trophy, Calendar, Gift, ChevronDown, ScrollText, Share2 } from "lucide-react";
+import { ArrowLeft, Trophy, Calendar, Gift, ChevronDown, ScrollText, Share2, Video, CheckCircle, XCircle, Clock, Upload } from "lucide-react";
 import Link from "next/link";
-import { getChallengeDetails, getChallengeLeaderboard } from "@/lib/challengeService";
+import { getChallengeDetails, getChallengeLeaderboard, getChallengeScoringCategories, getParticipantSubmissions, submitVideoProof } from "@/lib/challengeService";
 import { cn } from "@/lib/utils";
-import { withTimeout } from "@/lib/withTimeout";
+import { useToast } from "@/components/ui/toast-provider";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function ChallengeDetailContent() {
   const params = useParams();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
   const challengeId = params.id as string;
 
   const [challenge, setChallenge] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [scoringCategories, setScoringCategories] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitModalCategory, setSubmitModalCategory] = useState<any>(null);
+  const [submitVideo, setSubmitVideo] = useState<File | null>(null);
+  const [submitWeight, setSubmitWeight] = useState("");
+  const [submitReps, setSubmitReps] = useState("");
+  const [submitNotes, setSubmitNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,18 +72,75 @@ function ChallengeDetailContent() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [challengeData, leaderboardData] = await Promise.all([
+      const [challengeData, leaderboardData, categoriesData] = await Promise.all([
         getChallengeDetails(challengeId),
         getChallengeLeaderboard(challengeId),
+        getChallengeScoringCategories(challengeId),
       ]);
 
       setChallenge(challengeData);
       setLeaderboard(leaderboardData);
+      setScoringCategories(categoriesData || []);
+
+      const userEntry = user?.id ? leaderboardData?.find((e: any) => e.client_id === user.id) : null;
+      if (userEntry?.id) {
+        const subs = await getParticipantSubmissions(userEntry.id);
+        setSubmissions(subs || []);
+      } else {
+        setSubmissions([]);
+      }
     } catch (error) {
       console.error("Error loading challenge:", error);
       setLoadError(error instanceof Error ? error.message : "Failed to load challenge");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshSubmissions = async () => {
+    const userEntry = user?.id ? leaderboard.find((e: any) => e.client_id === user.id) : null;
+    if (userEntry?.id) {
+      const subs = await getParticipantSubmissions(userEntry.id);
+      setSubmissions(subs || []);
+    }
+  };
+
+  const getSubmissionForCategory = (categoryId: string) => {
+    const forCategory = submissions.filter((s: any) => s.scoring_category_id === categoryId).sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+    return forCategory[0] || null;
+  };
+
+  const handleSubmitProof = async () => {
+    const userEntry = user?.id ? leaderboard.find((e: any) => e.client_id === user.id) : null;
+    if (!userEntry?.id || !submitModalCategory || !submitVideo) {
+      addToast({ title: "Select a video file.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await submitVideoProof(
+        userEntry.id,
+        submitModalCategory.id,
+        submitVideo,
+        submitWeight ? parseFloat(submitWeight) : undefined,
+        submitReps ? parseInt(submitReps, 10) : undefined
+      );
+      if (result) {
+        addToast({ title: "Proof submitted. Waiting for coach review.", variant: "success" });
+        setSubmitModalCategory(null);
+        setSubmitVideo(null);
+        setSubmitWeight("");
+        setSubmitReps("");
+        setSubmitNotes("");
+        await refreshSubmissions();
+        loadChallenge();
+      } else {
+        addToast({ title: "Failed to submit. Try again.", variant: "destructive" });
+      }
+    } catch (err) {
+      addToast({ title: "Failed to submit.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -188,6 +263,44 @@ function ChallengeDetailContent() {
           ) : null;
         })()}
 
+        {(() => {
+          const userEntry = user?.id ? leaderboard.find((e: any) => e.client_id === user.id) : null;
+          const canSubmit = userEntry && challenge.requires_video_proof && scoringCategories.length > 0 && challenge.status === "active";
+          if (!canSubmit) return null;
+          return (
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+              <h2 className="text-xl font-semibold fc-text-primary mb-4 flex items-center gap-2">
+                <Video className="w-5 h-5" />
+                Submit proof
+              </h2>
+              <p className="text-sm fc-text-dim mb-4">Submit video proof for each scoring category.</p>
+              <div className="space-y-3">
+                {scoringCategories.map((cat: any) => {
+                  const sub = getSubmissionForCategory(cat.id);
+                  const status = !sub ? "none" : sub.status;
+                  return (
+                    <div key={cat.id} className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                      <div>
+                        <p className="font-semibold fc-text-primary">{cat.category_name}</p>
+                        {status === "none" && <p className="text-xs fc-text-subtle">No submission</p>}
+                        {status === "pending" && <p className="text-xs text-amber-600 flex items-center gap-1"><Clock className="w-3 h-3" /> Waiting for coach review</p>}
+                        {status === "approved" && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Approved {sub?.claimed_weight != null && `— ${sub.claimed_weight} kg${sub?.claimed_reps != null ? ` × ${sub.claimed_reps} reps` : ""}`}</p>}
+                        {status === "rejected" && <p className="text-xs text-red-600 flex items-center gap-1"><XCircle className="w-3 h-3" /> Rejected — submit again</p>}
+                      </div>
+                      {(status === "none" || status === "rejected") && (
+                        <Button size="sm" onClick={() => { setSubmitModalCategory(cat); setSubmitVideo(null); setSubmitWeight(""); setSubmitReps(""); setSubmitNotes(""); }}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Submit proof
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
+          );
+        })()}
+
         {challenge.description && (
           <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl overflow-hidden">
             <details className="group">
@@ -283,6 +396,43 @@ function ChallengeDetailContent() {
           )}
         </GlassCard>
         </section>
+
+        <Dialog open={!!submitModalCategory} onOpenChange={(open) => !open && setSubmitModalCategory(null)}>
+          <DialogContent className="fc-glass fc-card border border-[color:var(--fc-glass-border)] max-w-md">
+            <DialogHeader>
+              <DialogTitle>Submit proof — {submitModalCategory?.category_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Video (MP4, MOV)</Label>
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,.mp4,.mov"
+                  className="mt-1 block w-full text-sm fc-text-primary"
+                  onChange={(e) => setSubmitVideo(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <div>
+                <Label>Claimed weight (kg)</Label>
+                <Input type="number" step="0.1" value={submitWeight} onChange={(e) => setSubmitWeight(e.target.value)} placeholder="Optional" variant="fc" />
+              </div>
+              <div>
+                <Label>Claimed reps</Label>
+                <Input type="number" value={submitReps} onChange={(e) => setSubmitReps(e.target.value)} placeholder="Optional" variant="fc" />
+              </div>
+              <div>
+                <Label>Notes (optional)</Label>
+                <Input value={submitNotes} onChange={(e) => setSubmitNotes(e.target.value)} placeholder="Optional" variant="fc" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSubmitModalCategory(null)}>Cancel</Button>
+              <Button onClick={handleSubmitProof} disabled={submitting || !submitVideo}>
+                {submitting ? "Submitting…" : "Submit"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AnimatedBackground>
   );

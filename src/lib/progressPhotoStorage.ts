@@ -1,3 +1,10 @@
+/**
+ * Progress Photo Storage (record-scoped attachments)
+ * Upload/delete photos for arbitrary records by recordType + recordId.
+ * Returns storage path only; caller stores path in their own record (e.g. mobility_metrics, FMS).
+ * Path pattern: {recordType}/{clientId}/{recordId}/{fileName}.
+ * Used by: MobilityFormFields, coach FMS page. Not the same as progressPhotoService (client timeline).
+ */
 import { supabase } from './supabase'
 
 const STORAGE_BUCKET = 'progress-photos'

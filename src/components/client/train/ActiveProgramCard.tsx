@@ -4,13 +4,15 @@ import React, { useState, useEffect } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
 import { Progress } from "@/components/ui/progress";
 import { Play, Loader2 } from "lucide-react";
-import { ProgramWeekState } from "@/lib/programWeekStateBuilder";
+import { ProgramWeekState, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
 
 interface ActiveProgramCardProps {
   programWeek: ProgramWeekState;
   onStartWorkout: (scheduleId: string) => void;
+  /** When set, main CTA opens the day preview instead of starting directly */
+  onSelectDay?: (day: ProgramWeekDayCard) => void;
   isStarting: boolean;
   startingScheduleId: string | null;
   exerciseCounts?: Map<string, number>; // templateId -> exercise count
@@ -41,11 +43,12 @@ function getCurrentBlock(
 export function ActiveProgramCard({
   programWeek,
   onStartWorkout,
+  onSelectDay,
   isStarting,
   startingScheduleId,
   exerciseCounts,
 }: ActiveProgramCardProps) {
-  const { programName, programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay } = programWeek;
+  const { programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay } = programWeek;
 
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
   useEffect(() => {
@@ -74,17 +77,20 @@ export function ActiveProgramCard({
     : 0;
 
   const handleStart = () => {
-    if (nextWorkout && !isRestDay) {
+    if (!nextWorkout || isRestDay) return;
+    if (onSelectDay) {
+      onSelectDay(nextWorkout);
+    } else {
       onStartWorkout(nextWorkout.scheduleId);
     }
   };
 
   return (
-    <ClientGlassCard className="p-6 mb-6">
-      {/* Program Header */}
+    <ClientGlassCard className="p-6 mb-6 border-l-4 border-cyan-400 bg-cyan-600 text-white">
+      {/* Slightly darker cyan (600) for better contrast with white text */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h2 className="text-xl font-bold fc-text-primary mb-1">{programName}</h2>
+          <h2 className="text-xl font-bold text-white mb-1 drop-shadow-sm">Today&apos;s Workout</h2>
           {/* Training block badge — one line when present */}
           {blockInfo && (
             <div className="flex items-center gap-2 mb-1">
@@ -101,11 +107,11 @@ export function ActiveProgramCard({
                   : TRAINING_BLOCK_GOALS[blockInfo.block.goal]}
               </span>
               {blockInfo.block.name && (
-                <span className="text-xs fc-text-dim truncate">{blockInfo.block.name}</span>
+                <span className="text-xs text-white/80 truncate">{blockInfo.block.name}</span>
               )}
             </div>
           )}
-          <p className="text-sm fc-text-dim">
+          <p className="text-sm text-white/80">
             Week {currentUnlockedWeek} of {totalWeeks} · Day {completedDays + 1} of {totalDays}
           </p>
         </div>
@@ -114,16 +120,13 @@ export function ActiveProgramCard({
       {/* Progress Bar */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs fc-text-dim">Progress</span>
-          <span className="text-xs font-semibold fc-text-primary">{completionPercent}% complete</span>
+          <span className="text-xs text-white/80">Progress</span>
+          <span className="text-xs font-semibold text-white">{completionPercent}% complete</span>
         </div>
-        <div className="relative h-2 w-full rounded-full overflow-hidden" style={{ background: "var(--fc-surface-sunken)" }}>
+        <div className="relative h-2 w-full rounded-full overflow-hidden bg-white/20">
           <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{
-              width: `${completionPercent}%`,
-              background: "var(--fc-accent-cyan)",
-            }}
+            className="h-full rounded-full transition-all duration-300 bg-white"
+            style={{ width: `${completionPercent}%` }}
           />
         </div>
       </div>
@@ -134,20 +137,19 @@ export function ActiveProgramCard({
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">⚡</span>
-              <span className="text-xs font-bold uppercase tracking-wider fc-text-dim">NEXT UP</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/80">NEXT UP</span>
             </div>
-            <h3 className="text-lg font-bold fc-text-primary mb-1">{nextWorkout.workoutName}</h3>
-            <p className="text-sm fc-text-dim">
+            <h3 className="text-lg font-bold text-white mb-1 drop-shadow-sm">{nextWorkout.workoutName}</h3>
+            <p className="text-sm text-white/80">
               {exerciseCount > 0 ? `${exerciseCount} exercises` : "Workout"} • ~{nextWorkout.estimatedDuration || 45} min
             </p>
           </div>
 
-          {/* Start Button */}
+          {/* Start Button — dark surface (previous card color) */}
           <button
             onClick={handleStart}
             disabled={isStarting && startingScheduleId === nextWorkout.scheduleId}
-            className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "var(--fc-accent-cyan)" }}
+            className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed bg-[color:var(--fc-surface-card)] border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-surface-sunken)]"
           >
             {isStarting && startingScheduleId === nextWorkout.scheduleId ? (
               <>
@@ -164,8 +166,8 @@ export function ActiveProgramCard({
         </>
       ) : (
         <div className="text-center py-4">
-          <p className="text-base font-semibold fc-text-primary mb-1">Rest day</p>
-          <p className="text-sm fc-text-dim">No workout scheduled for today</p>
+          <p className="text-base font-semibold text-white mb-1">Rest day</p>
+          <p className="text-sm text-white/80">No workout scheduled for today</p>
         </div>
       )}
     </ClientGlassCard>

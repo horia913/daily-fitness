@@ -24,6 +24,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface ExerciseCategory {
   id: string
@@ -70,6 +71,7 @@ export default function ExerciseCategoryForm({
   onSuccess,
   category
 }: ExerciseCategoryFormProps) {
+  const { addToast } = useToast()
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
 
@@ -139,7 +141,7 @@ export default function ExerciseCategoryForm({
       resetForm()
     } catch (error) {
       console.error('Error saving category:', error)
-      alert('Error saving category. Please try again.')
+      addToast({ title: 'Error saving category. Please try again.', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

@@ -37,6 +37,7 @@ import {
   HabitCategory 
 } from '@/lib/habitTracker'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface HabitTrackerProps {
   userId: string
@@ -44,6 +45,7 @@ interface HabitTrackerProps {
 }
 
 export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerProps) {
+  const { addToast } = useToast()
   const [userHabits, setUserHabits] = useState<UserHabit[]>([])
   const [habitEntries, setHabitEntries] = useState<HabitEntry[]>([])
   const [habitStreaks, setHabitStreaks] = useState<HabitStreak[]>([])
@@ -148,7 +150,7 @@ export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerP
       loadHabitData()
     } catch (error) {
       console.error('Error completing habit:', error)
-      alert('Error completing habit. Please try again.')
+      addToast({ title: 'Error completing habit. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -192,7 +194,7 @@ export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerP
       loadHabitData()
     } catch (error) {
       console.error('Error skipping habit:', error)
-      alert('Error skipping habit. Please try again.')
+      addToast({ title: 'Error skipping habit. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -259,7 +261,7 @@ export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerP
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Habit Tracker</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 fc-text-primary">Habit Tracker</h2>
           <p className="text-slate-600">Build healthy habits, one day at a time</p>
         </div>
         <div className="flex items-center gap-2">
@@ -469,7 +471,7 @@ export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerP
         <Card className="text-center py-12">
           <CardContent>
             <Target className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-800 mb-2">No habits yet</h3>
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 fc-text-primary mb-2">No habits yet</h3>
             <p className="text-slate-600 mb-4">
               Start building healthy habits by adding your first one
             </p>

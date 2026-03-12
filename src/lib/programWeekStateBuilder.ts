@@ -52,6 +52,12 @@ export interface ProgramWeekState {
   todaySlot: ProgramWeekDayCard | null
   isRestDay: boolean
   overdueSlots: OverdueSlotCard[]
+  /** For dashboard program progress: completed slots count */
+  completedCount: number
+  /** For dashboard program progress: total schedule slots */
+  totalSlots: number
+  /** For dashboard program progress: current week number (1-based) */
+  currentWeekNumber: number
 }
 
 /**
@@ -76,6 +82,9 @@ export async function buildProgramWeekState(
     todaySlot: null,
     isRestDay: false,
     overdueSlots: [],
+    completedCount: 0,
+    totalSlots: 0,
+    currentWeekNumber: 1,
   }
 
   const state = await getProgramState(supabase, clientId)
@@ -85,9 +94,17 @@ export async function buildProgramWeekState(
     const completedAssignment = await getRecentlyCompletedProgramAssignment(supabase, clientId)
     if (completedAssignment) {
       const totalWeeks = completedAssignment.duration_weeks ?? 1
+      const totalSlots = completedAssignment.total_days ?? 0
+      let programName = completedAssignment.name
+      if (!programName && completedAssignment.program_id) {
+        const { data: program } = await supabase.from('programs').select('name').eq('id', completedAssignment.program_id).maybeSingle()
+        programName = program?.name ?? 'Training Program'
+      } else if (!programName) {
+        programName = 'Training Program'
+      }
       return {
         hasProgram: true,
-        programName: completedAssignment.name || 'Training Program',
+        programName,
         programId: completedAssignment.program_id || null,
         programAssignmentId: completedAssignment.id,
         currentUnlockedWeek: totalWeeks,
@@ -98,6 +115,9 @@ export async function buildProgramWeekState(
         todaySlot: null,
         isRestDay: false,
         overdueSlots: [],
+        completedCount: totalSlots,
+        totalSlots,
+        currentWeekNumber: totalWeeks,
       }
     }
     return empty
@@ -168,9 +188,17 @@ export async function buildProgramWeekState(
     }
   })
 
+  let programName = state.assignment.name
+  if (!programName && state.assignment.program_id) {
+    const { data: program } = await supabase.from('programs').select('name').eq('id', state.assignment.program_id).maybeSingle()
+    programName = program?.name ?? 'Training Program'
+  } else if (!programName) {
+    programName = 'Training Program'
+  }
+
   return {
     hasProgram: true,
-    programName: state.assignment.name || 'Training Program',
+    programName,
     programId: state.assignment.program_id || null,
     programAssignmentId: state.assignment.id,
     currentUnlockedWeek: unlockedWeekMax,
@@ -181,5 +209,8 @@ export async function buildProgramWeekState(
     todaySlot,
     isRestDay,
     overdueSlots,
+    completedCount: state.completedCount,
+    totalSlots: state.totalSlots,
+    currentWeekNumber: state.currentWeekNumber,
   }
 }

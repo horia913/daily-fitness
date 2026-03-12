@@ -51,6 +51,7 @@ import {
 } from '@/lib/bulkAssignment'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface BulkAssignmentProps {
   isOpen: boolean
@@ -68,6 +69,7 @@ export default function BulkAssignmentComponent({
   initialType = 'program'
 }: BulkAssignmentProps) {
   const { isDark, getThemeStyles } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
   
   const [operationType, setOperationType] = useState<'program' | 'workout' | 'meal_plan'>(initialType)
@@ -198,7 +200,7 @@ export default function BulkAssignmentComponent({
 
   const addOperationItem = () => {
     if (selectedClients.length === 0) {
-      alert('Please select at least one client')
+      addToast({ title: 'Please select at least one client', variant: 'warning' })
       return
     }
 
@@ -229,7 +231,7 @@ export default function BulkAssignmentComponent({
 
   const handleExecute = async () => {
     if (!validation?.isValid) {
-      alert('Please fix validation errors before proceeding')
+      addToast({ title: 'Please fix validation errors before proceeding', variant: 'warning' })
       return
     }
 
@@ -287,7 +289,7 @@ export default function BulkAssignmentComponent({
       onClose()
     } catch (error) {
       console.error('Error executing bulk assignment:', error)
-      alert('Error executing bulk assignment. Please try again.')
+      addToast({ title: 'Error executing bulk assignment. Please try again.', variant: 'destructive' })
     } finally {
       setAssigning(false)
     }
