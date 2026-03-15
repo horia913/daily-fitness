@@ -57,6 +57,8 @@ interface ClientStatus {
   } | null;
   activeSession: {
     sessionId: string;
+    workoutLogId: string;
+    workoutAssignmentId: string;
     startedAt: string;
     currentBlock: number;
     currentExercise: string;
@@ -134,6 +136,7 @@ function ClientCard({
   onSkipDay,
   onMarkComplete,
   onStartWorkout,
+  onLogSet,
   skipLoading,
   markLoading,
   startLoading,
@@ -145,6 +148,7 @@ function ClientCard({
   onSkipDay: () => void;
   onMarkComplete: () => void;
   onStartWorkout: () => void;
+  onLogSet: () => void;
   skipLoading: boolean;
   markLoading: boolean;
   startLoading: boolean;
@@ -236,10 +240,16 @@ function ClientCard({
           </Button>
         )}
         {hasSession && (
-          <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700" onClick={onMarkComplete} disabled={markLoading}>
-            {markLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
-            Mark Complete
-          </Button>
+          <>
+            <Button size="sm" className="text-xs bg-cyan-600 hover:bg-cyan-700" onClick={onLogSet} disabled={!status.activeSession?.workoutLogId}>
+              <Dumbbell className="h-3.5 w-3.5 mr-1" />
+              Log Set
+            </Button>
+            <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700" onClick={onMarkComplete} disabled={markLoading}>
+              {markLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+              Mark Complete
+            </Button>
+          </>
         )}
         {!hasSession && hasNextWorkout && (
           <Button size="sm" className="text-xs bg-cyan-600 hover:bg-cyan-700" onClick={onStartWorkout} disabled={startLoading}>
@@ -343,6 +353,197 @@ function ViewDetailPanel({
         )}
         {!loading && !error && data?.status === "completed" && (
           <p className="text-sm text-green-400">Program completed.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// QUICK LOG SET MODAL
+// ============================================================================
+
+function QuickLogModal({
+  open,
+  onClose,
+  clientId,
+  clientName,
+  workoutLogId,
+  workoutAssignmentId,
+  sessionId,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  clientId: string;
+  clientName: string;
+  workoutLogId: string;
+  workoutAssignmentId: string;
+  sessionId: string;
+  onSuccess: () => void;
+}) {
+  const [blocks, setBlocks] = useState<WorkoutBlock[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [selected, setSelected] = useState<{ blockId: string; exerciseId: string; exerciseName: string } | null>(null);
+  const [weight, setWeight] = useState("");
+  const [reps, setReps] = useState("");
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (!open || !clientId) return;
+    setLoading(true);
+    setBlocks([]);
+    setSelected(null);
+    setWeight("");
+    setReps("");
+    fetchApi(`/api/coach/pickup/next-workout?clientId=${clientId}`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (body.blocks && Array.isArray(body.blocks)) {
+          setBlocks(body.blocks);
+        }
+      })
+      .catch(() => addToast({ title: "Failed to load exercises", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  }, [open, clientId, addToast]);
+
+  const exerciseOptions: { blockId: string; exerciseId: string; exerciseName: string }[] = [];
+  for (const block of blocks) {
+    for (const ex of block.exercises || []) {
+      if (ex.exercise_id && ex.exercise_name) {
+        exerciseOptions.push({
+          blockId: block.id,
+          exerciseId: ex.exercise_id,
+          exerciseName: ex.exercise_name,
+        });
+      }
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!selected || !weight.trim() || !reps.trim()) {
+      addToast({ title: "Enter weight and reps", variant: "destructive" });
+      return;
+    }
+    const w = parseFloat(weight);
+    const r = parseInt(reps, 10);
+    if (isNaN(w) || w < 0 || isNaN(r) || r <= 0) {
+      addToast({ title: "Invalid weight or reps", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetchApi("/api/log-set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          workout_log_id: workoutLogId,
+          workout_assignment_id: workoutAssignmentId,
+          session_id: sessionId,
+          set_entry_id: selected.blockId,
+          exercise_id: selected.exerciseId,
+          weight: w,
+          reps: r,
+          set_type: "straight_set",
+          set_number: 1,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to log set");
+      addToast({ title: "Set logged", description: `${selected.exerciseName}: ${w}kg × ${r} reps`, variant: "success" });
+      onSuccess();
+      onClose();
+    } catch (e) {
+      addToast({ title: "Error", description: e instanceof Error ? e.message : "Failed to log set", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div
+        className="fc-glass fc-card p-4 w-full max-w-md flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Log Set — {clientName}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-[color:var(--fc-text-dim)] block mb-1">Exercise</label>
+              <select
+                value={selected ? `${selected.blockId}:${selected.exerciseId}` : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) {
+                    setSelected(null);
+                    return;
+                  }
+                  const opt = exerciseOptions.find((o) => `${o.blockId}:${o.exerciseId}` === v);
+                  setSelected(opt ?? null);
+                }}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+              >
+                <option value="">Select exercise</option>
+                {exerciseOptions.map((o) => (
+                  <option key={`${o.blockId}:${o.exerciseId}`} value={`${o.blockId}:${o.exerciseId}`}>
+                    {o.exerciseName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-[color:var(--fc-text-dim)] block mb-1">Weight (kg)</label>
+                <input
+                  type="number"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="0"
+                  step="0.5"
+                  min="0"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[color:var(--fc-text-dim)] block mb-1">Reps</label>
+                <input
+                  type="number"
+                  value={reps}
+                  onChange={(e) => setReps(e.target.value)}
+                  placeholder="0"
+                  step="1"
+                  min="1"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+                onClick={handleSubmit}
+                disabled={submitting || !selected}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log Set"}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -485,6 +686,13 @@ function GymConsoleContent() {
   const [viewDetailClientId, setViewDetailClientId] = useState<string | null>(null);
   const [viewDetailClientName, setViewDetailClientName] = useState("");
   const [actionLoading, setActionLoading] = useState<{ skip?: string; mark?: string; start?: string }>({});
+  const [quickLogClient, setQuickLogClient] = useState<{
+    clientId: string;
+    clientName: string;
+    workoutLogId: string;
+    workoutAssignmentId: string;
+    sessionId: string;
+  } | null>(null);
 
   const fetchStatus = useCallback(async () => {
     if (!user || consoleClientIds.length === 0) {
@@ -696,6 +904,18 @@ function GymConsoleContent() {
                         onSkipDay={() => handleSkipDay(status)}
                         onMarkComplete={() => handleMarkComplete(clientId)}
                         onStartWorkout={() => handleStartWorkout(clientId)}
+                        onLogSet={() => {
+                          const s = statusByClientId.get(clientId);
+                          if (s?.activeSession?.workoutLogId) {
+                            setQuickLogClient({
+                              clientId,
+                              clientName: s.clientName,
+                              workoutLogId: s.activeSession.workoutLogId,
+                              workoutAssignmentId: s.activeSession.workoutAssignmentId,
+                              sessionId: s.activeSession.sessionId,
+                            });
+                          }
+                        }}
                         skipLoading={actionLoading.skip === clientId}
                         markLoading={actionLoading.mark === clientId}
                         startLoading={actionLoading.start === clientId}
@@ -734,6 +954,19 @@ function GymConsoleContent() {
           currentIds={consoleClientIds}
           onSave={saveConsoleClients}
         />
+
+        {quickLogClient && (
+          <QuickLogModal
+            open={!!quickLogClient}
+            onClose={() => setQuickLogClient(null)}
+            clientId={quickLogClient.clientId}
+            clientName={quickLogClient.clientName}
+            workoutLogId={quickLogClient.workoutLogId}
+            workoutAssignmentId={quickLogClient.workoutAssignmentId}
+            sessionId={quickLogClient.sessionId}
+            onSuccess={fetchStatus}
+          />
+        )}
       </div>
     </AnimatedBackground>
   );

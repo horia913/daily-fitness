@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -18,7 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
 import { withTimeout } from "@/lib/withTimeout";
-
 interface AssignmentInfo {
   id: string;
   name: string;
@@ -143,6 +142,7 @@ export default function WorkoutDetailsPage() {
   const [blocks, setBlocks] = useState<StructuredBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(
@@ -165,6 +165,7 @@ export default function WorkoutDetailsPage() {
 
     const load = async (assignmentId: string) => {
       setLoading(true);
+      setLoadingStartedAt(Date.now());
       setError(null);
 
       try {
@@ -557,6 +558,7 @@ export default function WorkoutDetailsPage() {
       setError(loadError?.message === "timeout" ? "Loading took too long. Please try again." : (loadError?.message || "Failed to load workout details"));
   } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
   }
     };
 
@@ -564,8 +566,16 @@ export default function WorkoutDetailsPage() {
       console.error("Unexpected error loading workout details:", loadError);
       setError(loadError?.message === "timeout" ? "Loading took too long. Please try again." : "Failed to load workout details");
       setLoading(false);
+      setLoadingStartedAt(null);
     });
   }, [id, retryTrigger]);
+
+  const refetchDetails = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    setLoadingStartedAt(Date.now());
+    setRetryTrigger((t) => t + 1);
+  }, []);
 
   // Calculate stats
   const totalSets = useMemo(() => {

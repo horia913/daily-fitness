@@ -440,6 +440,7 @@ export function SupersetExecutor({
       const logData: any = {
         set_type: "superset",
         set_number: setNumber,
+        isLastSet: setNumber >= totalSets,
       };
 
       // Only add fields if they're defined

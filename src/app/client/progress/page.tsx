@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -25,7 +25,6 @@ import {
 import Link from "next/link";
 import { getProgressStats, ProgressStats, getMonthlyProgressSummary, getMonthlyNarrativeData, type MonthlyProgressSummary, type MonthlyNarrativeData } from "@/lib/progressStatsService";
 import { withTimeout } from "@/lib/withTimeout";
-
 const HUB_NAV_ITEMS: {
   href: string;
   title: string;
@@ -67,19 +66,17 @@ function ProgressHubContent() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [monthlySummary, setMonthlySummary] = useState<MonthlyProgressSummary | null>(null);
   const [narrativeData, setNarrativeData] = useState<MonthlyNarrativeData | null>(null);
 
-  useEffect(() => {
-    loadProgressData();
-  }, [user]);
-
-  const loadProgressData = async () => {
+  const loadProgressData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       setLoadError(null);
+      setLoadingStartedAt(Date.now());
       const [progressStats, summary, narrative] = await Promise.all([
         withTimeout(getProgressStats(user.id), 25000, "timeout"),
         getMonthlyProgressSummary(user.id),
@@ -93,8 +90,14 @@ function ProgressHubContent() {
       setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load progress"));
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadProgressData();
+  }, [loadProgressData]);
+
 
   const monthName = new Date().toLocaleDateString("en-US", { month: "long" });
   const narrativeParagraph = (() => {

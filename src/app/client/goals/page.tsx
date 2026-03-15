@@ -61,7 +61,6 @@ import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { withTimeout } from "@/lib/withTimeout";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
-
 const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string }[] = [
   { id: "training", label: "Training", emoji: "🏋️" },
   { id: "nutrition", label: "Nutrition", emoji: "🍎" },
@@ -260,6 +259,7 @@ export default function ClientGoals() {
   const { performanceSettings, isDark, getSemanticColor } = useTheme();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const loadingRef = useRef(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [presetGoalTemplates, setPresetGoalTemplates] = useState<PresetGoal[]>(
@@ -370,6 +370,7 @@ export default function ClientGoals() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
+    setLoadingStartedAt(Date.now());
     try {
       await withTimeout(
         (async () => {
@@ -453,9 +454,11 @@ export default function ClientGoals() {
       setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load goals"));
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
       loadingRef.current = false;
     }
   }, [user]);
+
 
   // Load preset goals from database (with fallback to hardcoded array)
   const loadPresetGoals = useCallback(async () => {

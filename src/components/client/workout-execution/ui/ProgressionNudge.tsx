@@ -69,12 +69,6 @@ export function ProgressionNudge({
   previousPerformance,
   onApplySuggestion,
 }: ProgressionNudgeProps) {
-  console.log('[ProgressionNudge] RENDER:', {
-    suggestion: suggestion?.type || 'null',
-    previousPerformance: previousPerformance?.lastWorkout ? 'has data' : 'null',
-    lastTimeLineWeight: previousPerformance?.lastWorkout?.weight,
-  });
-
   const lastTimeLine = buildLastTimeLine(
     previousPerformance?.lastWorkout ?? null
   );

@@ -177,7 +177,7 @@ export async function getControlRoomResult(
       .in('program_assignment_id', assignmentIds),
     supabase
       .from('program_schedule')
-      .select('id, program_id, week_number, day_number')
+      .select('id, program_id, week_number, day_number, is_optional')
       .in('program_id', programIds)
       .order('week_number', { ascending: true })
       .order('day_number', { ascending: true }),
@@ -194,11 +194,11 @@ export async function getControlRoomResult(
     }
   }
 
-  const scheduleByProgram = new Map<string, { id: string; program_id: string; week_number: number; day_number: number }[]>()
+  const scheduleByProgram = new Map<string, { id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }[]>()
   const scheduleIdToWeek = new Map<string, { program_id: string; week_number: number }>()
   for (const s of scheduleRows ?? []) {
     const list = scheduleByProgram.get(s.program_id) ?? []
-    list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1 })
+    list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1, is_optional: s.is_optional ?? false })
     scheduleByProgram.set(s.program_id, list)
     scheduleIdToWeek.set(s.id, { program_id: s.program_id, week_number: s.week_number })
   }
@@ -218,7 +218,9 @@ export async function getControlRoomResult(
     const referenceSlot = nextSlot ?? slots[slots.length - 1]
     const currentWeek = progressMap.get(a.assignmentId) ?? referenceSlot?.week_number ?? 1
 
-    const scheduleIdsThisWeek = (scheduleByProgram.get(a.programId) ?? []).filter((s) => s.week_number === currentWeek).map((s) => s.id)
+    const slotsThisWeek = (scheduleByProgram.get(a.programId) ?? []).filter((s) => s.week_number === currentWeek)
+    const requiredSlotsThisWeek = slotsThisWeek.filter((s) => !s.is_optional)
+    const scheduleIdsThisWeek = requiredSlotsThisWeek.map((s) => s.id)
     const total = scheduleIdsThisWeek.length
     const completedThisWeek = (completionRows ?? []).filter(
       (c) => c.program_assignment_id === a.assignmentId && scheduleIdsThisWeek.includes(c.program_schedule_id)

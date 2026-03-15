@@ -25,7 +25,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { type MorningBriefing, type ClientAlert, sortAlertsByPriority } from "@/lib/coachDashboardService";
-
 function CoachDashboardContent() {
   const { user, profile } = useAuth();
   const { performanceSettings } = useTheme();
@@ -34,6 +33,7 @@ function CoachDashboardContent() {
   const [programCompliance, setProgramCompliance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "lastActive" | "streak" | "compliance">("name");
   const loadingRef = useRef(false);
@@ -47,6 +47,7 @@ function CoachDashboardContent() {
     loadingRef.current = true;
     try {
       setLoading(true);
+      setLoadingStartedAt(Date.now());
       setError(null);
 
       const res = await fetch("/api/coach/dashboard", { signal: signal ?? null });
@@ -70,9 +71,15 @@ function CoachDashboardContent() {
       didLoadRef.current = false;
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
       loadingRef.current = false;
     }
   }, [user]);
+
+  const refetchDashboard = useCallback(() => {
+    didLoadRef.current = false;
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (!user) return;
@@ -199,7 +206,23 @@ function CoachDashboardContent() {
           </header>
         </AnimatedEntry>
 
-        {error && (
+        {error && !loading && (
+          <div className="fc-surface rounded-2xl p-4 mb-6 border-l-4 border-l-[color:var(--fc-status-error)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <p className="text-sm fc-text-error">{error}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                didLoadRef.current = false;
+                loadData();
+              }}
+              className="fc-btn fc-btn-primary fc-press shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {error && loading && (
           <div className="fc-surface rounded-2xl p-4 mb-6 border-l-4 border-l-[color:var(--fc-status-error)]">
             <p className="text-sm fc-text-error">{error}</p>
           </div>

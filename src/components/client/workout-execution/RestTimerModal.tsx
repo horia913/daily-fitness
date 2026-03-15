@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
 import { SkipForward, Plus, Trophy, Layers } from "lucide-react";
 import { preventBackgroundScroll, restoreBackgroundScroll } from "@/lib/mobile-compatibility";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 export interface RestTimerLastSet {
   weight: number;
@@ -134,8 +135,9 @@ export function RestTimerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="fc-modal fc-card w-full max-w-[320px] overflow-hidden rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass)]">
+    <ModalPortal isOpen={isOpen}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fc-modal fc-card w-full max-w-[320px] overflow-hidden rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass)]">
         {/* Optional: Completion hero */}
         {lastSet && (
           <div className="relative px-4 pt-4 pb-3 border-b border-[color:var(--fc-glass-border)]">
@@ -263,5 +265,6 @@ export function RestTimerModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

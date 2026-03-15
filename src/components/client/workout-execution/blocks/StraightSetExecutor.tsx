@@ -455,6 +455,7 @@ export function StraightSetExecutor({
       const logData: any = {
         set_type: "straight_set",
         set_number: currentSetNumber,
+        isLastSet: currentSetNumber >= totalSets,
       };
 
       // Only add fields if they're defined

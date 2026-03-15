@@ -27,6 +27,11 @@ import {
   getTodayPlanSelection,
   selectPlanForToday,
 } from "@/lib/mealCompletionService";
+import {
+  mapNutritionPageRpcToPageData,
+  type NutritionPageRpcResponse,
+  type MappedMeal,
+} from "@/lib/nutritionPageDataMapper";
 import MealCardWithOptions from "@/components/client/MealCardWithOptions";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -98,7 +103,6 @@ function NutritionDashboardContent() {
 
   const [meals, setMeals] = useState<Meal[]>([]);
 
-  const NUTRITION_LOAD_TIMEOUT_MS = 20000;
   const [loadingMeals, setLoadingMeals] = useState(true);
   const [mealsLoadError, setMealsLoadError] = useState<string | null>(null);
   const loadGenerationRef = useRef(0);
@@ -152,7 +156,7 @@ function NutritionDashboardContent() {
   const loadStartedAtRef = useRef<number | null>(null);
   const goalsSectionRef = useRef<HTMLDivElement>(null);
 
-  const runMealsLoadWithTimeout = async () => {
+  const runMealsLoad = async () => {
     if (!user?.id) return;
     setMealsLoadError(null);
     setLoadingMeals(true);
@@ -160,32 +164,7 @@ function NutritionDashboardContent() {
     loadGenerationRef.current = (loadGenerationRef.current ?? 0) + 1;
     const loadId = loadGenerationRef.current;
     try {
-      // On retry (after an error), refresh auth so a stale token doesn't cause the same failure
-      if (mealsLoadError) {
-        try {
-          await Promise.race([
-            supabase.auth.refreshSession(),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("refresh_timeout")), 3000)
-            ),
-          ]);
-        } catch {
-          // Proceed with load even if refresh fails or times out
-        }
-      }
-      await Promise.race([
-        loadTodayMeals(loadId),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), NUTRITION_LOAD_TIMEOUT_MS)
-        ),
-      ]);
-    } catch (err) {
-      if (loadId !== loadGenerationRef.current) return;
-      setMealsLoadError(
-        err instanceof Error && err.message === "timeout"
-          ? "Loading took too long. Check your connection."
-          : "Could not load nutrition. Please try again."
-      );
+      await loadTodayMeals(loadId);
     } finally {
       if (loadId === loadGenerationRef.current) {
         setLoadingMeals(false);
@@ -201,7 +180,7 @@ function NutritionDashboardContent() {
 
   useEffect(() => {
     if (!user?.id) return;
-    runMealsLoadWithTimeout();
+    runMealsLoad();
     return () => {
       loadGenerationRef.current = (loadGenerationRef.current ?? 0) + 1;
       setLoadingMeals(false);
@@ -212,375 +191,85 @@ function NutritionDashboardContent() {
   const loadTodayMeals = async (loadId: number) => {
     if (!user?.id) return;
     const isCurrent = () => loadId === loadGenerationRef.current;
+    const today = new Date().toISOString().split("T")[0];
 
     try {
       setLoadingMeals(true);
-      const today = new Date().toISOString().split("T")[0];
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_client_nutrition_page", {
+        p_client_id: user.id,
+        p_date: today,
+      });
 
-      // STEP 1 (Phase N4): Load ALL active assignments + today's plan selection
-      const [
-        { data: assignmentsData, error: assignmentError },
-        { data: todaySelectionRow },
-      ] = await Promise.all([
-        supabase
-          .from("meal_plan_assignments")
-          .select(
-            `
-            id,
-            meal_plan_id,
-            start_date,
-            end_date,
-            is_active,
-            label,
-            meal_plans (
-              id,
-              name,
-              notes,
-              target_calories,
-              target_protein,
-              target_carbs,
-              target_fat
-            )
-          `
-          )
-          .eq("client_id", user.id)
-          .eq("is_active", true)
-          .lte("start_date", today)
-          .or(`end_date.is.null,end_date.gte.${today}`)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("client_daily_plan_selection")
-          .select("meal_plan_assignment_id")
-          .eq("client_id", user.id)
-          .eq("date", today)
-          .maybeSingle(),
-      ]);
-
-      if (assignmentError) {
-        console.error("Error loading meal plan assignments:", assignmentError);
-      }
-
-      const assignmentsList = assignmentsData ?? [];
-      const todaySelectionId = todaySelectionRow?.meal_plan_assignment_id ?? null;
-
-      if (assignmentsList.length === 0) {
-        if (!isCurrent()) return;
-        setActiveAssignmentId(null);
-        setActiveMealPlanInfo(null);
-        setActiveAssignments([]);
-        setHasActivePlan(false);
-        setMeals([]);
-        setNutritionData((prev) => ({
-          ...prev,
-          calories: { consumed: 0, goal: 0 },
-          protein: { consumed: 0, goal: 0 },
-          carbs: { consumed: 0, goal: 0 },
-          fat: { consumed: 0, goal: 0 },
-        }));
-        setLoadingMeals(false);
+      if (rpcError) {
+        console.error("[Fuel] get_client_nutrition_page RPC error:", rpcError);
+        if (isCurrent()) setMealsLoadError(rpcError.message || "Failed to load nutrition");
         return;
       }
 
-      if (!isCurrent()) return;
-      setActiveAssignments(assignmentsList as any);
-
-      // Effective assignment: today's selection if valid, else first assignment
-      const selectedId =
-        todaySelectionId && assignmentsList.some((a: { id: string }) => a.id === todaySelectionId)
-          ? todaySelectionId
-          : assignmentsList[0].id;
-      const assignment = assignmentsList.find((a: { id: string }) => a.id === selectedId) ?? assignmentsList[0];
-
-      setHasActivePlan(true);
-      setActiveAssignmentId(assignment.id);
-      const mealPlan = assignment.meal_plans as any;
-      setActiveMealPlanInfo({
-        mealPlanId: assignment.meal_plan_id,
-        name: mealPlan?.name || "Active Meal Plan",
-        startDate: assignment.start_date || null,
-        endDate: assignment.end_date || null,
-        description: mealPlan?.notes || undefined,
-      });
-
-      // Extract meal plan targets (use 0 if not set - no defaults)
-      const targetCalories = mealPlan?.target_calories || 0;
-      const targetProtein = mealPlan?.target_protein || 0;
-      const targetCarbs = mealPlan?.target_carbs || 0;
-      const targetFat = mealPlan?.target_fat || 0;
-
-      // STEP 2: Get all meals in the active meal plan
-      const { data: planMeals, error: mealsError } = await supabase
-        .from("meals")
-        .select("*")
-        .eq("meal_plan_id", assignment.meal_plan_id)
-        .order("order_index", { ascending: true });
-
-      if (mealsError || !planMeals || planMeals.length === 0) {
-        console.error("Error fetching meals or no meals in plan:", mealsError);
-        if (!isCurrent()) return;
-        setHasMealsInPlan(false);
-        setMeals([]);
-        // Active plan but no meals -> zero intake, use meal plan targets (may be 0)
-        setNutritionData((prev) => ({
-          ...prev,
-          calories: { consumed: 0, goal: targetCalories || 0 },
-          protein: { consumed: 0, goal: targetProtein || 0 },
-          carbs: { consumed: 0, goal: targetCarbs || 0 },
-          fat: { consumed: 0, goal: targetFat || 0 },
-        }));
-        setLoadingMeals(false);
+      const rpc = (rpcData ?? null) as NutritionPageRpcResponse | null;
+      if (!rpc) {
+        if (isCurrent()) {
+          setActiveAssignmentId(null);
+          setActiveMealPlanInfo(null);
+          setActiveAssignments([]);
+          setHasActivePlan(false);
+          setHasMealsInPlan(false);
+          setMeals([]);
+          setNutritionGoals([]);
+          setNutritionData((prev) => ({ ...prev, calories: { consumed: 0, goal: 0 }, protein: { consumed: 0, goal: 0 }, carbs: { consumed: 0, goal: 0 }, fat: { consumed: 0, goal: 0 } }));
+        }
         return;
       }
 
+      const mapped = mapNutritionPageRpcToPageData(rpc);
+
       if (!isCurrent()) return;
-      setHasMealsInPlan(true);
+      setHasActivePlan(mapped.hasAssignment);
+      setActiveAssignmentId(mapped.assignmentId);
+      setActiveMealPlanInfo(mapped.activeMealPlanInfo);
+      setActiveAssignments(mapped.activeAssignments as any);
+      setHasMealsInPlan(mapped.hasAssignment && mapped.meals.length > 0);
+      setNutritionGoals(mapped.nutritionGoals);
 
-      const mealsWithData: Meal[] = [];
-
-      // STEP 3: OPTIMIZED - Batch 1: items that only need mealIds (parallel)
-      const mealIds = planMeals.map(m => m.id);
-
-      const [
-        { data: allFoodItems, error: foodError },
-        { data: allMealOptions, error: optionsError },
-        { data: allCompletions },
-      ] = await Promise.all([
-        supabase.from("meal_food_items").select("id, quantity, unit, food_id, meal_id, meal_option_id").in("meal_id", mealIds),
-        supabase.from("meal_options").select("*").in("meal_id", mealIds).order("order_index", { ascending: true }),
-        supabase.from("meal_completions").select("*").in("meal_id", mealIds).eq("client_id", user.id).eq("date", today),
-      ]);
-
-      if (foodError) {
-        console.error("Error fetching meal food items:", foodError);
-      }
-      if (optionsError) {
-        console.error("Error fetching meal options:", optionsError);
-      }
-
-      // Batch 2: foods (depends on meal_food_items for unique food IDs)
-      const uniqueFoodIds = [...new Set((allFoodItems || []).map((item: any) => item.food_id).filter(Boolean))];
-      const { data: allFoods, error: foodsError } = await supabase
-        .from("foods")
-        .select("id, name, serving_size, serving_unit, calories_per_serving, protein, carbs, fat")
-        .in("id", uniqueFoodIds);
-
-      if (foodsError) {
-        console.error("Error fetching foods:", foodsError);
-      }
-
-      const foodMap = new Map((allFoods || []).map((food: any) => [food.id, food]));
-
-      const optionsByMealMap = new Map<string, any[]>();
-      (allMealOptions || []).forEach((opt: any) => {
-        if (!optionsByMealMap.has(opt.meal_id)) {
-          optionsByMealMap.set(opt.meal_id, []);
-        }
-        optionsByMealMap.get(opt.meal_id)!.push(opt);
-      });
-
-      // Resolve private storage paths to signed URLs for display (graceful fallback)
-      const completionsWithSignedUrls = await Promise.all(
-        (allCompletions || []).map(async (comp: any) => {
-          const raw = comp?.photo_url as string | null | undefined;
-          if (!raw) return comp;
-          // If this already looks like a URL, keep it (backwards compat)
-          if (/^https?:\/\//i.test(raw)) return comp;
-          try {
-            const { data, error } = await supabase.storage
-              .from("meal-photos")
-              .createSignedUrl(raw, 3600);
-            if (error || !data?.signedUrl) return { ...comp, photo_url: null };
-            return { ...comp, photo_url: data.signedUrl };
-          } catch {
-            return { ...comp, photo_url: null };
-          }
-        })
-      );
-
-      const completionMap = new Map(
-        completionsWithSignedUrls.map((comp: any) => [comp.meal_id, comp])
-      );
-
-      // STEP 4: Process meals with batched data
-      for (const meal of planMeals) {
-        // Get food items for this meal from batched data
-        const foodItems = (allFoodItems || []).filter((item: any) => item.meal_id === meal.id);
-        
-        // Get options for this meal
-        const mealOptions = optionsByMealMap.get(meal.id) || [];
-        const hasOptions = mealOptions.length > 0;
-
-        // Build options with their food items
-        let mealOptionsDisplay: MealOptionDisplay[] = [];
-        
-        if (hasOptions) {
-          // Meal has options - group food items by option
-          mealOptionsDisplay = mealOptions.map((option: any) => {
-            const optionFoodItems = foodItems.filter((item: any) => item.meal_option_id === option.id);
-            
-            let optionItems: MealFoodItemDisplay[] = [];
-            let optionCalories = 0;
-            let optionProtein = 0;
-            let optionCarbs = 0;
-            let optionFat = 0;
-            
-            for (const item of optionFoodItems as any[]) {
-              const foodData = foodMap.get(item.food_id);
-              if (foodData) {
-                const servingSize = foodData.serving_size || 1;
-                const multiplier = item.quantity / servingSize;
-                const calories = (foodData.calories_per_serving || 0) * multiplier;
-                const protein = (foodData.protein || 0) * multiplier;
-                const carbs = (foodData.carbs || 0) * multiplier;
-                const fat = (foodData.fat || 0) * multiplier;
-                
-                optionCalories += calories;
-                optionProtein += protein;
-                optionCarbs += carbs;
-                optionFat += fat;
-                
-                optionItems.push({
-                  food: {
-                    id: foodData.id,
-                    name: foodData.name,
-                    serving_size: foodData.serving_size,
-                    serving_unit: foodData.serving_unit,
-                  },
-                  quantity: item.quantity,
-                  calories,
-                  protein,
-                  carbs,
-                  fat,
-                });
-              }
-            }
-            
-            return {
-              id: option.id,
-              name: option.name,
-              order_index: option.order_index,
-              items: optionItems,
-              totals: {
-                calories: optionCalories,
-                protein: optionProtein,
-                carbs: optionCarbs,
-                fat: optionFat,
-                fiber: 0, // Not tracked in display
-              }
-            };
-          });
-        }
-
-        // Build legacy food items (for meals without options)
-        let mappedFoodItems: MealFoodItem[] = [];
-        let totalCalories = 0;
-        let totalProtein = 0;
-        let totalCarbs = 0;
-        let totalFat = 0;
-
-        // For legacy meals (no options), use items with meal_option_id = null
-        const legacyFoodItems = hasOptions 
-          ? [] 
-          : foodItems.filter((item: any) => !item.meal_option_id);
-
-        if (legacyFoodItems.length > 0) {
-          for (const item of legacyFoodItems as any[]) {
-            const foodData = foodMap.get(item.food_id);
-
-            if (foodData) {
-              const servingSize = foodData.serving_size || 1;
-              const multiplier = item.quantity / servingSize;
-
-              const calories =
-                (foodData.calories_per_serving || 0) * multiplier;
-              const protein = (foodData.protein || 0) * multiplier;
-              const carbs = (foodData.carbs || 0) * multiplier;
-              const fat = (foodData.fat || 0) * multiplier;
-
-              totalCalories += calories;
-              totalProtein += protein;
-              totalCarbs += carbs;
-              totalFat += fat;
-
-              mappedFoodItems.push({
-                food: {
-                  id: foodData.id,
-                  name: foodData.name,
-                  serving_size: foodData.serving_size,
-                  serving_unit: foodData.serving_unit,
-                },
-                quantity: item.quantity,
-                calories,
-                protein,
-                carbs,
-                fat,
-              });
-            }
-          }
-        } else if (hasOptions && mealOptionsDisplay.length > 0) {
-          // If meal has options, use the first option's totals for the summary
-          totalCalories = mealOptionsDisplay[0].totals.calories;
-          totalProtein = mealOptionsDisplay[0].totals.protein;
-          totalCarbs = mealOptionsDisplay[0].totals.carbs;
-          totalFat = mealOptionsDisplay[0].totals.fat;
-          mappedFoodItems = mealOptionsDisplay[0].items;
-        }
-
-        const completion = completionMap.get(meal.id) || null;
-
-        // When completed with a specific option, use that option's items for display and macro sum
-        if (completion?.meal_option_id && mealOptionsDisplay.length > 0) {
-          const chosenOption = mealOptionsDisplay.find((o) => o.id === completion.meal_option_id);
-          if (chosenOption) {
-            mappedFoodItems = chosenOption.items;
-            totalCalories = chosenOption.totals.calories;
-            totalProtein = chosenOption.totals.protein;
-            totalCarbs = chosenOption.totals.carbs;
-            totalFat = chosenOption.totals.fat;
-          }
-        }
-
-        mealsWithData.push({
-          id: meal.id,
-          type: meal.meal_type,
-          name: meal.name,
-          emoji:
-            meal.meal_type === "breakfast"
-              ? "🍳"
-              : meal.meal_type === "lunch"
-              ? "🥗"
-              : meal.meal_type === "dinner"
-              ? "🍽️"
-              : "🍎",
-          items: mappedFoodItems,
-          logged: !!completion,
-          photoUrl: completion?.photo_url ?? undefined,
-          logged_at: completion?.completed_at ?? undefined,
-          options: mealOptionsDisplay.length > 0 ? mealOptionsDisplay : undefined,
-          loggedOptionId: completion?.meal_option_id ?? undefined,
-        });
-      }
-
-      // Update nutrition totals based on LOGGED meals only (only if this load is still current)
+      // Resolve storage paths to signed URLs for completion photos (non-blocking)
+      const mealsWithSignedUrls = await resolveMealPhotoUrls(mapped.meals);
       if (!isCurrent()) return;
-      setMeals(mealsWithData);
+      setMeals(mealsWithSignedUrls);
 
-      // Calculate totals from meals array and update goals
       calculateNutritionTotals(
-        mealsWithData,
-        targetCalories,
-        targetProtein,
-        targetCarbs,
-        targetFat
+        mealsWithSignedUrls,
+        mapped.targetCalories,
+        mapped.targetProtein,
+        mapped.targetCarbs,
+        mapped.targetFat
       );
     } catch (error) {
-      console.error("Error loading meals:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("[Fuel] loadTodayMeals ERROR:", error);
+      if (isCurrent()) setMealsLoadError(msg || "Failed to load nutrition");
     } finally {
-      if (isCurrent()) {
-        setLoadingMeals(false);
-      }
+      if (isCurrent()) setLoadingMeals(false);
     }
   };
+
+  /** Resolve completion photo_url storage paths to signed URLs. */
+  async function resolveMealPhotoUrls(meals: MappedMeal[]): Promise<Meal[]> {
+    const withPhotos = meals.filter((m) => m.logged && m.photoUrl && !/^https?:\/\//i.test(m.photoUrl));
+    if (withPhotos.length === 0) return meals;
+    const resolved = await Promise.all(
+      meals.map(async (m) => {
+        if (!m.photoUrl || /^https?:\/\//i.test(m.photoUrl)) return m;
+        try {
+          const { data, error } = await supabase.storage.from("meal-photos").createSignedUrl(m.photoUrl, 3600);
+          if (error || !data?.signedUrl) return { ...m, photoUrl: undefined };
+          return { ...m, photoUrl: data.signedUrl };
+        } catch {
+          return m;
+        }
+      })
+    );
+    return resolved;
+  }
 
   const todayStr = () => new Date().toISOString().split("T")[0];
 
@@ -616,7 +305,7 @@ function NutritionDashboardContent() {
         mealPlanAssignmentId: activeAssignmentId,
         date: todayStr(),
       });
-      runMealsLoadWithTimeout();
+      runMealsLoad();
     } catch (e) {
       addToast({
         title: "Could not complete meal",
@@ -630,7 +319,7 @@ function NutritionDashboardContent() {
     if (!user?.id) return;
     try {
       await undoCompletion(user.id, mealId, todayStr());
-      runMealsLoadWithTimeout();
+      runMealsLoad();
     } catch (e) {
       addToast({
         title: "Could not undo",
@@ -645,7 +334,7 @@ function NutritionDashboardContent() {
     if (!user?.id || assignmentId === activeAssignmentId) return;
     try {
       await selectPlanForToday(user.id, assignmentId, todayStr());
-      runMealsLoadWithTimeout();
+      runMealsLoad();
     } catch (e) {
       addToast({
         title: "Could not switch plan",
@@ -659,7 +348,7 @@ function NutritionDashboardContent() {
     if (!user?.id) return;
     try {
       await addPhotoToCompletion(user.id, mealId, todayStr(), file);
-      await runMealsLoadWithTimeout();
+      await runMealsLoad();
       addToast({
         title: "Photo added",
         description: "Your meal photo has been saved.",
@@ -1196,24 +885,14 @@ function NutritionDashboardContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <ClientPageShell className="max-w-3xl flex flex-col gap-6 overflow-x-hidden px-4 sm:px-6">
-        {/* Load error */}
         {mealsLoadError && !loadingMeals && (
           <ClientGlassCard className="p-6">
             <div className="text-center space-y-4">
               <p className="fc-text-primary font-medium">{mealsLoadError}</p>
-              <SecondaryButton
-                onClick={() => {
-                  setMealsLoadError(null);
-                  setLoadingMeals(true);
-                  runMealsLoadWithTimeout();
-                }}
-              >
-                Retry
-              </SecondaryButton>
+              <SecondaryButton onClick={() => runMealsLoad()}>Retry</SecondaryButton>
             </div>
           </ClientGlassCard>
         )}
-
         {loadingMeals ? (
           <div className="space-y-6">
             {[1, 2, 3].map((i) => (

@@ -13,6 +13,8 @@ interface ToolsDrawerProps {
   onOpenAlternatives: () => void;
   onOpenPlateCalculator: () => void;
   exerciseName: string;
+  /** When false, hide the Plate Calculator button. Default true for backward compat. */
+  showPlateCalculator?: boolean;
 }
 
 export function ToolsDrawer({
@@ -24,6 +26,7 @@ export function ToolsDrawer({
   onOpenAlternatives,
   onOpenPlateCalculator,
   exerciseName,
+  showPlateCalculator = true,
 }: ToolsDrawerProps) {
   // Lock background scroll when drawer is open
   useEffect(() => {
@@ -175,36 +178,38 @@ export function ToolsDrawer({
               </button>
             )}
 
-            {/* Plate Calculator */}
-            <button
-              type="button"
-              onClick={handlePlateCalculatorClick}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-white/10 active:scale-[0.98]"
-              style={{
-                background: "var(--fc-surface-sunken)",
-                border: "1px solid var(--fc-surface-card-border)",
-              }}
-            >
-              <div
-                className="flex items-center justify-center w-10 h-10 rounded-lg"
+            {/* Plate Calculator - only for barbell exercises */}
+            {showPlateCalculator && (
+              <button
+                type="button"
+                onClick={handlePlateCalculatorClick}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-white/10 active:scale-[0.98]"
                 style={{
-                  background: "color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)",
+                  background: "var(--fc-surface-sunken)",
+                  border: "1px solid var(--fc-surface-card-border)",
                 }}
               >
-                <Calculator
-                  className="w-5 h-5"
-                  style={{ color: "var(--fc-domain-workouts)" }}
-                />
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-semibold fc-text-primary">
-                  Plate Calculator
+                <div
+                  className="flex items-center justify-center w-10 h-10 rounded-lg"
+                  style={{
+                    background: "color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)",
+                  }}
+                >
+                  <Calculator
+                    className="w-5 h-5"
+                    style={{ color: "var(--fc-domain-workouts)" }}
+                  />
                 </div>
-                <div className="text-xs fc-text-dim">
-                  Calculate plates for target weight
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-semibold fc-text-primary">
+                    Plate Calculator
+                  </div>
+                  <div className="text-xs fc-text-dim">
+                    Calculate plates for target weight
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+            )}
           </div>
 
           {/* Close button */}

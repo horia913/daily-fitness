@@ -79,64 +79,62 @@ export async function getClientNutritionMode(clientId: string): Promise<Nutritio
   }
 }
 
+/** Raw goal row shape for parsing nutrition goals (e.g. from a combined goals query). */
+export interface NutritionGoalRow {
+  title: string | null;
+  target_value: number | string | null;
+  target_unit: string | null;
+  pillar?: string;
+}
+
 /**
- * Get client's nutrition goals from goals table
- * Returns null if no goals set (client cannot log)
+ * Parse nutrition goal rows into the shape used by getNutritionComplianceTrend.
+ * Use when you have already fetched goals (e.g. together with check-in goals) to avoid duplicate fetch.
  */
-export async function getClientNutritionGoals(clientId: string): Promise<{
-  calories?: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  water_ml?: number;
-} | null> {
-  const { data: goals, error } = await supabase
-    .from('goals')
-    .select('title, target_value, target_unit, pillar')
-    .eq('client_id', clientId)
-    .eq('pillar', 'nutrition')
-    .eq('status', 'active');
-
-  if (error || !goals || goals.length === 0) {
-    return null;
-  }
-
-  // Map goals by pillar/title to extract values
-  const result: {
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-    water_ml?: number;
-  } = {};
-
+export function parseNutritionGoalsFromRows(
+  goals: NutritionGoalRow[]
+): NutritionGoalsForCompliance {
+  if (!goals?.length) return null;
+  const result: NonNullable<NutritionGoalsForCompliance> = {};
   for (const goal of goals) {
     const targetValue = goal.target_value ? Number(goal.target_value) : null;
     if (targetValue === null) continue;
-
-    // Match by title or pillar-specific logic
-    const titleLower = goal.title.toLowerCase();
-    
-    if (titleLower.includes('calorie') || titleLower.includes('cal')) {
+    const titleLower = (goal.title ?? "").toLowerCase();
+    if (titleLower.includes("calorie") || titleLower.includes("cal")) {
       result.calories = targetValue;
-    } else if (titleLower.includes('protein') || titleLower.includes('prot')) {
+    } else if (titleLower.includes("protein") || titleLower.includes("prot")) {
       result.protein = targetValue;
-    } else if (titleLower.includes('carb') || titleLower.includes('carbohydrate')) {
+    } else if (titleLower.includes("carb") || titleLower.includes("carbohydrate")) {
       result.carbs = targetValue;
-    } else if (titleLower.includes('fat')) {
+    } else if (titleLower.includes("fat")) {
       result.fat = targetValue;
-    } else if (titleLower.includes('water') || titleLower.includes('hydration')) {
-      // Convert liters to ml if needed
-      if (goal.target_unit?.toLowerCase().includes('liter') || goal.target_unit?.toLowerCase().includes('l')) {
+    } else if (titleLower.includes("water") || titleLower.includes("hydration")) {
+      if (goal.target_unit?.toLowerCase().includes("liter") || goal.target_unit?.toLowerCase().includes("l")) {
         result.water_ml = targetValue * 1000;
       } else {
         result.water_ml = targetValue;
       }
     }
   }
-
-  // Return null if no goals found (empty object means no valid goals)
   return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * Get client's nutrition goals from goals table
+ * Returns null if no goals set (client cannot log)
+ */
+export async function getClientNutritionGoals(clientId: string): Promise<NutritionGoalsForCompliance> {
+  const { data: goals, error } = await supabase
+    .from("goals")
+    .select("title, target_value, target_unit, pillar")
+    .eq("client_id", clientId)
+    .eq("pillar", "nutrition")
+    .eq("status", "active");
+
+  if (error || !goals || goals.length === 0) {
+    return null;
+  }
+  return parseNutritionGoalsFromRows(goals);
 }
 
 // ============================================================================
@@ -398,20 +396,33 @@ export interface NutritionComplianceDay {
   compliance: number;
 }
 
+/** Nutrition goals shape used by getNutritionComplianceTrend (calories used for compliance). */
+export type NutritionGoalsForCompliance = {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  water_ml?: number;
+} | null;
+
 /**
  * Get daily nutrition compliance for a date range.
  * Uses nutrition_logs + goals: for each day, compliance % from calorie adherence
  * (within 10% of target = 100%; otherwise continuous scale down to 0).
  * If no calorie goal, days with a log are 100%, others 0.
+ * When prefetchedGoals is provided, skips getClientNutritionGoals (avoids duplicate goals fetch).
  */
 export async function getNutritionComplianceTrend(
   clientId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  prefetchedGoals?: NutritionGoalsForCompliance
 ): Promise<NutritionComplianceDay[]> {
   const [logs, goals] = await Promise.all([
     getLogRange(clientId, startDate, endDate),
-    getClientNutritionGoals(clientId),
+    prefetchedGoals !== undefined
+      ? Promise.resolve(prefetchedGoals)
+      : getClientNutritionGoals(clientId),
   ]);
 
   const byDate = new Map<string, NutritionLog>();

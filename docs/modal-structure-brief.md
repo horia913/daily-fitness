@@ -10,7 +10,9 @@
 - **Z-index:** `z-[9999]`.
 - **Backdrop:** Semi-transparent dark overlay, e.g. `bg-black/60 backdrop-blur-sm` (or `bg-black/50` for light).
 - **Layout:** Flexbox to center (or align-start) the inner card, e.g. `flex items-center justify-center p-4` (or `items-start`, `pb-20`, etc. as needed).
-- **Scroll:** When the modal is open, background must not scroll. Use body scroll lock and/or `body.fc-modal-open main { overflow: hidden }` so the page behind does not scroll.
+- **Overflow:** The overlay must **not** have `overflow-y-auto` or `overflow-auto`. Only the **inner modal card** may scroll (use `overflow-y-auto` and `max-h-[90vh]` on the card). Putting overflow on the overlay causes the modal to drift (e.g. “climb” up the screen) when the browser scrolls.
+- **Scroll lock:** When the modal is open, the background must not scroll. Call `preventBackgroundScroll()` from `@/lib/mobile-compatibility` when opening and `restoreBackgroundScroll()` when closing. This uses the `fc-modal-open` class and `body.style.overflow`; `body.fc-modal-open main { overflow: hidden }` in `globals.css` locks the main content.
+- **Portal:** For stable viewport centering (no drift from ancestor scroll/transform), render the overlay + card via `ModalPortal` from `@/components/ui/ModalPortal`: wrap the overlay in `<ModalPortal isOpen={isOpen}>…</ModalPortal>` so the modal is rendered into `document.body`.
 
 ---
 
@@ -29,11 +31,11 @@
 
 | Layer   | Role        | Must have                                                                 |
 |---------|-------------|---------------------------------------------------------------------------|
-| Outer   | Full-screen overlay | `fixed inset-0 z-[9999]`, dark backdrop (`bg-black/60 backdrop-blur-sm`), flex + padding, background scroll locked |
-| Inner   | Modal card  | `fc-modal fc-card`, rounded corners, max-width, overflow controlled        |
+| Outer   | Full-screen overlay | `fixed inset-0 z-[9999]`, dark backdrop, flex + padding, **no overflow** on overlay, background scroll locked via `preventBackgroundScroll` / `restoreBackgroundScroll`, prefer `ModalPortal` to body |
+| Inner   | Modal card  | `fc-modal fc-card`, rounded corners, max-width, **overflow-y-auto** (and max-height) on card for scrollable content |
 
-**Wrong:** One full-bleed div that is both overlay and content (no separate card).  
-**Right:** Overlay (backdrop + flex) → inside it, one card (`fc-modal fc-card` + rounded + max-width) that contains all modal content.
+**Wrong:** One full-bleed div that is both overlay and content (no separate card). Overlay with `overflow-y-auto` (causes modal drift).  
+**Right:** Overlay (backdrop + flex, no overflow) → inside it, one card (`fc-modal fc-card` + rounded + max-width + overflow-y-auto) that contains all modal content. Use `ModalPortal` and scroll-lock helpers.
 
 ---
 
@@ -41,7 +43,11 @@
 
 Use these as the pattern; new modals should match their structure:
 
-- `RestTimerModal.tsx` — overlay + `fc-modal fc-card` card with max-width.
+- `ModalPortal.tsx` — use `<ModalPortal isOpen={isOpen}>` to render the overlay + card into `document.body` for viewport-stable centering.
+- `RestTimerModal.tsx` — uses `ModalPortal`, overlay (no overflow) + `fc-modal fc-card`, `preventBackgroundScroll` / `restoreBackgroundScroll`.
+- `TabataCircuitTimerModal.tsx` — uses `ModalPortal` and shared scroll-lock helpers.
+- `VideoPlayerModal.tsx` — uses `ModalPortal` and scroll-lock helpers.
+- `ExerciseAlternativesModal.tsx` — uses `ModalPortal`, overlay without overflow, scroll-lock helpers.
 - `ResponsiveModal.tsx` — overlay + card with `fc-glass fc-card rounded-3xl`, header/footer.
 - `SimpleModal.tsx` — overlay + card with `fc-glass fc-card rounded-3xl`.
 - `VolumeDetailsModal.tsx` — overlay + `fc-modal fc-card` with max-width and max-height.

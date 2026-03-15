@@ -13,7 +13,7 @@ import { Search, Grid3x3, List, UserPlus, Users, Flame, Dumbbell, ClipboardCheck
 import Link from "next/link";
 import { type ClientMetrics } from "@/lib/coachDashboardService";
 import { dbToUiScale } from "@/lib/wellnessService";
-
+import { withTimeout } from "@/lib/withTimeout";
 interface Client {
   id: string;
   name: string;
@@ -39,6 +39,8 @@ function ClientManagementContent() {
   const [sortBy, setSortBy] = useState<SortOption>("lastActive");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const loadingRef = useRef(false);
   const didLoadRef = useRef(false);
 
@@ -50,7 +52,13 @@ function ClientManagementContent() {
     loadingRef.current = true;
     try {
       setLoading(true);
-      const res = await fetch("/api/coach/clients", { signal: signal ?? null });
+      setLoadError(null);
+      setLoadingStartedAt(Date.now());
+      const res = await withTimeout(
+        fetch("/api/coach/clients", { signal: signal ?? null }),
+        25_000,
+        "timeout"
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -63,12 +71,19 @@ function ClientManagementContent() {
         return;
       }
       console.error("Error loading clients:", err);
+      setLoadError(err instanceof Error ? err.message : "Failed to load clients");
       didLoadRef.current = false;
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
       loadingRef.current = false;
     }
   }, [user]);
+
+  const refetchClients = useCallback(() => {
+    didLoadRef.current = false;
+    loadClients();
+  }, [loadClients]);
 
   useEffect(() => {
     if (!user) return;
@@ -336,7 +351,21 @@ function ClientManagementContent() {
         </header>
 
         <main className="px-4 py-6 sm:px-6">
-          {loading ? (
+          {loadError && !loading ? (
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+              <p className="text-sm fc-text-error mb-4">{loadError}</p>
+              <Button
+                className="fc-btn fc-btn-primary"
+                onClick={() => {
+                  setLoadError(null);
+                  didLoadRef.current = false;
+                  loadClients();
+                }}
+              >
+                Retry
+              </Button>
+            </GlassCard>
+          ) : loading ? (
             <div className="space-y-4">
               <div className="fc-skeleton rounded-2xl" style={{ height: 200 }} />
               <div className="fc-skeleton rounded-2xl" style={{ height: 200 }} />

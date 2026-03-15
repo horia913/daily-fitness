@@ -97,7 +97,7 @@ export default function ClientDetailModal({ client, onClose, onSelectFunction }:
   ]
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4 px-4 sm:px-8 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4 px-4 sm:px-8 bg-black/60 backdrop-blur-sm">
       <div
         className="w-full max-w-[1600px]"
         style={{ maxHeight: 'min(88vh, calc(100vh - 4rem))' }}

@@ -1,6 +1,10 @@
 /**
  * Canonical timezone sync: auto-detect on client boot/login, persist to profiles.timezone
  * at most once per session per user. No manual timezone UI; no duplicate updates.
+ *
+ * IMPORTANT: Do NOT invoke syncProfileTimezoneOnce from AuthContext or on every auth init.
+ * If timezone sync is reintroduced, call it only from the profile/settings page or on
+ * first-ever login — not on every page load.
  */
 
 const FALLBACK_TZ = 'UTC'

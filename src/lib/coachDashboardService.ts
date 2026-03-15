@@ -308,7 +308,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
     const assignmentIdsForCompliance = Array.from(activeProgramMap.values()).map((p) => p.id);
     const programIdsForCompliance = [...new Set(Array.from(activeProgramMap.values()).map((p) => p.program_id))];
     let progressMap = new Map<string, number>();
-    let scheduleByProgram = new Map<string, Array<{ id: string; program_id: string; week_number: number; day_number: number }>>();
+    let scheduleByProgram = new Map<string, Array<{ id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }>>();
     let completionRowsCompliance: Array<{ program_assignment_id: string; program_schedule_id: string }> = [];
     if (assignmentIdsForCompliance.length > 0) {
       const [
@@ -317,7 +317,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         { data: completionRowsComp },
       ] = await Promise.all([
         db.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIdsForCompliance),
-        db.from('program_schedule').select('id, program_id, week_number, day_number').in('program_id', programIdsForCompliance).order('week_number', { ascending: true }).order('day_number', { ascending: true }),
+        db.from('program_schedule').select('id, program_id, week_number, day_number, is_optional').in('program_id', programIdsForCompliance).order('week_number', { ascending: true }).order('day_number', { ascending: true }),
         db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', assignmentIdsForCompliance),
       ]);
       for (const r of progressRows ?? []) {
@@ -325,7 +325,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       }
       for (const s of scheduleRows ?? []) {
         const list = scheduleByProgram.get(s.program_id) ?? [];
-        list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1 });
+        list.push({ id: s.id, program_id: s.program_id, week_number: s.week_number, day_number: s.day_number ?? 1, is_optional: s.is_optional ?? false });
         scheduleByProgram.set(s.program_id, list);
       }
       completionRowsCompliance = (completionRowsComp ?? []) as typeof completionRowsCompliance;
@@ -665,14 +665,15 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         clientsWithCheckins++;
       }
 
-      // Per-client program compliance: completed this week / total scheduled this week (reuse program from above)
+      // Per-client program compliance: completed this week / total required scheduled this week (reuse program from above)
       let programCompliance: number | null = null;
       if (program) {
         const assignmentId = program.id;
         const programId = program.program_id;
         const currentWeek = progressMap.get(assignmentId) ?? 1;
         const slots = scheduleByProgram.get(programId) ?? [];
-        const scheduleIdsThisWeek = slots.filter((s) => s.week_number === currentWeek).map((s) => s.id);
+        const requiredSlotsThisWeek = slots.filter((s) => s.week_number === currentWeek && !s.is_optional);
+        const scheduleIdsThisWeek = requiredSlotsThisWeek.map((s) => s.id);
         const total = scheduleIdsThisWeek.length;
         const completedThisWeek = completionRowsCompliance.filter(
           (c) => c.program_assignment_id === assignmentId && scheduleIdsThisWeek.includes(c.program_schedule_id)

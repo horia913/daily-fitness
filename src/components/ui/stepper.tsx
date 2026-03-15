@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Minus, Plus, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PlateCalculatorWidget } from '@/components/PlateCalculatorWidget'
+import { isBarbellExercise as isBarbell } from '@/lib/exerciseUtils'
 
 interface StepperProps {
   value: number
@@ -57,14 +58,7 @@ export function Stepper({
     }
   }
 
-  // Check if exercise uses barbell equipment
-  const isBarbellExercise = () => {
-    return exerciseEquipment.some((eq: string) => 
-      eq.toLowerCase().includes('barbell') || 
-      eq.toLowerCase().includes('bar') ||
-      eq.toLowerCase().includes('olympic')
-    )
-  }
+  const showPlateCalc = isBarbell({ equipment: exerciseEquipment });
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -132,7 +126,7 @@ export function Stepper({
       </div>
 
       {/* Plate Calculator for Barbell Exercises */}
-      {showPlateCalculator && isBarbellExercise() && (
+      {showPlateCalculator && showPlateCalc && (
         <div className="mt-6">
           <PlateCalculatorWidget
             currentWeight={value}

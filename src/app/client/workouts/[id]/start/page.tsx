@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -50,6 +50,10 @@ import { useToast } from "@/components/ui/toast-provider";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
 import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
+import {
+  PRCelebrationModal,
+  type PRDetectedPayload,
+} from "@/components/client/workout-execution/ui/PRCelebrationModal";
 import { WorkoutProgressBar } from "@/components/client/workout-execution/ui/WorkoutProgressBar";
 import {
   WorkoutBlock,
@@ -72,7 +76,7 @@ import type {
 import { BARBELL_OPTIONS } from "./constants";
 import { isValidUuid, calculatePlateLoading } from "./utils";
 import { PreviousPerformanceCard } from "./components/PreviousPerformanceCard";
-
+import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
 export default function LiveWorkout() {
   const params = useParams();
   const router = useRouter();
@@ -86,6 +90,7 @@ export default function LiveWorkout() {
   const [currentSet, setCurrentSet] = useState(1);
   const [workoutStarted, setWorkoutStarted] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   /** True once blocks + exercises are loaded; allows showing "Loading exercises..." after assignment is resolved */
   const [contentReady, setContentReady] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -168,12 +173,14 @@ export default function LiveWorkout() {
   // Achievements unlocked during workout (e.g. from PR via log-set)
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
+  const [prCelebrationData, setPrCelebrationData] = useState<PRDetectedPayload | null>(null);
 
   // Progression suggestions state
   const [progressionSuggestions, setProgressionSuggestions] = useState<
     Map<string, import("@/lib/clientProgressionService").ProgressionSuggestion>
   >(new Map());
 
+  // DIAGNOSTIC: Tab return loading audit
   useEffect(() => {
     workoutBlocksRef.current = workoutBlocks;
   }, [workoutBlocks]);
@@ -526,6 +533,10 @@ export default function LiveWorkout() {
     });
   }, [assignmentId]);
 
+  const refetchAssignment = useCallback(() => {
+    if (assignmentId) loadAssignment().catch(() => {});
+  }, [assignmentId]);
+
   // Log when completion modal state changes and calculate stats from database
   useEffect(() => {
     if (showWorkoutCompletion) {
@@ -713,51 +724,57 @@ export default function LiveWorkout() {
     workoutLogId: string,
     workoutBlocks: any[],
     userId: string,
+    prefetched?: {
+      setLogs?: any[];
+      blockCompletions?: { workout_set_entry_id: string }[];
+      startedAt?: string | null;
+    },
   ): Promise<{
     currentBlockIndex: number;
     workoutBlocksWithProgress: LiveWorkoutBlock[];
     workoutStartTime: number;
   } | null> => {
     try {
-      // Fetch set logs and block completions in parallel
-      const [setLogsResult, blockCompletionsResult, workoutLogResult] =
-        await Promise.all([
-          supabase
-            .from("workout_set_logs")
-            .select(
-              "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps",
-            )
-            .eq("workout_log_id", workoutLogId)
-            .eq("client_id", userId)
-            .order("completed_at", { ascending: true }),
-          supabase
-            .from("workout_set_entry_completions")
-            .select("workout_set_entry_id")
-            .eq("workout_log_id", workoutLogId),
-          supabase
-            .from("workout_logs")
-            .select("started_at")
-            .eq("id", workoutLogId)
-            .single(),
-        ]);
+      let setLogs: any[];
+      let blockCompletions: { workout_set_entry_id: string }[];
+      let startedAt: string | null = null;
 
-      const { data: setLogs, error } = setLogsResult;
-      const { data: blockCompletions, error: blockCompletionsError } =
-        blockCompletionsResult;
-      const { data: workoutLog } = workoutLogResult;
-
-      if (error) {
-        console.error(
-          "Error fetching set logs for progress restoration:",
-          error,
-        );
-        return null;
-      }
-      if (blockCompletionsError) {
-        console.error(
-          "Error fetching block completions for progress restoration:",
-          blockCompletionsError,
-        );
+      if (prefetched?.setLogs != null && prefetched?.blockCompletions != null) {
+        setLogs = prefetched.setLogs;
+        blockCompletions = prefetched.blockCompletions;
+        startedAt = prefetched.startedAt ?? null;
+      } else {
+        const [setLogsResult, blockCompletionsResult, workoutLogResult] =
+          await Promise.all([
+            supabase
+              .from("workout_set_logs")
+              .select(
+                "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps",
+              )
+              .eq("workout_log_id", workoutLogId)
+              .eq("client_id", userId)
+              .order("completed_at", { ascending: true }),
+            supabase
+              .from("workout_set_entry_completions")
+              .select("workout_set_entry_id")
+              .eq("workout_log_id", workoutLogId),
+            supabase
+              .from("workout_logs")
+              .select("started_at")
+              .eq("id", workoutLogId)
+              .single(),
+          ]);
+        const err = setLogsResult.error;
+        if (err) {
+          console.error("Error fetching set logs for progress restoration:", err);
+          return null;
+        }
+        setLogs = setLogsResult.data ?? [];
+        blockCompletions = blockCompletionsResult.data ?? [];
+        startedAt = workoutLogResult.data?.started_at ?? null;
+        if (blockCompletionsResult.error) {
+          console.error("Error fetching block completions:", blockCompletionsResult.error);
+        }
       }
 
       const completedBlockIds = new Set(
@@ -765,6 +782,10 @@ export default function LiveWorkout() {
           (r: { workout_set_entry_id: string }) => r.workout_set_entry_id,
         ),
       );
+
+      const workoutStartTime = startedAt
+        ? new Date(startedAt).getTime()
+        : Date.now();
 
       if (!setLogs || setLogs.length === 0) {
         if (completedBlockIds.size === 0) {
@@ -779,10 +800,6 @@ export default function LiveWorkout() {
           `📊 Found ${setLogs.length} set logs to restore progress from`,
         );
       }
-
-      const workoutStartTime = workoutLog?.started_at
-        ? new Date(workoutLog.started_at).getTime()
-        : Date.now();
 
       // Group sets by set_entry_id and exercise_id
       // Also track set_number for blocks that use it
@@ -1370,11 +1387,13 @@ export default function LiveWorkout() {
     const isStale = () => loadId !== loadIdRef.current;
     setContentReady(false);
     setLoading(true);
+    setLoadingStartedAt(Date.now());
 
     const safetyTimeout = setTimeout(() => {
       if (loadInProgressRef.current) {
         loadInProgressRef.current = false;
         setLoading(false);
+        setLoadingStartedAt(null);
         setContentReady(true);
         addToast({
           title: "Loading took too long",
@@ -1393,6 +1412,7 @@ export default function LiveWorkout() {
         clearTimeout(safetyTimeout);
         loadInProgressRef.current = false;
         setLoading(false);
+        setLoadingStartedAt(null);
         return;
       }
 
@@ -1656,6 +1676,7 @@ export default function LiveWorkout() {
       if (isStale()) return;
       setAssignment(combinedAssignment);
       setLoading(false);
+      setLoadingStartedAt(null);
 
       // Check if this is a program assignment - load blocks from progression rules
       const isProgramAssignment =
@@ -1712,12 +1733,17 @@ export default function LiveWorkout() {
           throw new Error("Workout template ID not found in assignment");
         }
 
-        // Use WorkoutBlockService to fetch blocks (handles RLS properly)
-        const { WorkoutBlockService } =
-          await import("@/lib/workoutBlockService");
-        workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
-          combinedAssignment.workout_template_id,
+        // Single RPC for all block data (replaces 25+ sequential queries)
+        const templateId = combinedAssignment.workout_template_id;
+        const { data: rpcBlocks, error: rpcError } = await supabase.rpc(
+          "get_workout_blocks",
+          { p_template_id: templateId },
         );
+        if (rpcError) {
+          console.error("[start] get_workout_blocks RPC error:", rpcError);
+          throw new Error(rpcError.message || "Failed to load workout blocks");
+        }
+        workoutBlocks = mapWorkoutBlocksRpcToSetEntries(rpcBlocks ?? []);
 
         if (!workoutBlocks || workoutBlocks.length === 0) {
           throw new Error("No workout blocks found for this template");
@@ -2021,54 +2047,51 @@ export default function LiveWorkout() {
         } | null = null;
 
         if (actualWorkoutAssignmentId) {
-          // Fix 3/6: Guard — check if this workout_assignment is linked to an
-          // already-completed program slot. Catches direct-URL access bypassing
-          // start-from-progress. Reads program_assignment_id + program_schedule_id
-          // directly from the workout_log (tagged at creation by start-from-progress).
-          try {
-            const { data: linkedLog } = await supabase
-              .from('workout_logs')
-              .select('program_assignment_id, program_schedule_id')
-              .eq('workout_assignment_id', actualWorkoutAssignmentId)
-              .eq('client_id', user.id)
-              .not('program_schedule_id', 'is', null)
-              .order('started_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            if (linkedLog?.program_assignment_id && linkedLog?.program_schedule_id) {
-              const { data: completionEntry } = await supabase
-                .from('program_day_completions')
-                .select('id')
-                .eq('program_assignment_id', linkedLog.program_assignment_id)
-                .eq('program_schedule_id', linkedLog.program_schedule_id)
-                .maybeSingle();
-
-              if (completionEntry) {
-                addToast({
-                  title: 'Workout Already Completed',
-                  description: 'This workout has already been completed. Returning to training.',
-                  variant: 'default',
-                });
-                router.push('/client/train');
-                return;
-              }
-            }
-          } catch (completionCheckError) {
-            console.warn('⚠️ Completion guard check failed (non-blocking):', completionCheckError);
-          }
-
-          // 2. Close incomplete logs from previous days
+          // 2. Close incomplete logs from previous days (before session RPC)
           await closeIncompleteLogsFromPreviousDays(
             actualWorkoutAssignmentId,
             user.id,
           );
 
-          // 3. Find active workout_log for today
-          const activeLog = await findActiveWorkoutLogForToday(
-            actualWorkoutAssignmentId,
-            user.id,
-          );
+          // 3. Single RPC for all session/log/progress data (replaces 20+ queries)
+          let sessionData: {
+            session?: { id: string; status: string; started_at?: string; assignment_id?: string; program_assignment_id?: string; program_schedule_id?: string } | null;
+            activeLog?: { id: string; started_at?: string; workout_session_id?: string; program_assignment_id?: string; program_schedule_id?: string } | null;
+            setLogs?: any[];
+            blockCompletions?: { workout_set_entry_id: string }[];
+            dayCompletions?: string[];
+            coachId?: string | null;
+          } = {};
+          try {
+            const { data: rpcSession, error: rpcSessionError } = await supabase.rpc(
+              "get_workout_session_data",
+              { p_client_id: user.id, p_assignment_id: actualWorkoutAssignmentId },
+            );
+            if (!rpcSessionError && rpcSession) sessionData = rpcSession as typeof sessionData;
+          } catch (e) {
+            console.warn("⚠️ get_workout_session_data RPC failed (fallback to per-query):", e);
+          }
+
+          // Guard: if this program slot is already in dayCompletions, redirect
+          const scheduleId = sessionData.activeLog?.program_schedule_id;
+          const dayCompletions = Array.isArray(sessionData.dayCompletions) ? sessionData.dayCompletions : [];
+          if (scheduleId && dayCompletions.includes(scheduleId)) {
+            addToast({
+              title: "Workout Already Completed",
+              description: "This workout has already been completed. Returning to training.",
+              variant: "default",
+            });
+            router.push("/client/train");
+            return;
+          }
+
+          const activeLog = sessionData.activeLog
+            ? {
+                id: sessionData.activeLog.id,
+                started_at: sessionData.activeLog.started_at ?? null,
+                workout_session_id: sessionData.activeLog.workout_session_id ?? null,
+              }
+            : await findActiveWorkoutLogForToday(actualWorkoutAssignmentId, user.id);
 
           if (activeLog) {
             console.log(
@@ -2076,11 +2099,20 @@ export default function LiveWorkout() {
               activeLog.started_at,
             );
 
-            // 4. Restore progress from workout_set_logs
+            // 4. Restore progress (use pre-fetched setLogs/blockCompletions when from RPC)
+            const prefetched =
+              sessionData.setLogs != null && sessionData.blockCompletions != null
+                ? {
+                    setLogs: sessionData.setLogs,
+                    blockCompletions: sessionData.blockCompletions,
+                    startedAt: activeLog.started_at,
+                  }
+                : undefined;
             restoredProgress = await restoreWorkoutProgress(
               activeLog.id,
               workoutBlocksConverted,
               user.id,
+              prefetched,
             );
 
             if (restoredProgress) {
@@ -2244,7 +2276,10 @@ export default function LiveWorkout() {
       return;
     } finally {
       clearTimeout(safetyTimeout);
-      if (!isStale()) setLoading(false);
+      if (!isStale()) {
+        setLoading(false);
+        setLoadingStartedAt(null);
+      }
       loadInProgressRef.current = false;
     }
   };
@@ -3344,10 +3379,23 @@ export default function LiveWorkout() {
     }, 15000);
 
     try {
-      console.log("🚀 completeWorkout called - navigating to complete page");
-      console.log("📍 assignmentId:", assignmentId);
-      console.log("📍 completeTargetId:", completeTargetId);
-      console.log("📍 sessionId:", sessionId);
+      console.log("[COMPLETE-FLOW] button clicked");
+      console.log("[COMPLETE-FLOW] current state", {
+        workoutLogId,
+        sessionId,
+        assignmentId,
+        completeTargetId: assignment?.id || assignmentId,
+        isCompleting: isCompletingWorkoutRef.current,
+      });
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      console.log("[COMPLETE-FLOW] auth session", {
+        hasSession: !!session,
+        expiresAt: session?.expires_at,
+        isExpired: session ? Date.now() / 1000 > (session.expires_at ?? 0) : "no session",
+      });
 
       const {
         data: { user },
@@ -3375,23 +3423,22 @@ export default function LiveWorkout() {
         durationMinutes,
       });
 
-      // Store duration in localStorage to pass to complete page (sync — do this first)
-      // Guard against storage failures (e.g., private mode)
-      try {
-        localStorage.setItem(
-          "workoutDurationMinutes",
-          durationMinutes.toString(),
-        );
-        localStorage.setItem("workoutStartTime", workoutStartTime.toString());
+      // Pass completion handoff via URL params (primary) so navigation works after tab switch.
+      // Also write to localStorage as fallback for backward compatibility.
+      const logIdForComplete =
+        workoutLogId ||
+        (sessionId?.startsWith("restored-") ? sessionId.replace("restored-", "") : null);
+      const params = new URLSearchParams();
+      if (logIdForComplete) params.set("logId", logIdForComplete);
+      if (sessionId && isUuid(sessionId)) params.set("sessionId", sessionId);
+      params.set("duration", String(durationMinutes));
 
-        // Store workout_log_id for complete page to avoid mismatched logs
-        if (workoutLogId) {
-          localStorage.setItem("workoutLogIdForComplete", workoutLogId);
-        } else if (sessionId?.startsWith("restored-")) {
-          localStorage.setItem(
-            "workoutLogIdForComplete",
-            sessionId.replace("restored-", ""),
-          );
+      try {
+        localStorage.setItem("workoutDurationMinutes", durationMinutes.toString());
+        localStorage.setItem("workoutStartTime", workoutStartTime.toString());
+        if (logIdForComplete) localStorage.setItem("workoutLogIdForComplete", logIdForComplete);
+        if (sessionId && isUuid(sessionId)) {
+          localStorage.setItem("workoutSessionIdForComplete", sessionId);
         }
       } catch (storageError) {
         console.warn(
@@ -3400,21 +3447,12 @@ export default function LiveWorkout() {
         );
       }
 
-      if (sessionId && isUuid(sessionId)) {
-        localStorage.setItem("workoutSessionIdForComplete", sessionId);
-      }
-
-      // Navigate immediately so user never gets stuck if tab is backgrounded.
-      // The complete page will call /api/complete-workout and update totals.
-      console.log(
-        "🧭 Navigating to complete page:",
-        `/client/workouts/${completeTargetId}/complete`,
-      );
-      router.push(`/client/workouts/${completeTargetId}/complete`);
+      // Use full page navigation so it works after tab switch (router.push is dead then).
+      console.log("[COMPLETE-FLOW] navigating to complete page");
+      window.location.href = `/client/workouts/${completeTargetId}/complete?${params.toString()}`;
 
       // Update workout session in background — do not await so tab backgrounding doesn't block navigation
       if (sessionId && isUuid(sessionId)) {
-        console.log("💾 Updating workout session (background):", sessionId);
         supabase
           .from("workout_sessions")
           .update({
@@ -3848,10 +3886,13 @@ export default function LiveWorkout() {
   // Theme-aware styles using your app's approach
   const theme = getThemeStyles();
 
+  // Guard: prevent duplicate in-flight fetches for the same exercise (throttles ProgressionNudge)
+  const fetchingPreviousPerformanceRef = useRef<Set<string>>(new Set());
+
   // Fetch previous performance data for current exercise (with per-exercise caching)
   const fetchPreviousPerformance = async (exerciseId: string) => {
-    console.log('[fetchPreviousPerformance] called with exerciseId:', exerciseId);
     if (!exerciseId) return;
+    if (fetchingPreviousPerformanceRef.current.has(exerciseId)) return;
 
     // Serve from cache if already fetched
     if (previousPerformanceMap.has(exerciseId)) {
@@ -3866,6 +3907,7 @@ export default function LiveWorkout() {
     }
 
     setPreviousPerformance((prev) => ({ ...prev, loading: true }));
+    fetchingPreviousPerformanceRef.current.add(exerciseId);
 
     try {
       const {
@@ -3921,6 +3963,8 @@ export default function LiveWorkout() {
     } catch (error) {
       console.error("Failed to fetch previous performance:", error);
       setPreviousPerformance({ lastWorkout: null, personalBest: null, loading: false });
+    } finally {
+      fetchingPreviousPerformanceRef.current.delete(exerciseId);
     }
   };
 
@@ -4153,6 +4197,7 @@ export default function LiveWorkout() {
                       )
                     }
                     onPlateCalculatorClick={() => setShowPlateCalculator(true)}
+                    onPRDetected={(pr) => setPrCelebrationData(pr)}
                     onAchievementsUnlocked={(achievements) => {
                       const tierToRarity = (tier: string | null): Achievement["rarity"] => {
                         if (!tier) return "uncommon";
@@ -7199,6 +7244,14 @@ export default function LiveWorkout() {
               </div>
             </div>
           </div>
+        )}
+
+        {prCelebrationData && (
+          <PRCelebrationModal
+            visible={!!prCelebrationData}
+            onClose={() => setPrCelebrationData(null)}
+            pr={prCelebrationData}
+          />
         )}
 
         {newAchievementsQueue.length > 0 && (

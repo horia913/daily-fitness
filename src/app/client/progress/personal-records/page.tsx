@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -82,7 +82,60 @@ export default function PersonalRecordsPage() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grouped" | "timeline">("grouped");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadPersonalRecords = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setLoadError(null);
+    setLoadingStartedAt(Date.now());
+    try {
+      const [stats, timeline] = await Promise.all([
+        getPRStats(user.id),
+        getPRTimeline(user.id, 100),
+      ]);
+      
+      setPRStats(stats);
+      setPRTimeline(timeline);
+
+      if (stats.totalPRs === 0) {
+        const { data: workoutLogs } = await supabase
+          .from("workout_logs")
+          .select("id")
+          .eq("client_id", user.id)
+          .limit(1);
+        
+        if (workoutLogs && workoutLogs.length > 0) {
+          setBackfilling(true);
+          try {
+            const count = await backfillPRs(user.id);
+            if (count > 0) {
+              const [newStats, newTimeline] = await Promise.all([
+                getPRStats(user.id),
+                getPRTimeline(user.id, 100),
+              ]);
+              setPRStats(newStats);
+              setPRTimeline(newTimeline);
+            }
+          } catch (err) {
+            console.error("Error backfilling PRs:", err);
+          } finally {
+            setBackfilling(false);
+          }
+        }
+      }
+
+      const records = await fetchPersonalRecords(user.id);
+      setPersonalRecords(records);
+    } catch (err) {
+      console.error("Error loading personal records:", err);
+      setLoadError(err instanceof Error ? err.message : "Failed to load personal records");
+    } finally {
+      setLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -104,61 +157,7 @@ export default function PersonalRecordsPage() {
         timeoutRef.current = null;
       }
     };
-  }, [user, authLoading]);
-
-  const loadPersonalRecords = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      // Load stats and timeline from stored table
-      const [stats, timeline] = await Promise.all([
-        getPRStats(user.id),
-        getPRTimeline(user.id, 100),
-      ]);
-      
-      setPRStats(stats);
-      setPRTimeline(timeline);
-
-      // Check if backfill is needed
-      if (stats.totalPRs === 0) {
-        // Check if there's workout data to backfill from
-        const { data: workoutLogs } = await supabase
-          .from("workout_logs")
-          .select("id")
-          .eq("client_id", user.id)
-          .limit(1);
-        
-        if (workoutLogs && workoutLogs.length > 0) {
-          // Has workout data but no PRs - trigger backfill
-          setBackfilling(true);
-          try {
-            const count = await backfillPRs(user.id);
-            if (count > 0) {
-              // Reload after backfill
-              const [newStats, newTimeline] = await Promise.all([
-                getPRStats(user.id),
-                getPRTimeline(user.id, 100),
-              ]);
-              setPRStats(newStats);
-              setPRTimeline(newTimeline);
-            }
-          } catch (error) {
-            console.error("Error backfilling PRs:", error);
-          } finally {
-            setBackfilling(false);
-          }
-        }
-      }
-
-      // Also load legacy format for compatibility
-      const records = await fetchPersonalRecords(user.id);
-      setPersonalRecords(records);
-    } catch (error) {
-      console.error("Error loading personal records:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadPersonalRecords, user, authLoading]);
 
   const totalRecords = personalRecords.length;
   const thisMonthStart = useMemo(() => {
@@ -252,7 +251,7 @@ export default function PersonalRecordsPage() {
     [personalRecords]
   );
 
-  if (loadError) {
+  if (loadError && !loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
@@ -261,7 +260,7 @@ export default function PersonalRecordsPage() {
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
                 <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+                <button type="button" onClick={() => { setLoadError(null); loadPersonalRecords(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
               </div>
             </div>
           </div>

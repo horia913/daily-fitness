@@ -24,6 +24,7 @@ import {
   type RestTimerNextSetPreview,
 } from "./workout-execution/RestTimerModal";
 import { BaseBlockExecutorProps } from "./workout-execution/types";
+import { isBarbellExercise } from "@/lib/exerciseUtils";
 import {
   formatTime,
   calculateSuggestedWeightUtil,
@@ -81,23 +82,46 @@ interface LiveWorkoutBlockExecutorProps {
     string,
     import("@/lib/clientProgressionService").ProgressionSuggestion
   >;
-  previousPerformanceMap?: Map<string, {
-    lastWorkout: { weight: number | null; reps: number | null; sets: number; avgRpe: number | null; date: string } | null;
-    personalBest: { maxWeight: number | null; maxReps: number | null; date: string } | null;
-  }>;
+  previousPerformanceMap?: Map<
+    string,
+    {
+      lastWorkout: {
+        weight: number | null;
+        reps: number | null;
+        sets: number;
+        avgRpe: number | null;
+        date: string;
+      } | null;
+      personalBest: {
+        maxWeight: number | null;
+        maxReps: number | null;
+        date: string;
+      } | null;
+    }
+  >;
   onPlateCalculatorClick?: () => void;
   /** Called whenever the active exercise changes (by exercise_id). Used to trigger per-exercise data fetches in the parent. */
   onExerciseChanged?: (exerciseId: string) => void;
+  /** Called when log-set returns pr_detected (new PR stored). Parent can show PRCelebrationModal. */
+  onPRDetected?: (pr: {
+    type: "weight" | "reps";
+    exercise_name: string;
+    new_value: number;
+    previous_value: number | null;
+    unit: string;
+  }) => void;
   /** Called when log-set returns new_achievements (e.g. PR-triggered). Parent can show AchievementUnlockModal. */
-  onAchievementsUnlocked?: (achievements: Array<{
-    templateId: string;
-    templateName: string;
-    templateIcon: string;
-    tier: string | null;
-    description: string;
-    nextTier: unknown;
-    currentMetricValue: number;
-  }>) => void;
+  onAchievementsUnlocked?: (
+    achievements: Array<{
+      templateId: string;
+      templateName: string;
+      templateIcon: string;
+      tier: string | null;
+      description: string;
+      nextTier: unknown;
+      currentMetricValue: number;
+    }>,
+  ) => void;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -124,10 +148,11 @@ export default function LiveWorkoutBlockExecutor({
   previousPerformanceMap,
   onPlateCalculatorClick,
   onExerciseChanged,
+  onPRDetected,
   onAchievementsUnlocked,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
-  const { ensureFreshSession, user: authUser } = useAuth();
+  const { user: authUser } = useAuth();
 
   // Sync local exercise index with block's currentExerciseIndex
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
@@ -358,18 +383,20 @@ export default function LiveWorkoutBlockExecutor({
       const currentExercise = block.block.exercises?.[currentExerciseIndex];
       const exerciseId = data.exercise_id || currentExercise?.exercise_id || "";
 
+      // Extract isLastSet (UI-only, must not be sent to API)
+      const isLastSet = data.isLastSet === true;
+      const { isLastSet: _omit, ...dataWithoutLastSet } = data;
+
       // Build the enriched payload (same fields the old function built)
       const enrichedPayload: Record<string, unknown> = {
         set_entry_id: block.block.id,
         set_type:
-          data.set_type ||
-          (block.block as any).type ||
-          block.block.set_type,
+          data.set_type || (block.block as any).type || block.block.set_type,
         client_id: authUser?.id || undefined,
         workout_assignment_id: assignmentId || undefined,
         session_id: String(sessionId).trim(),
         template_exercise_id: currentExercise?.id || null,
-        ...data,
+        ...dataWithoutLastSet,
       };
 
       // Route through golden flow orchestrator (giant_set uses round_number, others use set_number)
@@ -385,6 +412,7 @@ export default function LiveWorkoutBlockExecutor({
         exerciseId,
         setNumber,
         payload: enrichedPayload,
+        isLastSet,
       });
 
       if (!result.accepted) {
@@ -441,20 +469,9 @@ export default function LiveWorkoutBlockExecutor({
 
     try {
       try {
-        await Promise.race([
-          ensureFreshSession(),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error("ensureFreshSession timeout")),
-              4000,
-            ),
-          ),
-        ]);
-      } catch (refreshError) {
-        console.warn(
-          "[log-set] ensureFreshSession failed or timed out",
-          refreshError,
-        );
+        await supabase.auth.refreshSession();
+      } catch {
+        // Non-critical
       }
 
       let resolvedUserId = authUser?.id || null;
@@ -508,9 +525,7 @@ export default function LiveWorkoutBlockExecutor({
           // Required for workout_set_logs
           set_entry_id: block.block.id,
           set_type:
-            data.set_type ||
-            (block.block as any).type ||
-            block.block.set_type,
+            data.set_type || (block.block as any).type || block.block.set_type,
           client_id: resolvedUserId || undefined,
           workout_assignment_id: assignmentId || undefined,
           // For API to get/create workout_log_id (session tracking)
@@ -575,7 +590,7 @@ export default function LiveWorkoutBlockExecutor({
           (response.status === 401 || response.status === 403) &&
           attempt === 1
         ) {
-          await ensureFreshSession();
+          await supabase.auth.refreshSession();
           const {
             data: { session: refreshedSession },
           } = await supabase.auth.getSession();
@@ -681,15 +696,18 @@ export default function LiveWorkoutBlockExecutor({
               }
             }
 
-            // Show PR notification if new personal record
-            if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
+            // PR celebration: show modal when pr_detected, else toast
+            if (result.pr_detected && onPRDetected) {
+              onPRDetected(result.pr_detected);
+            } else if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
               addToast({
                 title: "🎉 New Personal Record!",
                 description: result.pr?.message || "New PR achieved!",
                 variant: "success",
                 duration: 4000,
               });
-            } else if (result.pr?.warning) {
+            }
+            if (result.pr?.warning) {
               addToast({
                 title: "Set Logged",
                 description: result.pr.warning,
@@ -698,7 +716,11 @@ export default function LiveWorkoutBlockExecutor({
               });
             }
 
-            if (Array.isArray(result.new_achievements) && result.new_achievements.length > 0 && onAchievementsUnlocked) {
+            if (
+              Array.isArray(result.new_achievements) &&
+              result.new_achievements.length > 0 &&
+              onAchievementsUnlocked
+            ) {
               onAchievementsUnlocked(result.new_achievements);
             }
 
@@ -954,7 +976,7 @@ export default function LiveWorkoutBlockExecutor({
     if (currentExercise?.exercise_id && onExerciseChanged) {
       onExerciseChanged(currentExercise.exercise_id);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentExercise?.exercise_id]);
 
   // Common props for all block executors
@@ -985,7 +1007,9 @@ export default function LiveWorkoutBlockExecutor({
       setAlternativesExerciseId(exerciseId);
       setShowAlternativesModal(true);
     },
-    onPlateCalculatorClick: onPlateCalculatorClick || (() => {}),
+    onPlateCalculatorClick: isBarbellExercise(currentExercise?.exercise ?? {})
+      ? onPlateCalculatorClick
+      : undefined,
     onRestTimerClick: handleRestTimerClick,
     onSetComplete: handleSetComplete,
     onLastSetLoggedForRest: handleLastSetLoggedForRest,
@@ -1096,7 +1120,6 @@ export default function LiveWorkoutBlockExecutor({
         lastSet={restModalData?.lastSet ?? null}
         nextSetPreview={restModalData?.nextSetPreview ?? null}
       />
-
     </>
   );
 }

@@ -39,6 +39,12 @@ export class WorkoutSetEntryService {
   /** Chunk array to avoid Supabase/Postgres statement timeouts on large .in() lists */
   private static readonly QUERY_CHUNK_SIZE = 50
 
+  /** Unique id for dev timers so React Strict Mode double-invoke never reuses the same label */
+  private static _runIdCounter = 0
+  private static nextRunId(): string {
+    return (++WorkoutSetEntryService._runIdCounter).toString(36)
+  }
+
   private static chunk<T>(arr: T[], size: number): T[][] {
     const out: T[][] = []
     for (let i = 0; i < arr.length; i += size) {
@@ -127,6 +133,7 @@ export class WorkoutSetEntryService {
       return first
     }
 
+    const buildRunId = this.nextRunId()
     const queryTableInChunks = async (
       tableName: string,
       select: string,
@@ -134,7 +141,7 @@ export class WorkoutSetEntryService {
     ): Promise<{ data: any[]; error: any }> => {
       if (blockIds.length === 0) return { data: [], error: null }
       const chunks = this.chunk(blockIds, this.QUERY_CHUNK_SIZE)
-      const label = `[buildBlocks] queryTableInChunks ${tableName}`
+      const label = `[buildBlocks] queryTableInChunks ${tableName} ${buildRunId}`
       if (process.env.NODE_ENV !== 'production') console.time(label)
       const allData: any[] = []
       for (const chunkIds of chunks) {
@@ -156,6 +163,7 @@ export class WorkoutSetEntryService {
     }
 
     const lite = (options && 'lite' in options && options.lite) === true
+    // Sequential only: 3+ concurrent requests cause Supabase 500s and statement timeouts on hosted DB
     const exercisesRes = await queryTableInChunks(
       'workout_set_entry_exercises',
       'id, set_entry_id, exercise_id, exercise_order, sets, reps, weight_kg, rest_seconds, tempo, rir, notes, exercise_letter, load_percentage',
@@ -185,7 +193,8 @@ export class WorkoutSetEntryService {
     ;(timeProtocolsRes.data || []).forEach((tp: any) => allExerciseIds.add(tp.exercise_id))
     ;(hrSetsRes.data || []).forEach((hr: any) => allExerciseIds.add(hr.exercise_id))
 
-    if (process.env.NODE_ENV !== 'production') console.time('[buildBlocks] exercises')
+    const exercisesLabel = process.env.NODE_ENV !== 'production' ? `[buildBlocks] exercises ${buildRunId}` : ''
+    if (process.env.NODE_ENV !== 'production') console.time(exercisesLabel)
     let exercisesData: any[] = []
     if (allExerciseIds.size > 0) {
       const ids = Array.from(allExerciseIds)
@@ -199,7 +208,7 @@ export class WorkoutSetEntryService {
       }
     }
     if (process.env.NODE_ENV !== 'production') {
-      console.timeEnd('[buildBlocks] exercises')
+      console.timeEnd(exercisesLabel)
       console.log('[buildBlocks] exercises ids=', allExerciseIds.size, 'rows=', exercisesData.length)
     }
 
@@ -454,11 +463,11 @@ export class WorkoutSetEntryService {
 
   // Get all set entries for a workout template
   static async getWorkoutBlocks(templateId: string, options?: { lite?: boolean }): Promise<WorkoutSetEntry[]> {
+    const getBlocksRunId = this.nextRunId()
     try {
       const cached = this.getCachedBlocks(templateId)
       if (cached) return cached
-
-      if (process.env.NODE_ENV !== 'production') console.time('[WorkoutSetEntryService] getWorkoutBlocks')
+      if (process.env.NODE_ENV !== 'production') console.time(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
       const { ensureAuthenticated } = await import('./supabase')
       await ensureAuthenticated()
 
@@ -470,19 +479,19 @@ export class WorkoutSetEntryService {
 
       if (error) throw error
       if (!blocks || blocks.length === 0) {
-        if (process.env.NODE_ENV !== 'production') console.timeEnd('[WorkoutSetEntryService] getWorkoutBlocks')
+        if (process.env.NODE_ENV !== 'production') console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
         return []
       }
 
       const enriched = await this.buildBlocksForTemplates(blocks, options)
       this.setCachedBlocks(templateId, enriched)
       if (process.env.NODE_ENV !== 'production') {
-        console.timeEnd('[WorkoutSetEntryService] getWorkoutBlocks')
+        console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
         console.log('[WorkoutSetEntryService] getWorkoutBlocks set entries:', blocks.length, 'enriched:', enriched?.length ?? 0)
       }
       return enriched
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') console.timeEnd('[WorkoutSetEntryService] getWorkoutBlocks')
+      if (process.env.NODE_ENV !== 'production') console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
       console.error('Error fetching workout set entries:', error)
       return []
     }
@@ -505,28 +514,32 @@ export class WorkoutSetEntryService {
 
     if (uncachedTemplateIds.length === 0) return result
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[getWorkoutBlocksForTemplates] fetching blocks for', uncachedTemplateIds.length, 'templates:', uncachedTemplateIds.slice(0, 5).join(', ') + (uncachedTemplateIds.length > 5 ? '...' : ''))
+    }
+    const forTemplatesRunId = this.nextRunId()
     try {
-      if (process.env.NODE_ENV !== 'production') console.time('[WorkoutSetEntryService] getWorkoutBlocksForTemplates')
+      if (process.env.NODE_ENV !== 'production') console.time(`[WorkoutSetEntryService] getWorkoutBlocksForTemplates ${forTemplatesRunId}`)
       const { ensureAuthenticated } = await import('./supabase')
       await ensureAuthenticated()
 
-      if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutBlocksForTemplates] workout_set_entries')
+      if (process.env.NODE_ENV !== 'production') console.time(`[getWorkoutBlocksForTemplates] workout_set_entries ${forTemplatesRunId}`)
       const { data: blocks, error } = await supabase
         .from('workout_set_entries')
         .select('*')
         .in('template_id', uncachedTemplateIds)
         .order('set_order')
       if (process.env.NODE_ENV !== 'production') {
-        console.timeEnd('[getWorkoutBlocksForTemplates] workout_set_entries')
+        console.timeEnd(`[getWorkoutBlocksForTemplates] workout_set_entries ${forTemplatesRunId}`)
         console.log('[getWorkoutBlocksForTemplates] workout_set_entries rows=', (blocks || []).length)
       }
       if (error) throw error
 
-      if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutBlocksForTemplates] buildBlocksForTemplates')
+      if (process.env.NODE_ENV !== 'production') console.time(`[getWorkoutBlocksForTemplates] buildBlocksForTemplates ${forTemplatesRunId}`)
       const enriched = await this.buildBlocksForTemplates(blocks || [], options)
-      if (process.env.NODE_ENV !== 'production') console.timeEnd('[getWorkoutBlocksForTemplates] buildBlocksForTemplates')
+      if (process.env.NODE_ENV !== 'production') console.timeEnd(`[getWorkoutBlocksForTemplates] buildBlocksForTemplates ${forTemplatesRunId}`)
       if (process.env.NODE_ENV !== 'production') {
-        console.timeEnd('[WorkoutSetEntryService] getWorkoutBlocksForTemplates')
+        console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocksForTemplates ${forTemplatesRunId}`)
         console.log('[WorkoutSetEntryService] getWorkoutBlocksForTemplates templates:', uncachedTemplateIds.length, 'set entries:', (blocks || []).length)
       }
       const blocksByTemplate = new Map<string, WorkoutSetEntry[]>()
@@ -548,7 +561,7 @@ export class WorkoutSetEntryService {
 
       return result
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') console.timeEnd('[WorkoutSetEntryService] getWorkoutBlocksForTemplates')
+      if (process.env.NODE_ENV !== 'production') console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocksForTemplates ${forTemplatesRunId}`)
       console.error('Error fetching workout set entries (batched):', error)
       uncachedTemplateIds.forEach((templateId) => {
         result.set(templateId, [])

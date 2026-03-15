@@ -68,7 +68,7 @@ export function WeekStrip({
           }
 
           const isCompleted = day.isCompleted;
-          const isMissed = !isCompleted && weekday < todayWeekday;
+          const isMissed = !isCompleted && weekday < todayWeekday && !day.isOptional;
           const isTodaySlot = isToday && todaySlot?.scheduleId === day.scheduleId;
 
           return (
@@ -110,6 +110,9 @@ export function WeekStrip({
                     ? day.workoutName.substring(0, 10) + "..."
                     : day.workoutName}
                 </p>
+                {day.isOptional && (
+                  <span className="text-[8px] text-cyan-500 dark:text-cyan-400">Optional</span>
+                )}
               </div>
             </button>
           );

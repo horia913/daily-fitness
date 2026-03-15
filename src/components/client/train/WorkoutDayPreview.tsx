@@ -48,6 +48,10 @@ export interface WorkoutDayPreviewProps {
   isStarting: boolean;
   startingScheduleId: string | null;
   clientId: string | undefined;
+  /** When provided, used instead of fetching blocks (avoids extra getWorkoutBlocks calls). */
+  blocks?: WorkoutSetEntry[] | null;
+  /** When provided (e.g. from Train page RPC), blocks are not loaded; summary shows this count and no exercise list. */
+  exerciseCount?: number;
 }
 
 export function WorkoutDayPreview({
@@ -63,9 +67,15 @@ export function WorkoutDayPreview({
   isStarting,
   startingScheduleId,
   clientId,
+  blocks: blocksProp,
+  exerciseCount: exerciseCountProp,
 }: WorkoutDayPreviewProps) {
-  const [blocks, setBlocks] = useState<WorkoutSetEntry[] | null>(null);
-  const [loading, setLoading] = useState(!!templateId);
+  const [blocks, setBlocks] = useState<WorkoutSetEntry[] | null>(() =>
+    blocksProp !== undefined && Array.isArray(blocksProp) ? blocksProp : null
+  );
+  const [loading, setLoading] = useState(() =>
+    !!(templateId && blocksProp === undefined && exerciseCountProp === undefined)
+  );
   const [error, setError] = useState<string | null>(null);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(null);
 
@@ -90,6 +100,7 @@ export function WorkoutDayPreview({
     }
   }, [templateId]);
 
+  // Use preloaded blocks when parent provides them; when exerciseCount is provided, skip block load (Train page)
   useEffect(() => {
     if (status === "rest" || !templateId) {
       setBlocks(null);
@@ -97,8 +108,20 @@ export function WorkoutDayPreview({
       setError(null);
       return;
     }
+    if (blocksProp !== undefined) {
+      setBlocks(Array.isArray(blocksProp) ? blocksProp : null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    if (exerciseCountProp !== undefined) {
+      setBlocks(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     loadBlocks();
-  }, [templateId, status, loadBlocks]);
+  }, [templateId, status, loadBlocks, blocksProp, exerciseCountProp]);
 
   // Fetch workout log id for completed days (View Log link)
   useEffect(() => {
@@ -126,7 +149,10 @@ export function WorkoutDayPreview({
     return () => { cancelled = true; };
   }, [status, scheduleId, clientId]);
 
-  const totalExercises = blocks?.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0) ?? 0;
+  const totalExercises =
+    exerciseCountProp !== undefined
+      ? exerciseCountProp
+      : (blocks?.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0) ?? 0);
   const canStart = scheduleId && status !== "rest" && status !== "completed";
   const isStartingThis = isStarting && startingScheduleId === scheduleId;
 
@@ -242,6 +268,11 @@ export function WorkoutDayPreview({
         )}
         {!loading && !error && blocks && blocks.length === 0 && (
           <p className="text-sm fc-text-dim py-4 text-center">No exercises in this workout.</p>
+        )}
+        {!loading && !error && !blocks && exerciseCountProp !== undefined && (
+          <p className="text-sm fc-text-dim py-4 text-center">
+            {totalExercises} exercise{totalExercises !== 1 ? "s" : ""} · ~{estimatedDuration || 45} min — tap Start to begin
+          </p>
         )}
       </div>
 

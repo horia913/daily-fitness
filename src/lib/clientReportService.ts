@@ -284,16 +284,17 @@ export async function getReportData(
     if (assignment?.id) {
       const { data: schedule } = await supabase
         .from("program_schedule")
-        .select("id, week_number")
+        .select("id, week_number, is_optional")
         .eq("program_id", assignment.program_id);
-      const scheduleInRange: { id: string; week_number: number }[] = schedule ?? [];
+      const scheduleInRange: { id: string; week_number: number; is_optional?: boolean }[] = schedule ?? [];
+      const requiredScheduleInRange = scheduleInRange.filter((s) => !s.is_optional);
       const startTs = parseYmd(start).getTime();
       const endTs = parseYmd(end).getTime();
       const slotIdsInRange = new Set<string>();
-      scheduleInRange.forEach((s: { id: string; week_number: number }) => {
+      requiredScheduleInRange.forEach((s: { id: string }) => {
         slotIdsInRange.add(s.id);
       });
-      scheduledWorkouts = scheduleInRange.length;
+      scheduledWorkouts = requiredScheduleInRange.length;
       const { data: completions } = await supabase
         .from("program_day_completions")
         .select("program_schedule_id, completed_at")

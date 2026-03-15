@@ -444,6 +444,7 @@ export function PreExhaustionExecutor({
       const logData: any = {
         set_type: "preexhaust",
         set_number: completedSets + 1,
+        isLastSet: currentSetNumber >= totalSets,
       };
 
       // Only add fields if they're defined

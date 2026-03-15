@@ -81,6 +81,8 @@ export interface LogSetParams {
   setNumber: number;
   /** Full payload the old `logSetToDatabase` would send */
   payload: Record<string, unknown>;
+  /** When true, do NOT open rest timer (last set of block) */
+  isLastSet?: boolean;
 }
 
 export type LogSetResult =
@@ -277,8 +279,10 @@ export function useSetLoggingOrchestrator(
       // Start background sync immediately (no RPE modal delay)
       startBackgroundSync(key);
 
-      // Signal rest timer should open immediately (no RPE delay)
-      setShouldOpenRestTimer(true);
+      // Signal rest timer should open only when NOT the last set of the block
+      if (!params.isLastSet) {
+        setShouldOpenRestTimer(true);
+      }
       setActiveKey(key);
       setPendingVersion((v) => v + 1);
 

@@ -408,6 +408,7 @@ export function AmrapExecutor({
 
       const logData: any = {
         set_type: "amrap",
+        isLastSet: true, // AMRAP is single set per block
       };
 
       // Only add fields if they're defined

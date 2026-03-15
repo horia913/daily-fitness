@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -109,13 +108,14 @@ export default function BottomNav() {
           const isActive = isSegmentActive(pathname, item);
           const isCenter = item.isCenter === true;
 
-          // Render center button with special styling
+          // Render center button (window.location.href bypasses dead router after tab switch)
           if (isCenter) {
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
-                className="fc-bottom-nav-item-center"
+                type="button"
+                onClick={() => { window.location.href = item.href; }}
+                className="fc-bottom-nav-item-center bg-transparent border-none cursor-pointer"
               >
                 <div className="fc-bottom-nav-center-button">
                   <Icon
@@ -130,16 +130,17 @@ export default function BottomNav() {
                 <span className="fc-bottom-nav-center-label">
                   {item.label}
                 </span>
-              </Link>
+              </button>
             );
           }
 
-          // Render regular nav items
+          // Render regular nav items (window.location.href bypasses dead router after tab switch)
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              className={`fc-bottom-nav-item ${isActive ? "fc-bottom-nav-item--active" : ""}`}
+              type="button"
+              onClick={() => { window.location.href = item.href; }}
+              className={`fc-bottom-nav-item ${isActive ? "fc-bottom-nav-item--active" : ""} bg-transparent border-none cursor-pointer`}
             >
               {/* Active pill background */}
               {isActive && (
@@ -161,7 +162,7 @@ export default function BottomNav() {
               >
                 {item.label}
               </span>
-            </Link>
+            </button>
           );
         })}
       </div>

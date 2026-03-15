@@ -31,6 +31,7 @@ const WHITELIST: Record<string, Set<string>> = {
     'dropset_final_weight',
     'dropset_final_reps',
     'dropset_percentage',
+    'dropset_drops',
     'exercise_id',
     'rpe',
   ]),

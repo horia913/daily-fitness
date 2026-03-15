@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, Pause, X } from "lucide-react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
+import { preventBackgroundScroll, restoreBackgroundScroll } from "@/lib/mobile-compatibility";
 
 // Simple beep via Web Audio — no external files. work = higher, rest = lower.
 function playWorkBeep() {
@@ -76,15 +78,15 @@ export function TabataCircuitTimerModal({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const prevPhaseRef = useRef<"work" | "rest" | "rest_after_set" | null>(null);
 
-  // Lock background scroll while modal is open (same as other app modals)
+  // Lock background scroll while modal is open (shared helper)
   useEffect(() => {
-    if (!isOpen) return;
-    document.body.classList.add("fc-modal-open");
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (isOpen) {
+      preventBackgroundScroll();
+    } else {
+      restoreBackgroundScroll();
+    }
     return () => {
-      document.body.classList.remove("fc-modal-open");
-      document.body.style.overflow = prev;
+      restoreBackgroundScroll();
     };
   }, [isOpen]);
 
@@ -401,10 +403,11 @@ export function TabataCircuitTimerModal({
       : "bg-[#16a34a]";
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 min-h-full ${overlayBgClass}`}>
-      <div
-        className={`fc-modal fc-card rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col shadow-2xl border-2 border-white/30 ${overlayBgClass}`}
-      >
+    <ModalPortal isOpen={isOpen}>
+      <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 min-h-full ${overlayBgClass}`}>
+        <div
+          className={`fc-modal fc-card rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col shadow-2xl border-2 border-white/30 ${overlayBgClass}`}
+        >
           {/* Minimal top bar: round + close */}
           <div className="flex items-center justify-between px-4 pt-4 py-3 text-white/90">
             <span className="text-sm font-medium">
@@ -522,6 +525,7 @@ export function TabataCircuitTimerModal({
           </div>
         </div>
       </div>
+    </ModalPortal>
   );
 }
 

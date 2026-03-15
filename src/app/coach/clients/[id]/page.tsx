@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,8 +30,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { calculateStreak, calculateWeeklyProgress } from "@/lib/clientDashboardService";
+import { usePageData } from "@/hooks/usePageData";
 import WorkoutAssignmentModal from "@/components/WorkoutAssignmentModal";
 
 interface ClientData {
@@ -53,76 +52,40 @@ function ClientDetailContent() {
   const { addToast } = useToast();
   const clientId = params.id as string;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetchSummary = useMemo(
+    () => async (): Promise<ClientData> => {
+      const res = await fetch(`/api/coach/clients/${clientId}/summary`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `Failed to load client (${res.status})`);
+      }
+      const json = await res.json();
+      return {
+        id: clientId,
+        name: json.name ?? "Client",
+        email: json.email ?? "",
+        phone: json.phone,
+        location: undefined,
+        joinedDate: json.joinedDate ?? "",
+        status: json.status ?? "active",
+      };
+    },
+    [clientId]
+  );
+
+  const { data: client, loading } = usePageData(
+    fetchSummary,
+    [clientId, user?.id]
+  );
+
   const [showAssignWorkoutModal, setShowAssignWorkoutModal] = useState(false);
-  const [client, setClient] = useState<ClientData>({
+
+  const clientOrPlaceholder: ClientData = client ?? {
     id: clientId,
     name: "Client",
     email: "",
     joinedDate: "",
     status: "active",
-  });
-
-  useEffect(() => {
-    loadClientData();
-  }, [clientId, user]);
-
-  const loadClientData = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", clientId)
-        .single();
-
-      if (profileError || !profile) {
-        throw new Error("Failed to load client profile. Please try again.");
-      }
-
-      const [, weeklyProgress] = await Promise.all([
-        calculateStreak(clientId),
-        calculateWeeklyProgress(clientId),
-      ]);
-
-      const compliance =
-        weeklyProgress.goal > 0
-          ? Math.round((weeklyProgress.current / weeklyProgress.goal) * 100)
-          : 0;
-      let status: ClientData["status"] = "active";
-      if (compliance < 50) status = "at-risk";
-      else if (compliance === 0 && weeklyProgress.goal > 0) status = "inactive";
-
-      setClient({
-        id: clientId,
-        name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Client",
-        email: profile.email || "",
-        phone: profile.phone || undefined,
-        location: undefined,
-        joinedDate: new Date(profile.created_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        status,
-      });
-
-    } catch (error) {
-      console.error("Error loading client data:", error);
-      setError(error instanceof Error ? error.message : "Failed to load client data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRetry = () => {
-    setError(null);
-    loadClientData();
   };
 
   const getStatusColor = (status: ClientData["status"]) => {
@@ -184,36 +147,7 @@ function ClientDetailContent() {
     );
   }
 
-  if (error) {
-    return (
-      <ProtectedRoute requiredRole="coach">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-10">
-            <Link href="/coach/clients" className="inline-flex mb-4">
-              <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Clients
-              </Button>
-            </Link>
-            <div className="flex flex-col items-center justify-center px-4 py-20">
-              <div className="fc-surface rounded-2xl p-8 text-center max-w-md w-full">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="h-6 w-6 text-red-400" />
-                </div>
-                <h3 className="text-lg font-semibold fc-text-primary mb-2">Something went wrong</h3>
-                <p className="text-sm fc-text-dim mb-6">{error}</p>
-                <div className="flex gap-3 justify-center">
-                  <Button variant="fc-secondary" onClick={() => router.back()}>Go Back</Button>
-                  <Button variant="fc-primary" onClick={handleRetry}>Try Again</Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </AnimatedBackground>
-      </ProtectedRoute>
-    );
-  }
+  const displayClient = client ?? clientOrPlaceholder;
 
   const navCards: { section: string; items: { label: string; href: string; icon: React.ElementType }[] }[] = [
     {
@@ -284,40 +218,40 @@ function ClientDetailContent() {
                   color: "#fff",
                 }}
               >
-                {client.name.charAt(0)}
+                {displayClient.name.charAt(0)}
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <h1 className="text-2xl font-bold fc-text-primary">
-                    {client.name}
+                    {displayClient.name}
                   </h1>
                   <span
                     className="px-3 py-1 rounded-full text-sm font-semibold"
                     style={{
-                      background: `${getStatusColor(client.status)}20`,
-                      color: getStatusColor(client.status),
+                      background: `${getStatusColor(displayClient.status)}20`,
+                      color: getStatusColor(displayClient.status),
                     }}
                   >
-                    {getStatusLabel(client.status)}
+                    {getStatusLabel(displayClient.status)}
                   </span>
                 </div>
                 <div className="space-y-0.5 text-sm text-[color:var(--fc-text-dim)]">
-                  {client.email && (
+                  {displayClient.email && (
                     <div className="flex items-center gap-2">
                       <Mail className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{client.email}</span>
+                      <span className="truncate">{displayClient.email}</span>
                     </div>
                   )}
-                  {client.phone && (
+                  {displayClient.phone && (
                     <div className="flex items-center gap-2">
                       <Phone className="w-4 h-4 flex-shrink-0" />
-                      <span>{client.phone}</span>
+                      <span>{displayClient.phone}</span>
                     </div>
                   )}
-                  {client.joinedDate && (
+                  {displayClient.joinedDate && (
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 flex-shrink-0" />
-                      <span>Client since {client.joinedDate}</span>
+                      <span>Client since {displayClient.joinedDate}</span>
                     </div>
                   )}
                 </div>
@@ -328,8 +262,8 @@ function ClientDetailContent() {
                 variant="outline"
                 className="fc-btn fc-btn-secondary min-h-[44px]"
                 onClick={() => {
-                  const phone = client?.phone;
-                  const email = client?.email;
+                  const phone = displayClient?.phone;
+                  const email = displayClient?.email;
                   if (phone) {
                     const cleanPhone = phone.replace(/[\s\-\(\)]/g, "");
                     window.open(`https://wa.me/${cleanPhone}`, "_blank");
@@ -341,7 +275,7 @@ function ClientDetailContent() {
                 }}
               >
                 <MessageCircle className="w-4 h-4 mr-2" />
-                <span>{client?.phone ? "WhatsApp" : client?.email ? "Email" : "Message"}</span>
+                <span>{displayClient?.phone ? "WhatsApp" : displayClient?.email ? "Email" : "Message"}</span>
               </Button>
               <Button
                 className="fc-btn fc-btn-primary"

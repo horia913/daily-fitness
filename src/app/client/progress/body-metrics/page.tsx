@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -30,7 +30,7 @@ import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getPhotosForDate } from "@/lib/progressPhotoService";
-import { getClientNutritionGoals, getNutritionComplianceTrend } from "@/lib/nutritionLogService";
+import { getNutritionComplianceTrend, parseNutritionGoalsFromRows } from "@/lib/nutritionLogService";
 
 interface BodyMetric {
   date: string;
@@ -66,10 +66,108 @@ function BodyMetricsPageContent() {
   const [latestDatePhotos, setLatestDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [previousDatePhotos, setPreviousDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [checkInGoals, setCheckInGoals] = useState<Array<{ id: string; title: string; target_value: number; target_unit: string | null }>>([]);
   const [hasNutritionGoals, setHasNutritionGoals] = useState(false);
   const [nutritionAdherence30, setNutritionAdherence30] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadMetricsData = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setLoadError(null);
+    setLoadingStartedAt(Date.now());
+    try {
+      // Load 12 months of data (for 12M range)
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const dateFrom = twelveMonthsAgo.toISOString().split("T")[0];
+
+      // Single body_metrics fetch (full columns); chart subset derived client-side
+      const { data: fullData, error: fullError } = await supabase
+        .from("body_metrics")
+        .select("*")
+        .eq("client_id", user.id)
+        .gte("measured_date", dateFrom)
+        .order("measured_date", { ascending: false });
+
+      if (fullError) {
+        console.error("Error loading body metrics:", fullError);
+        setFullMeasurements([]);
+        setMetrics([]);
+      } else {
+        setFullMeasurements(fullData || []);
+        // Derive chart subset from full data (ascending by date for chart)
+        const sorted = [...(fullData || [])].sort(
+          (a, b) => a.measured_date.localeCompare(b.measured_date)
+        );
+        setMetrics(
+          sorted.map((m) => ({
+            date: m.measured_date,
+            weight: m.weight_kg,
+            waist: m.waist_circumference ?? undefined,
+            bodyFat: m.body_fat_percentage ?? undefined,
+          }))
+        );
+      }
+
+      // Single goals fetch for both check-in and nutrition pillars
+      const { data: goalsData } = await supabase
+        .from("goals")
+        .select("id, title, target_value, target_unit, pillar")
+        .eq("client_id", user.id)
+        .in("pillar", ["checkins", "nutrition"])
+        .eq("status", "active")
+        .not("target_value", "is", null);
+
+      const allGoals = goalsData || [];
+      const checkInGoalsRows = allGoals.filter((g) => g.pillar === "checkins");
+      const nutritionGoalsRows = allGoals.filter((g) => g.pillar === "nutrition");
+
+      setCheckInGoals(
+        checkInGoalsRows.map((g) => ({
+          id: g.id,
+          title: g.title ?? "",
+          target_value: Number(g.target_value),
+          target_unit: g.target_unit ?? null,
+        }))
+      );
+
+      const nutritionGoals = parseNutritionGoalsFromRows(nutritionGoalsRows);
+      setHasNutritionGoals(nutritionGoals != null);
+      if (nutritionGoals != null) {
+        const end30 = new Date();
+        const start30 = new Date();
+        start30.setDate(start30.getDate() - 30);
+        const startStr = start30.toISOString().split("T")[0];
+        const endStr = end30.toISOString().split("T")[0];
+        const trend = await getNutritionComplianceTrend(
+          user.id,
+          startStr,
+          endStr,
+          nutritionGoals
+        );
+        const daysWithData = trend.filter((d) => d.compliance > 0).length;
+        const avgAdherence =
+          trend.length > 0
+            ? Math.round(
+                trend.reduce((s, d) => s + d.compliance, 0) / trend.length
+              )
+            : 0;
+        setNutritionAdherence30(daysWithData > 0 ? avgAdherence : null);
+      } else {
+        setNutritionAdherence30(null);
+      }
+    } catch (err) {
+      console.error("Error loading body metrics:", err);
+      setLoadError(err instanceof Error ? err.message : "Failed to load metrics");
+      setMetrics([]);
+      setFullMeasurements([]);
+    } finally {
+      setLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -91,85 +189,7 @@ function BodyMetricsPageContent() {
         timeoutRef.current = null;
       }
     };
-  }, [user, authLoading]);
-
-  const loadMetricsData = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      // Load 12 months of data (for 12M range)
-      const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-      const dateFrom = twelveMonthsAgo.toISOString().split("T")[0];
-
-      const [
-        { data: fullData, error: fullError },
-        { data, error },
-        { data: goalsData },
-      ] = await Promise.all([
-        supabase.from("body_metrics").select("*").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: false }),
-        supabase.from("body_metrics").select("measured_date, weight_kg, waist_circumference, body_fat_percentage").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: true }),
-        supabase.from("goals").select("id, title, target_value, target_unit").eq("client_id", user.id).eq("pillar", "checkins").eq("status", "active").not("target_value", "is", null),
-      ]);
-
-      if (fullError) {
-        console.error("Error loading full measurements:", fullError);
-      } else {
-        setFullMeasurements(fullData || []);
-      }
-
-      if (error) {
-        console.error("Error loading measurements:", error);
-        setMetrics([]);
-      } else {
-        setMetrics(
-          (data || []).map((m) => ({
-            date: m.measured_date,
-            weight: m.weight_kg,
-            waist: m.waist_circumference ?? undefined,
-            bodyFat: m.body_fat_percentage ?? undefined,
-          }))
-        );
-      }
-
-      setCheckInGoals(
-        (goalsData || []).map((g) => ({
-          id: g.id,
-          title: g.title,
-          target_value: Number(g.target_value),
-          target_unit: g.target_unit ?? null,
-        }))
-      );
-
-      // Nutrition vs body: need goals + compliance for last 30 days (client-callable)
-      const goals = await getClientNutritionGoals(user.id);
-      setHasNutritionGoals(goals != null);
-      if (goals != null) {
-        const end30 = new Date();
-        const start30 = new Date();
-        start30.setDate(start30.getDate() - 30);
-        const startStr = start30.toISOString().split("T")[0];
-        const endStr = end30.toISOString().split("T")[0];
-        const trend = await getNutritionComplianceTrend(user.id, startStr, endStr);
-        const daysWithData = trend.filter((d) => d.compliance > 0).length;
-        const avgAdherence =
-          trend.length > 0
-            ? Math.round(
-                trend.reduce((s, d) => s + d.compliance, 0) / trend.length
-              )
-            : 0;
-        setNutritionAdherence30(daysWithData > 0 ? avgAdherence : null);
-      } else {
-        setNutritionAdherence30(null);
-      }
-    } catch (error) {
-      console.error("Error loading body metrics:", error);
-      setMetrics([]);
-      setFullMeasurements([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadMetricsData, user, authLoading]);
 
   // Latest = most recent check-in, previous = one before that (for "last vs current" comparison)
   const { latest, previous } = useMemo(() => {
@@ -303,7 +323,7 @@ function BodyMetricsPageContent() {
     );
   }, [fullMeasurements]);
 
-  if (loadError) {
+  if (loadError && !loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
@@ -311,7 +331,7 @@ function BodyMetricsPageContent() {
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
             <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
+              <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>

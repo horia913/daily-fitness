@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useTheme } from "@/contexts/ThemeContext";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
@@ -1238,6 +1239,7 @@ export default function EnhancedProgramManager({
                   day_of_week: number;
                   week_number: number;
                   template_id: string;
+                  is_optional?: boolean;
                 }[] = [];
                 const inputRows = (schedule || []).map(
                   (item: ProgramSchedule) => ({
@@ -1245,6 +1247,7 @@ export default function EnhancedProgramManager({
                     day_of_week: (item.program_day ?? 1) - 1,
                     week_number: item.week_number || 1,
                     template_id: item.template_id,
+                    is_optional: item.is_optional ?? false,
                   })
                 );
 
@@ -1293,6 +1296,7 @@ export default function EnhancedProgramManager({
                     day_of_week: number;
                     week_number: number;
                     template_id: string;
+                    is_optional?: boolean;
                   }
                 >();
                 desiredRows.forEach((r) =>
@@ -1309,11 +1313,15 @@ export default function EnhancedProgramManager({
                   const week = parseInt(weekStr, 10);
                   const existing = existingByKey.get(key);
                   if (existing) {
-                    if (existing.template_id !== desired.template_id) {
-                      // Template changed - need to copy new workout data
+                    const templateChanged = existing.template_id !== desired.template_id;
+                    const optionalChanged = (existing.is_optional ?? false) !== (desired.is_optional ?? false);
+                    if (templateChanged || optionalChanged) {
                       const { error: updateErr } = await supabase
                         .from("program_schedule")
-                        .update({ template_id: desired.template_id })
+                        .update({
+                          template_id: desired.template_id,
+                          is_optional: desired.is_optional ?? false,
+                        })
                         .eq("program_id", programId)
                         .eq("day_of_week", day)
                         .eq("week_number", week);
@@ -1341,6 +1349,7 @@ export default function EnhancedProgramManager({
                         day_of_week: day,
                         week_number: week,
                         template_id: desired.template_id,
+                        is_optional: desired.is_optional ?? false,
                       })
                       .select()
                       .single();
@@ -3396,6 +3405,52 @@ function ProgramCreateForm({
                             ))}
                           </SelectContent>
                         </Select>
+                        {schedule.find(
+                          (s) =>
+                            s.program_day === dayIndex + 1 &&
+                            (s.week_number || 1) === selectedWeek
+                        )?.template_id &&
+                        schedule.find(
+                          (s) =>
+                            s.program_day === dayIndex + 1 &&
+                            (s.week_number || 1) === selectedWeek
+                        )?.template_id !== "rest" && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <Checkbox
+                              id={`optional-${dayIndex}-${selectedWeek}`}
+                              checked={
+                                schedule.find(
+                                  (s) =>
+                                    s.program_day === dayIndex + 1 &&
+                                    (s.week_number || 1) === selectedWeek
+                                )?.is_optional ?? false
+                              }
+                              onCheckedChange={(checked) => {
+                                const s = schedule.find(
+                                  (item) =>
+                                    item.program_day === dayIndex + 1 &&
+                                    (item.week_number || 1) === selectedWeek
+                                );
+                                if (s) {
+                                  setSchedule((prev) =>
+                                    prev.map((item) =>
+                                      item.program_day === dayIndex + 1 &&
+                                      (item.week_number || 1) === selectedWeek
+                                        ? { ...item, is_optional: !!checked }
+                                        : item
+                                    )
+                                  );
+                                }
+                              }}
+                            />
+                            <Label
+                              htmlFor={`optional-${dayIndex}-${selectedWeek}`}
+                              className="text-sm text-[color:var(--fc-text-dim)] cursor-pointer"
+                            >
+                              Optional day
+                            </Label>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

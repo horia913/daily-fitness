@@ -114,13 +114,13 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="w-full max-w-md mt-8 mb-8 fc-modal fc-card p-6 md:p-8"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto fc-modal fc-card p-6 md:p-8 my-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">

@@ -118,11 +118,14 @@ export async function computeWeekCompliance(
 
   const startDate = assignment.start_date
   const slotsInWeek = slots.filter((s) => s.week_number === weekNumber)
+  const requiredSlotsInWeek = slotsInWeek.filter((s) => !s.is_optional)
+  const requiredScheduleIds = new Set(requiredSlotsInWeek.map((s) => s.id))
   const completedInWeek = completedSlots.filter((c) => c.week_number === weekNumber)
   const completedScheduleIds = new Set(completedInWeek.map((c) => c.program_schedule_id))
 
-  const assigned = slotsInWeek.length
-  let completed = completedInWeek.length
+  const assigned = requiredSlotsInWeek.length
+  const completedRequired = completedInWeek.filter((c) => requiredScheduleIds.has(c.program_schedule_id)).length
+  let completed = completedRequired
   if (completed > assigned) completed = assigned
 
   const structuralPct =

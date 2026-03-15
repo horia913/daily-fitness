@@ -169,7 +169,10 @@ export default function ClientCheckInsPage() {
       };
   }, [user?.id, historyKey]);
 
-  const { data, loading: dataLoading, error: dataError, refetch } = usePageData(fetchCheckInData, [user?.id, historyKey]);
+  const { data, loading: dataLoading } = usePageData(
+    fetchCheckInData,
+    [user?.id, historyKey]
+  );
 
   const todayLog = data?.todayLog ?? null;
   const logRange = data?.logRange ?? [];
@@ -273,15 +276,6 @@ export default function ClientCheckInsPage() {
             <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Check-ins</h1>
             <p className="text-sm fc-text-dim mt-0.5">Body metrics, mobility, and reporting</p>
           </header>
-
-          {dataError && (
-            <ClientGlassCard className="mb-6 p-4 flex items-center justify-between gap-3 rounded-xl border border-[color:var(--fc-status-error)]">
-              <p className="text-sm fc-text-error">{dataError}</p>
-              <Button variant="fc-secondary" onClick={() => window.location.reload()} className="text-sm shrink-0 min-h-[44px] min-w-[44px]">
-                Retry
-              </Button>
-            </ClientGlassCard>
-          )}
 
           {user?.id && (
             <>

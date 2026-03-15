@@ -395,7 +395,8 @@ export function RestPauseExecutor({
       const logData: any = {
         set_type: "rest_pause",
         set_number: completedSets + 1,
-        rest_pause_number: 1, // First rest-pause set
+        rest_pause_number: 1,
+        isLastSet: currentSetNumber >= totalSets,
       };
 
       // Only add fields if they're defined

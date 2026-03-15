@@ -285,17 +285,164 @@ export async function getTrainedExercises(
 }
 
 /**
- * Get progressions for all trained exercises (summary; one progression per exercise).
+ * Builds a single ExerciseProgression from grouped set logs.
  */
-export async function getAllExerciseProgressions(
+function buildProgressionFromSets(
+  exerciseId: string,
+  exerciseName: string,
+  setLogs: { weight: number; reps: number; completed_at: string }[]
+): ExerciseProgression | null {
+  const byDate = new Map<
+    string,
+    { weight: number; reps: number; volume: number }[]
+  >();
+
+  for (const row of setLogs) {
+    const w = Number(row.weight) || 0;
+    const r = Math.max(0, Math.floor(Number(row.reps) || 0));
+    if (w <= 0) continue;
+    const dateKey = getDateKey(
+      row.completed_at ? new Date(row.completed_at).toISOString() : new Date().toISOString()
+    );
+    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+    byDate.get(dateKey)!.push({
+      weight: w,
+      reps: r,
+      volume: w * r,
+    });
+  }
+
+  const dataPoints: ExerciseProgressionDataPoint[] = [];
+  let allTimeMax = 0;
+  let allTimeMaxReps = 0;
+
+  const sortedDates = Array.from(byDate.keys()).sort();
+  for (const dateKey of sortedDates) {
+    const sets = byDate.get(dateKey)!;
+    const bestSet = sets.reduce(
+      (best, s) =>
+        s.weight > best.weight ||
+        (s.weight === best.weight && s.reps > best.reps)
+          ? s
+          : best,
+      sets[0]
+    );
+    const maxWeight = bestSet.weight;
+    const maxReps = bestSet.reps;
+    const totalVolume = sets.reduce((sum, s) => sum + s.volume, 0);
+    const estimatedOneRM = bestEstimatedOneRMFromSets(sets);
+    const bestSetDisplay =
+      maxWeight > 0
+        ? `${maxWeight}kg × ${maxReps}`
+        : `${maxReps} reps`;
+
+    if (maxWeight > allTimeMax) {
+      allTimeMax = maxWeight;
+      allTimeMaxReps = maxReps;
+    }
+
+    dataPoints.push({
+      date: dateKey,
+      maxWeight,
+      maxReps,
+      estimatedOneRM,
+      totalVolume,
+      bestSetDisplay,
+    });
+  }
+
+  if (dataPoints.length < 2) return null;
+
+  const firstE1RM = dataPoints[0]?.estimatedOneRM ?? 0;
+  const lastE1RM = dataPoints[dataPoints.length - 1]?.estimatedOneRM ?? 0;
+  const progressPercent =
+    firstE1RM > 0
+      ? Math.round(((lastE1RM - firstE1RM) / firstE1RM) * 1000) / 10
+      : 0;
+  const trend = computeTrend(dataPoints);
+
+  return {
+    exerciseId,
+    exerciseName,
+    dataPoints,
+    currentOneRM: lastE1RM,
+    allTimeMax,
+    allTimeMaxReps,
+    progressPercent,
+    trend,
+  };
+}
+
+/**
+ * Get progressions for multiple exercises in a single batch (avoids N+1 queries).
+ */
+export async function getExerciseProgressionsBatch(
   clientId: string,
+  exerciseIds: string[],
   timeRange: keyof typeof DEFAULT_TIME_RANGES = "3M"
 ): Promise<ExerciseProgression[]> {
-  const exercises = await getTrainedExercises(clientId);
-  const results: ExerciseProgression[] = [];
+  if (exerciseIds.length === 0) return [];
 
-  for (const ex of exercises) {
-    const prog = await getExerciseProgression(clientId, ex.id, timeRange);
+  const { ensureAuthenticated } = await import("./supabase");
+  await ensureAuthenticated();
+
+  const days = DEFAULT_TIME_RANGES[timeRange];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffKey = getDateKey(cutoff.toISOString());
+
+  const { data: setLogs, error } = await supabase
+    .from("workout_set_logs")
+    .select(
+      `
+      weight,
+      reps,
+      completed_at,
+      exercise_id,
+      exercises (
+        id,
+        name
+      )
+    `
+    )
+    .eq("client_id", clientId)
+    .in("exercise_id", exerciseIds)
+    .not("weight", "is", null)
+    .gt("weight", 0)
+    .order("completed_at", { ascending: true });
+
+  if (error || !setLogs?.length) return [];
+
+  const byExercise = new Map<
+    string,
+    { name: string; sets: { weight: number; reps: number; completed_at: string }[] }
+  >();
+
+  for (const row of setLogs as any[]) {
+    const ex = row.exercises;
+    const id = ex?.id ?? row.exercise_id;
+    const name = (ex?.name as string) || "Unknown";
+    if (!id) continue;
+
+    const completedAt = row.completed_at
+      ? new Date(row.completed_at).toISOString()
+      : new Date().toISOString();
+    const dateKey = getDateKey(completedAt);
+    if (dateKey < cutoffKey) continue;
+
+    if (!byExercise.has(id)) {
+      byExercise.set(id, { name, sets: [] });
+    }
+    byExercise.get(id)!.sets.push({
+      weight: Number(row.weight) || 0,
+      reps: Number(row.reps) || 0,
+      completed_at: completedAt,
+    });
+  }
+
+  const results: ExerciseProgression[] = [];
+  for (const [exId, { name, sets }] of byExercise.entries()) {
+    const prog = buildProgressionFromSets(exId, name, sets);
     if (prog && prog.dataPoints.length >= 2) results.push(prog);
   }
 
@@ -304,6 +451,21 @@ export async function getAllExerciseProgressions(
       new Date(b.dataPoints[b.dataPoints.length - 1]?.date ?? 0).getTime() -
       new Date(a.dataPoints[a.dataPoints.length - 1]?.date ?? 0).getTime()
   );
+}
+
+/**
+ * Get progressions for all trained exercises (summary; one progression per exercise).
+ * Uses batched query to avoid N+1.
+ */
+export async function getAllExerciseProgressions(
+  clientId: string,
+  timeRange: keyof typeof DEFAULT_TIME_RANGES = "3M"
+): Promise<ExerciseProgression[]> {
+  const exercises = await getTrainedExercises(clientId);
+  const exerciseIds = exercises.map((ex) => ex.id);
+  if (exerciseIds.length === 0) return [];
+
+  return getExerciseProgressionsBatch(clientId, exerciseIds, timeRange);
 }
 
 /**

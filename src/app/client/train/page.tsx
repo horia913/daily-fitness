@@ -2,9 +2,9 @@
 
 /**
  * Train Page - Client Training Hub
- * 
- * APPROACH: Pages render immediately with empty/placeholder content, then populate when data arrives.
- * Loads program week (API) and standalone workout_assignments (Supabase) so both program and assigned workouts list display.
+ *
+ * Data: Single get_train_page_data RPC only. No block fetching on this page — blocks load
+ * when the user taps "Start Workout" and lands on the workout execution page.
  */
 
 import React, { useState, useCallback } from "react";
@@ -19,15 +19,34 @@ import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ProgramWeekState, OverdueSlotCard, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
-import { WorkoutDayPreview, type PreviewDayStatus } from "@/components/client/train/WorkoutDayPreview";
+import {
+  ProgramWeekState,
+  OverdueSlotCard,
+  type ProgramWeekDayCard,
+} from "@/lib/programWeekStateBuilder";
+import {
+  WorkoutDayPreview,
+  type PreviewDayStatus,
+} from "@/components/client/train/WorkoutDayPreview";
 import { useToast } from "@/components/ui/toast-provider";
 import { Dumbbell, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
+import {
+  rpcResponseToProgramWeekState,
+  type TrainPageRpcResponse,
+  type TrainPageRpcExtraWorkoutRow,
+} from "@/lib/trainPageDataMapper";
 
-
-const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 /** 0=Monday .. 6=Sunday (client timezone) */
 function getTodayWeekday(): number {
@@ -36,7 +55,7 @@ function getTodayWeekday(): number {
 
 function getDayStatus(
   day: ProgramWeekDayCard,
-  todayWeekday: number
+  todayWeekday: number,
 ): PreviewDayStatus {
   if (!day.templateId) return "rest";
   if (day.isCompleted) return "completed";
@@ -45,63 +64,38 @@ function getDayStatus(
   return "upcoming";
 }
 
-async function fetchExtraWorkouts(
-  clientId: string
-): Promise<{ workouts: ExtraWorkout[]; counts: Map<string, number> }> {
-  const counts = new Map<string, number>();
-  try {
-    const { data: rows, error } = await supabase
-      .from("workout_assignments")
-      .select(
-        `
-        id,
-        name,
-        estimated_duration,
-        workout_template_id,
-        workout_templates (
-          id,
-          name,
-          estimated_duration
-        )
-      `
-      )
-      .eq("client_id", clientId)
-      .in("status", ["assigned", "in_progress"])
-      .order("scheduled_date", { ascending: true });
-
-    if (error) {
-      console.warn("[train] Error fetching workout_assignments:", error);
-      return { workouts: [], counts };
-    }
-    if (!rows?.length) return { workouts: [], counts };
-
-    const templateIds = [...new Set((rows as any[]).map((r) => r.workout_template_id).filter(Boolean))];
-    if (templateIds.length > 0) {
-      const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
-      const blocksByTemplate = await WorkoutBlockService.getWorkoutBlocksForTemplates(templateIds);
-      templateIds.forEach((tid) => {
-        const blocks = blocksByTemplate.get(tid) || [];
-        const n = blocks.reduce((sum, b) => sum + ((b as any).exercises?.length || 0), 0);
-        counts.set(tid, n);
-      });
-    }
-
-    const workouts: ExtraWorkout[] = (rows as any[]).map((r) => {
-      const template = r.workout_templates;
-      const templateId = r.workout_template_id || template?.id || "";
-      return {
-        id: r.id,
-        name: r.name || template?.name || "Workout",
-        exerciseCount: counts.get(templateId) ?? 0,
-        estimatedDuration: r.estimated_duration ?? template?.estimated_duration ?? 45,
-        templateId,
-      };
-    });
-    return { workouts, counts };
-  } catch (e) {
-    console.warn("[train] fetchExtraWorkouts failed:", e);
-    return { workouts: [], counts };
+/** Build exercise counts Map from RPC schedule + extraWorkouts (no block fetch). */
+function buildExerciseCountsFromRpc(
+  data: TrainPageRpcResponse | null,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!data) return map;
+  for (const s of data.schedule ?? []) {
+    if (s.template_id)
+      map.set(s.template_id, s.exercise_count ?? 0);
   }
+  for (const w of data.extraWorkouts ?? []) {
+    if (w.template_id)
+      map.set(w.template_id, w.exercise_count ?? 0);
+  }
+  return map;
+}
+
+function buildExtraWorkoutsFromRpc(
+  extraFromRpc: TrainPageRpcExtraWorkoutRow[],
+  exerciseCounts: Map<string, number>,
+): ExtraWorkout[] {
+  if (!extraFromRpc.length) return [];
+  return extraFromRpc.map((r) => {
+    const templateId = r.template_id ?? "";
+    return {
+      id: r.id,
+      name: r.template_name ?? "Workout",
+      exerciseCount: exerciseCounts.get(templateId) ?? 0,
+      estimatedDuration: r.estimated_duration ?? 45,
+      templateId,
+    };
+  });
 }
 
 interface ExtraWorkout {
@@ -122,56 +116,87 @@ export default function TrainPage() {
   const { user } = useAuth();
 
   const [isStarting, setIsStarting] = useState(false);
-  const [startingScheduleId, setStartingScheduleId] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<ProgramWeekDayCard | null>(null);
-  const [selectedOverdueSlot, setSelectedOverdueSlot] = useState<OverdueSlotCard | null>(null);
-  const [selectedRestWeekday, setSelectedRestWeekday] = useState<number | null>(null);
+  const [startingScheduleId, setStartingScheduleId] = useState<string | null>(
+    null,
+  );
+  const [selectedDay, setSelectedDay] = useState<ProgramWeekDayCard | null>(
+    null,
+  );
+  const [selectedOverdueSlot, setSelectedOverdueSlot] =
+    useState<OverdueSlotCard | null>(null);
+  const [selectedRestWeekday, setSelectedRestWeekday] = useState<number | null>(
+    null,
+  );
 
-  // Phase 1: Load program week + standalone assigned workouts
+  // Single RPC only — no block fetch; blocks load on workout execution page when user taps Start
   const fetchProgramWeekOnly = useCallback(async (): Promise<TrainPageData> => {
     if (!user?.id) {
-      return { programWeek: null, extraWorkouts: [], exerciseCounts: new Map() };
+      return {
+        programWeek: null,
+        extraWorkouts: [],
+        exerciseCounts: new Map(),
+      };
     }
     const todayWeekday = getTodayWeekday();
-    const programResponse = await fetch(`/api/client/program-week?todayWeekday=${todayWeekday}`, {
-      credentials: "include",
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_train_page_data", {
+      p_client_id: user.id,
+      p_today_weekday: todayWeekday,
     });
-    if (programResponse.status === 401 || programResponse.status === 403) {
-      await supabase.auth.getSession();
-      const retryResponse = await fetch(`/api/client/program-week?todayWeekday=${todayWeekday}`, {
-        credentials: "include",
-      });
-      if (!retryResponse.ok) {
-        const errorData = await retryResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to fetch program week after retry");
-      }
-      const programData = await retryResponse.json();
-      const extra = await fetchExtraWorkouts(user.id);
-      return { programWeek: programData, extraWorkouts: extra.workouts, exerciseCounts: extra.counts };
+    if (rpcError) {
+      throw new Error(rpcError.message || "Failed to load train page data");
     }
-    if (!programResponse.ok) {
-      const errorData = await programResponse.json().catch(() => ({}));
-      throw new Error(errorData.error || "Failed to fetch program week");
-    }
-    const programData = await programResponse.json();
-    const extra = await fetchExtraWorkouts(user.id);
-    return { programWeek: programData, extraWorkouts: extra.workouts, exerciseCounts: extra.counts };
+    const data = (rpcData ?? null) as TrainPageRpcResponse | null;
+    const programWeek = data
+      ? rpcResponseToProgramWeekState(data, todayWeekday)
+      : null;
+    const extraFromRpc: TrainPageRpcExtraWorkoutRow[] = Array.isArray(data?.extraWorkouts)
+      ? data.extraWorkouts
+      : [];
+    const exerciseCounts = buildExerciseCountsFromRpc(data);
+    const extraWorkouts = buildExtraWorkoutsFromRpc(extraFromRpc, exerciseCounts);
+    return {
+      programWeek,
+      extraWorkouts,
+      exerciseCounts,
+    };
   }, [user?.id]);
 
   const { addToast } = useToast();
-  const { data: programData, loading: programLoading, error, refetch } = usePageData(fetchProgramWeekOnly, [user?.id]);
+  const {
+    data: programData,
+    loading: programLoading,
+    error,
+    refetch,
+  } = usePageData(fetchProgramWeekOnly, [user?.id]);
+
   const programWeek = programData?.programWeek ?? null;
   const extraWorkouts: ExtraWorkout[] = programData?.extraWorkouts ?? [];
-  const exerciseCounts = programData?.exerciseCounts ?? new Map<string, number>();
+  const exerciseCounts =
+    programData?.exerciseCounts ?? new Map<string, number>();
 
   const loading = programLoading;
   const todayWeekday = getTodayWeekday();
 
   // Default selected day to today or first day when program first loads (do not override user selection)
   React.useEffect(() => {
-    if (!programWeek?.hasProgram || programWeek.isCompleted || !programWeek.days?.length) return;
-    setSelectedDay((prev) => (prev !== null ? prev : programWeek.todaySlot ?? programWeek.days[0] ?? null));
-  }, [programWeek?.hasProgram, programWeek?.isCompleted, programWeek?.days?.length, programWeek?.todaySlot?.scheduleId, programWeek?.days?.[0]?.scheduleId]);
+    if (
+      !programWeek?.hasProgram ||
+      programWeek.isCompleted ||
+      !programWeek.days?.length
+    )
+      return;
+    setSelectedDay((prev) =>
+      prev !== null
+        ? prev
+        : (programWeek.todaySlot ?? programWeek.days[0] ?? null),
+    );
+  }, [
+    programWeek?.hasProgram,
+    programWeek?.isCompleted,
+    programWeek?.days?.length,
+    programWeek?.todaySlot?.scheduleId,
+    programWeek?.days?.[0]?.scheduleId,
+  ]);
 
   const handleStartWorkout = async (scheduleId: string) => {
     if (isStarting) return;
@@ -183,25 +208,40 @@ export default function TrainPage() {
     const timeout = setTimeout(() => controller.abort(), 15_000);
 
     try {
-      const response = await fetch("/api/program-workouts/start-from-progress", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ program_schedule_id: scheduleId }),
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        "/api/program-workouts/start-from-progress",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ program_schedule_id: scheduleId }),
+          signal: controller.signal,
+        },
+      );
 
       clearTimeout(timeout);
       const data = await response.json();
 
       if (!response.ok) {
         if (data.error === "WEEK_LOCKED") {
-          addToast({ title: data.message || "Complete the current week first.", variant: "destructive" });
+          addToast({
+            title: data.message || "Complete the current week first.",
+            variant: "destructive",
+          });
         } else if (response.status === 409) {
           refetch();
-          addToast({ title: data.message || data.error || "This workout is already completed. Refreshing.", variant: "destructive" });
+          addToast({
+            title:
+              data.message ||
+              data.error ||
+              "This workout is already completed. Refreshing.",
+            variant: "destructive",
+          });
         } else {
-          addToast({ title: data.message || data.error || "Could not start workout.", variant: "destructive" });
+          addToast({
+            title: data.message || data.error || "Could not start workout.",
+            variant: "destructive",
+          });
         }
         return;
       }
@@ -212,10 +252,16 @@ export default function TrainPage() {
     } catch (err: any) {
       clearTimeout(timeout);
       if (err?.name === "AbortError") {
-        addToast({ title: "Request timed out. Please try again.", variant: "destructive" });
+        addToast({
+          title: "Request timed out. Please try again.",
+          variant: "destructive",
+        });
       } else {
         console.error("Error starting workout:", err);
-        addToast({ title: "Could not start workout. Check your connection.", variant: "destructive" });
+        addToast({
+          title: "Could not start workout. Check your connection.",
+          variant: "destructive",
+        });
       }
     } finally {
       setIsStarting(false);
@@ -247,17 +293,19 @@ export default function TrainPage() {
         <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
           {/* Section 1: Page Header */}
           <header className="mb-6">
-            <h1 className="font-bold fc-text-primary" style={{ fontSize: "var(--fc-type-h2)" }}>
+            <h1
+              className="font-bold fc-text-primary"
+              style={{ fontSize: "var(--fc-type-h2)" }}
+            >
               Training
             </h1>
           </header>
 
-          {/* Error State */}
           {error && (
-            <ClientGlassCard className="p-6 text-center">
+            <ClientGlassCard className="p-6 text-center mb-6">
               <p className="text-sm fc-text-dim mb-4">{error}</p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => refetch()}
                 className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm"
               >
                 Retry
@@ -265,17 +313,16 @@ export default function TrainPage() {
             </ClientGlassCard>
           )}
 
-          {/* Main Content */}
-          {!error && (
+          {loading ? (
+            /* Loading State */
+            <div className="space-y-4">
+              <SkeletonCard className="fc-surface border border-[color:var(--fc-surface-card-border)]" />
+              <Skeleton variant="rectangular" className="h-14 w-full" />
+              <SkeletonCard className="fc-surface border border-[color:var(--fc-surface-card-border)]" />
+            </div>
+          ) : !error ? (
             <>
-              {loading ? (
-                /* Loading State */
-                <div className="space-y-4">
-                  <SkeletonCard className="fc-surface border border-[color:var(--fc-surface-card-border)]" />
-                  <Skeleton variant="rectangular" className="h-14 w-full" />
-                  <SkeletonCard className="fc-surface border border-[color:var(--fc-surface-card-border)]" />
-                </div>
-              ) : programWeek?.hasProgram && programWeek?.isCompleted ? (
+              {programWeek?.hasProgram && programWeek?.isCompleted ? (
                 /* Section 2b: Program Completed — congratulations card (Fix D) */
                 <ProgramCompletedCard programWeek={programWeek} />
               ) : programWeek?.hasProgram ? (
@@ -296,12 +343,18 @@ export default function TrainPage() {
                     todaySlot={programWeek.todaySlot}
                     todayWeekday={todayWeekday}
                     onDaySelect={handleDaySelect}
-                    selectedScheduleId={selectedDay?.scheduleId ?? selectedOverdueSlot?.scheduleId ?? null}
+                    selectedScheduleId={
+                      selectedDay?.scheduleId ??
+                      selectedOverdueSlot?.scheduleId ??
+                      null
+                    }
                     selectedRestWeekday={selectedRestWeekday}
                   />
 
                   {/* Section 3c: Workout Day Preview */}
-                  {(selectedDay || selectedOverdueSlot !== null || selectedRestWeekday !== null) && (
+                  {(selectedDay ||
+                    selectedOverdueSlot !== null ||
+                    selectedRestWeekday !== null) && (
                     <div className="mb-6" data-workout-preview>
                       {selectedOverdueSlot ? (
                         <WorkoutDayPreview
@@ -310,13 +363,18 @@ export default function TrainPage() {
                           templateId={selectedOverdueSlot.templateId}
                           workoutName={selectedOverdueSlot.workoutName}
                           dayLabel={selectedOverdueSlot.dayLabel}
-                          estimatedDuration={selectedOverdueSlot.estimatedDuration}
+                          estimatedDuration={
+                            selectedOverdueSlot.estimatedDuration
+                          }
                           scheduleId={selectedOverdueSlot.scheduleId}
                           onStartWorkout={handleStartWorkout}
                           onClose={handleClosePreview}
                           isStarting={isStarting}
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
+                          exerciseCount={exerciseCounts.get(
+                            selectedOverdueSlot.templateId,
+                          )}
                         />
                       ) : selectedRestWeekday !== null ? (
                         <WorkoutDayPreview
@@ -347,6 +405,9 @@ export default function TrainPage() {
                           isStarting={isStarting}
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
+                          exerciseCount={exerciseCounts.get(
+                            selectedDay.templateId,
+                          )}
                         />
                       ) : null}
                     </div>
@@ -357,7 +418,9 @@ export default function TrainPage() {
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <Calendar className="w-5 h-5 fc-text-dim" />
-                        <h3 className="text-lg font-bold fc-text-primary">This week&apos;s workouts</h3>
+                        <h3 className="text-lg font-bold fc-text-primary">
+                          This week&apos;s workouts
+                        </h3>
                       </div>
                       <ul className="space-y-2">
                         {programWeek.days.map((day) => (
@@ -372,9 +435,17 @@ export default function TrainPage() {
                               className="w-full text-left rounded-xl p-4 fc-surface border border-[color:var(--fc-surface-card-border)] hover:opacity-90 transition-opacity flex items-center justify-between gap-3"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold fc-text-primary truncate">{day.workoutName}</p>
+                                <p className="text-sm font-semibold fc-text-primary truncate flex items-center gap-2">
+                                  {day.workoutName}
+                                  {day.isOptional && (
+                                    <span className="text-[10px] font-normal text-cyan-500 dark:text-cyan-400">
+                                      Optional
+                                    </span>
+                                  )}
+                                </p>
                                 <p className="text-xs fc-text-dim">
-                                  {day.dayLabel} · ~{day.estimatedDuration || 45} min
+                                  {day.dayLabel} · ~
+                                  {day.estimatedDuration || 45} min
                                 </p>
                               </div>
                               <span className="text-xs font-medium fc-text-dim shrink-0">
@@ -408,7 +479,7 @@ export default function TrainPage() {
               {/* Section 5: Extra Training */}
               {!loading && <ExtraTraining workouts={extraWorkouts} />}
             </>
-          )}
+          ) : null}
         </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>

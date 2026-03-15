@@ -275,6 +275,7 @@ export function HRSetExecutor({
           ? parseFloat(currentHRPercentage)
           : null,
         hr_distance_meters: distanceMeters ? parseFloat(distanceMeters) : null,
+        isLastSet: isIntervals ? currentRound >= targetRounds : true,
       };
 
       if (isIntervals) {

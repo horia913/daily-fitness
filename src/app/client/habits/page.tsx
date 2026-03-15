@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -14,7 +14,6 @@ import { Flame, Target, CheckCircle, Plus, BarChart3, ChevronDown, LayoutGrid, R
 import { EmptyState } from '@/components/ui/EmptyState'
 import { supabase } from '@/lib/supabase'
 import { withTimeout } from '@/lib/withTimeout'
-
 interface HabitAssignment {
   id: string
   habit_id: string
@@ -37,6 +36,7 @@ export default function ClientHabitsPage() {
   const { performanceSettings } = useTheme()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null)
   const [habits, setHabits] = useState<HabitAssignment[]>([])
   const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set())
   const [showAnalytics, setShowAnalytics] = useState(false)
@@ -45,17 +45,12 @@ export default function ClientHabitsPage() {
   /** Last 30 days: { daysWithCompletion, totalDays } for completion rate */
   const [completionRate30, setCompletionRate30] = useState<{ daysWithCompletion: number; totalDays: number }>({ daysWithCompletion: 0, totalDays: 30 })
 
-  useEffect(() => {
-    if (user) {
-      loadHabits()
-    }
-  }, [user])
-
-  const loadHabits = async () => {
+  const loadHabits = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
     setLoadError(null)
+    setLoadingStartedAt(Date.now())
     try {
       await withTimeout(
         (async () => {
@@ -211,8 +206,14 @@ export default function ClientHabitsPage() {
       setLoadError(error?.message === 'timeout' ? 'Loading took too long. Please try again.' : (error?.message || 'Failed to load habits'))
     } finally {
       setLoading(false)
+      setLoadingStartedAt(null)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user) loadHabits()
+  }, [loadHabits])
+
 
   const handleHabitToggle = async (assignmentId: string) => {
     const habit = habits.find(h => h.id === assignmentId)

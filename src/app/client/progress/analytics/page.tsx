@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -27,6 +27,7 @@ import {
   getTopProgressions,
   getTrainedExercises,
   getExerciseProgression,
+  getExerciseProgressionsBatch,
   isCompoundLift,
   getCompoundLiftDisplayName,
   type ExerciseProgression,
@@ -88,6 +89,7 @@ function AnalyticsPageContent() {
   const [loadingProgression, setLoadingProgression] = useState<string | null>(null);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cross-link: open strength section with exercise expanded when ?exerciseId= is present
@@ -99,6 +101,61 @@ function AnalyticsPageContent() {
     const el = document.getElementById("strength-exercises");
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [exerciseIdFromUrl, user?.id]);
+
+  const loadStrengthProgressions = async () => {
+    if (!user?.id) return;
+    try {
+      const [top, trained] = await Promise.all([
+        getTopProgressions(user.id, 3, "3M"),
+        getTrainedExercises(user.id),
+      ]);
+      setTopProgressions(top);
+      setTrainedExercises(trained);
+      const compound = trained.filter((ex) => isCompoundLift(ex.name));
+      const compoundIds = compound.map((ex) => ex.id);
+      const progressions = compoundIds.length > 0
+        ? await getExerciseProgressionsBatch(user.id, compoundIds, "3M")
+        : [];
+      setCompoundProgressions(progressions.filter((p): p is ExerciseProgression => p != null && p.dataPoints.length >= 2));
+    } catch (e) {
+      console.error("Error loading strength progressions:", e);
+      setTopProgressions([]);
+      setTrainedExercises([]);
+      setCompoundProgressions([]);
+    }
+  };
+
+  const loadAnalyticsData = useCallback(async () => {
+    if (!user) {
+      setWorkoutFrequency([]);
+      setBodyComposition([]);
+      setGoalCompletion({ completed: 0, total: 0 });
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+    setLoadingStartedAt(Date.now());
+    try {
+      await Promise.all([
+        loadWorkoutFrequency(),
+        loadDurationTrend(),
+        loadStrengthProgressions(),
+        loadBodyComposition(),
+        loadGoalCompletion(),
+        loadVolumeStats(),
+        loadWellnessStats(),
+        loadWorkoutsForSleepAnalysis(),
+      ]);
+    } catch (error) {
+      console.error("Error loading analytics data:", error);
+      setLoadError(error instanceof Error ? error.message : "Failed to load analytics");
+    } finally {
+      setLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -120,57 +177,7 @@ function AnalyticsPageContent() {
         timeoutRef.current = null;
       }
     };
-  }, [user]);
-
-  const loadAnalyticsData = async () => {
-      if (!user) {
-      setWorkoutFrequency([]);
-      setBodyComposition([]);
-      setGoalCompletion({ completed: 0, total: 0 });
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadWorkoutFrequency(),
-        loadDurationTrend(),
-        loadStrengthProgressions(),
-        loadBodyComposition(),
-        loadGoalCompletion(),
-        loadVolumeStats(),
-        loadWellnessStats(),
-        loadWorkoutsForSleepAnalysis(),
-      ]);
-    } catch (error) {
-      console.error("Error loading analytics data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadStrengthProgressions = async () => {
-    if (!user?.id) return;
-    try {
-      const [top, trained] = await Promise.all([
-        getTopProgressions(user.id, 3, "3M"),
-        getTrainedExercises(user.id),
-      ]);
-      setTopProgressions(top);
-      setTrainedExercises(trained);
-      const compound = trained.filter((ex) => isCompoundLift(ex.name));
-      const progressions = await Promise.all(
-        compound.map((ex) => getExerciseProgression(user.id, ex.id, "3M"))
-      );
-      setCompoundProgressions(progressions.filter((p): p is ExerciseProgression => p != null && p.dataPoints.length >= 2));
-    } catch (e) {
-      console.error("Error loading strength progressions:", e);
-      setTopProgressions([]);
-      setTrainedExercises([]);
-      setCompoundProgressions([]);
-    }
-  };
+  }, [loadAnalyticsData, user]);
 
   const loadExerciseProgressionForExpand = async (exerciseId: string) => {
     if (!user?.id || progressionCache[exerciseId]) {
@@ -631,10 +638,12 @@ function AnalyticsPageContent() {
           </div>
         </div>
 
-        {loadError ? (
+        {loadError && !loading ? (
           <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
             <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-            <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
+            <Button variant="secondary" onClick={() => { setLoadError(null); loadAnalyticsData(); }} className="h-11 px-6">
+              Retry
+            </Button>
           </div>
         ) : loading ? (
           <div className="animate-pulse space-y-4 p-4 pb-32">

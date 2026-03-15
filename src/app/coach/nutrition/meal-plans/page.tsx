@@ -72,7 +72,7 @@ export default function MealPlansPage() {
     return { mealPlans: mealPlansWithStats };
   }, [user?.id]);
 
-  const { data, loading, error, refetch } = usePageData(fetchMealPlansData, [user?.id]);
+  const { data, loading, refetch } = usePageData(fetchMealPlansData, [user?.id]);
 
   const mealPlans = data?.mealPlans ?? [];
 
@@ -183,15 +183,6 @@ export default function MealPlansPage() {
                 </div>
               </div>
             </div>
-
-            {error && (
-              <div className="fc-glass fc-card p-4 rounded-xl border border-[color:var(--fc-status-error)] fc-text-error text-sm">
-                {error}
-                <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="ml-2">
-                  Retry
-                </Button>
-              </div>
-            )}
 
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="sticky top-0 z-10 flex-1 fc-glass fc-card p-2 rounded-xl border border-[color:var(--fc-glass-border)]">

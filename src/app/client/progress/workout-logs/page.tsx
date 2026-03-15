@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -60,6 +60,7 @@ export default function WorkoutLogsPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [timeFilter, setTimeFilter] = useState<"all" | "this_month" | "this_week">("all");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,38 +72,12 @@ export default function WorkoutLogsPage() {
     setError(null);
   }, [user]);
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        timeoutRef.current = null;
-        setLoading(false);
-        setError("Loading took too long. Tap Retry to try again.");
-      }, 20_000);
-      loadWorkoutLogs().finally(() => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      });
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      };
-    }
-    if (!authLoading && !user) {
-      setLoading(false);
-    }
-  }, [user, authLoading]);
-
-  const loadWorkoutLogs = async () => {
+  const loadWorkoutLogs = useCallback(async () => {
     if (!user?.id) return;
-
+    setLoading(true);
+    setError(null);
+    setLoadingStartedAt(Date.now());
     try {
-      setLoading(true);
-
       // Ensure user is authenticated before querying
       const { ensureAuthenticated } = await import('@/lib/supabase');
       await ensureAuthenticated();
@@ -129,6 +104,7 @@ export default function WorkoutLogsPage() {
 
       if (error) {
         console.error("❌ Error loading workout logs:", error);
+        setError(error.message);
         setWorkoutLogs([]);
         return;
       }
@@ -265,13 +241,41 @@ export default function WorkoutLogsPage() {
         });
 
       setWorkoutLogs(processedLogs);
-    } catch (error) {
-      console.error("❌ Error loading workout logs:", error);
+    } catch (err) {
+      console.error("❌ Error loading workout logs:", err);
+      setError(err instanceof Error ? err.message : "Failed to load workout logs");
       setWorkoutLogs([]);
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        setLoading(false);
+        setError("Loading took too long. Tap Retry to try again.");
+      }, 20_000);
+      loadWorkoutLogs().finally(() => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      });
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      };
+    }
+    if (!authLoading && !user) {
+      setLoading(false);
+    }
+  }, [loadWorkoutLogs, user, authLoading]);
 
   const filteredLogs = useMemo(() => {
     if (timeFilter === "all") return workoutLogs;
@@ -308,7 +312,7 @@ export default function WorkoutLogsPage() {
       .reduce((sum, log) => sum + log.totalWeight, 0);
   }, [workoutLogs]);
 
-  if (error) {
+  if (error && !loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
@@ -317,7 +321,7 @@ export default function WorkoutLogsPage() {
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
                 <p className="text-[color:var(--fc-text-dim)] mb-4">{error}</p>
-                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">
+                <button type="button" onClick={() => { setError(null); loadWorkoutLogs(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">
                   Retry
                 </button>
               </div>

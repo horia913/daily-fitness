@@ -184,12 +184,13 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
         if (assignmentIds.length > 0) {
           const [slotsRes, progressRes, completionsRes] = await Promise.all([
             programIds.length > 0
-              ? supabase.from('program_schedule').select('program_id, week_number').in('program_id', programIds)
+              ? supabase.from('program_schedule').select('program_id, week_number, is_optional').in('program_id', programIds)
               : { data: [] },
             supabase.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIds),
             supabase.from('program_day_completions').select('program_assignment_id, program_schedule_id, program_schedule!inner(week_number)').in('program_assignment_id', assignmentIds)
           ])
           slotsRes.data?.forEach((r: any) => {
+            if (r.is_optional) return
             const key = `${r.program_id}:${r.week_number}`
             programSlotsByProgramWeek.set(key, (programSlotsByProgramWeek.get(key) || 0) + 1)
           })

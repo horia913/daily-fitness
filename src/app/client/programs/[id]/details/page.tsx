@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -23,7 +23,6 @@ import { withTimeout } from "@/lib/withTimeout";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import ProtectedRoute from "@/components/ProtectedRoute";
-
 interface Program {
   id: string;
   name: string;
@@ -125,6 +124,7 @@ function ProgramDetailsContent() {
   const [weeks, setWeeks] = useState<ProgramWeekExtended[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [unlockedWeekMax, setUnlockedWeekMax] = useState<number>(1);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -132,41 +132,10 @@ function ProgramDetailsContent() {
   const isValidUuid = (val: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-  useEffect(() => {
-    if (!id) return;
-    const idStr = id as string;
-    if (!isValidUuid(idStr)) {
-      setError("Invalid program link. Please go back and try again.");
-      setLoading(false);
-      return;
-    }
-    loadProgramDetails(idStr);
-  }, [id]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/client/program-week", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.unlockedWeekMax != null) setUnlockedWeekMax(data.unlockedWeekMax);
-          if (data.isCompleted === true) setIsCompleted(true);
-        }
-      } catch {
-        // non-fatal
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (weeks.length > 0 && unlockedWeekMax >= 1 && selectedWeek === 1) {
-      setSelectedWeek(unlockedWeekMax);
-    }
-  }, [weeks.length, unlockedWeekMax]);
-
-  const loadProgramDetails = async (programId: string) => {
+  const loadProgramDetails = useCallback(async (programId: string) => {
     try {
       setLoading(true);
+      setLoadingStartedAt(Date.now());
       setError(null);
 
       await withTimeout(
@@ -271,8 +240,45 @@ function ProgramDetailsContent() {
       setError("Failed to load program details");
     } finally {
       setLoading(false);
+      setLoadingStartedAt(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    const idStr = id as string;
+    if (!isValidUuid(idStr)) {
+      setError("Invalid program link. Please go back and try again.");
+      setLoading(false);
+      return;
+    }
+    loadProgramDetails(idStr);
+  }, [id, loadProgramDetails]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/client/program-week", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.unlockedWeekMax != null) setUnlockedWeekMax(data.unlockedWeekMax);
+          if (data.isCompleted === true) setIsCompleted(true);
+        }
+      } catch {
+        // non-fatal
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (weeks.length > 0 && unlockedWeekMax >= 1 && selectedWeek === 1) {
+      setSelectedWeek(unlockedWeekMax);
+    }
+  }, [weeks.length, unlockedWeekMax]);
+
+  const refetchProgram = useCallback(() => {
+    if (id && typeof id === "string" && isValidUuid(id)) loadProgramDetails(id);
+  }, [id, loadProgramDetails]);
 
   const selectedWeekData = useMemo(
     () => weeks.find((w) => w.week_number === selectedWeek),

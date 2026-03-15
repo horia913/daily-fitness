@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
 import { Progress } from "@/components/ui/progress";
 import { Play, Loader2 } from "lucide-react";
@@ -51,10 +51,31 @@ export function ActiveProgramCard({
   const { programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay } = programWeek;
 
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
+  const cachedProgramIdRef = useRef<string | null>(null);
+  const cachedBlocksRef = useRef<TrainingBlock[] | null>(null);
+  const inFlightProgramIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (programId) {
-      TrainingBlockService.getTrainingBlocks(programId).then(setTrainingBlocks);
+    if (!programId) return;
+    // Use cache if we already have blocks for this program
+    if (cachedProgramIdRef.current === programId && cachedBlocksRef.current) {
+      setTrainingBlocks(cachedBlocksRef.current);
+      return;
     }
+    // Don't start a second request if one is already in flight for this programId (Strict Mode)
+    if (inFlightProgramIdRef.current === programId) return;
+    inFlightProgramIdRef.current = programId;
+    cachedProgramIdRef.current = programId;
+    cachedBlocksRef.current = null;
+    const requestedId = programId;
+    TrainingBlockService.getTrainingBlocks(programId).then((data) => {
+      inFlightProgramIdRef.current = null;
+      const blocks = data ?? [];
+      if (cachedProgramIdRef.current === requestedId) {
+        cachedBlocksRef.current = blocks;
+        setTrainingBlocks(blocks);
+      }
+    });
   }, [programId]);
 
   const blockInfo = trainingBlocks.length > 0

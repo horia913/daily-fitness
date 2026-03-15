@@ -722,6 +722,27 @@ export function AuthWrapper() {
           </div>
         )}
 
+        {/* Fix login - clear cached session when stuck */}
+        {isLogin && (
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await supabase.auth.signOut();
+                  if (typeof localStorage !== "undefined") localStorage.clear();
+                  if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+              } finally {
+                  window.location.reload();
+                }
+              }}
+              className="fc-text-dim hover:fc-text-primary text-xs font-medium transition-colors"
+            >
+              Having trouble signing in? Clear session and retry
+            </button>
+          </div>
+        )}
+
         {/* Security Assurance */}
         <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-center gap-2 text-sm fc-text-dim">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import {
@@ -121,6 +121,7 @@ interface BlockGroup {
 export default function WorkoutComplete() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const assignmentId = params.id as string;
   const { addToast } = useToast();
 
@@ -138,6 +139,8 @@ export default function WorkoutComplete() {
     totalSets: 0,
     totalReps: 0,
     totalWeight: 0,
+    rating: null as number | null,
+    notes: null as string | null,
   });
   const [workoutLogIdForSummary, setWorkoutLogIdForSummary] = useState<
     string | null
@@ -149,6 +152,12 @@ export default function WorkoutComplete() {
     string | null
   >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
+  const [programProgression, setProgramProgression] = useState<{
+    current_week_number?: number;
+    current_day_number?: number;
+    is_completed?: boolean;
+    status?: string;
+  } | null>(null);
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [storedDurationMinutes, setStoredDurationMinutes] = useState<number | undefined>(undefined);
@@ -160,6 +169,7 @@ export default function WorkoutComplete() {
 
   const completeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // DIAGNOSTIC: Tab return loading audit
   useEffect(() => {
     if (!assignmentId) return;
     if (completeTimeoutRef.current) clearTimeout(completeTimeoutRef.current);
@@ -194,26 +204,28 @@ export default function WorkoutComplete() {
   }, [assignmentId]);
 
   useEffect(() => {
-    // Read and immediately clear ALL completion handoff keys from localStorage.
-    // This prevents stale retries and multi-tab duplicates.
-    try {
-      const storedWorkoutLogId = localStorage.getItem("workoutLogIdForComplete");
-      if (storedWorkoutLogId) {
-        setWorkoutLogIdOverride(storedWorkoutLogId);
-      }
-      const storedWorkoutSessionId = localStorage.getItem(
-        "workoutSessionIdForComplete"
-      );
-      if (storedWorkoutSessionId) {
-        setWorkoutSessionIdOverride(storedWorkoutSessionId);
-      }
-      // Capture duration into state before clearing
-      const rawDuration = localStorage.getItem("workoutDurationMinutes");
-      if (rawDuration) {
-        setStoredDurationMinutes(parseInt(rawDuration, 10) || undefined);
-      }
+    // Primary: URL params (survives reload, works when navigation used window.location.href).
+    // Fallback: localStorage for backward compatibility.
+    const logIdFromUrl = searchParams.get("logId");
+    const sessionIdFromUrl = searchParams.get("sessionId");
+    const durationFromUrl = searchParams.get("duration");
+    const effectiveLogId =
+      logIdFromUrl ||
+      (typeof window !== "undefined" ? localStorage.getItem("workoutLogIdForComplete") : null);
+    const effectiveSessionId =
+      sessionIdFromUrl ||
+      (typeof window !== "undefined" ? localStorage.getItem("workoutSessionIdForComplete") : null);
+    const effectiveDuration =
+      durationFromUrl ||
+      (typeof window !== "undefined" ? localStorage.getItem("workoutDurationMinutes") : null);
 
-      // Clear ALL completion handoff keys at once
+    if (effectiveLogId) setWorkoutLogIdOverride(effectiveLogId);
+    if (effectiveSessionId) setWorkoutSessionIdOverride(effectiveSessionId);
+    if (effectiveDuration) {
+      setStoredDurationMinutes(parseInt(effectiveDuration, 10) || undefined);
+    }
+
+    try {
       localStorage.removeItem("workoutLogIdForComplete");
       localStorage.removeItem("workoutSessionIdForComplete");
       localStorage.removeItem("workoutDurationMinutes");
@@ -221,7 +233,7 @@ export default function WorkoutComplete() {
     } catch (e) {
       console.warn("⚠️ Could not clear localStorage completion keys:", e);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (workoutLogIdOverride) {
@@ -317,6 +329,21 @@ export default function WorkoutComplete() {
         }
       }
 
+      // Last resort: if handoff failed (e.g. URL params lost on reload), use most recent incomplete log for this client
+      if (!workoutLog) {
+        const { data: recentLog } = await supabase
+          .from("workout_logs")
+          .select(
+            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
+          )
+          .eq("client_id", user.id)
+          .is("completed_at", null)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (recentLog) workoutLog = recentLog;
+      }
+
       let workoutLogId = workoutLog?.id;
 
       if (workoutLogId) {
@@ -341,12 +368,19 @@ export default function WorkoutComplete() {
             totalSets: workoutLog.total_sets_completed || 0,
             totalReps: workoutLog.total_reps_completed || 0,
             totalWeight: workoutLog.total_weight_lifted || 0,
+            rating: (workoutLog as any).rating ?? null,
+            notes: (workoutLog as any).notes ?? null,
           });
           setWorkoutLog(workoutLog);
           await loadBlocksAndSets(workoutLogId, user.id);
           completionDoneRef.current = true;
         } else {
           // Complete the workout — duration already captured in state from localStorage
+          console.log("[COMPLETE-FLOW] calling /api/complete-workout", {
+            workout_log_id: workoutLogId,
+            duration_minutes: storedDurationMinutes,
+            session_id: workoutSessionIdOverride,
+          });
           const completeResponse = await withTimeout(
             fetchApi("/api/complete-workout", {
               method: "POST",
@@ -365,6 +399,10 @@ export default function WorkoutComplete() {
           if (completeResponse.ok) {
             const result = await completeResponse.json();
             const updatedLog = result.workout_log || workoutLog;
+
+            if (result.program_progression) {
+              setProgramProgression(result.program_progression);
+            }
 
             const rawNew = result.new_achievements ?? [];
             if (rawNew.length > 0) {
@@ -426,6 +464,8 @@ export default function WorkoutComplete() {
                 totalSets: apiTotals.sets,
                 totalReps: apiTotals.reps,
                 totalWeight: apiTotals.weight,
+                rating: (updatedLog as any)?.rating ?? null,
+                notes: (updatedLog as any)?.notes ?? null,
               });
 
               setWorkoutLog(updatedLog);
@@ -810,8 +850,27 @@ export default function WorkoutComplete() {
     const targetAssignmentId = assignment?.id || resolvedAssignmentId || null;
     if (!assignment || !targetAssignmentId) return;
 
+    console.log("[COMPLETE-FLOW] submit handler called");
+    console.log("[COMPLETE-FLOW] sending to API", {
+      workoutLogId: workoutLogIdOverride ?? workoutLogIdForSummary,
+      assignmentId: targetAssignmentId,
+      duration: workoutStats.duration,
+      rating: workoutStats.rating,
+      notes: workoutStats.notes,
+    });
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    console.log("[COMPLETE-FLOW] auth session", {
+      hasSession: !!session,
+      expiresAt: session?.expires_at,
+      isExpired: session ? Date.now() / 1000 > (session.expires_at ?? 0) : "no session",
+    });
+
     // Idempotent: if assignment is already completed, just navigate
     if (assignment.status === "completed") {
+      console.log("[COMPLETE-FLOW] navigating after completion (already completed)");
       router.push("/client/train");
       return;
     }
@@ -851,8 +910,11 @@ export default function WorkoutComplete() {
         );
       }
 
+      console.log("[COMPLETE-FLOW] API response", { status: "success" });
+      console.log("[COMPLETE-FLOW] navigating after completion");
       router.push("/client/train");
     } catch (error) {
+      console.log("[COMPLETE-FLOW] API response", { status: "error", error: (error as Error)?.message });
       console.error("❌ Error completing workout:", error);
     } finally {
       setCompleting(false);
@@ -1419,7 +1481,9 @@ export default function WorkoutComplete() {
                         const isTimeoutErr = err?.message === "timeout" || err?.message?.includes("Timeout") || err?.message?.includes("took longer than");
                         setLoadError(isTimeoutErr ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
                       })
-                      .finally(() => setLoading(false));
+                      .finally(() => {
+                        setLoading(false);
+                      });
                   }}
                 >
                   Retry
@@ -1540,11 +1604,11 @@ export default function WorkoutComplete() {
               <ClientGlassCard className="p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
-                    <Star className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
+                    <Trophy className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
                   </div>
                   <div>
                     <h2 className="text-base font-bold fc-text-primary">
-                      Personal Records
+                      PRs This Workout
                     </h2>
                     <p className="text-xs fc-text-dim">
                       {personalRecords.length} new {personalRecords.length === 1 ? "PR" : "PRs"} this session
@@ -1556,18 +1620,20 @@ export default function WorkoutComplete() {
                   {personalRecords.slice(0, 5).map((pr: any) => {
                     const exerciseName =
                       pr.exercises?.name || pr.exercise?.name || "Exercise";
-                    const recordType =
+                    const improvement =
+                      pr.previous_record_value != null
+                        ? pr.record_value - pr.previous_record_value
+                        : null;
+                    const improvementStr =
+                      improvement != null && improvement > 0
+                        ? ` (+${improvement} ${pr.record_type === "weight" ? pr.record_unit || "kg" : "reps"})`
+                        : "";
+                    const valueStr =
                       pr.record_type === "weight"
-                        ? "Strength"
+                        ? `${pr.record_value || 0} ${pr.record_unit || "kg"}${improvementStr}`
                         : pr.record_type === "reps"
-                        ? "Volume"
-                        : "Record";
-                    const deltaValue =
-                      pr.record_type === "weight"
-                        ? `+${pr.record_value || 0} ${pr.record_unit || "kg"}`
-                        : pr.record_type === "reps"
-                        ? `+${pr.record_value || 0} ${pr.record_unit || "reps"}`
-                        : `+${pr.record_value || 0} ${pr.record_unit || ""}`;
+                        ? `${pr.record_value || 0} reps${improvementStr}`
+                        : `${pr.record_value || 0} ${pr.record_unit || ""}${improvementStr}`;
 
                     return (
                       <div
@@ -1580,16 +1646,38 @@ export default function WorkoutComplete() {
                             {exerciseName}
                           </h4>
                           <p className="text-xs fc-text-dim">
-                            {recordType}
+                            {pr.record_type === "weight" ? "Strength" : pr.record_type === "reps" ? "Volume" : "Record"}
                           </p>
                         </div>
-                        <div className="font-mono text-sm font-bold flex-shrink-0" style={{ color: "var(--fc-status-success)" }}>
-                          {deltaValue}
+                        <div className="font-mono text-sm font-bold flex-shrink-0 text-right" style={{ color: "var(--fc-status-success)" }}>
+                          {valueStr}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+              </ClientGlassCard>
+            )}
+
+            {programProgression &&
+              (programProgression.current_week_number != null ||
+                programProgression.current_day_number != null) && (
+              <ClientGlassCard className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <LayoutDashboard className="w-4 h-4" style={{ color: "var(--fc-accent-cyan)" }} />
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">
+                    Program
+                  </p>
+                </div>
+                <p className="text-sm font-semibold fc-text-primary">
+                  Week {programProgression.current_week_number ?? "?"} Day {programProgression.current_day_number ?? "?"}
+                  {assignment?.name ? ` — ${assignment.name}` : ""} ✓
+                </p>
+                {programProgression.is_completed && (
+                  <p className="text-xs fc-text-dim mt-1">
+                    Week complete! Next week unlocked.
+                  </p>
+                )}
               </ClientGlassCard>
             )}
 

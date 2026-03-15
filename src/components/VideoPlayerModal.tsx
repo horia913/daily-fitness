@@ -1,8 +1,11 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { X, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ModalPortal } from '@/components/ui/ModalPortal'
+import { preventBackgroundScroll, restoreBackgroundScroll } from '@/lib/mobile-compatibility'
 
 interface VideoPlayerModalProps {
   isOpen: boolean
@@ -19,6 +22,15 @@ export default function VideoPlayerModal({
 }: VideoPlayerModalProps) {
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
+
+  useEffect(() => {
+    if (isOpen) {
+      preventBackgroundScroll()
+    } else {
+      restoreBackgroundScroll()
+    }
+    return () => restoreBackgroundScroll()
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -46,11 +58,12 @@ export default function VideoPlayerModal({
   const isDirectVideo = !videoUrl.includes('youtube') && !videoUrl.includes('vimeo')
 
   return (
-    <div 
-      className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isDark ? 'bg-black/80 backdrop-blur-sm' : 'bg-black/70 backdrop-blur-sm'}`}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      data-theme={isDark ? 'dark' : 'light'}
-    >
+    <ModalPortal isOpen={isOpen}>
+      <div 
+        className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isDark ? 'bg-black/80 backdrop-blur-sm' : 'bg-black/70 backdrop-blur-sm'}`}
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+        data-theme={isDark ? 'dark' : 'light'}
+      >
       <div 
         className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
         style={{
@@ -149,6 +162,7 @@ export default function VideoPlayerModal({
         }
       `}</style>
     </div>
+    </ModalPortal>
   )
 }
 

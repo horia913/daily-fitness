@@ -17,6 +17,11 @@ export interface GeneratorConfig {
   excludedFoodIds: string[];
   requiredFoodIds: string[];
   tolerance: number;        // default 0.07
+  // Optional meal styles per meal type — filters templates when set
+  breakfastStyle?: string | null;
+  lunchStyle?: string | null;
+  dinnerStyle?: string | null;
+  snackStyle?: string | null;
 }
 
 export interface MacroTargets {
@@ -115,13 +120,16 @@ export interface GenerateOutput {
 // CONSTANTS
 // ============================================================================
 
+// Role-defining slots with no fallback — prevents e.g. chicken in "Protein Smoothie"
+const NO_FALLBACK_SLOT_TYPES = ["protein_powder"] as const;
+
 const SLOT_TYPE_FALLBACKS: Record<string, string[]> = {
   protein_egg: ["protein_any"],
   protein_fish: ["protein_any"],
   protein_dairy: ["protein_any"],
   protein_plant: ["protein_any"],
   protein_meat: ["protein_any"],
-  protein_powder: ["protein_any"],
+  protein_powder: [], // No fallback — smoothie templates must use actual protein powder
   fat_avocado: ["fat_nut", "fat_any"],
   fat_oil: ["fat_any"],
   fat_nut: ["fat_any"],
@@ -132,6 +140,65 @@ const SLOT_TYPE_FALLBACKS: Record<string, string[]> = {
   bread: ["carb_grain", "carb_any"],
   liquid: [],
   condiment: [],
+};
+
+// Template name -> style(s) for meal-style filtering. Used when coach selects a style.
+// Semantics: smoothie = drinkable blend only; yogurt_bowl/oats_bowl/sandwich/wrap/salad/plated = genuinely matching.
+// One template can match multiple styles (e.g. "Eggs + Toast" matches eggs_breakfast and toast_sandwich).
+const TEMPLATE_NAME_TO_STYLES: Record<string, string[]> = {
+  // Breakfast — smoothie = drinkable only (no smoothie bowls)
+  "Protein Smoothie": ["smoothie"],
+  "Greek Yogurt + Granola + Fruit": ["yogurt_bowl"],
+  "Cottage Cheese + Fruit + Nuts": ["yogurt_bowl"],
+  "Oatmeal + Nut Butter + Berries": ["oats_bowl"],
+  "Overnight Oats": ["oats_bowl"],
+  "Eggs + Toast + Fruit": ["eggs_breakfast", "toast_sandwich"],
+  "Avocado Toast + Eggs": ["eggs_breakfast", "toast_sandwich"],
+  "Breakfast Wrap": ["wrap", "eggs_breakfast"],
+  // Lunch
+  "Protein + Rice + Vegetables": ["rice_bowl", "plated"],
+  "Protein Salad Bowl": ["salad"],
+  "Sandwich": ["sandwich"],
+  "Grain Bowl": ["rice_bowl"],
+  "Wrap + Protein + Salad": ["wrap"],
+  "Pasta + Protein + Vegetables": ["pasta"],
+  "Protein + Potato + Vegetables": ["plated"],
+  "Lentil/Bean + Rice + Vegetables": ["rice_bowl"],
+  "Stuffed Sweet Potato": ["plated"],
+  "Fish + Rice + Salad": ["rice_bowl", "salad"],
+  // Dinner — no wrap or soup templates
+  "Protein + Roasted Potato + Vegetables": ["plated"],
+  "Stir-Fry + Rice": ["rice_bowl"],
+  "Grilled Protein + Salad + Grain": ["salad", "plated"],
+  "Fish + Sweet Potato + Vegetables": ["plated"],
+  "Protein Pasta + Vegetables": ["pasta"],
+  "Dinner Bowl": ["rice_bowl"],
+  "Lean Protein + Mashed Potato + Greens": ["plated"],
+  "Salmon + Quinoa + Roasted Vegetables": ["rice_bowl", "plated"],
+  "Plant Protein + Grain + Vegetables": ["rice_bowl", "plated"],
+  "Simple Protein + Rice + Veggies": ["rice_bowl", "plated"],
+  // Snack — smoothie = drinkable; no sandwich templates
+  "Greek Yogurt + Fruit": ["yogurt_bowl"],
+  "Protein Shake": ["smoothie"],
+  "Nuts + Fruit": ["fruit_protein", "quick_snack"],
+  "Rice Cakes + Nut Butter": ["quick_snack"],
+  "Cottage Cheese + Berries": ["yogurt_bowl", "fruit_protein", "quick_snack"],
+  "Boiled Eggs + Fruit": ["fruit_protein", "quick_snack"],
+  "Hummus + Veggies": ["quick_snack"],
+  "Fruit Smoothie": ["smoothie"],
+};
+
+function templateMatchesStyle(templateName: string, style: string): boolean {
+  const styles = TEMPLATE_NAME_TO_STYLES[templateName];
+  return styles?.includes(style) ?? false;
+}
+
+/** Styles that have at least one matching template per meal type (based on current seed). Used for UI filtering. */
+export const SUPPORTED_MEAL_STYLES: Record<string, string[]> = {
+  breakfast: ["smoothie", "yogurt_bowl", "oats_bowl", "eggs_breakfast", "toast_sandwich", "wrap"],
+  lunch: ["rice_bowl", "wrap", "salad", "sandwich", "plated", "pasta"],
+  dinner: ["salad", "rice_bowl", "plated", "pasta"],
+  snack: ["smoothie", "yogurt_bowl", "fruit_protein", "quick_snack"],
 };
 
 // What fraction of the meal's macro target each slot category aims to fill
@@ -232,6 +299,18 @@ function deviationPct(actual: number, target: number): number {
   return Math.abs((actual - target) / target) * 100;
 }
 
+/** Returns true if the food can fill this slot (direct or via fallback). */
+function foodMatchesSlot(
+  foodId: string,
+  slot: SlotRecord,
+  foodIdToSlotTypes: Map<string, string[]>
+): boolean {
+  const foodSlotTypes = foodIdToSlotTypes.get(foodId) ?? [];
+  if (foodSlotTypes.includes(slot.slot_type)) return true;
+  const fallbacks = SLOT_TYPE_FALLBACKS[slot.slot_type] ?? [];
+  return fallbacks.some((fb) => foodSlotTypes.includes(fb));
+}
+
 // ============================================================================
 // MACRO CALCULATION
 // ============================================================================
@@ -323,7 +402,8 @@ function distributeCalories(targets: MacroTargets, mealTypes: string[]): MacroTa
 async function loadFilteredFoods(
   sb: { from: (table: string) => ReturnType<typeof supabase.from> },
   excludedTags: string[],
-  excludedFoodIds: string[]
+  excludedFoodIds: string[],
+  requiredFoodIds: string[] = []
 ): Promise<{ foodsById: Map<string, FoodRecord>; foodsBySlot: Map<string, FoodRecord[]> }> {
   // Step 1: Get IDs of foods excluded by tag
   const excludedByTagIds = new Set<string>();
@@ -378,6 +458,23 @@ async function loadFilteredFoods(
     return { foodsById: new Map(), foodsBySlot: new Map() };
   }
 
+  // Generation-default pool: common foods + required. Isolated for easy replacement
+  // with a stricter generator-specific flag (e.g. is_generator_common) if needed.
+  const commonFiltered = filteredFoods.filter((f) => f.is_common);
+  const requiredSet = new Set(requiredFoodIds);
+  const requiredFromFiltered = filteredFoods.filter((f) => requiredSet.has(f.id));
+  const seenIds = new Set<string>();
+  const finalPool: FoodRecord[] = [];
+  for (const f of [...commonFiltered, ...requiredFromFiltered]) {
+    if (seenIds.has(f.id)) continue;
+    seenIds.add(f.id);
+    finalPool.push(f);
+  }
+
+  if (finalPool.length === 0) {
+    return { foodsById: new Map(), foodsBySlot: new Map() };
+  }
+
   // Step 3: Fetch ALL slot types (no .in() filter — avoids URL-too-long with large food sets).
   // The table is small (~500 rows). Filter by allowed food IDs in JS.
   const { data: slotRows, error: slotErr } = await sb
@@ -386,8 +483,8 @@ async function loadFilteredFoods(
 
   if (slotErr) throw new Error("Failed to load slot types: " + slotErr.message);
 
-  // Build maps — only keep slot rows whose food_id is in our filtered set
-  const foodsById = new Map<string, FoodRecord>(filteredFoods.map((f) => [f.id, f]));
+  // Build maps — only keep slot rows whose food_id is in our final pool
+  const foodsById = new Map<string, FoodRecord>(finalPool.map((f) => [f.id, f]));
   const foodsBySlot = new Map<string, FoodRecord[]>();
 
   (slotRows ?? []).forEach((row: { food_id: string; slot_type: string }) => {
@@ -398,7 +495,7 @@ async function loadFilteredFoods(
   });
 
   console.log(
-    `[Generator] Loaded ${filteredFoods.length} foods across ${foodsBySlot.size} slot types`
+    `[Generator] Loaded ${finalPool.length} foods across ${foodsBySlot.size} slot types`
   );
 
   return { foodsById, foodsBySlot };
@@ -481,7 +578,11 @@ function fillTemplate(
   foodsBySlot: Map<string, FoodRecord[]>,
   usedFoodIds: Set<string>,
   fiberSoFar: number,
-  totalFiberTarget: number
+  totalFiberTarget: number,
+  requiredFoodIds: string[],
+  placedRequiredIds: Set<string>,
+  foodIdToSlotTypes: Map<string, string[]>,
+  foodsById: Map<string, FoodRecord>
 ): GeneratedOption | null {
   // Fiber lagging if we've used less than 60% of the daily fiber target so far —
   // a higher threshold (was 40%) so the bonus kicks in throughout the day
@@ -500,6 +601,29 @@ function fillTemplate(
   const picks: Pick[] = [];
 
   for (const slot of template.slots) {
+    // Required-food pass: place pinned foods with fewest compatible slots first
+    const unplacedRequired = requiredFoodIds.filter((id) => !placedRequiredIds.has(id));
+    const compatibleRequired = unplacedRequired.filter((id) =>
+      foodMatchesSlot(id, slot, foodIdToSlotTypes)
+    );
+
+    if (compatibleRequired.length > 0) {
+      // Pick the required food with fewest compatible slots in this template
+      const withCount = compatibleRequired.map((id) => ({
+        id,
+        count: template.slots.filter((s) => foodMatchesSlot(id, s, foodIdToSlotTypes)).length,
+      }));
+      withCount.sort((a, b) => a.count - b.count);
+      const pickedId = withCount[0].id;
+      const food = foodsById.get(pickedId);
+      if (food) {
+        placedRequiredIds.add(pickedId);
+        const portionG = roundTo5(clamp(slot.default_portion_g, slot.min_portion_g, slot.max_portion_g));
+        picks.push({ food, slot, portionG });
+        continue;
+      }
+    }
+
     const candidates = getCandidates(slot.slot_type, foodsBySlot, 1);
     if (candidates.length === 0) {
       if (slot.is_required) return null;
@@ -658,6 +782,7 @@ interface DailyState {
   fruitServings: number;
   usedFoodIds: Set<string>;
   usedTemplateIds: Set<string>;
+  placedRequiredIds: Set<string>;
 }
 
 function generateMeal(
@@ -667,9 +792,22 @@ function generateMeal(
   foodsBySlot: Map<string, FoodRecord[]>,
   config: GeneratorConfig,
   dailyState: DailyState,
-  optionsPerMeal: number
+  optionsPerMeal: number,
+  foodIdToSlotTypes: Map<string, string[]>,
+  foodsById: Map<string, FoodRecord>,
+  warningsSet: Set<string>
 ): GeneratedMeal | null {
-  const mealTemplates = allTemplates.get(mealType) ?? [];
+  let mealTemplates = allTemplates.get(mealType) ?? [];
+
+  // Filter by meal style when coach selects one
+  const selectedStyle =
+    mealType === "breakfast" ? config.breakfastStyle
+    : mealType === "lunch" ? config.lunchStyle
+    : mealType === "dinner" ? config.dinnerStyle
+    : config.snackStyle;
+  if (selectedStyle) {
+    mealTemplates = mealTemplates.filter((t) => templateMatchesStyle(t.name, selectedStyle));
+  }
 
   // Filter: remove incompatible templates
   const compatible = mealTemplates.filter((t) => {
@@ -683,6 +821,19 @@ function generateMeal(
       .filter((s) => s.is_required)
       .every((s) => getCandidates(s.slot_type, foodsBySlot, 1).length > 0);
   });
+
+  // Warn about skipped templates due to role-defining slots with no candidates
+  for (const t of compatible) {
+    if (viable.includes(t)) continue;
+    for (const s of t.slots.filter((sl) => sl.is_required)) {
+      if (getCandidates(s.slot_type, foodsBySlot, 1).length === 0) {
+        if ((NO_FALLBACK_SLOT_TYPES as readonly string[]).includes(s.slot_type)) {
+          warningsSet.add(`Skipped template "${t.name}": no ${s.slot_type} foods available`);
+        }
+        break;
+      }
+    }
+  }
 
   if (viable.length === 0) return null;
 
@@ -705,7 +856,11 @@ function generateMeal(
       foodsBySlot,
       dailyState.usedFoodIds,
       dailyState.fiberSoFar,
-      dailyState.totalFiberTarget
+      dailyState.totalFiberTarget,
+      config.requiredFoodIds,
+      dailyState.placedRequiredIds,
+      foodIdToSlotTypes,
+      foodsById
     );
 
     if (option) {
@@ -779,10 +934,19 @@ export async function generateMealPlanWithClient(
   const mealTargets = distributeCalories(targets, mealTypes);
 
   // 4. Load foods + templates in parallel (2 queries each = 4 total)
-  const [{ foodsById: _foodsById, foodsBySlot }, allTemplates] = await Promise.all([
-    loadFilteredFoods(sb, config.excludedTags, config.excludedFoodIds),
+  const [{ foodsById, foodsBySlot }, allTemplates] = await Promise.all([
+    loadFilteredFoods(sb, config.excludedTags, config.excludedFoodIds, config.requiredFoodIds),
     loadTemplates(sb),
   ]);
+
+  // Build reverse map: foodId -> slot types it can fill
+  const foodIdToSlotTypes = new Map<string, string[]>();
+  foodsBySlot.forEach((foods, slotType) => {
+    foods.forEach((f) => {
+      if (!foodIdToSlotTypes.has(f.id)) foodIdToSlotTypes.set(f.id, []);
+      foodIdToSlotTypes.get(f.id)!.push(slotType);
+    });
+  });
 
   // 5. Track daily state
   const dailyState: DailyState = {
@@ -792,7 +956,10 @@ export async function generateMealPlanWithClient(
     fruitServings: 0,
     usedFoodIds: new Set<string>(),
     usedTemplateIds: new Set<string>(),
+    placedRequiredIds: new Set<string>(),
   };
+
+  const warningsSet = new Set<string>();
 
   // 6. Generate each meal
   const meals: GeneratedMeal[] = [];
@@ -806,7 +973,10 @@ export async function generateMealPlanWithClient(
       foodsBySlot,
       config,
       dailyState,
-      config.optionsPerMeal
+      config.optionsPerMeal,
+      foodIdToSlotTypes,
+      foodsById,
+      warningsSet
     );
 
     if (meal) {
@@ -834,7 +1004,19 @@ export async function generateMealPlanWithClient(
   // 7. Build result
   const result = buildResult(meals, targets, config.tolerance, config);
 
-  // 8. Add warnings
+  // 8. Add warnings (Set first to avoid duplicates, then convert)
+  const unplaced = config.requiredFoodIds.filter((id) => !dailyState.placedRequiredIds.has(id));
+  if (unplaced.length > 0) {
+    const names = unplaced
+      .map((id) => foodsById.get(id)?.name ?? id)
+      .filter(Boolean)
+      .join(", ");
+    warningsSet.add(
+      `Required food(s) could not be placed: ${names || "unknown"}. No compatible slot in any template.`
+    );
+  }
+  result.warnings.push(...Array.from(warningsSet));
+
   if (dailyState.vegetableServings < 2) {
     result.warnings.push(`Only ${dailyState.vegetableServings} vegetable serving(s) — recommend at least 3`);
   }
@@ -857,6 +1039,134 @@ export async function generateMealPlanWithClient(
 /** Client-side entry (uses browser Supabase; can hang after tab background — prefer API route + generateMealPlanWithClient). */
 export async function generateMealPlan(config: GeneratorConfig): Promise<GenerateOutput> {
   return generateMealPlanWithClient(supabase, config);
+}
+
+// ============================================================================
+// PRE-GENERATION VALIDATION
+// ============================================================================
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/** Validates config before generation. Blocks impossible setups with clear messages.
+ * Uses the SAME loadFilteredFoods as generation: common foods + required union, exclusions applied.
+ * Avoids false negatives for must-have placement. */
+export async function validateGeneratorConfig(
+  sb: { from: (table: string) => ReturnType<typeof supabase.from> },
+  config: GeneratorConfig
+): Promise<ValidationResult> {
+  const errors: string[] = [];
+
+  const [allTemplates, { foodsById, foodsBySlot }] = await Promise.all([
+    loadTemplates(sb),
+    loadFilteredFoods(sb, config.excludedTags, config.excludedFoodIds, config.requiredFoodIds),
+  ]);
+
+  const mealTypes = assignMealTypes(config.mealCount);
+
+  const foodIdToSlotTypes = new Map<string, string[]>();
+  foodsBySlot.forEach((foods, slotType) => {
+    foods.forEach((f) => {
+      if (!foodIdToSlotTypes.has(f.id)) foodIdToSlotTypes.set(f.id, []);
+      foodIdToSlotTypes.get(f.id)!.push(slotType);
+    });
+  });
+
+  // 1. Check each meal type: if style selected and no templates match, block
+  for (const mealType of mealTypes) {
+    const selectedStyle =
+      mealType === "breakfast" ? config.breakfastStyle
+      : mealType === "lunch" ? config.lunchStyle
+      : mealType === "dinner" ? config.dinnerStyle
+      : config.snackStyle;
+
+    if (!selectedStyle) continue;
+
+    const baseTemplates = allTemplates.get(mealType) ?? [];
+    const styleFiltered = baseTemplates.filter((t) => templateMatchesStyle(t.name, selectedStyle));
+    const compatible = styleFiltered.filter((t) => {
+      if (config.excludedTags.length === 0) return true;
+      return !t.incompatible_tags.some((tag) => config.excludedTags.includes(tag));
+    });
+
+    if (compatible.length === 0) {
+      const mealLabel = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+      errors.push(
+        `${mealLabel} style "${selectedStyle}" has no matching templates. Try a different style or "No preference".`
+      );
+    }
+  }
+
+  // 2. Check each required food: can it fit in any valid template/slot?
+  for (const foodId of config.requiredFoodIds) {
+    const food = foodsById.get(foodId);
+    if (!food) {
+      errors.push(
+        `Must-have food (ID: ${foodId}) is not in the generation pool. It may be excluded by tags or not in the database.`
+      );
+      continue;
+    }
+
+    const foodSlotTypes = foodIdToSlotTypes.get(foodId) ?? [];
+    if (foodSlotTypes.length === 0) {
+      errors.push(
+        `"${food.name}" has no slot types assigned. It cannot be placed in any meal.`
+      );
+      continue;
+    }
+
+    let canPlace = false;
+    for (const mealType of mealTypes) {
+      const selectedStyle =
+        mealType === "breakfast" ? config.breakfastStyle
+        : mealType === "lunch" ? config.lunchStyle
+        : mealType === "dinner" ? config.dinnerStyle
+        : config.snackStyle;
+
+      let templates = allTemplates.get(mealType) ?? [];
+      if (selectedStyle) {
+        templates = templates.filter((t) => templateMatchesStyle(t.name, selectedStyle));
+      }
+      templates = templates.filter((t) => {
+        if (config.excludedTags.length === 0) return true;
+        return !t.incompatible_tags.some((tag) => config.excludedTags.includes(tag));
+      });
+
+      for (const t of templates) {
+        for (const slot of t.slots) {
+          if (foodMatchesSlot(foodId, slot, foodIdToSlotTypes)) {
+            const candidates = getCandidates(slot.slot_type, foodsBySlot, 1);
+            if (candidates.some((c) => c.id === foodId)) {
+              canPlace = true;
+              break;
+            }
+          }
+        }
+        if (canPlace) break;
+      }
+      if (canPlace) break;
+    }
+
+    if (!canPlace) {
+      const styleHint =
+        mealTypes.some((mt) => {
+          const s = mt === "breakfast" ? config.breakfastStyle : mt === "lunch" ? config.lunchStyle : mt === "dinner" ? config.dinnerStyle : config.snackStyle;
+          return !!s;
+        })
+          ? " Add a lunch/dinner style like plated, rice_bowl, wrap, or salad, or remove this from must-have foods."
+          : " Add a lunch or dinner meal, or remove this from must-have foods.";
+      errors.push(
+        `"${food.name}" cannot be placed with the current setup.${styleHint}`
+      );
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }
 
 // ============================================================================

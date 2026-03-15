@@ -1097,7 +1097,7 @@ export class WorkoutTemplateService {
           week_number: weekNumber,
           template_id: templateId,
           training_block_id: row.training_block_id ?? null,
-          is_optional: false, // Default value since column doesn't exist in DB
+          is_optional: row.is_optional ?? false,
           is_active: row.is_active ?? true,
           notes: row.notes,
           template_name: row.template_name ?? undefined,
@@ -1535,6 +1535,7 @@ export class WorkoutTemplateService {
           .from('program_schedule')
           .update({
             template_id: templateId,
+            is_optional: isOptional,
             updated_at: new Date().toISOString(),
             // Ensure training_block_id is stamped on update so migrated rows
             // (which had it set via SQL UPDATE) stay correctly attributed
@@ -1559,6 +1560,7 @@ export class WorkoutTemplateService {
             day_of_week: dayOfWeek,
             week_number: weekNumber,
             template_id: templateId,
+            is_optional: isOptional,
             ...(trainingBlockId ? { training_block_id: trainingBlockId } : {}),
           })
           .select('*')

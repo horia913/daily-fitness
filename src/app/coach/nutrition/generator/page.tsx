@@ -74,6 +74,42 @@ interface SwapModalState {
 
 type Step = 1 | 2 | 3;
 
+const MEAL_STYLE_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  breakfast: [
+    { value: "", label: "No preference" },
+    { value: "smoothie", label: "Smoothie" },
+    { value: "yogurt_bowl", label: "Yogurt bowl" },
+    { value: "oats_bowl", label: "Oats bowl" },
+    { value: "eggs_breakfast", label: "Eggs" },
+    { value: "toast_sandwich", label: "Toast / sandwich" },
+  ],
+  lunch: [
+    { value: "", label: "No preference" },
+    { value: "rice_bowl", label: "Rice bowl" },
+    { value: "wrap", label: "Wrap" },
+    { value: "salad", label: "Salad" },
+    { value: "sandwich", label: "Sandwich" },
+    { value: "plated", label: "Plated" },
+    { value: "pasta", label: "Pasta" },
+  ],
+  dinner: [
+    { value: "", label: "No preference" },
+    { value: "salad", label: "Salad" },
+    { value: "rice_bowl", label: "Rice bowl" },
+    { value: "plated", label: "Plated" },
+    { value: "pasta", label: "Pasta" },
+    // wrap, soup: no dinner templates — removed to avoid impossible selection
+  ],
+  snack: [
+    { value: "", label: "No preference" },
+    { value: "smoothie", label: "Smoothie" },
+    { value: "yogurt_bowl", label: "Yogurt bowl" },
+    { value: "fruit_protein", label: "Fruit + protein" },
+    { value: "quick_snack", label: "Quick snack" },
+    // sandwich: no snack templates — removed
+  ],
+};
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -358,6 +394,10 @@ export default function GeneratorPage() {
   const [selectedPresets, setSelectedPresets] = useState<Set<string>>(new Set());
   const [excludedFoods, setExcludedFoods] = useState<FoodSearchResult[]>([]);
   const [requiredFoods, setRequiredFoods] = useState<FoodSearchResult[]>([]);
+  const [breakfastStyle, setBreakfastStyle] = useState<string>("");
+  const [lunchStyle, setLunchStyle] = useState<string>("");
+  const [dinnerStyle, setDinnerStyle] = useState<string>("");
+  const [snackStyle, setSnackStyle] = useState<string>("");
   // Tracks whether the Supabase session has been refreshed for this mount.
   // On client-side navigation the middleware does NOT run, so the access token
   // can be stale. We refresh once per mount before any query runs.
@@ -437,6 +477,10 @@ export default function GeneratorPage() {
       excludedFoodIds: excludedFoods.map((f) => f.id),
       requiredFoodIds: requiredFoods.map((f) => f.id),
       tolerance: 0.07,
+      breakfastStyle: breakfastStyle || null,
+      lunchStyle: lunchStyle || null,
+      dinnerStyle: dinnerStyle || null,
+      snackStyle: snackStyle || null,
     };
 
     try {
@@ -452,7 +496,11 @@ export default function GeneratorPage() {
       if (cancelledRef.current) return;
       const data = await res.json();
       if (!res.ok) {
-        setGenerationError(data?.error ?? res.statusText ?? "Generation failed.");
+        const validationErrors = data?.validationErrors as string[] | undefined;
+        const msg = validationErrors?.length
+          ? [data?.error ?? "Configuration invalid", ...validationErrors].join("\n")
+          : data?.error ?? res.statusText ?? "Generation failed.";
+        setGenerationError(msg);
         return;
       }
       setResult(data.result);
@@ -792,6 +840,68 @@ export default function GeneratorPage() {
                 </div>
               </GlassCard>
 
+              {/* Meal styles — optional per meal type */}
+              <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-4">
+                <div>
+                  <Label className="text-[color:var(--fc-text-primary)] font-semibold">Meal Styles</Label>
+                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
+                    Optionally restrict each meal type to a specific style. Leave as &quot;No preference&quot; for maximum variety.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-[color:var(--fc-text-dim)]">Breakfast</Label>
+                    <select
+                      value={breakfastStyle}
+                      onChange={(e) => setBreakfastStyle(e.target.value)}
+                      className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                    >
+                      {MEAL_STYLE_OPTIONS.breakfast.map((o) => (
+                        <option key={o.value || "_none"} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-[color:var(--fc-text-dim)]">Lunch</Label>
+                    <select
+                      value={lunchStyle}
+                      onChange={(e) => setLunchStyle(e.target.value)}
+                      className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                    >
+                      {MEAL_STYLE_OPTIONS.lunch.map((o) => (
+                        <option key={o.value || "_none"} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-[color:var(--fc-text-dim)]">Dinner</Label>
+                    <select
+                      value={dinnerStyle}
+                      onChange={(e) => setDinnerStyle(e.target.value)}
+                      className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                    >
+                      {MEAL_STYLE_OPTIONS.dinner.map((o) => (
+                        <option key={o.value || "_none"} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {mealCount >= 4 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-[color:var(--fc-text-dim)]">Snack</Label>
+                      <select
+                        value={snackStyle}
+                        onChange={(e) => setSnackStyle(e.target.value)}
+                        className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                      >
+                        {MEAL_STYLE_OPTIONS.snack.map((o) => (
+                          <option key={o.value || "_none"} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </GlassCard>
+
               {/* Exclude specific foods — separate card so dropdown is never clipped */}
               <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-3">
                 <div>
@@ -892,9 +1002,13 @@ export default function GeneratorPage() {
                 <GlassCard elevation={2} className="fc-glass fc-card p-6">
                   <div className="flex items-start gap-3 text-[color:var(--fc-status-error)]">
                     <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold">Generation Failed</p>
-                      <p className="text-sm mt-1 text-[color:var(--fc-text-dim)]">{generationError}</p>
+                      <div className="text-sm mt-1 text-[color:var(--fc-text-dim)] space-y-1">
+                        {generationError.split("\n").map((line, i) => (
+                          <p key={i}>{line}</p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-3 mt-4">

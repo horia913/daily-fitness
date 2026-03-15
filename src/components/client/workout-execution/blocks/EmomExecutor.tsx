@@ -386,6 +386,7 @@ export function EmomExecutor({
         emom_minute_number: currentMinute,
         emom_mode: emomMode,
         emom_reps_per_round: emomMode === "target_reps" ? targetReps : null,
+        isLastSet: currentMinute >= durationMinutes,
       };
 
       // Only add fields if they're defined

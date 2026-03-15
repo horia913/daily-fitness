@@ -25,6 +25,7 @@ export interface ProgramWeekDayCard {
   workoutName: string
   estimatedDuration: number
   isCompleted: boolean
+  isOptional?: boolean
 }
 
 export interface OverdueSlotCard {
@@ -37,6 +38,7 @@ export interface OverdueSlotCard {
   workoutName: string
   estimatedDuration: number
   isCompleted: boolean
+  isOptional?: boolean
 }
 
 export interface ProgramWeekState {
@@ -159,6 +161,7 @@ export async function buildProgramWeekState(
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
       isCompleted: completedScheduleIds.has(slot.id),
+      isOptional: slot.is_optional ?? false,
     }
   }
 
@@ -185,6 +188,7 @@ export async function buildProgramWeekState(
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
       isCompleted: completedScheduleIds.has(slot.id),
+      isOptional: slot.is_optional ?? false,
     }
   })
 

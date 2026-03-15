@@ -3,6 +3,7 @@
  * Handles real-time dashboard data: streak, weekly progress
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
 export interface DashboardStats {
@@ -65,6 +66,48 @@ export async function calculateStreak(clientId: string): Promise<number> {
     return streak;
   } catch (error) {
     console.error('Error calculating streak:', error);
+    return 0;
+  }
+}
+
+/**
+ * Server-side: same as calculateStreak but uses the provided Supabase client (e.g. server client in API routes).
+ */
+export async function calculateStreakWithClient(
+  sb: SupabaseClient,
+  clientId: string
+): Promise<number> {
+  try {
+    const { data: logs, error } = await sb
+      .from('workout_logs')
+      .select('completed_at')
+      .eq('client_id', clientId)
+      .not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false });
+
+    if (error || !logs || logs.length === 0) return 0;
+
+    const uniqueDates = Array.from(
+      new Set(logs.map((log) => new Date(log.completed_at!).toISOString().split('T')[0]))
+    ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+    if (uniqueDates.length === 0) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) return 0;
+
+    let streak = 1;
+    let expectedDate = new Date(uniqueDates[0]);
+    for (let i = 1; i < uniqueDates.length; i++) {
+      expectedDate.setDate(expectedDate.getDate() - 1);
+      const expectedDateStr = expectedDate.toISOString().split('T')[0];
+      if (uniqueDates[i] === expectedDateStr) streak++;
+      else break;
+    }
+    return streak;
+  } catch (error) {
+    console.error('Error calculating streak (server):', error);
     return 0;
   }
 }
@@ -135,6 +178,63 @@ export async function calculateWeeklyProgress(clientId: string): Promise<{ curre
     return { current, goal };
   } catch (error) {
     console.error('Error calculating weekly progress:', error);
+    return { current: 0, goal: 0 };
+  }
+}
+
+/**
+ * Server-side: same as calculateWeeklyProgress but uses the provided Supabase client (e.g. server client in API routes).
+ */
+export async function calculateWeeklyProgressWithClient(
+  sb: SupabaseClient,
+  clientId: string
+): Promise<{ current: number; goal: number }> {
+  try {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const { data: completedLogs, error: logError } = await sb
+      .from('workout_logs')
+      .select('id, completed_at')
+      .eq('client_id', clientId)
+      .not('completed_at', 'is', null)
+      .gte('completed_at', monday.toISOString())
+      .lte('completed_at', sunday.toISOString());
+
+    if (logError) console.error('Error fetching completed logs:', logError);
+    const current = completedLogs?.length || 0;
+
+    const { getProgramState } = await import('./programStateService');
+    const programState = await getProgramState(sb, clientId);
+
+    if (programState.assignment && programState.slots.length > 0) {
+      const currentWeekSlots = programState.slots.filter(
+        (s) => s.week_number === programState.currentWeekNumber
+      ).length;
+      return { current, goal: currentWeekSlots };
+    }
+
+    const mondayStr = monday.toISOString().split('T')[0];
+    const sundayStr = sunday.toISOString().split('T')[0];
+    const { data: assignments, error: assignError } = await sb
+      .from('workout_assignments')
+      .select('id')
+      .eq('client_id', clientId)
+      .gte('scheduled_date', mondayStr)
+      .lte('scheduled_date', sundayStr);
+
+    if (assignError) console.error('Error fetching assignments:', assignError);
+    const goal = assignments?.length || 0;
+    return { current, goal };
+  } catch (error) {
+    console.error('Error calculating weekly progress (server):', error);
     return { current: 0, goal: 0 };
   }
 }

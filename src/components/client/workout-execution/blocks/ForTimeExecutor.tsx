@@ -547,6 +547,7 @@ export function ForTimeExecutor({
         fortime_time_taken_sec: completionTimeToLog,
         fortime_time_cap_sec: timeCapMinutes * 60,
         fortime_target_reps: targetReps || null,
+        isLastSet: true, // For-time is single set per block
       };
 
       // Include exercise_id if available (optional for fortime blocks)

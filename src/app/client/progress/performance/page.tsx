@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -113,7 +113,31 @@ function PerformancePageContent() {
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TestType>("1km_run");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadData = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setLoadError(null);
+    setLoadingStartedAt(Date.now());
+    try {
+      const [run, step] = await Promise.all([
+        getClientPerformanceTests(user.id, "1km_run"),
+        getClientPerformanceTests(user.id, "step_test"),
+      ]);
+      setRunTests(run);
+      setStepTests(step);
+    } catch (err) {
+      console.error("Error loading performance tests:", err);
+      setLoadError(err instanceof Error ? err.message : "Failed to load performance data");
+      setRunTests([]);
+      setStepTests([]);
+    } finally {
+      setLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -123,7 +147,7 @@ function PerformancePageContent() {
       setLoading(false);
       setLoadError("Loading took too long. Tap Retry to try again.");
     }, 20_000);
-    loadTests().finally(() => {
+    loadData().finally(() => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -135,24 +159,7 @@ function PerformancePageContent() {
         timeoutRef.current = null;
       }
     };
-  }, [user, authLoading]);
-
-  const loadTests = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      const [runs, steps] = await Promise.all([
-        getClientPerformanceTests(user.id, "1km_run"),
-        getClientPerformanceTests(user.id, "step_test"),
-      ]);
-      setRunTests(runs);
-      setStepTests(steps);
-    } catch (error) {
-      console.error("Error loading performance tests:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadData, user, authLoading]);
 
   const currentTests = selectedType === "1km_run" ? runTests : stepTests;
   const runTrendPercent = getTrendPercent(runTests, "1km_run");
@@ -168,7 +175,7 @@ function PerformancePageContent() {
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-12 fc-page max-w-4xl mx-auto">
             <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              <button type="button" onClick={() => { setLoadError(null); loadData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -474,7 +481,7 @@ function PerformancePageContent() {
           clientId={user.id}
           testType={selectedType}
           onClose={() => setShowLogModal(false)}
-          onSuccess={() => loadTests()}
+          onSuccess={() => loadData()}
         />
       )}
     </AnimatedBackground>

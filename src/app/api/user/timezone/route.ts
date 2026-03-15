@@ -9,6 +9,9 @@
  * - User ID from supabase.auth.getUser() (session; equivalent to auth.uid() in DB).
  * - Update is explicitly scoped with .eq('id', user.id). RLS profiles_update_own
  *   (id = auth.uid()) also enforces this at the database level.
+ *
+ * Performance: Validation MUST remain client-side (regex only). Do NOT use pg_timezone_names
+ * or any DB call for timezone validation — that would add ~949ms per request.
  */
 
 import { NextRequest, NextResponse } from 'next/server'

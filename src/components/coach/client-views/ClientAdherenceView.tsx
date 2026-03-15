@@ -64,20 +64,23 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           const weekNum = progress?.current_week_number ?? 1
           const { data: slots } = await supabase
             .from('program_schedule')
-            .select('id')
+            .select('id, is_optional')
             .eq('program_id', assignment.program_id)
             .eq('week_number', weekNum)
-          const assigned = slots?.length ?? 0
+          const requiredSlots = (slots || []).filter((s: { is_optional?: boolean }) => !s.is_optional)
+          const assigned = requiredSlots.length
+          const requiredScheduleIds = new Set(requiredSlots.map((s: { id: string }) => s.id))
           const { data: completions } = await supabase
             .from('program_day_completions')
             .select('id, program_schedule_id, program_schedule!inner(week_number)')
             .eq('program_assignment_id', assignment.id)
-          const completedInWeek = (completions || []).filter((c: { program_schedule?: { week_number?: number } | { week_number?: number }[] }) => {
+          const completedInWeek = (completions || []).filter((c: { program_schedule_id: string; program_schedule?: { week_number?: number } | { week_number?: number }[] }) => {
             const ps = (c as { program_schedule?: { week_number?: number } | { week_number?: number }[] }).program_schedule
             const weekNumVal = Array.isArray(ps) ? ps[0]?.week_number : ps?.week_number
             return (weekNumVal ?? 0) === weekNum
-          }).length
-          const completed = Math.min(assigned, completedInWeek)
+          })
+          const completedRequired = completedInWeek.filter((c: { program_schedule_id: string }) => requiredScheduleIds.has(c.program_schedule_id)).length
+          const completed = Math.min(assigned, completedRequired)
           workoutAdherence = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
           weeklyAverage = workoutAdherence
           thisWeek = { completed, missed: Math.max(0, assigned - completed), total: assigned }

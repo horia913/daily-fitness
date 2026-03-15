@@ -87,13 +87,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // SECURITY: Validate that client_id matches authenticated user
-    // This prevents users from logging sets for other clients
-    if (client_id && client_id !== userId) {
-      console.error("❌ Security violation: client_id mismatch", { client_id, userId });
-      return createForbiddenResponse('Cannot log sets for another user')
+    // SECURITY: Determine effective client for the insert
+    // - If client_id === userId: self-log (client logging own sets)
+    // - If client_id !== userId: coach logging for client — verify coach relationship
+    let effectiveClientId = userId
+    if (client_id) {
+      if (client_id === userId) {
+        effectiveClientId = userId
+      } else {
+        // Coach path: verify coach–client relationship before allowing log
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (!supabaseServiceKey) {
+          console.error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+          return NextResponse.json({ error: 'Server configuration error' }, { status: 503 })
+        }
+        supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+          global: { fetch: getTrackedFetch() },
+        })
+        const { data: clientRow } = await supabaseAdmin
+          .from('clients')
+          .select('client_id')
+          .eq('client_id', client_id)
+          .eq('coach_id', userId)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (!clientRow) {
+          console.error("❌ Coach not authorized to log for client", { client_id, coachId: userId })
+          return createForbiddenResponse('Not authorized to log sets for this client')
+        }
+        effectiveClientId = client_id
+      }
     }
-    
+
     // Ensure we have admin client
     if (!supabaseAdmin) {
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -170,7 +195,7 @@ export async function POST(req: NextRequest) {
           .from('workout_logs')
           .select('workout_assignment_id')
           .eq('id', workout_log_id)
-          .eq('client_id', userId)
+          .eq('client_id', effectiveClientId)
           .maybeSingle();
 
         if (logError) {
@@ -216,7 +241,7 @@ export async function POST(req: NextRequest) {
         .from('workout_assignments')
         .select('id, workout_template_id, client_id')
         .eq('id', actualWorkoutAssignmentId)
-        .eq('client_id', userId)
+        .eq('client_id', effectiveClientId)
         .maybeSingle();
 
       if (assignmentError) {
@@ -280,7 +305,7 @@ export async function POST(req: NextRequest) {
         const { data: rawUnlinked, error: unlinkedError } = await supabaseAdmin
           .from('workout_logs')
           .select('id, started_at, completed_at, workout_session_id')
-          .eq('client_id', userId)
+          .eq('client_id', effectiveClientId)
           .eq('workout_assignment_id', actualWorkoutAssignmentId)
           .is('completed_at', null)
           .is('workout_session_id', null)
@@ -309,7 +334,7 @@ export async function POST(req: NextRequest) {
       const { data: allLogsForAssignment, count } = await supabaseAdmin
         .from('workout_logs')
         .select('id, started_at, completed_at', { count: 'exact' })
-        .eq('client_id', userId)
+        .eq('client_id', effectiveClientId)
         .eq('workout_assignment_id', actualWorkoutAssignmentId)
         .order('started_at', { ascending: false })
         .limit(10);
@@ -335,7 +360,7 @@ export async function POST(req: NextRequest) {
           completed_at: null;
           workout_session_id?: string;
         } = {
-          client_id: userId,
+          client_id: effectiveClientId,
           workout_assignment_id: actualWorkoutAssignmentId,
           started_at: new Date().toISOString(),
           completed_at: null,
@@ -417,7 +442,7 @@ export async function POST(req: NextRequest) {
 
     // Build insert data - workout_log_id is REQUIRED (NOT NULL constraint)
     const insertData: any = {
-      client_id: userId,
+      client_id: effectiveClientId,
       set_entry_id,
       workout_log_id: workoutLogId, // REQUIRED - always set at this point
       set_type: blockType,
@@ -520,16 +545,32 @@ export async function POST(req: NextRequest) {
 
         case 'dropset': {
           insertData.set_number = body.set_number || 1
-          insertData.dropset_initial_weight = parseNumber(body.dropset_initial_weight)
-          insertData.dropset_initial_reps = parseIntNumber(body.dropset_initial_reps)
-          insertData.dropset_final_weight = parseNumber(body.dropset_final_weight)
-          insertData.dropset_final_reps = parseIntNumber(body.dropset_final_reps)
-          insertData.dropset_percentage = parseNumber(body.dropset_percentage)
+          const dropsArray = Array.isArray(body.dropset_drops) ? body.dropset_drops : null
+          if (dropsArray && dropsArray.length >= 2) {
+            insertData.dropset_drops = dropsArray.map((d: { weight?: number; reps?: number }) => ({
+              weight: parseNumber(d.weight),
+              reps: parseIntNumber(d.reps),
+            }))
+            const first = dropsArray[0]
+            const last = dropsArray[dropsArray.length - 1]
+            insertData.dropset_initial_weight = parseNumber(first?.weight)
+            insertData.dropset_initial_reps = parseIntNumber(first?.reps)
+            insertData.dropset_final_weight = parseNumber(last?.weight)
+            insertData.dropset_final_reps = parseIntNumber(last?.reps)
+            insertData.dropset_percentage = insertData.dropset_initial_weight && insertData.dropset_final_weight
+              ? ((insertData.dropset_initial_weight - insertData.dropset_final_weight) / insertData.dropset_initial_weight) * 100
+              : null
+          } else {
+            insertData.dropset_initial_weight = parseNumber(body.dropset_initial_weight)
+            insertData.dropset_initial_reps = parseIntNumber(body.dropset_initial_reps)
+            insertData.dropset_final_weight = parseNumber(body.dropset_final_weight)
+            insertData.dropset_final_reps = parseIntNumber(body.dropset_final_reps)
+            insertData.dropset_percentage = parseNumber(body.dropset_percentage)
+          }
 
-          // Use initial weight/reps for e1RM
           primaryExerciseId = body.exercise_id || null
-          primaryWeight = parseNumber(body.dropset_initial_weight)
-          primaryReps = parseIntNumber(body.dropset_initial_reps)
+          primaryWeight = parseNumber(insertData.dropset_initial_weight)
+          primaryReps = parseIntNumber(insertData.dropset_initial_reps)
           if (body.exercise_id) {
             insertData.exercise_id = body.exercise_id
           }
@@ -800,7 +841,7 @@ export async function POST(req: NextRequest) {
         .select(
           'user_id, exercise_id, estimated_1rm, best_weight, best_reps, best_volume, best_volume_weight, best_volume_reps'
         )
-        .eq('user_id', userId)
+        .eq('user_id', effectiveClientId)
         .in('exercise_id', Array.from(exerciseIdsForMetrics))
 
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -858,7 +899,7 @@ export async function POST(req: NextRequest) {
       }
 
       updatedMetricsByExercise.set(entry.exercise_id, {
-        user_id: userId,
+        user_id: effectiveClientId,
         exercise_id: entry.exercise_id,
         estimated_1rm: existing?.estimated_1rm ?? null,
         best_weight: bestWeight,
@@ -938,7 +979,7 @@ export async function POST(req: NextRequest) {
           const { data: strengthGoals } = await (supabaseAdmin as any)
             .from('goals')
             .select('id, title')
-            .eq('client_id', userId)
+            .eq('client_id', effectiveClientId)
             .eq('status', 'active')
             .or(`title.ilike.%${exercise.name}%,title.ilike.%bench%,title.ilike.%squat%,title.ilike.%deadlift%,title.ilike.%hip thrust%`)
 
@@ -998,7 +1039,7 @@ export async function POST(req: NextRequest) {
             workoutAssignmentId = workoutLog?.workout_assignment_id || undefined
           }
           
-          const prResult = await checkAndStorePR(userId, {
+          const prResult = await checkAndStorePR(effectiveClientId, {
             exercise_id: primaryExerciseId,
             weight: primaryWeight,
             reps: primaryReps,
@@ -1031,7 +1072,7 @@ export async function POST(req: NextRequest) {
     if (storedPRResults.length > 0) {
       try {
         const { AchievementService } = await import('@/lib/achievementService')
-        const unlocked = await AchievementService.checkAndUnlockAchievements(userId, 'pr_count')
+        const unlocked = await AchievementService.checkAndUnlockAchievements(effectiveClientId, 'pr_count')
         for (const a of unlocked) {
           newAchievements.push({
             templateId: a.templateId,
@@ -1049,7 +1090,7 @@ export async function POST(req: NextRequest) {
       for (const stored of storedPRResults) {
         try {
           const { updateLeaderboardForClient } = await import('@/lib/leaderboardPopulationService')
-          await updateLeaderboardForClient(userId, stored.exercise_id, supabaseAdmin)
+          await updateLeaderboardForClient(effectiveClientId, stored.exercise_id, supabaseAdmin)
         } catch (lbErr) {
           console.error('Leaderboard update after PR (non-blocking):', lbErr)
         }
@@ -1083,6 +1124,17 @@ export async function POST(req: NextRequest) {
         message: prMessage,
         stored_prs: storedPRResults,
       },
+      pr_detected:
+        storedPRResults.length > 0
+          ? {
+              type: storedPRResults[0].prResult.prType ?? 'weight',
+              exercise_name: storedPRResults[0].exercise_name,
+              new_value: storedPRResults[0].prResult.pr?.record_value,
+              previous_value:
+                storedPRResults[0].prResult.pr?.previous_record_value ?? null,
+              unit: storedPRResults[0].prResult.pr?.record_unit ?? 'kg',
+            }
+          : null,
       new_achievements: newAchievements,
     }
 

@@ -283,7 +283,7 @@ export function PRTimelineChart({
                   const isHovered = hoveredIndex === i;
                   const isLast = i === chartData.length - 1;
                   return (
-                    <g key={`${point.date}-${point.weight}`}>
+                    <g key={`${point.date}-${point.weight}-${i}`}>
                       <circle
                         cx={x}
                         cy={y}

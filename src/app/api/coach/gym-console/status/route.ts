@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const sessionIds = (sessions ?? []).map((s: { id: string }) => s.id)
     const sessionByClient = new Map(
-      (sessions ?? []).map((s: { client_id: string; id: string; started_at: string }) => [s.client_id, s])
+      (sessions ?? []).map((s: { client_id: string; id: string; started_at: string; assignment_id?: string }) => [s.client_id, s])
     )
 
     // Workout logs for these sessions
@@ -181,6 +181,8 @@ export async function POST(request: NextRequest) {
       } | null = null
       let activeSession: {
         sessionId: string
+        workoutLogId: string
+        workoutAssignmentId: string
         startedAt: string
         currentBlock: number
         currentExercise: string
@@ -227,6 +229,8 @@ export async function POST(request: NextRequest) {
         }
         activeSession = {
           sessionId: session.id,
+          workoutLogId: log?.id ?? '',
+          workoutAssignmentId: session.assignment_id ?? '',
           startedAt: session.started_at,
           currentBlock,
           currentExercise,

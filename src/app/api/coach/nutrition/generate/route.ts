@@ -4,11 +4,15 @@
  * Runs meal plan generation on the server to avoid browser Supabase client
  * hanging after tab background/foreground (see supabase#36046).
  * Body: GeneratorConfig (JSON). Returns { result, foodsBySlot } (foodsBySlot as plain object).
+ * Pre-validates config before generation; returns 400 with validationErrors if impossible.
  */
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { generateMealPlanWithClient } from "@/lib/mealPlanGeneratorService";
+import {
+  generateMealPlanWithClient,
+  validateGeneratorConfig,
+} from "@/lib/mealPlanGeneratorService";
 import type { GeneratorConfig } from "@/lib/mealPlanGeneratorService";
 
 export async function POST(request: Request) {
@@ -29,6 +33,17 @@ export async function POST(request: Request) {
     if (!config || typeof config.mealCount !== "number" || typeof config.targetKcal !== "number") {
       return NextResponse.json(
         { error: "Invalid config: mealCount and targetKcal required" },
+        { status: 400 }
+      );
+    }
+
+    const validation = await validateGeneratorConfig(supabase, config);
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Configuration is invalid. Please fix the issues below.",
+          validationErrors: validation.errors,
+        },
         { status: 400 }
       );
     }

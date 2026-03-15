@@ -456,11 +456,10 @@ export const mobileCSS = {
  */
 export const preventBackgroundScroll = (): void => {
   if (!isBrowser()) return
-  
+
   const body = document.body
   if (body) {
-    body.classList.add('modal-open')
-    // Only prevent background scroll, don't interfere with modal content
+    body.classList.add('fc-modal-open')
     body.style.overflow = 'hidden'
   }
 }
@@ -470,10 +469,10 @@ export const preventBackgroundScroll = (): void => {
  */
 export const restoreBackgroundScroll = (): void => {
   if (!isBrowser()) return
-  
+
   const body = document.body
   if (body) {
-    body.classList.remove('modal-open')
+    body.classList.remove('fc-modal-open')
     body.style.overflow = ''
   }
 }

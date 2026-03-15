@@ -135,15 +135,16 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
   if (assignment?.id) {
     const [{ data: progress }, { data: schedule }, { data: completions }] = await Promise.all([
       supabase.from("program_progress").select("current_week_number").eq("program_assignment_id", assignment.id).single(),
-      supabase.from("program_schedule").select("id, week_number").eq("program_id", assignment.program_id),
+      supabase.from("program_schedule").select("id, week_number, is_optional").eq("program_id", assignment.program_id),
       supabase.from("program_day_completions").select("program_schedule_id, program_schedule(week_number)").eq("program_assignment_id", assignment.id),
     ]);
     const weekNum = progress?.current_week_number ?? 1;
     const durationWeeks = assignment.duration_weeks ?? 12;
     programProgress = { weekNum, totalWeeks: durationWeeks, pct: durationWeeks > 0 ? Math.round((weekNum / durationWeeks) * 100) : 0 };
     const slotsThisWeek = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === weekNum);
-    scheduledThisWeek = slotsThisWeek.length;
-    const slotIds = new Set(slotsThisWeek.map((s: { id: string }) => s.id));
+    const requiredSlotsThisWeek = slotsThisWeek.filter((s: { is_optional?: boolean }) => !s.is_optional);
+    scheduledThisWeek = requiredSlotsThisWeek.length;
+    const slotIds = new Set(requiredSlotsThisWeek.map((s: { id: string }) => s.id));
     completedThisWeek = (completions ?? []).filter((c: { program_schedule_id: string }) => slotIds.has(c.program_schedule_id)).length;
     programAdherenceThisWeek = scheduledThisWeek > 0 ? Math.round((completedThisWeek / scheduledThisWeek) * 100) : null;
   }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { ModalPortal } from '@/components/ui/ModalPortal'
+import { preventBackgroundScroll, restoreBackgroundScroll } from '@/lib/mobile-compatibility'
 import { 
   X, 
   Plus, 
@@ -81,6 +83,15 @@ export default function ExerciseAlternativesModal({
       loadAlternatives()
     }
   }, [isOpen, exercise.id])
+
+  useEffect(() => {
+    if (isOpen) {
+      preventBackgroundScroll()
+    } else {
+      restoreBackgroundScroll()
+    }
+    return () => restoreBackgroundScroll()
+  }, [isOpen])
 
   const loadAlternatives = async () => {
     setLoading(true)
@@ -177,9 +188,10 @@ export default function ExerciseAlternativesModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-24 bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div 
-        className="fc-modal fc-card w-full overflow-hidden flex flex-col"
+    <ModalPortal isOpen={isOpen}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-24 bg-black/60 backdrop-blur-sm">
+        <div 
+          className="fc-modal fc-card w-full overflow-hidden flex flex-col"
         style={{ 
           maxWidth: 'min(95vw, 50rem)',
           maxHeight: 'min(85vh, calc(100vh - 7rem))',
@@ -470,6 +482,7 @@ export default function ExerciseAlternativesModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

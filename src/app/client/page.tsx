@@ -7,10 +7,9 @@
  * This ensures the page is always functional, even if data fetching hangs or fails.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell, ClientGlassCard } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import { AthleteScoreRing } from "@/components/client-ui/AthleteScoreRing";
 import { ScoreBreakdown } from "@/components/client-ui/ScoreBreakdown";
 import { AthleteScore } from "@/types/athleteScore";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Flame,
   Dumbbell,
@@ -29,16 +27,10 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
-import {
-  getTodayLog,
-  getCheckinStreak,
-  dbToUiScale,
-  DailyWellnessLog,
-} from "@/lib/wellnessService";
+import { dbToUiScale, DailyWellnessLog } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
-import { useToast } from "@/components/ui/toast-provider";
-import { getMilestoneData } from "@/lib/progressStatsService";
-import { checkMilestoneToasts } from "@/lib/milestoneToasts";
+import { usePageData } from "@/hooks/usePageData";
+import { supabase } from "@/lib/supabase";
 
 interface DashboardData {
   avatarUrl: string | null;
@@ -67,6 +59,16 @@ interface DashboardData {
     latestAchievement: { name: string; icon: string | null; tier: string | null } | null;
     bestLeaderboardRank: { rank: number; exerciseName?: string | null } | null;
   };
+}
+
+interface DashboardPageData {
+  dashboard: DashboardData | null;
+  athleteScore: AthleteScore | null;
+  scoreHistory: { date: string; score: number }[];
+  hasCheckInToday: boolean | null;
+  todayWellnessLog: DailyWellnessLog | null;
+  checkinStreak: number;
+  scoreError: string | null;
 }
 
 function formatDate(): string {
@@ -110,183 +112,93 @@ function getSorenessLabel(dbValue: number | null | undefined): string {
 }
 
 
+/** Single source: one RPC returns everything the dashboard UI needs. */
+async function fetchDashboardPageData(_userId: string): Promise<DashboardPageData> {
+  const { data, error } = await supabase.rpc("get_client_dashboard");
+  if (error) {
+    if (error.message?.includes("Not authenticated")) {
+      throw new Error("Unauthorized");
+    }
+    throw new Error(error.message || "Failed to load dashboard");
+  }
+  return mapDashboardRpcResponse((data ?? null) as Record<string, unknown> | null);
+}
+
+function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): DashboardPageData {
+  if (!rpc) {
+    return {
+      dashboard: null,
+      athleteScore: null,
+      scoreHistory: [],
+      hasCheckInToday: null,
+      todayWellnessLog: null,
+      checkinStreak: 0,
+      scoreError: null,
+    };
+  }
+
+  const dashboard: DashboardData | null = {
+    avatarUrl: (rpc.avatarUrl as string) ?? null,
+    firstName: (rpc.firstName as string) ?? null,
+    streak: Number(rpc.streak) ?? 0,
+    weeklyProgress:
+      (rpc.weeklyProgress as { current: number; goal: number }) ?? { current: 0, goal: 0 },
+    todaysWorkout: (rpc.todaysWorkout as DashboardData["todaysWorkout"]) ?? { hasWorkout: false },
+    programProgress: rpc.programProgress as DashboardData["programProgress"],
+    highlights: rpc.highlights as DashboardData["highlights"],
+  };
+
+  const rawScore = rpc.athleteScore as Record<string, unknown> | null | undefined;
+  const athleteScore: AthleteScore | null =
+    rawScore && typeof rawScore.score === "number" ? (rawScore as unknown as AthleteScore) : null;
+
+  const rawHistory = rpc.scoreHistory;
+  const scoreHistory: { date: string; score: number }[] = Array.isArray(rawHistory)
+    ? (rawHistory as { date: string; score: number }[])
+    : [];
+
+  const todayWellnessLog = (rpc.todayWellnessLog as DailyWellnessLog | null) ?? null;
+  const hasCheckInToday = todayWellnessLog != null;
+  const checkinStreak = Number(rpc.checkinStreak) ?? 0;
+
+  return {
+    dashboard,
+    athleteScore,
+    scoreHistory,
+    hasCheckInToday,
+    todayWellnessLog,
+    checkinStreak,
+    scoreError: null,
+  };
+}
+
 export default function ClientDashboard() {
   const { user, profile } = useAuth();
-  const { performanceSettings } = useTheme();
-  const router = useRouter();
-  const { addToast } = useToast();
 
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [athleteScore, setAthleteScore] = useState<AthleteScore | null>(null);
-  const [scoreHistory, setScoreHistory] = useState<{ date: string; score: number }[]>([]);
-  const [hasCheckInToday, setHasCheckInToday] = useState<boolean | null>(null);
-  const [todayWellnessLog, setTodayWellnessLog] = useState<DailyWellnessLog | null>(null);
-  const [checkinStreak, setCheckinStreak] = useState<number>(0);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [scoreError, setScoreError] = useState<string | null>(null);
-
-  const checkTodayCheckIn = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      const [log, streak] = await Promise.all([
-        getTodayLog(user.id),
-        getCheckinStreak(user.id),
-      ]);
-      setTodayWellnessLog(log);
-      setHasCheckInToday(!!log);
-      setCheckinStreak(streak);
-    } catch (err) {
-      // Non-fatal - just don't show check-in prompt
-      console.warn("Error checking check-in (non-critical):", err);
-      setHasCheckInToday(null);
-      setTodayWellnessLog(null);
-      setCheckinStreak(0);
+  const fetchFn = useCallback(async (): Promise<DashboardPageData> => {
+    if (!user?.id) {
+      return {
+        dashboard: null,
+        athleteScore: null,
+        scoreHistory: [],
+        hasCheckInToday: null,
+        todayWellnessLog: null,
+        checkinStreak: 0,
+        scoreError: null,
+      };
     }
+    return fetchDashboardPageData(user.id);
   }, [user?.id]);
 
-  const fetchAthleteScore = useCallback(async () => {
-    const fetchWithRetry = async (): Promise<any> => {
-      const response = await fetch("/api/client/athlete-score", {
-        credentials: "include",
-      });
+  const { data: pageData, loading, error, refetch } = usePageData(fetchFn, [user?.id]);
 
-      // Handle auth errors by refreshing session and retrying once
-      if (response.status === 401 || response.status === 403) {
-        const { supabase } = await import("@/lib/supabase");
-        await supabase.auth.getSession(); // Force session refresh
-        // Retry once
-        const retryResponse = await fetch("/api/client/athlete-score", {
-          credentials: "include",
-        });
-        if (!retryResponse.ok) {
-          throw new Error("Failed to fetch athlete score after retry");
-        }
-        return retryResponse.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch athlete score");
-      }
-
-      return response.json();
-    };
-
-    const data = await fetchWithRetry();
-    setAthleteScore(data.score || null);
-    setScoreHistory(Array.isArray(data.scoreHistory) ? data.scoreHistory : []);
-  }, []);
-
-  const fetchDashboardData = async () => {
-    const fetchWithRetry = async (): Promise<any> => {
-      const response = await fetch("/api/client/dashboard", {
-        credentials: "include",
-      });
-
-      // Handle auth errors by refreshing session and retrying once
-      if (response.status === 401 || response.status === 403) {
-        const { supabase } = await import("@/lib/supabase");
-        await supabase.auth.getSession(); // Force session refresh
-        // Retry once
-        const retryResponse = await fetch("/api/client/dashboard", {
-          credentials: "include",
-        });
-        if (!retryResponse.ok) {
-          const errorData = await retryResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to fetch dashboard data after retry");
-        }
-        return retryResponse.json();
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to fetch dashboard data");
-      }
-
-      return response.json();
-    };
-
-    const data = await fetchWithRetry();
-    setDashboardData(data);
-  };
-
-  const fetchAllData = async () => {
-    // Fetch dashboard data and athlete score in parallel
-    // Use Promise.allSettled so one failure doesn't block others
-    const [dashResult, scoreResult, checkInResult] = await Promise.allSettled([
-      fetchDashboardData(),
-      fetchAthleteScore(),
-      checkTodayCheckIn(),
-    ]);
-
-    // Process results — the fetch functions set state directly, but we handle errors here
-    if (dashResult.status === "rejected") {
-      setError(dashResult.reason?.message || "Failed to load dashboard");
-    }
-
-    if (scoreResult.status === "rejected") {
-      setScoreError("Couldn't load score");
-      console.warn("Athlete score error (non-critical):", scoreResult.reason);
-    }
-
-    if (checkInResult.status === "rejected") {
-      // Non-fatal, just don't show check-in prompt
-      setHasCheckInToday(null);
-    }
-  };
-
-  const dashboardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const userId = user?.id;
-    if (!userId) return;
-
-    if (dashboardTimeoutRef.current) clearTimeout(dashboardTimeoutRef.current);
-    dashboardTimeoutRef.current = setTimeout(() => {
-      dashboardTimeoutRef.current = null;
-      setDataLoaded(true);
-      setError("Loading took too long. Tap Retry to try again.");
-    }, 20_000);
-
-    (async () => {
-      try {
-        await fetchAllData();
-      } catch (err: any) {
-        console.error('Dashboard fetch error:', err);
-        setError(err?.message || "Failed to load data");
-      } finally {
-        if (dashboardTimeoutRef.current) {
-          clearTimeout(dashboardTimeoutRef.current);
-          dashboardTimeoutRef.current = null;
-        }
-        setDataLoaded(true);
-      }
-    })();
-
-    return () => {
-      if (dashboardTimeoutRef.current) {
-        clearTimeout(dashboardTimeoutRef.current);
-        dashboardTimeoutRef.current = null;
-      }
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !dataLoaded) return;
-    getMilestoneData(user.id)
-      .then((data) => {
-        checkMilestoneToasts(data, (opts) =>
-          addToast({
-            title: opts.title,
-            description: opts.description,
-            duration: opts.duration ?? 4000,
-            variant: (opts.variant as "success") || "default",
-          })
-        );
-      })
-      .catch(() => {});
-  }, [user?.id, dataLoaded, addToast]);
+  const dashboardData = pageData?.dashboard ?? null;
+  const athleteScore = pageData?.athleteScore ?? null;
+  const scoreHistory = pageData?.scoreHistory ?? [];
+  const hasCheckInToday = pageData?.hasCheckInToday ?? null;
+  const todayWellnessLog = pageData?.todayWellnessLog ?? null;
+  const checkinStreak = pageData?.checkinStreak ?? 0;
+  const scoreError = pageData?.scoreError ?? null;
 
   const userName = dashboardData?.firstName || profile?.first_name || "there";
   const streak = dashboardData?.streak ?? 0;
@@ -307,9 +219,9 @@ export default function ClientDashboard() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
-          {!dataLoaded ? (
-            /* Loading: skeleton layout */
+          {loading ? (
             <>
+              {/* Loading: skeleton layout */}
               <header className="flex items-center justify-between mb-8">
                 <div className="space-y-2">
                   <Skeleton variant="text" className="h-6 w-32" />
@@ -655,23 +567,6 @@ export default function ClientDashboard() {
           </section>
 
             </>
-          )}
-
-          {/* Error State */}
-          {error && (
-            <ClientGlassCard className="p-6 text-center">
-              <p className="text-sm fc-text-dim mb-4">{error}</p>
-              <Button
-                variant="fc-secondary"
-                onClick={() => {
-                  setError(null);
-                  fetchAllData().then(() => setDataLoaded(true)).catch((err) => setError(err?.message || "Failed to load data"));
-                }}
-                className="h-11 px-6 text-sm"
-              >
-                Retry
-              </Button>
-            </ClientGlassCard>
           )}
         </ClientPageShell>
       </AnimatedBackground>

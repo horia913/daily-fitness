@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -46,7 +46,53 @@ function LeaderboardPageContent() {
   const [exerciseSearchResults, setExerciseSearchResults] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadLeaderboardData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    setLoadingStartedAt(Date.now());
+    try {
+      let leaderboardType: LeaderboardType;
+      
+      if (metricType === "tonnage") {
+        if (timeWindow === "this_week") {
+          leaderboardType = "tonnage_week";
+        } else if (timeWindow === "this_month") {
+          leaderboardType = "tonnage_month";
+        } else {
+          leaderboardType = "tonnage_all_time";
+        }
+      } else {
+        leaderboardType = `pr_${metricType}` as LeaderboardType;
+      }
+
+      let exerciseId: string | undefined;
+      if (customExerciseId) {
+        exerciseId = customExerciseId;
+      } else {
+        const { data: exerciseData } = await supabase
+          .from("exercises")
+          .select("id")
+          .ilike("name", activeExercise)
+          .limit(1)
+          .maybeSingle();
+        
+        exerciseId = exerciseData?.id;
+      }
+
+      const data = await getLeaderboard(leaderboardType, exerciseId, timeWindow);
+      setLeaderboardData(data);
+    } catch (error) {
+      console.error("Error loading leaderboard:", error);
+      setLoadError(error instanceof Error ? error.message : "Failed to load leaderboard");
+      setLeaderboardData([]);
+    } finally {
+      setLoading(false);
+      setLoadingStartedAt(null);
+    }
+  }, [timeWindow, activeExercise, metricType, customExerciseId]);
 
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -67,52 +113,7 @@ function LeaderboardPageContent() {
         timeoutRef.current = null;
       }
     };
-  }, [timeWindow, activeExercise, metricType, customExerciseId]);
-
-  const loadLeaderboardData = async () => {
-    setLoading(true);
-    try {
-      let leaderboardType: LeaderboardType;
-      
-      // Determine leaderboard type based on metric
-      if (metricType === "tonnage") {
-        if (timeWindow === "this_week") {
-          leaderboardType = "tonnage_week";
-        } else if (timeWindow === "this_month") {
-          leaderboardType = "tonnage_month";
-        } else {
-          leaderboardType = "tonnage_all_time";
-        }
-      } else {
-        // PR types
-        leaderboardType = `pr_${metricType}` as LeaderboardType;
-      }
-
-      // Get exercise ID for the active exercise or custom exercise
-      let exerciseId: string | undefined;
-      if (customExerciseId) {
-        exerciseId = customExerciseId;
-      } else {
-        // Find exercise by name
-        const { data: exerciseData } = await supabase
-          .from("exercises")
-          .select("id")
-          .ilike("name", activeExercise)
-          .limit(1)
-          .maybeSingle();
-        
-        exerciseId = exerciseData?.id;
-      }
-
-      const data = await getLeaderboard(leaderboardType, exerciseId, timeWindow);
-      setLeaderboardData(data);
-    } catch (error) {
-      console.error("Error loading leaderboard:", error);
-      setLeaderboardData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadLeaderboardData, timeWindow, activeExercise, metricType, customExerciseId]);
 
   const handleExerciseSearch = async (query: string) => {
     setSearchQuery(query);
@@ -352,10 +353,10 @@ function LeaderboardPageContent() {
             </div>
           </div>
 
-          {loadError ? (
+          {loadError && !loading ? (
             <div className="text-center py-12">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              <button type="button" onClick={() => { setLoadError(null); loadLeaderboardData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
           ) : loading ? (
             <div className="text-center py-12">

@@ -38,6 +38,7 @@ import { supabase } from '@/lib/supabase'
 import { fetchApi } from '@/lib/apiClient'
 import { useTheme } from '@/contexts/ThemeContext'
 import { PlateCalculatorWidget } from './PlateCalculatorWidget'
+import { isBarbellExercise } from '@/lib/exerciseUtils'
 
 interface SetLoggingFormProps {
   isOpen: boolean
@@ -222,15 +223,7 @@ export default function SetLoggingForm({
     return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
   }
 
-  // Check if exercise uses barbell equipment
-  const isBarbellExercise = () => {
-    const equipment = templateExercise?.exercise?.equipment || []
-    return equipment.some((eq: string) => 
-      eq.toLowerCase().includes('barbell') || 
-      eq.toLowerCase().includes('bar') ||
-      eq.toLowerCase().includes('olympic')
-    )
-  }
+  const showPlateCalc = isBarbellExercise(templateExercise?.exercise ?? {});
 
   if (!isOpen) return null
 
@@ -340,7 +333,7 @@ export default function SetLoggingForm({
                       </div>
                       
                       {/* Plate Calculator for Barbell Exercises */}
-                      {isBarbellExercise() && (
+                      {showPlateCalc && (
                         <div className="mt-4">
                           <PlateCalculatorWidget
                             currentWeight={parseFloat(formData.weight_used) || 0}

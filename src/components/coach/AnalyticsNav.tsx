@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BarChart3, ClipboardCheck, TrendingUp, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -27,10 +26,12 @@ export default function AnalyticsNav() {
           const isActive = pathname === tab.href
 
           return (
-            <Link
+            <button
               key={tab.href}
-              href={tab.href}
+              type="button"
+              onClick={() => { window.location.href = tab.href; }}
               className={cn(
+                'bg-transparent border-none cursor-pointer',
                 'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 min-h-[44px] rounded-t-xl',
                 'border-b-2 -mb-[1px]',
                 isActive
@@ -40,7 +41,7 @@ export default function AnalyticsNav() {
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span>{tab.label}</span>
-            </Link>
+            </button>
           )
         })}
       </nav>

@@ -69,9 +69,21 @@ export function ClusterSetExecutor({
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
   const loggedSetsList = loggedSets ?? [];
 
-  const clustersPerSet: number = 3;
-  const repsPerCluster: number = 2;
-  const intraClusterRest: number = 20;
+  const clustersPerSet: number =
+    Number((currentExercise as any)?.clusters_per_set) ||
+    Number((currentExercise as any)?.meta?.clusters_per_set) ||
+    Number((currentExercise as any)?.cluster_sets?.[0]?.clusters_per_set) ||
+    4;
+  const repsPerCluster: number =
+    Number((currentExercise as any)?.reps_per_cluster) ||
+    Number((currentExercise as any)?.meta?.reps_per_cluster) ||
+    Number((currentExercise as any)?.cluster_sets?.[0]?.reps_per_cluster) ||
+    3;
+  const intraClusterRest: number =
+    Number((currentExercise as any)?.intra_cluster_rest) ||
+    Number((currentExercise as any)?.meta?.intra_cluster_rest) ||
+    Number((currentExercise as any)?.cluster_sets?.[0]?.intra_cluster_rest) ||
+    15;
   const restBetweenSets = block.block.rest_seconds || 90;
 
   const [weight, setWeight] = useState("");
@@ -88,6 +100,9 @@ export function ClusterSetExecutor({
     weight: string;
     set_number: number;
   } | null>(null);
+  const [currentClusterInSet, setCurrentClusterInSet] = useState(1);
+  const [showIntraClusterRest, setShowIntraClusterRest] = useState(false);
+  const [intraClusterTimeLeft, setIntraClusterTimeLeft] = useState(intraClusterRest);
 
   const displaySetNumber =
     editingSetId && editDraft?.set_number != null
@@ -144,6 +159,29 @@ export function ClusterSetExecutor({
   useEffect(() => {
     setIsWeightPristine(true);
   }, [completedSets, currentExerciseIndex, exerciseId]);
+
+  useEffect(() => {
+    setCurrentClusterInSet(1);
+  }, [completedSets, currentSetNumber]);
+
+  useEffect(() => {
+    if (!showIntraClusterRest || intraClusterRest <= 0) {
+      if (!showIntraClusterRest) setIntraClusterTimeLeft(intraClusterRest);
+      return;
+    }
+    let restSec = intraClusterRest;
+    setIntraClusterTimeLeft(restSec);
+    const interval = setInterval(() => {
+      restSec -= 1;
+      setIntraClusterTimeLeft(restSec);
+      if (restSec <= 0) {
+        clearInterval(interval);
+        setShowIntraClusterRest(false);
+        setCurrentClusterInSet((c) => c + 1);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showIntraClusterRest, intraClusterRest]);
 
   useEffect(() => {
     if (viewingSetIndex >= 1) return;
@@ -301,7 +339,7 @@ export function ClusterSetExecutor({
     setEditDraft(null);
   };
 
-  const handleLog = async () => {
+  const handleClusterDone = async () => {
     if (!currentExercise || isLoggingSet) return;
 
     const weightNum = parseFloat(weight);
@@ -315,6 +353,13 @@ export function ClusterSetExecutor({
       return;
     }
 
+    const isLastCluster = currentClusterInSet >= clustersPerSet;
+
+    if (!isLastCluster) {
+      setShowIntraClusterRest(true);
+      return;
+    }
+
     setIsLoggingSet(true);
 
     try {
@@ -324,27 +369,23 @@ export function ClusterSetExecutor({
     } catch (e) {}
 
     try {
-      // Log cluster set
-      // Note: For cluster sets, we log each cluster separately
-      // This logs the first cluster - subsequent clusters would be logged with cluster_number incremented
+      const totalReps = repsPerCluster * clustersPerSet;
       const logData: any = {
         set_type: "cluster_set",
         set_number: completedSets + 1,
-        cluster_number: 1, // First cluster in the set
+        cluster_number: 1,
+        isLastSet: currentSetNumber >= totalSets,
+        reps: totalReps,
       };
 
-      // Only add fields if they're defined
       if (currentExercise?.exercise_id)
         logData.exercise_id = currentExercise.exercise_id;
       if (weightNum !== undefined && weightNum !== null)
         logData.weight = weightNum;
-      if (repsPerCluster !== undefined && repsPerCluster !== null)
-        logData.reps = repsPerCluster;
 
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const totalReps = repsPerCluster * clustersPerSet;
         const newLoggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise?.exercise_id || "",
@@ -362,7 +403,7 @@ export function ClusterSetExecutor({
 
         addToast({
           title: "Cluster Set Logged!",
-          description: `${weightNum}kg × ${repsPerCluster} reps × ${clustersPerSet} clusters`,
+          description: `${weightNum}kg × ${totalReps} reps (${repsPerCluster} × ${clustersPerSet} clusters)`,
           variant: "success",
           duration: 2000,
         });
@@ -382,6 +423,8 @@ export function ClusterSetExecutor({
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
         }
+
+        setCurrentClusterInSet(1);
       } else {
         addToast({
           title: "Failed to Save",
@@ -590,9 +633,19 @@ export function ClusterSetExecutor({
         <div className="text-sm font-semibold fc-text-dim mb-4">
           {editDraft
             ? "Edit set"
-            : `Cluster 1 of ${clustersPerSet} (Set ${displaySetNumber} of ${totalSets})`}
+            : showIntraClusterRest
+              ? `Rest ${intraClusterTimeLeft}s — next cluster`
+              : `Set ${displaySetNumber} — Cluster ${currentClusterInSet} of ${clustersPerSet}`}
         </div>
+        {showIntraClusterRest && (
+          <div className="mb-4 rounded-xl p-3 text-center" style={{ background: "var(--fc-surface-elevated)" }}>
+            <p className="text-lg font-bold fc-text-primary">{intraClusterTimeLeft}s</p>
+            <p className="text-xs fc-text-dim">Rest before next cluster</p>
+          </div>
+        )}
         <div className="space-y-4">
+          {!showIntraClusterRest && (
+          <>
           <div className="space-y-2">
             <LargeInput
               label="Weight"
@@ -631,6 +684,8 @@ export function ClusterSetExecutor({
             Rest {intraClusterRest}s between clusters, {restBetweenSets}s after
             set
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
@@ -672,13 +727,17 @@ export function ClusterSetExecutor({
     </Button>
   ) : (
     <Button
-      onClick={handleLog}
-      disabled={isLoggingSet || completedSets >= totalSets}
+      onClick={handleClusterDone}
+      disabled={isLoggingSet || completedSets >= totalSets || showIntraClusterRest}
       variant="fc-primary"
       className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Link className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG CLUSTER SET"}
+      {isLoggingSet
+        ? "Logging..."
+        : currentClusterInSet >= clustersPerSet
+          ? "LOG SET"
+          : `Done cluster ${currentClusterInSet}`}
     </Button>
   );
 

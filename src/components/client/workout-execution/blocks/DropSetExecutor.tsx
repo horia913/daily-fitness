@@ -8,6 +8,7 @@ import {
   ChevronRight,
   MoreVertical,
   Pencil,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -69,13 +70,13 @@ export function DropSetExecutor({
   /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
   const loggedSetsList = loggedSets ?? [];
 
-  const [initialWeight, setInitialWeight] = useState("");
-  const [initialReps, setInitialReps] = useState("");
-  const [dropWeight, setDropWeight] = useState("");
-  const [dropReps, setDropReps] = useState("");
+  const [drops, setDrops] = useState<Array<{ weight: string; reps: string }>>([
+    { weight: "", reps: "" },
+    { weight: "", reps: "" },
+  ]);
+  const MAX_DROPS = 5;
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
-  const isManuallyEditingDropWeight = useRef(false);
   const [isWeightPristine, setIsWeightPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
   /** Collapsible set history: show all sets or only last 2 */
@@ -84,10 +85,7 @@ export function DropSetExecutor({
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
-    initialWeight: string;
-    initialReps: string;
-    dropWeight: string;
-    dropReps: string;
+    drops: Array<{ weight: string; reps: string }>;
     set_number: number;
   } | null>(null);
 
@@ -102,8 +100,6 @@ export function DropSetExecutor({
       : viewingSetIndex >= 1
         ? viewingSetIndex
         : Math.min(currentSetNumber, totalSets);
-
-  const dropPercentage = 20;
 
   useEffect(() => {
     if (!registerSetLogIdResolved) return;
@@ -123,13 +119,18 @@ export function DropSetExecutor({
   }, [loggedSetsList.length, viewingSetIndex]);
   useEffect(() => {
     if (viewingSetIndex >= 1 && loggedSetsList[viewingSetIndex - 1]) {
-      const s = loggedSetsList[viewingSetIndex - 1];
-      setInitialWeight(String(s.weight_kg ?? ""));
-      setInitialReps(String(s.reps_completed ?? ""));
-      const dropVal = (s.weight_kg ?? 0) * (1 - dropPercentage / 100);
-      setDropWeight(String(Math.round(dropVal * 2) / 2));
+      const s = loggedSetsList[viewingSetIndex - 1] as LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> };
+      const stored = s.dropset_drops;
+      if (Array.isArray(stored) && stored.length >= 2) {
+        setDrops(stored.map((d) => ({ weight: String(d.weight), reps: String(d.reps) })));
+      } else {
+        setDrops([
+          { weight: String(s.weight_kg ?? ""), reps: String(s.reps_completed ?? "") },
+          { weight: String((s.weight_kg ?? 0) * 0.8), reps: String(s.reps_completed ?? "") },
+        ]);
+      }
     }
-  }, [viewingSetIndex, loggedSetsList, dropPercentage]);
+  }, [viewingSetIndex, loggedSetsList]);
 
   const exerciseId = currentExercise?.exercise_id ?? "";
   const sessionStickyWeight = exerciseId
@@ -160,47 +161,15 @@ export function DropSetExecutor({
     if (viewingSetIndex >= 1) return;
     if (!isWeightPristine) return;
     if (default_weight != null && default_weight > 0) {
-      setInitialWeight(String(default_weight));
-      const dropWeightValue = default_weight * (1 - dropPercentage / 100);
-      setDropWeight(String(Math.round(dropWeightValue * 2) / 2));
+      const dropWeightValue = default_weight * 0.8;
+      setDrops([
+        { weight: String(default_weight), reps: "" },
+        { weight: String(Math.round(dropWeightValue * 2) / 2), reps: "" },
+      ]);
     } else {
-      setInitialWeight("");
-      setDropWeight("");
+      setDrops([{ weight: "", reps: "" }, { weight: "", reps: "" }]);
     }
-  }, [
-    viewingSetIndex,
-    isWeightPristine,
-    default_weight,
-    completedSets,
-    exerciseId,
-    dropPercentage,
-  ]);
-
-  // Auto-calculate drop weight when initial weight changes
-  // Always recalculate when initial weight changes (unless user is actively editing drop weight)
-  useEffect(() => {
-    // Skip auto-calculation if user is currently manually editing drop weight field
-    if (isManuallyEditingDropWeight.current) {
-      return;
-    }
-
-    if (initialWeight) {
-      const initialWeightNum = parseFloat(initialWeight);
-      if (!isNaN(initialWeightNum) && initialWeightNum > 0) {
-        // Calculate drop weight: initial weight * (1 - drop percentage / 100)
-        // Round to nearest 0.5kg for practical weight selection
-        const dropWeightValue = initialWeightNum * (1 - dropPercentage / 100);
-        const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
-        setDropWeight(roundedDropWeight.toString());
-      } else if (initialWeightNum === 0 || isNaN(initialWeightNum)) {
-        // Clear drop weight if initial weight is invalid
-        setDropWeight("");
-      }
-    } else {
-      // Clear drop weight if initial weight is cleared
-      setDropWeight("");
-    }
-  }, [initialWeight, dropPercentage]);
+  }, [viewingSetIndex, isWeightPristine, default_weight, completedSets, exerciseId]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -213,12 +182,8 @@ export function DropSetExecutor({
       value: exerciseReps,
     },
     {
-      label: "DROP",
-      value: `${dropPercentage}%`,
-    },
-    {
-      label: "AFTER DROP",
-      value: `${dropSetReps} reps`,
+      label: "DROPS",
+      value: "2-5",
     },
     {
       label: "REST",
@@ -243,15 +208,19 @@ export function DropSetExecutor({
     currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleEditSet = (setEntry: LoggedSet) => {
-    const dropVal = (setEntry.weight_kg ?? 0) * (1 - dropPercentage / 100);
+    const s = setEntry as LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> };
+    const stored = s.dropset_drops;
+    let editDrops: Array<{ weight: string; reps: string }>;
+    if (Array.isArray(stored) && stored.length >= 2) {
+      editDrops = stored.map((d) => ({ weight: String(d.weight), reps: String(d.reps) }));
+    } else {
+      editDrops = [
+        { weight: String(setEntry.weight_kg ?? ""), reps: String(setEntry.reps_completed ?? "") },
+        { weight: String((setEntry.weight_kg ?? 0) * 0.8), reps: String(setEntry.reps_completed ?? "") },
+      ];
+    }
     setEditingSetId(setEntry.id);
-    setEditDraft({
-      initialWeight: String(setEntry.weight_kg ?? ""),
-      initialReps: String(setEntry.reps_completed ?? ""),
-      dropWeight: String(Math.round(dropVal * 2) / 2),
-      dropReps: String(setEntry.reps_completed ?? ""),
-      set_number: setEntry.set_number ?? 1,
-    });
+    setEditDraft({ drops: editDrops, set_number: setEntry.set_number ?? 1 });
     setMenuOpenSetId(null);
   };
 
@@ -274,37 +243,32 @@ export function DropSetExecutor({
       });
       return;
     }
-    const w0 = parseFloat(editDraft.initialWeight);
-    const r0 = parseInt(editDraft.initialReps, 10);
-    const w1 = parseFloat(editDraft.dropWeight);
-    const r1 = parseInt(editDraft.dropReps, 10);
-    if (
-      isNaN(w0) ||
-      w0 < 0 ||
-      isNaN(r0) ||
-      r0 <= 0 ||
-      isNaN(w1) ||
-      w1 < 0 ||
-      isNaN(r1) ||
-      r1 <= 0
-    ) {
+    const dropsParsed = editDraft.drops
+      .map((d) => ({ weight: parseFloat(d.weight), reps: parseInt(d.reps, 10) }))
+      .filter((d) => !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0);
+    if (dropsParsed.length < 2) {
       addToast({
         title: "Invalid values",
-        description: "Weight and reps must be valid",
+        description: "Need at least 2 drops with valid weight and reps",
         variant: "destructive",
         duration: 3000,
       });
       return;
     }
-    const pct = w0 > 0 ? ((w0 - w1) / w0) * 100 : dropPercentage;
+    const w0 = dropsParsed[0].weight;
+    const r0 = dropsParsed[0].reps;
+    const wLast = dropsParsed[dropsParsed.length - 1].weight;
+    const rLast = dropsParsed[dropsParsed.length - 1].reps;
+    const pct = w0 > 0 ? ((w0 - wLast) / w0) * 100 : 0;
     setIsSavingEdit(true);
     try {
       const payload = buildSetEditPatchPayload(block.block.set_type, {
         dropset_initial_weight: w0,
         dropset_initial_reps: r0,
-        dropset_final_weight: w1,
-        dropset_final_reps: r1,
+        dropset_final_weight: wLast,
+        dropset_final_reps: rLast,
         dropset_percentage: pct,
+        dropset_drops: dropsParsed,
         set_number: editDraft.set_number,
         ...(currentExercise?.exercise_id && {
           exercise_id: currentExercise.exercise_id,
@@ -325,7 +289,7 @@ export function DropSetExecutor({
       });
       if (res.ok) {
         const current = loggedSetsList.find((s) => s.id === editingSetId);
-        const updatedEntry: LoggedSet = {
+        const updatedEntry: LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> } = {
           ...current,
           id: editingSetId,
           exercise_id:
@@ -335,6 +299,7 @@ export function DropSetExecutor({
           weight_kg: w0,
           reps_completed: r0,
           completed_at: current?.completed_at ?? new Date(),
+          dropset_drops: dropsParsed,
         };
         onSetEditSaved?.(block.block.id, updatedEntry);
         setEditingSetId(null);
@@ -368,38 +333,23 @@ export function DropSetExecutor({
   const handleLog = async () => {
     if (!currentExercise || isLoggingSet) return;
 
-    const initialWeightNum = parseFloat(initialWeight);
-    const initialRepsNum = parseInt(initialReps);
-    const dropWeightNum = parseFloat(dropWeight);
-    const dropRepsNum = parseInt(dropReps);
+    const dropsParsed = drops
+      .map((d) => ({ weight: parseFloat(d.weight), reps: parseInt(d.reps, 10) }))
+      .filter((d) => !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0);
 
-    if (
-      !initialWeight ||
-      initialWeight.trim() === "" ||
-      isNaN(initialWeightNum) ||
-      initialWeightNum < 0 ||
-      !initialReps ||
-      initialReps.trim() === "" ||
-      isNaN(initialRepsNum) ||
-      initialRepsNum <= 0 ||
-      !dropWeight ||
-      dropWeight.trim() === "" ||
-      isNaN(dropWeightNum) ||
-      dropWeightNum < 0 ||
-      !dropReps ||
-      dropReps.trim() === "" ||
-      isNaN(dropRepsNum) ||
-      dropRepsNum <= 0
-    ) {
+    if (dropsParsed.length < 2) {
       addToast({
         title: "Invalid Input",
         description:
-          "Please enter valid weight and reps for both initial and drop sets",
+          "Please enter valid weight and reps for at least initial and first drop",
         variant: "destructive",
         duration: 3000,
       });
       return;
     }
+
+    const initialWeightNum = dropsParsed[0].weight;
+    const initialRepsNum = dropsParsed[0].reps;
 
     setIsLoggingSet(true);
 
@@ -410,35 +360,28 @@ export function DropSetExecutor({
     } catch (e) {}
 
     try {
-      // Calculate drop percentage
-      const dropPercentage =
-        initialWeightNum > 0
-          ? ((initialWeightNum - dropWeightNum) / initialWeightNum) * 100
-          : 0;
+      const last = dropsParsed[dropsParsed.length - 1];
+      const dropPct = initialWeightNum > 0 ? ((initialWeightNum - last.weight) / initialWeightNum) * 100 : 0;
 
       const logData: any = {
         set_type: "dropset",
         set_number: currentSetNumber,
+        isLastSet: currentSetNumber >= totalSets,
+        dropset_drops: dropsParsed,
+        dropset_initial_weight: initialWeightNum,
+        dropset_initial_reps: initialRepsNum,
+        dropset_final_weight: last.weight,
+        dropset_final_reps: last.reps,
+        dropset_percentage: dropPct,
       };
 
-      // Only add fields if they're defined
       if (currentExercise?.exercise_id)
         logData.exercise_id = currentExercise.exercise_id;
-      if (initialWeightNum !== undefined && initialWeightNum !== null)
-        logData.dropset_initial_weight = initialWeightNum;
-      if (initialRepsNum !== undefined && initialRepsNum !== null)
-        logData.dropset_initial_reps = initialRepsNum;
-      if (dropWeightNum !== undefined && dropWeightNum !== null)
-        logData.dropset_final_weight = dropWeightNum;
-      if (dropRepsNum !== undefined && dropRepsNum !== null)
-        logData.dropset_final_reps = dropRepsNum;
-      if (dropPercentage !== undefined && dropPercentage !== null)
-        logData.dropset_percentage = dropPercentage;
 
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const newLoggedSet: LoggedSet = {
+        const newLoggedSet: LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> } = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
           set_entry_id: block.block.id,
@@ -446,6 +389,7 @@ export function DropSetExecutor({
           weight_kg: initialWeightNum,
           reps_completed: initialRepsNum,
           completed_at: new Date(),
+          dropset_drops: dropsParsed,
         } as LoggedSet;
         onSetLogUpsert?.(block.block.id, newLoggedSet);
 
@@ -455,7 +399,7 @@ export function DropSetExecutor({
 
         addToast({
           title: "Drop Set Logged!",
-          description: `${initialWeightNum}kg × ${initialRepsNum} reps → ${dropWeightNum}kg × ${dropRepsNum} reps`,
+          description: `${initialWeightNum}kg × ${initialRepsNum} reps → ${last.weight}kg × ${last.reps} reps`,
           variant: "success",
           duration: 2000,
         });
@@ -474,9 +418,8 @@ export function DropSetExecutor({
 
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
-        } else {
-          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
         }
+        setDrops([{ weight: String(initialWeightNum), reps: "" }, { weight: String(Math.round(last.weight * 0.9 * 2) / 2), reps: "" }]);
       } else {
         addToast({
           title: "Failed to Save",
@@ -686,106 +629,150 @@ export function DropSetExecutor({
           className="font-semibold mb-4 text-lg"
           style={{ color: "var(--fc-accent-cyan)" }}
         >
-          {editDraft ? "Edit set" : "Initial (100%)"}
+          {editDraft ? "Edit set" : "Drop Set — Set " + displaySetNumber + " of " + totalSets}
         </h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={editDraft ? editDraft.initialWeight : initialWeight}
-              onChange={(val) => {
-                if (editDraft)
-                  setEditDraft((d) =>
-                    d ? { ...d, initialWeight: val } : null,
-                  );
-                else {
-                  setIsWeightPristine(false);
-                  setInitialWeight(val);
-                }
-              }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-            />
-            {!editDraft &&
-              coachSuggestedWeight != null &&
-              coachSuggestedWeight > 0 && (
-                <ApplySuggestedWeightButton
-                  suggestedKg={coachSuggestedWeight}
-                  onApply={() => {
-                    setInitialWeight(String(coachSuggestedWeight));
-                    setIsWeightPristine(false);
-                    const dropVal =
-                      coachSuggestedWeight * (1 - dropPercentage / 100);
-                    setDropWeight(String(Math.round(dropVal * 2) / 2));
+        {(editDraft ? editDraft.drops : drops).map((drop, idx) => (
+          <div key={idx} className="mb-4">
+            <h5 className="text-sm font-medium fc-text-dim mb-2">
+              {idx === 0 ? "Initial" : `Drop ${idx}`}
+            </h5>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <LargeInput
+                  label="Weight"
+                  value={drop.weight}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) =>
+                        d
+                          ? {
+                              ...d,
+                              drops: d.drops.map((x, i) =>
+                                i === idx ? { ...x, weight: val } : x,
+                              ),
+                            }
+                          : null,
+                      );
+                    else {
+                      setIsWeightPristine(false);
+                      setDrops((prev) =>
+                        prev.map((x, i) =>
+                          i === idx ? { ...x, weight: val } : x,
+                        ),
+                      );
+                    }
                   }}
+                  placeholder="0"
+                  step="0.5"
+                  unit="kg"
+                  showStepper
+                  stepAmount={2.5}
                 />
-              )}
+                {!editDraft && idx === 0 && coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
+                  <ApplySuggestedWeightButton
+                    suggestedKg={coachSuggestedWeight}
+                    onApply={() => {
+                      setDrops((prev) => [
+                        { weight: String(coachSuggestedWeight), reps: prev[0]?.reps ?? "" },
+                        ...prev.slice(1),
+                      ]);
+                      setIsWeightPristine(false);
+                    }}
+                  />
+                )}
+              </div>
+              <LargeInput
+                label="Reps"
+                value={drop.reps}
+                onChange={(val) => {
+                  if (editDraft)
+                    setEditDraft((d) =>
+                      d
+                        ? {
+                            ...d,
+                            drops: d.drops.map((x, i) =>
+                              i === idx ? { ...x, reps: val } : x,
+                            ),
+                          }
+                        : null,
+                    );
+                  else
+                    setDrops((prev) =>
+                      prev.map((x, i) => (i === idx ? { ...x, reps: val } : x)),
+                    );
+                }}
+                placeholder="0"
+                step="1"
+                showStepper
+                stepAmount={1}
+              />
+            </div>
+            {idx > 0 && (editDraft ? editDraft.drops : drops).length > 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (editDraft)
+                    setEditDraft((d) =>
+                      d
+                        ? {
+                            ...d,
+                            drops: d.drops.filter((_, i) => i !== idx),
+                          }
+                        : null,
+                    );
+                  else
+                    setDrops((prev) => prev.filter((_, i) => i !== idx));
+                }}
+                className="mt-2 text-xs text-amber-500 hover:underline"
+              >
+                Remove drop
+              </button>
+            )}
           </div>
-          <LargeInput
-            label="Reps"
-            value={editDraft ? editDraft.initialReps : initialReps}
-            onChange={(val) => {
-              if (editDraft)
-                setEditDraft((d) => (d ? { ...d, initialReps: val } : null));
-              else setInitialReps(val);
-            }}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
-        </div>
-      </div>
-
-      {/* Drop Set */}
-      <div
-        className="p-4 rounded-xl"
-        style={{ background: "var(--fc-surface-sunken)" }}
-      >
-        <h4
-          className="font-semibold mb-4 text-lg"
-          style={{ color: "var(--fc-status-error)" }}
-        >
-          After Drop ({100 - dropPercentage}%)
-        </h4>
-        <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={editDraft ? editDraft.dropWeight : dropWeight}
-            onChange={(value) => {
-              if (editDraft)
-                setEditDraft((d) => (d ? { ...d, dropWeight: value } : null));
-              else {
-                isManuallyEditingDropWeight.current = true;
-                setDropWeight(value);
-                setTimeout(() => {
-                  isManuallyEditingDropWeight.current = false;
-                }, 500);
-              }
-            }}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
-          <LargeInput
-            label="Reps"
-            value={editDraft ? editDraft.dropReps : dropReps}
-            onChange={(val) => {
-              if (editDraft)
-                setEditDraft((d) => (d ? { ...d, dropReps: val } : null));
-              else setDropReps(val);
-            }}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
-        </div>
+        ))}
+        {!editDraft && drops.length < MAX_DROPS && (
+          <button
+            type="button"
+            onClick={() =>
+              setDrops((prev) => [
+                ...prev,
+                {
+                  weight: prev.length > 0 ? String(Math.round(parseFloat(prev[prev.length - 1].weight || "0") * 0.85 * 2) / 2) : "",
+                  reps: "",
+                },
+              ])
+            }
+            className="text-sm fc-text-dim hover:fc-text-primary flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" /> Add Drop
+          </button>
+        )}
+        {editDraft && editDraft.drops.length < MAX_DROPS && (
+          <button
+            type="button"
+            onClick={() =>
+              setEditDraft((d) =>
+                d
+                  ? {
+                      ...d,
+                      drops: [
+                        ...d.drops,
+                        {
+                          weight: d.drops.length > 0
+                            ? String(Math.round(parseFloat(d.drops[d.drops.length - 1].weight || "0") * 0.85 * 2) / 2)
+                            : "",
+                          reps: "",
+                        },
+                      ],
+                    }
+                  : null,
+              )
+            }
+            className="text-sm fc-text-dim hover:fc-text-primary flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" /> Add Drop
+          </button>
+        )}
       </div>
     </div>
   );
@@ -805,18 +792,14 @@ export function DropSetExecutor({
         disabled={
           isSavingEdit ||
           !editDraft ||
-          editDraft.initialWeight.trim() === "" ||
-          editDraft.initialReps.trim() === "" ||
-          editDraft.dropWeight.trim() === "" ||
-          editDraft.dropReps.trim() === "" ||
-          isNaN(parseFloat(editDraft.initialWeight)) ||
-          parseFloat(editDraft.initialWeight) < 0 ||
-          isNaN(parseInt(editDraft.initialReps, 10)) ||
-          parseInt(editDraft.initialReps, 10) <= 0 ||
-          isNaN(parseFloat(editDraft.dropWeight)) ||
-          parseFloat(editDraft.dropWeight) < 0 ||
-          isNaN(parseInt(editDraft.dropReps, 10)) ||
-          parseInt(editDraft.dropReps, 10) <= 0
+          editDraft.drops.length < 2 ||
+          editDraft.drops.some(
+            (d) =>
+              isNaN(parseFloat(d.weight)) ||
+              parseFloat(d.weight) < 0 ||
+              isNaN(parseInt(d.reps, 10)) ||
+              parseInt(d.reps, 10) <= 0
+          )
         }
         variant="fc-primary"
         className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
@@ -884,7 +867,7 @@ export function DropSetExecutor({
         !!(block.block.rest_seconds || currentExercise?.rest_seconds)
       }
       onApplySuggestion={(w, _r) => {
-        if (w != null) setInitialWeight(String(w));
+        if (w != null) setDrops((prev) => [{ ...prev[0], weight: String(w) }, ...prev.slice(1)]);
       }}
     />
   );

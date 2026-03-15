@@ -530,6 +530,7 @@ export function GiantSetExecutor({
       const logData: any = {
         set_type: "giant_set",
         round_number: completedSets + 1,
+        isLastSet: (completedSets + 1) >= totalSets,
       };
 
       if (giantSetExercises.length > 0) {

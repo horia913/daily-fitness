@@ -41,6 +41,7 @@ export interface ProgramScheduleSlot {
   day_number: number       // 1-based day number (1..7)
   day_of_week: number      // Legacy 0-based (kept for compat)
   template_id: string
+  is_optional?: boolean    // Optional day (e.g. mobility) — does not block progression
 }
 
 export interface CompletedSlot {
@@ -130,17 +131,35 @@ export async function getRecentlyCompletedProgramAssignment(
  * Get all schedule slots for a program, ordered by (week_number ASC, day_number ASC).
  * Uses day_number (1-based) as the canonical ordering column.
  * Falls back to day_of_week + 1 if day_number is not yet populated.
+ * Gracefully degrades if is_optional column does not exist (migration not yet applied).
  */
 export async function getProgramSlots(
   supabase: SupabaseClient,
   programId: string
 ): Promise<ProgramScheduleSlot[]> {
-  const { data, error } = await supabase
+  const baseSelect = 'id, program_id, week_number, day_number, day_of_week, template_id'
+  let { data, error } = await supabase
     .from('program_schedule')
-    .select('id, program_id, week_number, day_number, day_of_week, template_id')
+    .select(`${baseSelect}, is_optional`)
     .eq('program_id', programId)
     .order('week_number', { ascending: true })
     .order('day_number', { ascending: true })
+
+  // If is_optional column does not exist (migration not applied), retry without it
+  if (error?.code === '42703') {
+    const fallback = await supabase
+      .from('program_schedule')
+      .select(baseSelect)
+      .eq('program_id', programId)
+      .order('week_number', { ascending: true })
+      .order('day_number', { ascending: true })
+    if (fallback.error) {
+      console.error('[programStateService] Error fetching program slots:', fallback.error)
+      return []
+    }
+    data = (fallback.data ?? []).map((row: any) => ({ ...row, is_optional: false })) as typeof data
+    error = null
+  }
 
   if (error) {
     console.error('[programStateService] Error fetching program slots:', error)
@@ -445,7 +464,10 @@ export function computeUnlockedWeekMax(
 
   for (const weekNum of weekNumbers) {
     const slotsInWeek = slots.filter(s => s.week_number === weekNum)
-    const allComplete = slotsInWeek.every(s => completedScheduleIds.has(s.id))
+    const requiredSlots = slotsInWeek.filter(s => !s.is_optional)
+    const allComplete =
+      requiredSlots.length === 0 ||
+      requiredSlots.every(s => completedScheduleIds.has(s.id))
 
     if (!allComplete) {
       // This week has incomplete slots — it is the current unlocked week
