@@ -204,6 +204,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
 
   // Fix C: Fallback when workout_log lacks program context (e.g. created via /api/log-set)
   // Trace: workout_assignments → program_day_assignments → program_assignments + program_schedule
+  // Use program_progress.current_week_number so we resolve the correct week's schedule slot (not just day_number).
   if ((!programAssignmentId || !programScheduleId) && workoutLog.workout_assignment_id) {
     const { data: pda } = await supabaseAdmin
       .from('program_day_assignments')
@@ -219,17 +220,25 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         .maybeSingle()
 
       if (pa?.program_id) {
+        const { data: progress } = await supabaseAdmin
+          .from('program_progress')
+          .select('current_week_number')
+          .eq('program_assignment_id', pda.program_assignment_id)
+          .maybeSingle()
+        const currentWeek = progress?.current_week_number ?? 1
+
         const { data: ps } = await supabaseAdmin
           .from('program_schedule')
           .select('id')
           .eq('program_id', pa.program_id)
+          .eq('week_number', currentWeek)
           .eq('day_number', pda.day_number)
           .maybeSingle()
 
         if (ps?.id) {
           programAssignmentId = pda.program_assignment_id
           programScheduleId = ps.id
-          console.log('[completeWorkoutService] Resolved program context via fallback:', { programAssignmentId, programScheduleId })
+          console.log('[completeWorkoutService] Resolved program context via fallback:', { programAssignmentId, programScheduleId, currentWeek })
         }
       }
     }
@@ -380,9 +389,9 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   try {
     const { AchievementService } = await import('@/lib/achievementService')
     const [workoutNew, streakNew, volumeNew] = await Promise.all([
-      AchievementService.checkAndUnlockAchievements(clientId, 'workout_count'),
-      AchievementService.checkAndUnlockAchievements(clientId, 'streak_weeks'),
-      AchievementService.checkAndUnlockAchievements(clientId, 'total_volume'),
+      AchievementService.checkAndUnlockAchievements(clientId, 'workout_count', supabaseAdmin),
+      AchievementService.checkAndUnlockAchievements(clientId, 'streak_weeks', supabaseAdmin),
+      AchievementService.checkAndUnlockAchievements(clientId, 'total_volume', supabaseAdmin),
     ])
     const seen = new Set<string>()
     for (const a of [...workoutNew, ...streakNew, ...volumeNew]) {
@@ -393,7 +402,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       }
     }
     if (programProgression?.status === 'program_completed' && programProgression?.programAssignmentId) {
-      const programNew = await AchievementService.checkAndUnlockAchievements(clientId, 'program_completion')
+      const programNew = await AchievementService.checkAndUnlockAchievements(clientId, 'program_completion', supabaseAdmin)
       for (const a of programNew) {
         const key = `${a.templateId}:${a.tier ?? 'single'}`
         if (!seen.has(key)) {

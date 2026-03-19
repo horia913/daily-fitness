@@ -408,9 +408,10 @@ export default function WorkoutComplete() {
             if (rawNew.length > 0) {
               const tierToRarity = (tier: string | null): Achievement["rarity"] => {
                 if (!tier) return "uncommon";
-                if (tier === "platinum") return "epic";
-                if (tier === "gold") return "rare";
-                if (tier === "silver") return "uncommon";
+                if (tier === "platinum") return "legendary";
+                if (tier === "gold") return "epic";
+                if (tier === "silver") return "rare";
+                if (tier === "bronze") return "uncommon";
                 return "common";
               };
               const mapped: Achievement[] = rawNew.map((a: any) => ({
@@ -1599,6 +1600,79 @@ export default function WorkoutComplete() {
                 </div>
               </div>
             </section>
+
+            {/* Session Highlights Card */}
+            {(personalRecords.length > 0 || newAchievementsQueue.length > 0) && (
+              <div
+                className="rounded-2xl p-[2px] overflow-hidden"
+                style={{
+                  background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan), var(--fc-status-warning))",
+                }}
+              >
+                <ClientGlassCard className="p-5 !rounded-[14px]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan))" }}
+                    >
+                      <Star className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold fc-text-primary">
+                        Session Highlights
+                      </h2>
+                      <p className="text-xs fc-text-dim">
+                        {[
+                          personalRecords.length > 0 ? `${personalRecords.length} PR${personalRecords.length !== 1 ? "s" : ""}` : null,
+                          newAchievementsQueue.length > 0 ? `${newAchievementsQueue.length} achievement${newAchievementsQueue.length !== 1 ? "s" : ""}` : null,
+                        ].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {personalRecords.slice(0, 3).map((pr: any) => {
+                      const exerciseName = pr.exercises?.name || pr.exercise?.name || "Exercise";
+                      return (
+                        <div
+                          key={pr.id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                          style={{ background: "var(--fc-surface-sunken)" }}
+                        >
+                          <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: "var(--fc-status-warning)" }} />
+                          <span className="text-sm font-semibold fc-text-primary truncate">{exerciseName}</span>
+                          <span className="ml-auto text-sm font-bold font-mono flex-shrink-0" style={{ color: "var(--fc-status-success)" }}>
+                            {pr.record_value} {pr.record_type === "weight" ? pr.record_unit || "kg" : "reps"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {personalRecords.length > 3 && (
+                      <p className="text-xs fc-text-dim text-center">+{personalRecords.length - 3} more PRs</p>
+                    )}
+                    {newAchievementsQueue.map((ach) => (
+                      <div
+                        key={ach.id}
+                        className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                        style={{ background: "var(--fc-surface-sunken)" }}
+                      >
+                        <span className="text-lg flex-shrink-0">{ach.icon}</span>
+                        <span className="text-sm font-semibold fc-text-primary truncate">{ach.name}</span>
+                        <span
+                          className="ml-auto text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                          style={{
+                            background: "color-mix(in srgb, var(--fc-accent-purple) 15%, transparent)",
+                            color: "var(--fc-accent-purple)",
+                          }}
+                        >
+                          {ach.rarity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ClientGlassCard>
+              </div>
+            )}
 
             {personalRecords.length > 0 && (
               <ClientGlassCard className="p-5">

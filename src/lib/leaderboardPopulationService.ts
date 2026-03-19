@@ -264,7 +264,7 @@ export async function updateLeaderboardForClient(
   if (hasTopThree) {
     try {
       const { AchievementService } = await import('@/lib/achievementService')
-      await AchievementService.checkAndUnlockAchievements(clientId, 'leaderboard_rank')
+      await AchievementService.checkAndUnlockAchievements(clientId, 'leaderboard_rank', db)
     } catch (err) {
       console.warn('[leaderboardPopulationService] leaderboard_rank achievement check failed (non-blocking):', err)
     }

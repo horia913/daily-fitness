@@ -196,10 +196,12 @@ export default function ExerciseCard({
                   <Users className="w-3 h-3" />
                   <span>{exercise.usage_count || 0}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3" />
-                  <span>{exercise.rating || 0}</span>
-                </div>
+                {exercise.rating ? (
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3 h-3" />
+                    <span>{exercise.rating}</span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -391,10 +393,12 @@ export default function ExerciseCard({
             <Users className="w-3 h-3" />
             <span>{exercise.usage_count || 0}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Star className="w-3 h-3" />
-            <span>{exercise.rating || 0}</span>
-          </div>
+          {exercise.rating ? (
+            <div className="flex items-center gap-1">
+              <Star className="w-3 h-3" />
+              <span>{exercise.rating}</span>
+            </div>
+          ) : null}
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             <span>{new Date(exercise.created_at).toLocaleDateString()}</span>

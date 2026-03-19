@@ -282,6 +282,7 @@ export function WeeklyCheckInFlow({
           notesEnabled={notesEnabled}
           onSubmit={handleSubmit}
           submitting={submitting}
+          frequencyDays={config?.frequency_days}
         />
       )}
 

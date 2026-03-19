@@ -28,6 +28,7 @@ import {
   Utensils,
   BookOpen,
   AlertCircle,
+  Footprints,
 } from "lucide-react";
 import Link from "next/link";
 import { usePageData } from "@/hooks/usePageData";
@@ -171,9 +172,10 @@ function ClientDetailContent() {
       ],
     },
     {
-      section: "Habits",
+      section: "Habits & Activities",
       items: [
         { label: "Habits", href: `/coach/clients/${clientId}/habits`, icon: Activity },
+        { label: "Extra Activities", href: `/coach/clients/${clientId}/activities`, icon: Footprints },
       ],
     },
     {

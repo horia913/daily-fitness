@@ -172,7 +172,6 @@ function NutritionDashboardContent() {
       }
     }
     if (loadId === loadGenerationRef.current) {
-      loadWaterGoal();
       loadNutritionHistory(loadId);
       loadNutritionTrends(loadId);
     }
@@ -230,6 +229,9 @@ function NutritionDashboardContent() {
       setActiveAssignments(mapped.activeAssignments as any);
       setHasMealsInPlan(mapped.hasAssignment && mapped.meals.length > 0);
       setNutritionGoals(mapped.nutritionGoals);
+
+      // Set water goal state from RPC goals (avoids separate goals query)
+      loadWaterGoal(mapped.nutritionGoals);
 
       // Resolve storage paths to signed URLs for completion photos (non-blocking)
       const mealsWithSignedUrls = await resolveMealPhotoUrls(mapped.meals);
@@ -364,36 +366,34 @@ function NutritionDashboardContent() {
     }
   };
 
-  const loadWaterGoal = async () => {
+  /** When goalsFromRpc is provided (from get_client_nutrition_page RPC), use it and skip the goals fetch. */
+  const loadWaterGoal = async (goalsFromRpc?: Array<{ id: string; title?: string; target_value?: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null }>) => {
     if (!user?.id) return;
-    if (loadingWaterGoal) return; // Prevent duplicate calls
-    
+    if (loadingWaterGoal) return;
+
     setLoadingWaterGoal(true);
     try {
-      // Single query: fetch ALL active goals, then derive water + nutrition in JS (deduplicated)
-      const { data: allGoals, error } = await supabase
-        .from("goals")
-        .select("id, title, target_value, target_unit, current_value, category, progress_percentage, pillar")
-        .eq("client_id", user.id)
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error loading goals:", error);
-        setWaterGoalId(null);
-        setWaterGoalGlasses(0);
-        setDisplayedWaterGlasses(1);
-        setNutritionGoals([]);
-        setActiveGoalsCount(0);
-        setGoalsAdherence(null);
-        setNutritionData((prev) => ({
-          ...prev,
-          water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
-        }));
-        return;
+      let goalsList: Array<{ id: string; title?: string; target_value?: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; pillar?: string; category?: string }>;
+      if (goalsFromRpc !== undefined) {
+        goalsList = goalsFromRpc.map((g) => ({ ...g, pillar: "nutrition" as string, category: "other" as string }));
+      } else {
+        const { data: allGoals, error } = await supabase
+          .from("goals")
+          .select("id, title, target_value, target_unit, current_value, category, progress_percentage, pillar")
+          .eq("client_id", user.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false });
+        if (error) {
+          console.error("Error loading goals:", error);
+          setWaterGoalId(null);
+          setWaterGoalGlasses(0);
+          setDisplayedWaterGlasses(1);
+          setNutritionData((prev) => ({ ...prev, water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 } }));
+          return;
+        }
+        goalsList = allGoals || [];
       }
 
-      const goalsList = allGoals || [];
       setActiveGoalsCount(goalsList.length);
       const adherence =
         goalsList.length > 0
@@ -404,45 +404,23 @@ function NutritionDashboardContent() {
           : null;
       setGoalsAdherence(adherence);
 
-      // Filter for water goal (first Water Intake match)
-      const goals = goalsList.filter((g: { title?: string }) =>
-        (g.title || "").toLowerCase().includes("water intake")
-      );
-
-      // Nutrition goals: prefer pillar=nutrition; fallback to category/keyword for legacy
-      let nutrition: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status: string }[] = [];
-      const pillarGoals = goalsList.filter((g: { pillar?: string }) => (g.pillar || "") === "nutrition").slice(0, 3);
-      if (pillarGoals.length > 0) {
-        nutrition = pillarGoals.map((g: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status?: string }) => ({
-          id: g.id,
-          title: g.title,
-          target_value: g.target_value,
-          target_unit: g.target_unit,
-          current_value: g.current_value,
-          progress_percentage: g.progress_percentage,
-          status: g.status ?? "active",
-        }));
-      } else {
-        const nutritionKeywords = ["calorie", "protein", "carb", "fat", "macro", "nutrition", "diet", "food"];
-        nutrition = goalsList
-          .filter(
-            (g: { category?: string; title?: string }) =>
-              (g.category || "").toLowerCase() === "nutrition" ||
-              nutritionKeywords.some((k) => (g.title || "").toLowerCase().includes(k))
-          )
-          .filter((g: { title?: string }) => !(g.title || "").toLowerCase().includes("water intake"))
-          .slice(0, 3)
-          .map((g: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status?: string }) => ({
-            id: g.id,
-            title: g.title,
-            target_value: g.target_value,
-            target_unit: g.target_unit,
-            current_value: g.current_value,
-            progress_percentage: g.progress_percentage,
-            status: g.status ?? "active",
-          }));
+      if (goalsFromRpc == null) {
+        let nutrition: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status: string }[] = [];
+        const pillarGoals = goalsList.filter((g: { pillar?: string }) => (g.pillar || "") === "nutrition").slice(0, 3);
+        if (pillarGoals.length > 0) {
+          nutrition = pillarGoals.map((g: any) => ({ id: g.id, title: g.title, target_value: g.target_value, target_unit: g.target_unit, current_value: g.current_value, progress_percentage: g.progress_percentage, status: "active" }));
+        } else {
+          const nutritionKeywords = ["calorie", "protein", "carb", "fat", "macro", "nutrition", "diet", "food"];
+          nutrition = goalsList
+            .filter((g: any) => (g.category || "").toLowerCase() === "nutrition" || nutritionKeywords.some((k) => (g.title || "").toLowerCase().includes(k)))
+            .filter((g: any) => !(g.title || "").toLowerCase().includes("water intake"))
+            .slice(0, 3)
+            .map((g: any) => ({ id: g.id, title: g.title, target_value: g.target_value, target_unit: g.target_unit, current_value: g.current_value, progress_percentage: g.progress_percentage, status: "active" }));
+        }
+        setNutritionGoals(nutrition);
       }
-      setNutritionGoals(nutrition);
+
+      const goals = goalsList.filter((g: { title?: string }) => (g.title || "").toLowerCase().includes("water intake"));
 
       if (!goals || goals.length === 0) {
         // No water goal configured - create one automatically with default values
@@ -506,8 +484,8 @@ function NutritionDashboardContent() {
 
       const waterGoal = goals[0];
       setWaterGoalId(waterGoal.id); // Store goal id for updates
-      const targetValue = waterGoal.target_value || 0;
-      const currentValue = waterGoal.current_value || 0; // Today's water intake (in ml)
+      const targetValue = Number(waterGoal.target_value ?? 0);
+      const currentValue = Number(waterGoal.current_value ?? 0); // Today's water intake (in ml)
       const unit = waterGoal.target_unit?.toLowerCase() || "liters";
 
       // Convert target_value to milliliters and glasses based on unit
@@ -1029,16 +1007,16 @@ function NutritionDashboardContent() {
                 </div>
                 <div className="text-sm fc-text-dim space-y-1">
                   <p>
-                    <span className="font-mono font-medium text-blue-500 dark:text-blue-400">
+                    <span className="font-mono font-medium" style={{ color: "var(--fc-accent-primary)" }}>
                       {Math.round(nutritionData.calories.consumed)} / {nutritionData.calories.goal || "—"} kcal
                     </span>
                   </p>
                   <p className="text-xs fc-text-dim">
-                    <span className="text-rose-500 dark:text-rose-400">P {Math.round(nutritionData.protein.consumed)}g</span>
+                    <span style={{ color: "var(--fc-status-error)" }}>P {Math.round(nutritionData.protein.consumed)}g</span>
                     {" · "}
-                    <span className="text-amber-500 dark:text-amber-400">C {Math.round(nutritionData.carbs.consumed)}g</span>
+                    <span style={{ color: "var(--fc-status-warning)" }}>C {Math.round(nutritionData.carbs.consumed)}g</span>
                     {" · "}
-                    <span className="text-purple-500 dark:text-purple-400">F {Math.round(nutritionData.fat.consumed)}g</span>
+                    <span style={{ color: "var(--fc-domain-habits)" }}>F {Math.round(nutritionData.fat.consumed)}g</span>
                     {nutritionData.protein.goal != null && (
                       <span className="fc-text-dim">
                         {" "}
@@ -1143,7 +1121,7 @@ function NutritionDashboardContent() {
               <button
                 type="button"
                 onClick={() => setNutritionTrendsOpen((o) => !o)}
-                className="w-full fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 flex items-center justify-between gap-3 text-left"
+                className="w-full fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4 flex items-center justify-between gap-3 text-left"
               >
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
@@ -1152,7 +1130,7 @@ function NutritionDashboardContent() {
                 {nutritionTrendsOpen ? <ChevronUp className="w-5 h-5 fc-text-dim" /> : <ChevronDown className="w-5 h-5 fc-text-dim" />}
               </button>
               {nutritionTrendsOpen && (
-                <div className="fc-surface rounded-b-2xl border border-t-0 border-[color:var(--fc-surface-card-border)] p-4 mt-0">
+                <div className="fc-surface rounded-b-2xl border border-t-0 border-[color:var(--fc-glass-border)] backdrop-blur-[8px] p-4 mt-0">
                   {nutritionTrends.length === 0 ? (
                     <p className="text-sm fc-text-dim py-6 text-center">Start logging meals to see trends.</p>
                   ) : (

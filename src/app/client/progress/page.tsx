@@ -21,6 +21,7 @@ import {
   FileText,
   Trophy,
   Camera,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { getProgressStats, ProgressStats, getMonthlyProgressSummary, getMonthlyNarrativeData, type MonthlyProgressSummary, type MonthlyNarrativeData } from "@/lib/progressStatsService";
@@ -33,15 +34,15 @@ const HUB_NAV_ITEMS: {
   iconClass: string;
   getBadge?: (stats: ProgressStats) => string | null;
 }[] = [
-  { href: "/client/progress/analytics", title: "Analytics", description: "Volume and intensity trends", icon: BarChart3, iconClass: "bg-blue-500/10 text-blue-400 border border-blue-500/20", getBadge: () => null },
-  { href: "/client/progress/workout-logs", title: "Workout History", description: "View past workouts and training volume", icon: FileText, iconClass: "bg-blue-500/10 text-blue-400 border border-blue-500/20", getBadge: (s) => (s.totalWorkouts > 0 ? `${s.totalWorkouts} total` : null) },
-  { href: "/client/progress/performance", title: "Performance tests", description: "Benchmarks and tests", icon: Timer, iconClass: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20", getBadge: () => null },
-  { href: "/client/progress/body-metrics", title: "Body metrics", description: "Weight and measurements", icon: Scale, iconClass: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20", getBadge: (s) => (s.currentWeight != null ? "Logged" : null) },
-  { href: "/client/progress/mobility", title: "Mobility", description: "Screening and flexibility", icon: Accessibility, iconClass: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20", getBadge: () => null },
-  { href: "/client/progress/personal-records", title: "Personal records", description: "PRs and lifts", icon: Dumbbell, iconClass: "bg-amber-500/10 text-amber-400 border border-amber-500/20", getBadge: (s) => (s.personalRecords > 0 ? `${s.personalRecords} PRs` : null) },
-  { href: "/client/progress/achievements", title: "Achievements", description: "Badges and milestones", icon: Award, iconClass: "bg-amber-500/10 text-amber-400 border border-amber-500/20", getBadge: (s) => (s.achievementsUnlocked > 0 ? `${s.achievementsUnlocked} Earned` : null) },
-  { href: "/client/progress/leaderboard", title: "Leaderboard", description: "Rankings and scores", icon: Trophy, iconClass: "bg-rose-500/10 text-rose-400 border border-rose-500/20", getBadge: (s) => (s.bestLeaderboardRank != null ? `#${s.bestLeaderboardRank}` : null) },
-  { href: "/client/progress/photos", title: "Photos", description: "Progress photos", icon: Camera, iconClass: "bg-violet-500/10 text-violet-400 border border-violet-500/20", getBadge: () => null },
+  { href: "/client/progress/analytics", title: "Analytics", description: "Volume and intensity trends", icon: BarChart3, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]", getBadge: () => null },
+  { href: "/client/progress/workout-logs", title: "Workout History", description: "View past workouts and training volume", icon: FileText, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]", getBadge: (s) => (s.totalWorkouts > 0 ? `${s.totalWorkouts} total` : null) },
+  { href: "/client/progress/performance", title: "Performance tests", description: "Benchmarks and tests", icon: Timer, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-workouts)_10%,transparent)] text-[color:var(--fc-domain-workouts)] border border-[color-mix(in_srgb,var(--fc-domain-workouts)_20%,transparent)]", getBadge: () => null },
+  { href: "/client/progress/body-metrics", title: "Body metrics", description: "Weight and measurements", icon: Scale, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)] text-[color:var(--fc-status-success)] border border-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)]", getBadge: (s) => (s.currentWeight != null ? "Logged" : null) },
+  { href: "/client/progress/mobility", title: "Mobility", description: "Screening and flexibility", icon: Accessibility, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]", getBadge: () => null },
+  { href: "/client/progress/personal-records", title: "Personal records", description: "PRs and lifts", icon: Dumbbell, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] text-[color:var(--fc-status-warning)] border border-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)]", getBadge: (s) => (s.personalRecords > 0 ? `${s.personalRecords} PRs` : null) },
+  { href: "/client/progress/achievements", title: "Achievements", description: "Badges and milestones", icon: Award, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] text-[color:var(--fc-status-warning)] border border-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)]", getBadge: (s) => (s.achievementsUnlocked > 0 ? `${s.achievementsUnlocked} Earned` : null) },
+  { href: "/client/progress/leaderboard", title: "Leaderboard", description: "Rankings and scores", icon: Trophy, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)] text-[color:var(--fc-status-error)] border border-[color-mix(in_srgb,var(--fc-status-error)_20%,transparent)]", getBadge: (s) => (s.bestLeaderboardRank != null ? `#${s.bestLeaderboardRank}` : null) },
+  { href: "/client/progress/photos", title: "Photos", description: "Progress photos", icon: Camera, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-habits)_10%,transparent)] text-[color:var(--fc-domain-habits)] border border-[color-mix(in_srgb,var(--fc-domain-habits)_20%,transparent)]", getBadge: () => null },
 ];
 
 function ProgressHubContent() {
@@ -140,8 +141,10 @@ function ProgressHubContent() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32 px-4">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
-            <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-8 text-center">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-3" style={{ color: "var(--fc-status-warning)" }} />
+            <p className="text-base font-semibold fc-text-primary mb-1">Something went wrong</p>
+            <p className="text-sm fc-text-dim mb-4">{loadError}</p>
             <button
               type="button"
               onClick={() => loadProgressData()}
@@ -162,7 +165,7 @@ function ProgressHubContent() {
       <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32">
         {/* This month summary — first thing */}
         {monthlySummary && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 mb-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5 mb-6">
             <h2 className="text-lg font-semibold fc-text-primary mb-2">
               {monthlySummary.isFirstMonth ? "This month so far" : "This month"}
             </h2>
@@ -202,13 +205,13 @@ function ProgressHubContent() {
 
         {/* Monthly "In Review" narrative card */}
         {narrativeParagraph && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 mb-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5 mb-6">
             <h2 className="text-lg font-semibold fc-text-primary mb-2">In Review</h2>
             <p className="text-sm fc-text-primary leading-relaxed">{narrativeParagraph}</p>
           </div>
         )}
 
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
@@ -223,7 +226,7 @@ function ProgressHubContent() {
                 </p>
               </div>
             </div>
-            <Link href="/client/profile" className="w-12 h-12 rounded-xl fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] transition-colors shrink-0">
+            <Link href="/client/profile" className="w-12 h-12 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] flex items-center justify-center text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] transition-colors shrink-0">
               <Settings className="w-6 h-6" />
             </Link>
           </div>
@@ -232,7 +235,7 @@ function ProgressHubContent() {
         {/* Quick Stats Banner — vertical stack on mobile, no horizontal scroll */}
         <section className="mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:flex-nowrap">
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start">
                 <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Workouts</span>
                 <Calendar className="w-5 h-5 fc-text-workouts" />
@@ -245,7 +248,7 @@ function ProgressHubContent() {
                 <div className="text-xs fc-text-success font-medium mt-1">This week</div>
               </div>
             </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start">
                 <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Volume</span>
                 <Layers className="w-5 h-5 fc-text-error" />
@@ -267,7 +270,7 @@ function ProgressHubContent() {
                 </div>
               </div>
             </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start">
                 <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Records</span>
                 <Award className="w-5 h-5 fc-text-warning" />
@@ -277,7 +280,7 @@ function ProgressHubContent() {
                 <div className="text-xs fc-text-subtle mt-1">Personal records</div>
               </div>
             </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start">
                 <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Achievements</span>
                 <Award className="w-5 h-5 fc-text-amber-400" />
@@ -288,7 +291,7 @@ function ProgressHubContent() {
               </div>
             </div>
             {stats.bestLeaderboardRank != null && (
-              <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+              <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <div className="flex justify-between items-start">
                   <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Best rank</span>
                   <Trophy className="w-5 h-5 fc-text-yellow-500" />
@@ -309,7 +312,7 @@ function ProgressHubContent() {
             const badge = item.getBadge?.(stats) ?? null;
             return (
               <Link key={item.href} href={item.href}>
-                <div className="fc-surface p-6 rounded-2xl cursor-pointer fc-hover-rise h-full group border border-[color:var(--fc-surface-card-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all">
+                <div className="fc-surface p-6 rounded-2xl cursor-pointer fc-hover-rise h-full group border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all">
                   <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 ${item.iconClass}`}>
                     <Icon className="w-8 h-8" />
                   </div>
@@ -329,7 +332,7 @@ function ProgressHubContent() {
               </Link>
             );
           })}
-          <div className="fc-surface p-6 rounded-2xl border border-dashed border-[color:var(--fc-surface-card-border)] h-full group opacity-80">
+          <div className="fc-surface p-6 rounded-2xl border border-dashed border-[color:var(--fc-glass-border)] h-full group opacity-80">
             <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-[color:var(--fc-domain-neutral)]/10 fc-text-subtle border border-[color:var(--fc-glass-border)]">
               <Download className="w-8 h-8" />
             </div>

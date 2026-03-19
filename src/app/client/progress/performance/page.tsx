@@ -173,7 +173,7 @@ function PerformancePageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-12 fc-page max-w-4xl mx-auto">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
@@ -208,9 +208,9 @@ function PerformancePageContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="relative z-10 mx-auto w-full max-w-4xl px-4 pb-40 pt-6 sm:px-6 lg:px-12 fc-page">
         {/* Header */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-10">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-10">
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+            <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
               <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
             </Link>
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -295,7 +295,7 @@ function PerformancePageContent() {
 
           {/* Main display */}
           <div
-            className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden p-6 md:p-8"
+            className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden p-6 md:p-8"
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
               <div className="flex-1 min-w-0">
@@ -387,7 +387,7 @@ function PerformancePageContent() {
           {/* History table */}
           <section className="space-y-4">
             <h3 className="text-lg font-semibold fc-text-primary px-1">Historical logs</h3>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
               {currentTests.length === 0 ? (
                 <div className="p-8">
                   <EmptyState

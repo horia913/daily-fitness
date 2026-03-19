@@ -300,7 +300,7 @@ function ProgressPhotosPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
@@ -316,7 +316,7 @@ function ProgressPhotosPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
               <div className="animate-pulse space-y-6">
                 <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                 <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
@@ -334,7 +334,7 @@ function ProgressPhotosPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] mb-6">
+            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold fc-text-primary">
                   Photo Comparison
@@ -383,7 +383,7 @@ function ProgressPhotosPageContent() {
 
             {comparisonPhotos ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+                <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <h3 className="text-lg font-semibold fc-text-primary mb-4">
                     {formatDate(comparisonDate1!)}
                     {comparisonPhotos.before[0]?.weight_kg != null && (
@@ -420,7 +420,7 @@ function ProgressPhotosPageContent() {
                   </div>
                 </div>
 
-                <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+                <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <h3 className="text-lg font-semibold fc-text-primary mb-4">
                     {formatDate(comparisonDate2!)}
                     {comparisonPhotos.after[0]?.weight_kg != null && (
@@ -458,7 +458,7 @@ function ProgressPhotosPageContent() {
                 </div>
               </div>
             ) : (
-              <div className="fc-surface p-12 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+              <div className="fc-surface p-12 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
                 <div className="animate-pulse">
                   <div className="h-64 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
                 </div>
@@ -476,12 +476,12 @@ function ProgressPhotosPageContent() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
           {/* Header */}
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link
                   href="/client/progress"
-                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]"
+                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]"
                 >
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
@@ -507,7 +507,7 @@ function ProgressPhotosPageContent() {
           </div>
 
           {/* Upload Section */}
-          <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] mb-8">
+          <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-8">
             <h2 className="text-xl font-semibold fc-text-primary mb-6">
               Take Progress Photos
             </h2>
@@ -614,7 +614,7 @@ function ProgressPhotosPageContent() {
 
           {/* Timeline */}
           {timeline.length > 0 && (
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold fc-text-primary">
                   Photo Timeline

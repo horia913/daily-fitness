@@ -502,10 +502,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   </div>
                   <div className="min-w-0">
                     <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      {templates.length > 0 
-                        ? (templates.reduce((sum, t) => sum + (t.rating || 0), 0) / templates.length).toFixed(1)
-                        : '0.0'
-                      }
+                      {(() => {
+                        const rated = templates.filter(t => t.rating);
+                        return rated.length > 0
+                          ? (rated.reduce((sum, t) => sum + (t.rating || 0), 0) / rated.length).toFixed(1)
+                          : '--';
+                      })()}
                     </p>
                     <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Rating</p>
                   </div>
@@ -876,10 +878,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               <Users className="w-3 h-3" />
                               <span>{template.usage_count || 0} assignments</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              <span>{template.rating || 0} rating</span>
-                            </div>
+                            {template.rating ? (
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3" />
+                                <span>{template.rating} rating</span>
+                              </div>
+                            ) : null}
                             <span className="hidden sm:inline">Created: {new Date(template.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>

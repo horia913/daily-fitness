@@ -1627,7 +1627,7 @@ function WorkoutTemplateCard({
                   color: "var(--fc-text-primary)",
                 }}
               >
-                {template.rating || 0}
+                {template.rating || '--'}
               </span>
               <span
                 style={{
@@ -1811,10 +1811,12 @@ function WorkoutTemplateListItem({
                 <Users className="w-3 h-3" />
                 <span>{assignmentCount} clients</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Star className="w-3 h-3" />
-                <span>{template.rating || 0}</span>
-              </div>
+              {template.rating ? (
+                <div className="flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  <span>{template.rating}</span>
+                </div>
+              ) : null}
               <span>
                 Created: {new Date(template.created_at).toLocaleDateString()}
               </span>

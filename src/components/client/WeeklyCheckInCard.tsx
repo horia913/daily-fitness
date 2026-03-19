@@ -89,7 +89,7 @@ export function WeeklyCheckInCard({
         </div>
         <div className="mt-4">
           <span
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold ${
+            className={`inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold ${
               isDue ? "fc-btn fc-btn-primary" : "fc-btn fc-btn-secondary"
             }`}
           >

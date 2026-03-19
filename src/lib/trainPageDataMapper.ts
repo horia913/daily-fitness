@@ -43,6 +43,8 @@ export interface TrainPageRpcResponse {
   programName?: string | null
   programId?: string | null
   assignmentId?: string | null
+  /** Assignment created_at — used to compute current program week start for "completed this week" filter */
+  assignmentStartDate?: string | null
   durationWeeks?: number | null
   schedule?: TrainPageRpcScheduleRow[] | null
   completions?: TrainPageRpcCompletionRow[] | null
@@ -65,6 +67,21 @@ const emptyState: ProgramWeekState = {
   completedCount: 0,
   totalSlots: 0,
   currentWeekNumber: 1,
+}
+
+/**
+ * Start of the given program week (Monday 00:00) in local time.
+ * assignmentStartDate = program_assignments.created_at (ISO string).
+ * weekNumber = 1-based program week.
+ */
+function getWeekStartDate(assignmentStartDate: string, weekNumber: number): Date {
+  const start = new Date(assignmentStartDate)
+  const dayOfWeek = start.getDay() // 0 = Sunday, 1 = Monday, ...
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  start.setDate(start.getDate() + mondayOffset)
+  start.setDate(start.getDate() + (weekNumber - 1) * 7)
+  start.setHours(0, 0, 0, 0)
+  return start
 }
 
 /**
@@ -113,7 +130,30 @@ export function rpcResponseToProgramWeekState(
   const weekNumbers = [...new Set(slots.map((s) => s.week_number))].sort((a, b) => a - b)
   const totalWeeks = weekNumbers.length
   const currentWeekSlots = slots.filter((s) => s.week_number === unlockedWeekMax)
-  const completedScheduleIds = new Set(completedSlots.map((c) => c.program_schedule_id))
+
+  // All-time: for nextSlot, isCompleted, completedCount (week unlock uses all completions)
+  const completedScheduleIdsAllTime = new Set(completedSlots.map((c) => c.program_schedule_id))
+
+  // Current program week only: day card shows completed only if completed this week (calendar)
+  const assignmentStartDate = data.assignmentStartDate ?? null
+  let completedScheduleIdsCurrentWeek: Set<string>
+  if (assignmentStartDate) {
+    const currentWeekStart = getWeekStartDate(assignmentStartDate, unlockedWeekMax)
+    const currentWeekEnd = new Date(currentWeekStart)
+    currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
+    completedScheduleIdsCurrentWeek = new Set(
+      completions
+        .filter((c) => {
+          const completedAt = new Date(c.completed_at)
+          return completedAt >= currentWeekStart && completedAt < currentWeekEnd
+        })
+        .map((c) => c.program_schedule_id)
+    )
+  } else {
+    completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+  }
+
+  const completedScheduleIds = completedScheduleIdsCurrentWeek
 
   const templateMap = new Map<string, { name: string; estimated_duration: number }>()
   for (const s of schedule) {
@@ -169,7 +209,7 @@ export function rpcResponseToProgramWeekState(
 
   const totalSlots = slots.length
   const completedCount = completedSlots.length
-  const nextSlot = slots.find((s) => !completedScheduleIds.has(s.id)) ?? null
+  const nextSlot = slots.find((s) => !completedScheduleIdsAllTime.has(s.id)) ?? null
   const isCompleted = nextSlot === null && completedCount > 0
 
   return {

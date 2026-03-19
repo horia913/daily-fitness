@@ -175,10 +175,12 @@ export default function WorkoutTemplateCard({
                   <Users className="w-3 h-3" />
                   <span>{template.usage_count || 0} assignments</span>
                 </div>
-                <div className={`flex items-center gap-1 ${getRatingColor(template.rating || 0)}`}>
-                  <Star className="w-3 h-3" />
-                  <span>{template.rating || 0}</span>
-                </div>
+                {template.rating ? (
+                  <div className={`flex items-center gap-1 ${getRatingColor(template.rating)}`}>
+                    <Star className="w-3 h-3" />
+                    <span>{template.rating}</span>
+                  </div>
+                ) : null}
                 <span>Created: {new Date(template.created_at).toLocaleDateString()}</span>
               </div>
             </div>
@@ -338,10 +340,12 @@ export default function WorkoutTemplateCard({
             <Users className="w-3 h-3" />
             <span>{template.usage_count || 0}</span>
           </div>
-          <div className={`flex items-center gap-1 ${getRatingColor(template.rating || 0)}`}>
-            <Star className="w-3 h-3" />
-            <span>{template.rating || 0}</span>
-          </div>
+          {template.rating ? (
+            <div className={`flex items-center gap-1 ${getRatingColor(template.rating)}`}>
+              <Star className="w-3 h-3" />
+              <span>{template.rating}</span>
+            </div>
+          ) : null}
         </div>
 
         {/* Quick Actions */}

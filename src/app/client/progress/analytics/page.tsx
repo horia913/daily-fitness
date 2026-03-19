@@ -19,6 +19,7 @@ import {
   Calendar,
   Search,
   Timer,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -39,6 +40,13 @@ import { getWeeklyVolume, getWorkoutsWithVolumeForSleepAnalysis, type VolumeStat
 import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { VolumeTrendChart } from "@/components/progress/VolumeTrendChart";
 import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
+import {
+  getActivitiesByDateRange,
+  ACTIVITY_META,
+  INTENSITY_META,
+  type ClientActivity,
+  type ActivityType,
+} from "@/lib/clientActivityService";
 
 interface WorkoutFrequencyData {
   week: string;
@@ -91,6 +99,9 @@ function AnalyticsPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Extra activities analytics state
+  const [recentActivities, setRecentActivities] = useState<ClientActivity[]>([]);
 
   // Cross-link: open strength section with exercise expanded when ?exerciseId= is present
   const exerciseIdFromUrl = searchParams.get("exerciseId");
@@ -147,6 +158,7 @@ function AnalyticsPageContent() {
         loadVolumeStats(),
         loadWellnessStats(),
         loadWorkoutsForSleepAnalysis(),
+        loadRecentActivities(),
       ]);
     } catch (error) {
       console.error("Error loading analytics data:", error);
@@ -313,6 +325,22 @@ function AnalyticsPageContent() {
     } catch (error) {
       console.error("Error loading goal completion:", error);
       setGoalCompletion({ completed: 0, total: 0 });
+    }
+  };
+
+  const loadRecentActivities = async () => {
+    if (!user?.id) return;
+    try {
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+      const data = await getActivitiesByDateRange(
+        user.id,
+        threeMonthsAgo.toISOString().split("T")[0],
+        new Date().toISOString().split("T")[0]
+      );
+      setRecentActivities(data);
+    } catch {
+      setRecentActivities([]);
     }
   };
 
@@ -584,11 +612,11 @@ function AnalyticsPageContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-10">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-10">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -639,7 +667,7 @@ function AnalyticsPageContent() {
         </div>
 
         {loadError && !loading ? (
-          <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+          <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
             <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
             <Button variant="secondary" onClick={() => { setLoadError(null); loadAnalyticsData(); }} className="h-11 px-6">
               Retry
@@ -660,7 +688,7 @@ function AnalyticsPageContent() {
         ) : (
           <div className="space-y-8">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
                 <div className="flex items-center justify-between">
                   <Calendar className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -674,7 +702,7 @@ function AnalyticsPageContent() {
                   Workouts logged
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
                 <div className="flex items-center justify-between">
                   <Target className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -688,7 +716,7 @@ function AnalyticsPageContent() {
                   {goalCompletion.completed} of {goalCompletion.total} completed
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
                 <div className="flex items-center justify-between">
                   <Scale className="h-5 w-5 text-[color:var(--fc-domain-meals)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -704,7 +732,7 @@ function AnalyticsPageContent() {
                     : "Body composition"}
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
                 <div className="flex items-center justify-between">
                   <Dumbbell className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -720,9 +748,9 @@ function AnalyticsPageContent() {
               </div>
             </div>
             {/* Workout Frequency Chart */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_rgba(59,130,246,0.25)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -769,15 +797,16 @@ function AnalyticsPageContent() {
                   </div>
                 </div>
               ) : (
-                <p className="py-12 text-center text-sm text-[color:var(--fc-text-dim)]">
-                  No workout data available
-                </p>
+                <div className="py-12 text-center">
+                  <p className="text-sm font-semibold fc-text-primary mb-1">No workout data yet</p>
+                  <p className="text-xs fc-text-dim">Start training to see your frequency trends here.</p>
+                </div>
               )}
             </div>
 
             {/* Workout Duration Trend */}
             {durationTrend && durationTrend.weeklyData.length > 0 && (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/80">
                     <Timer className="h-6 w-6 text-white" />
@@ -860,7 +889,7 @@ function AnalyticsPageContent() {
                 )}
 
                 {compoundProgressions.length > 0 && (
-                  <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6">
+                  <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4 sm:p-6">
                     <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
                       Estimated 1RM — Compound Lifts
                     </h3>
@@ -910,7 +939,7 @@ function AnalyticsPageContent() {
                         return (
                           <div
                             key={ex.id}
-                            className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden"
+                            className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] overflow-hidden"
                           >
                             <button
                               type="button"
@@ -982,9 +1011,9 @@ function AnalyticsPageContent() {
             )}
 
             {/* Recovery Insight Card — last 4 weeks volume vs soreness */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-[0_10px_20px_rgba(139,92,246,0.25)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-domain-habits)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-domain-habits)_25%,transparent)]">
                   <Dumbbell className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1105,9 +1134,9 @@ function AnalyticsPageContent() {
             </div>
 
             {/* Sleep vs Performance Insight Card */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
               <div className="mb-2 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-[0_10px_20px_rgba(14,165,233,0.25)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <BarChart3 className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1126,7 +1155,7 @@ function AnalyticsPageContent() {
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -1200,7 +1229,7 @@ function AnalyticsPageContent() {
                 )}
               </div>
             ) : (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -1214,16 +1243,17 @@ function AnalyticsPageContent() {
                     </p>
                   </div>
                 </div>
-                <p className="py-12 text-center text-sm text-[color:var(--fc-text-dim)]">
-                  No body metrics data available
-                </p>
+                <div className="py-12 text-center">
+                  <p className="text-sm font-semibold fc-text-primary mb-1">No body metrics yet</p>
+                  <p className="text-xs fc-text-dim">Log your weight and measurements to track progress.</p>
+                </div>
               </div>
             )}
 
             {/* Goal Completion */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_rgba(124,58,237,0.3)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1236,26 +1266,163 @@ function AnalyticsPageContent() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+              <div className="flex items-center gap-6">
+                <div className="relative w-20 h-20 flex-shrink-0">
+                  <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="33" fill="none" stroke="var(--fc-glass-border)" strokeWidth="5" />
+                    <circle cx="40" cy="40" r="33" fill="none" stroke="var(--fc-accent-primary)" strokeWidth="5" strokeLinecap="round"
+                      strokeDasharray={`${completionPercentage * 2.073} 999`} />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-lg font-black text-[color:var(--fc-text-primary)]">
                     {completionPercentage}%
                   </span>
-                  <span className="text-sm text-[color:var(--fc-text-dim)]">
-                    {goalCompletion.completed} of {goalCompletion.total} goals completed
-                  </span>
                 </div>
-
-                <div className="relative h-6 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[color:var(--fc-accent-primary)] transition-all duration-1000 ease-out"
-                    style={{
-                      width: `${completionPercentage}%`,
-                      animation: "fadeInLeft 1s ease-out",
-                    }}
-                  />
+                <div>
+                  <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    {goalCompletion.completed} of {goalCompletion.total}
+                  </p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">goals completed</p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Extra Activities Summary */}
+        {!loading && recentActivities.length > 0 && (
+          <div className="space-y-6" style={{ animation: "fadeInUp 0.8s ease-out 0.6s both" }}>
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    Extra Activities
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Your logged activities beyond workouts
+                  </p>
+                </div>
+              </div>
+
+              {(() => {
+                const byWeek: Record<string, { count: number; minutes: number }> = {};
+                const byType: Record<string, number> = {};
+
+                for (const a of recentActivities) {
+                  const d = new Date(a.activity_date + "T00:00:00");
+                  const dayOfWeek = d.getDay();
+                  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                  const monday = new Date(d);
+                  monday.setDate(d.getDate() + mondayOffset);
+                  const weekKey = monday.toISOString().split("T")[0];
+
+                  if (!byWeek[weekKey]) byWeek[weekKey] = { count: 0, minutes: 0 };
+                  byWeek[weekKey].count++;
+                  byWeek[weekKey].minutes += a.duration_minutes;
+
+                  const label = a.activity_type === "custom"
+                    ? (a.custom_activity_name ?? "Custom")
+                    : (ACTIVITY_META[a.activity_type]?.label ?? a.activity_type);
+                  byType[label] = (byType[label] || 0) + 1;
+                }
+
+                const weekKeys = Object.keys(byWeek).sort();
+                const last8Weeks = weekKeys.slice(-8);
+                const maxMinutes = Math.max(...last8Weeks.map((w) => byWeek[w].minutes), 1);
+
+                const sortedTypes = Object.entries(byType)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 5);
+                const totalByType = sortedTypes.reduce((s, [, c]) => s + c, 0);
+
+                return (
+                  <div className="space-y-6">
+                    {/* Weekly duration bar chart */}
+                    <div>
+                      <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
+                        Weekly Duration (minutes)
+                      </p>
+                      <div className="flex items-end gap-1.5 h-24">
+                        {last8Weeks.map((w) => {
+                          const pct = (byWeek[w].minutes / maxMinutes) * 100;
+                          const weekDate = new Date(w + "T00:00:00");
+                          const label = `${weekDate.getMonth() + 1}/${weekDate.getDate()}`;
+                          return (
+                            <div key={w} className="flex-1 flex flex-col items-center gap-1">
+                              <span className="text-[10px] fc-text-dim">
+                                {byWeek[w].minutes}
+                              </span>
+                              <div
+                                className="w-full rounded-t-md bg-gradient-to-t from-cyan-500 to-cyan-400 transition-all duration-500"
+                                style={{ height: `${Math.max(pct, 4)}%` }}
+                              />
+                              <span className="text-[9px] fc-text-dim">{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Activity type distribution */}
+                    <div>
+                      <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
+                        Activity Types
+                      </p>
+                      <div className="space-y-2">
+                        {sortedTypes.map(([label, count]) => {
+                          const pct = Math.round((count / totalByType) * 100);
+                          return (
+                            <div key={label} className="flex items-center gap-3">
+                              <span className="text-sm fc-text-primary w-24 truncate">
+                                {label}
+                              </span>
+                              <div className="flex-1 h-2 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-cyan-500 transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs fc-text-dim w-8 text-right">
+                                {count}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Total stats */}
+                    <div className="flex gap-4 pt-2 border-t border-[color:var(--fc-glass-border)]">
+                      <div className="flex-1 text-center">
+                        <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                          {recentActivities.length}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+                          Total Activities
+                        </p>
+                      </div>
+                      <div className="flex-1 text-center">
+                        <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                          {recentActivities.reduce((s, a) => s + a.duration_minutes, 0)}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+                          Total Minutes
+                        </p>
+                      </div>
+                      <div className="flex-1 text-center">
+                        <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                          {Object.keys(byType).length}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+                          Activity Types
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

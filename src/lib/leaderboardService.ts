@@ -99,6 +99,61 @@ export async function getClientRank(
   }
 }
 
+/**
+ * Get leaderboard filtered by sex (joins profiles to filter by sex)
+ */
+export async function getLeaderboardBySex(
+  type: LeaderboardType,
+  exerciseId?: string,
+  timeWindow: TimeWindow = 'this_month',
+  sex?: 'M' | 'F' | null,
+  limit: number = 50
+): Promise<LeaderboardEntry[]> {
+  if (!sex) return getLeaderboard(type, exerciseId, timeWindow, limit);
+
+  try {
+    const entries = await getLeaderboard(type, exerciseId, timeWindow, 200);
+    if (entries.length === 0) return [];
+
+    const clientIds = entries.map(e => e.client_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, sex')
+      .in('id', clientIds)
+      .eq('sex', sex);
+
+    if (!profiles?.length) return [];
+    const sexClientIds = new Set(profiles.map(p => p.id));
+
+    const filtered = entries.filter(e => sexClientIds.has(e.client_id));
+    return filtered.slice(0, limit).map((e, i) => ({ ...e, rank: i + 1 }));
+  } catch (error) {
+    console.error('Error in getLeaderboardBySex:', error);
+    return [];
+  }
+}
+
+/**
+ * Get current champions (rank 1 per category)
+ */
+export async function getCurrentChampions(limit: number = 5): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('current_champions')
+      .select('*')
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching champions:', error);
+      return [];
+    }
+    return data ?? [];
+  } catch (error) {
+    console.error('Error in getCurrentChampions:', error);
+    return [];
+  }
+}
+
 /** Epley 1RM estimate: weight * (1 + reps/30) */
 function epley1RM(weight: number, reps: number): number {
   if (reps <= 0) return weight;

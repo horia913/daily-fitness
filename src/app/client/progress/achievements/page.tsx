@@ -20,9 +20,12 @@ interface Achievement {
   icon: string;
   rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
   unlocked: boolean;
-  progress?: number; // 0-100
+  progress?: number;
   requirement?: string;
   unlockedAt?: Date;
+  unlockedTiers?: string[];
+  isMastered?: boolean;
+  nearMiss?: boolean;
 }
 
 function AchievementsPageContent() {
@@ -80,23 +83,24 @@ function AchievementsPageContent() {
       const mappedAchievements: Achievement[] = achievementProgress.map((progress: AchievementProgress) => {
         const { template, currentValue, progress: progressPercent, unlockedTiers, status, nextTier } = progress;
         
-        // Map category to rarity
         const rarityMap: Record<string, "common" | "uncommon" | "rare" | "epic" | "legendary"> = {
+          'workout': 'common',
           'milestone': 'common',
+          'consistency': 'uncommon',
           'activity': 'uncommon',
+          'wellness': 'uncommon',
           'performance': 'rare',
+          'challenges': 'rare',
           'volume': 'epic',
-          'strength': 'legendary'
+          'program': 'epic',
+          'transformation': 'legendary',
+          'strength': 'legendary',
         };
         const rarity = rarityMap[template.category] || 'common';
+        const icon = template.icon || '🏅';
+        const isUnlocked = status === 'unlocked' || status === 'partially_unlocked';
+        const isMastered = status === 'unlocked' && template.is_tiered;
         
-        // Get icon from template or use default
-        const icon = template.icon || '🏆';
-        
-        // Determine if unlocked (all tiers unlocked for tiered, or single threshold met for non-tiered)
-        const unlocked = status === 'unlocked';
-        
-        // Build description with progress info
         let description = template.description || '';
         if (template.is_tiered && nextTier) {
           description += ` (Next: ${nextTier.label} at ${nextTier.threshold})`;
@@ -104,37 +108,45 @@ function AchievementsPageContent() {
           description += ` (Target: ${template.single_threshold})`;
         }
         
-        // Build requirement text
         let requirement: string | undefined;
         if (template.is_tiered) {
-          const tiers = [
-            { name: 'bronze', threshold: template.tier_bronze_threshold, label: template.tier_bronze_label },
-            { name: 'silver', threshold: template.tier_silver_threshold, label: template.tier_silver_label },
-            { name: 'gold', threshold: template.tier_gold_threshold, label: template.tier_gold_label },
-            { name: 'platinum', threshold: template.tier_platinum_threshold, label: template.tier_platinum_label }
-          ].filter(t => t.threshold !== null && t.threshold !== undefined);
-          
-          if (unlockedTiers.length > 0) {
-            requirement = `Unlocked: ${unlockedTiers.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}`;
-          } else if (nextTier) {
+          if (nextTier) {
             requirement = `${currentValue}/${nextTier.threshold} for ${nextTier.label}`;
+          } else if (isMastered) {
+            requirement = `All tiers complete!`;
           } else {
+            const tiers = [
+              { threshold: template.tier_bronze_threshold },
+              { threshold: template.tier_silver_threshold },
+              { threshold: template.tier_gold_threshold },
+              { threshold: template.tier_platinum_threshold }
+            ].filter(t => t.threshold !== null && t.threshold !== undefined);
             requirement = `${currentValue}/${tiers[tiers.length - 1]?.threshold || 0}`;
           }
         } else {
           requirement = `${currentValue}/${template.single_threshold || 0}`;
         }
+
+        // Near-miss: within 20% of next tier threshold
+        let nearMiss = false;
+        if (nextTier && nextTier.threshold > 0) {
+          const ratio = currentValue / nextTier.threshold;
+          nearMiss = ratio >= 0.8 && ratio < 1;
+        }
         
         return {
           id: template.id,
           name: template.name,
-          description: description,
-          icon: icon,
-          rarity: rarity,
-          unlocked: unlocked,
-          progress: status === 'locked' ? undefined : progressPercent, // Locked achievements have undefined progress
-          requirement: requirement,
-          unlockedAt: undefined // We don't track unlock date per template, only per tier
+          description,
+          icon,
+          rarity,
+          unlocked: isUnlocked,
+          progress: status === 'locked' ? undefined : progressPercent,
+          requirement,
+          unlockedAt: undefined,
+          unlockedTiers: template.is_tiered ? unlockedTiers : undefined,
+          isMastered,
+          nearMiss,
         };
       });
       
@@ -187,7 +199,7 @@ function AchievementsPageContent() {
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
         <div className="space-y-8">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-6">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
@@ -238,7 +250,7 @@ function AchievementsPageContent() {
             </div>
           </div>
 
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-glass-soft)]">
                 <Filter className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
@@ -351,12 +363,12 @@ function AchievementsPageContent() {
           </div>
 
           {loadError ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
           ) : loading ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]" />
               <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
                 Loading achievements...
@@ -371,7 +383,7 @@ function AchievementsPageContent() {
               </div>
 
               {filteredAchievements.length === 0 && (
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
                   <Award className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
                   <p className="mb-2 text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     No achievements found

@@ -4,8 +4,9 @@
  * Uses achievement_templates and user_achievements tables
  */
 
-import { supabase } from './supabase'
+import { supabase as browserSupabase } from './supabase'
 import { getStreak } from './programService'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================================================
 // INTERFACES
@@ -50,7 +51,7 @@ export interface AchievementProgress {
   progress: number // 0-100
   unlockedTiers: string[] // Array of unlocked tier names (e.g., ['bronze', 'silver'])
   nextTier: { tier: string; threshold: number; label: string } | null
-  status: 'locked' | 'in_progress' | 'unlocked'
+  status: 'locked' | 'in_progress' | 'partially_unlocked' | 'unlocked'
 }
 
 /** Enriched achievement for UI (modal, API response) */
@@ -69,12 +70,16 @@ export interface NewlyUnlockedAchievement {
 // ============================================================================
 
 export class AchievementService {
+  private static db(overrideClient?: SupabaseClient): SupabaseClient {
+    return overrideClient || browserSupabase
+  }
+
   /**
    * Get all active achievement templates
    */
-  static async getTemplates(): Promise<AchievementTemplate[]> {
+  static async getTemplates(supabaseClient?: SupabaseClient): Promise<AchievementTemplate[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.db(supabaseClient)
         .from('achievement_templates')
         .select('*')
         .eq('is_active', true)
@@ -92,9 +97,9 @@ export class AchievementService {
   /**
    * Get unlocked achievements for a client
    */
-  static async getUnlockedAchievements(clientId: string): Promise<UserAchievement[]> {
+  static async getUnlockedAchievements(clientId: string, supabaseClient?: SupabaseClient): Promise<UserAchievement[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.db(supabaseClient)
         .from('user_achievements')
         .select('*')
         .eq('client_id', clientId)
@@ -116,6 +121,9 @@ export class AchievementService {
     if (achievementType === 'personal_record' || achievementType === 'pr_count') return 'pr_count'
     if (achievementType === 'volume' || achievementType === 'total_volume') return 'total_volume'
     if (achievementType === 'leaderboard_rank') return 'leaderboard_rank'
+    if (achievementType === 'challenge_completed' || achievementType === 'challenges_completed') return 'challenges_completed'
+    if (achievementType === 'challenge_won' || achievementType === 'challenges_won') return 'challenges_won'
+    if (achievementType === 'challenge_top3' || achievementType === 'challenges_top3') return 'challenges_top3'
     return achievementType
   }
 
@@ -129,9 +137,11 @@ export class AchievementService {
    */
   static async getCurrentMetricValue(
     clientId: string,
-    achievementType: string
+    achievementType: string,
+    supabaseClient?: SupabaseClient
   ): Promise<number> {
     try {
+      const supabase = this.db(supabaseClient)
       const type = this.normalizeAchievementType(achievementType)
       switch (type) {
         case 'workout_count': {
@@ -212,6 +222,38 @@ export class AchievementService {
           return minRank
         }
 
+        case 'challenges_completed': {
+          const { count, error } = await supabase
+            .from('challenge_participants')
+            .select('*', { count: 'exact', head: true })
+            .eq('client_id', clientId)
+            .eq('status', 'completed')
+          if (error) throw error
+          return count ?? 0
+        }
+
+        case 'challenges_won': {
+          const { count, error } = await supabase
+            .from('challenge_participants')
+            .select('*', { count: 'exact', head: true })
+            .eq('client_id', clientId)
+            .eq('is_winner', true)
+          if (error) throw error
+          return count ?? 0
+        }
+
+        case 'challenges_top3': {
+          const { data, error } = await supabase
+            .from('challenge_participants')
+            .select('final_rank')
+            .eq('client_id', clientId)
+            .eq('status', 'completed')
+            .not('final_rank', 'is', null)
+            .lte('final_rank', 3)
+          if (error) throw error
+          return data?.length ?? 0
+        }
+
         default:
           return 0
       }
@@ -275,9 +317,11 @@ export class AchievementService {
             : 0
 
           // Determine status
-          let status: 'locked' | 'in_progress' | 'unlocked'
+          let status: 'locked' | 'in_progress' | 'partially_unlocked' | 'unlocked'
           if (unlockedTiers.length === tiers.length) {
-            status = 'unlocked' // All tiers unlocked
+            status = 'unlocked'
+          } else if (unlockedTiers.length > 0) {
+            status = 'partially_unlocked'
           } else if (currentValue > 0) {
             status = 'in_progress'
           } else {
@@ -326,11 +370,11 @@ export class AchievementService {
    */
   static async checkAndUnlockAchievements(
     clientId: string,
-    achievementType: string
+    achievementType: string,
+    supabaseClient?: SupabaseClient
   ): Promise<NewlyUnlockedAchievement[]> {
     try {
-      // Get relevant templates (match canonical type so both 'streak' and 'streak_weeks' work)
-      const templates = await this.getTemplates()
+      const templates = await this.getTemplates(supabaseClient)
       const canonicalType = this.normalizeAchievementType(achievementType)
       const relevantTemplates = templates.filter(
         t => this.normalizeAchievementType(t.achievement_type) === canonicalType
@@ -340,11 +384,9 @@ export class AchievementService {
         return []
       }
 
-      // Get current metric value
-      const currentValue = await this.getCurrentMetricValue(clientId, achievementType)
+      const currentValue = await this.getCurrentMetricValue(clientId, achievementType, supabaseClient)
 
-      // Get already unlocked achievements for this type
-      const unlocked = await this.getUnlockedAchievements(clientId)
+      const unlocked = await this.getUnlockedAchievements(clientId, supabaseClient)
       const unlockedMap = new Map<string, Set<string>>()
       unlocked.forEach(ua => {
         if (!unlockedMap.has(ua.achievement_template_id)) {
@@ -376,12 +418,12 @@ export class AchievementService {
               : currentValue >= tier.threshold
 
             if (!alreadyUnlocked && meetsThreshold) {
-              // Unlock this tier
               const unlockedAchievement = await this.unlockAchievement(
                 clientId,
                 template.id,
                 tier.name,
-                currentValue
+                currentValue,
+                supabaseClient
               )
 
               if (unlockedAchievement) {
@@ -406,8 +448,9 @@ export class AchievementService {
             const unlockedAchievement = await this.unlockAchievement(
               clientId,
               template.id,
-              null, // No tier for non-tiered
-              currentValue
+              null,
+              currentValue,
+              supabaseClient
             )
 
             if (unlockedAchievement) {
@@ -464,16 +507,16 @@ export class AchievementService {
     clientId: string,
     templateId: string,
     tier: string | null,
-    metricValue: number
+    metricValue: number,
+    supabaseClient?: SupabaseClient
   ): Promise<UserAchievement | null> {
     try {
+      const supabase = this.db(supabaseClient)
       const { data, error } = await supabase
         .from('user_achievements')
         .insert({
-          // Required columns that were missing:
-          user_id: clientId,  // user_id is the same as client_id
-          achievement_id: templateId,  // achievement_id is the same as achievement_template_id
-          // Standard columns:
+          user_id: clientId,
+          achievement_id: templateId,
           client_id: clientId,
           achievement_template_id: templateId,
           tier: tier,
@@ -485,7 +528,6 @@ export class AchievementService {
         .single()
 
       if (error) {
-        // If unique constraint violation, achievement already unlocked (ignore)
         if (error.code === '23505') {
           console.log(`Achievement already unlocked: template=${templateId}, tier=${tier}`)
           return null
@@ -496,7 +538,6 @@ export class AchievementService {
 
       console.log(`Achievement unlocked! template=${templateId}, tier=${tier}, value=${metricValue}`)
 
-      // Fire-and-forget: push + email notification (do not block or fail unlock)
       ;(async () => {
         try {
           const { data: template } = await supabase

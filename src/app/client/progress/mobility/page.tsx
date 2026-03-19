@@ -239,7 +239,7 @@ export default function MobilityMetricsPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
             </div>
@@ -280,7 +280,7 @@ export default function MobilityMetricsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
@@ -312,7 +312,7 @@ export default function MobilityMetricsPage() {
             <>
               {/* Mobility Progress summary */}
               {(progressionByType.length > 0 || singleAssessmentTypes.length > 0) && (
-                <div className="mt-6 fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
+                <div className="mt-6 fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-5">
                   <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">Mobility Progress</h2>
                   <div className="space-y-3">
                     {progressionByType.map(({ type, firstVal, latestVal, firstDate }) => {
@@ -352,7 +352,7 @@ export default function MobilityMetricsPage() {
               )}
 
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
                       <Activity className="h-5 w-5" />
@@ -366,7 +366,7 @@ export default function MobilityMetricsPage() {
                   </div>
                 </div>
 
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
                       <Calendar className="h-5 w-5" />
@@ -385,7 +385,7 @@ export default function MobilityMetricsPage() {
                   </div>
                 </div>
 
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
                       <TrendingUp className="h-5 w-5" />
@@ -402,7 +402,7 @@ export default function MobilityMetricsPage() {
 
               <div className="mt-6 space-y-4">
                 {metrics.map((metric) => (
-                  <div key={metric.id} className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+                  <div key={metric.id} className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-domain-meals)]">

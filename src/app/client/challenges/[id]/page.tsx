@@ -9,7 +9,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trophy, Calendar, Gift, ChevronDown, ScrollText, Share2, Video, CheckCircle, XCircle, Clock, Upload } from "lucide-react";
+import { ArrowLeft, Trophy, Calendar, Gift, ChevronDown, ScrollText, Share2, Video, CheckCircle, XCircle, Clock, Upload, Flame, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { getChallengeDetails, getChallengeLeaderboard, getChallengeScoringCategories, getParticipantSubmissions, submitVideoProof } from "@/lib/challengeService";
 import { cn } from "@/lib/utils";
@@ -239,6 +239,47 @@ function ChallengeDetailContent() {
           </div>
         </header>
 
+        {/* Challenge completed celebration */}
+        {challenge.status === "completed" && (() => {
+          const userEntry = user?.id ? leaderboard.find((e: any) => e.client_id === user.id) : null;
+          if (!userEntry) return null;
+          const rank = userEntry.final_rank ?? leaderboard.indexOf(userEntry) + 1;
+          const isWinner = rank === 1;
+          const isTopThree = rank <= 3;
+          return (
+            <GlassCard elevation={2} className={cn(
+              "fc-glass fc-card p-6 sm:p-8 rounded-2xl text-center",
+              isWinner ? "border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-transparent" : ""
+            )}>
+              <div className="text-4xl mb-2">
+                {isWinner ? "🏆" : isTopThree ? "🥈" : "🎉"}
+              </div>
+              <h2 className="text-xl font-bold fc-text-primary mb-1">
+                {isWinner ? "You Won!" : isTopThree ? `You finished #${rank}!` : "Challenge Complete!"}
+              </h2>
+              <p className="text-sm fc-text-dim mb-4">
+                You placed #{rank} of {leaderboard.length} with {userEntry.total_score ?? 0} points
+              </p>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 text-sm font-medium hover:bg-cyan-500/30 transition-colors"
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.share) {
+                    navigator.share({
+                      title: `I placed #${rank} in ${challenge.name}!`,
+                      text: `I scored ${userEntry.total_score ?? 0} points and finished #${rank} in the ${challenge.name} challenge!`,
+                      url: window.location.href,
+                    }).catch(() => {});
+                  }
+                }}
+              >
+                <Share2 className="w-4 h-4" />
+                Share Result
+              </button>
+            </GlassCard>
+          );
+        })()}
+
         {(() => {
           const userEntry = user?.id ? leaderboard.find((e: any) => e.client_id === user.id) : null;
           return userEntry ? (
@@ -321,6 +362,76 @@ function ChallengeDetailContent() {
           </GlassCard>
         )}
 
+        {/* Challenge Progress Timeline */}
+        {challenge.status === "active" && (() => {
+          const start = new Date(challenge.start_date).getTime();
+          const end = new Date(challenge.end_date).getTime();
+          const now = Date.now();
+          const pct = Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)));
+          const daysTotal = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+          const daysLeft = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
+          const isHalfway = pct >= 45 && pct <= 55;
+          const isEndingSoon = daysLeft <= 3;
+
+          return (
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest fc-text-dim flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Challenge Progress
+                </h3>
+                <span className="text-sm font-mono font-bold fc-text-primary">
+                  Day {daysTotal - daysLeft} / {daysTotal}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="relative h-3 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden mb-3">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${pct}%`,
+                    background: isEndingSoon
+                      ? "linear-gradient(90deg, #ef4444, #f97316)"
+                      : "linear-gradient(90deg, #06b6d4, #3b82f6)",
+                  }}
+                />
+                {/* Milestone markers */}
+                <div className="absolute top-0 left-1/4 w-px h-full bg-[color:var(--fc-glass-border)]" />
+                <div className="absolute top-0 left-1/2 w-px h-full bg-[color:var(--fc-glass-border)]" />
+                <div className="absolute top-0 left-3/4 w-px h-full bg-[color:var(--fc-glass-border)]" />
+              </div>
+
+              <div className="flex justify-between text-[10px] fc-text-dim">
+                <span>Start</span>
+                <span>25%</span>
+                <span>Halfway</span>
+                <span>75%</span>
+                <span>End</span>
+              </div>
+
+              {/* Milestone badges */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {pct >= 50 && (
+                  <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-400 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Halfway reached
+                  </span>
+                )}
+                {isEndingSoon && (
+                  <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 flex items-center gap-1">
+                    <Flame className="w-3 h-3" /> {daysLeft} day{daysLeft !== 1 ? "s" : ""} left!
+                  </span>
+                )}
+                {daysLeft === 0 && (
+                  <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Last day!
+                  </span>
+                )}
+              </div>
+            </GlassCard>
+          );
+        })()}
+
         <section>
           <h2 className="text-xl font-semibold fc-text-primary mb-6 flex items-center gap-3">
             <Trophy className="w-6 h-6 fc-text-workouts" />
@@ -342,56 +453,86 @@ function ChallengeDetailContent() {
             </div>
           ) : (
             <div className="space-y-3">
-              {leaderboard.map((entry, index) => (
-                <div
-                  key={entry.id}
-                  className={cn(
-                    "fc-glass-soft fc-card p-4 transition-all",
-                    entry.client_id === user?.id
-                      ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
-                      : "border border-[color:var(--fc-glass-border)]"
-                  )}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0",
-                        entry.final_rank === 1
-                          ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
-                          : entry.final_rank === 2
-                          ? "bg-gradient-to-br from-slate-300 to-slate-500 text-white"
-                          : entry.final_rank === 3
-                          ? "bg-gradient-to-br from-amber-700 to-orange-900 text-white"
-                          : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
-                      )}
-                    >
-                      {entry.final_rank || index + 1}
-                    </div>
-
-                    <div className="flex-1">
-                      <p className="font-semibold text-[color:var(--fc-text-primary)]">
-                        Participant {index + 1}
-                      </p>
-                      {entry.selected_track && (
-                        <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                          {entry.selected_track === "fat_loss"
-                            ? "Fat Loss Track"
-                            : "Muscle Gain Track"}
+              {/* Podium for completed challenges with 3+ participants */}
+              {challenge.status === "completed" && leaderboard.length >= 3 && (
+                <div className="flex items-end justify-center gap-3 mb-4 py-4">
+                  {[1, 0, 2].map((podiumIdx) => {
+                    const entry = leaderboard[podiumIdx];
+                    if (!entry) return null;
+                    const heights = ["h-20", "h-16", "h-12"];
+                    const badges = ["🥇", "🥈", "🥉"];
+                    return (
+                      <div key={entry.id} className="flex flex-col items-center gap-1 flex-1 max-w-[100px]">
+                        <span className="text-xl">{badges[podiumIdx]}</span>
+                        <p className="text-xs font-semibold fc-text-primary truncate w-full text-center">
+                          {entry.display_name ?? "Participant"}
                         </p>
-                      )}
-                    </div>
+                        <p className="text-xs font-mono font-bold text-[color:var(--fc-accent-cyan)]">
+                          {entry.total_score} pts
+                        </p>
+                        <div className={cn("w-full rounded-t-xl border-t-2 border-amber-400 bg-gradient-to-t from-amber-500/10 to-transparent", heights[podiumIdx])} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
-                        {entry.total_score}
-                      </p>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                        points
-                      </p>
+              {leaderboard.map((entry, index) => {
+                const rank = entry.final_rank || index + 1;
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "fc-glass-soft fc-card p-4 transition-all",
+                      entry.client_id === user?.id
+                        ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
+                        : "border border-[color:var(--fc-glass-border)]"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={cn(
+                          "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0",
+                          rank === 1
+                            ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
+                            : rank === 2
+                            ? "bg-gradient-to-br from-slate-300 to-slate-500 text-white"
+                            : rank === 3
+                            ? "bg-gradient-to-br from-amber-700 to-orange-900 text-white"
+                            : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                        )}
+                      >
+                        {rank}
+                      </div>
+
+                      <div className="flex-1">
+                        <p className="font-semibold text-[color:var(--fc-text-primary)]">
+                          {entry.display_name ?? `Participant ${index + 1}`}
+                          {entry.client_id === user?.id && (
+                            <span className="text-xs ml-2 text-[color:var(--fc-accent-cyan)]">(You)</span>
+                          )}
+                        </p>
+                        {entry.selected_track && (
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                            {entry.selected_track === "fat_loss"
+                              ? "Fat Loss Track"
+                              : "Muscle Gain Track"}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
+                          {entry.total_score}
+                        </p>
+                        <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                          points
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </GlassCard>

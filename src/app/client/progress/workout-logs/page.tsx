@@ -31,12 +31,14 @@ interface WorkoutLog {
   total_reps_completed: number | null;
   total_weight_lifted: number | null;
   workout_assignment_id: string | null;
+  overall_difficulty_rating: number | null;
   workout_set_logs: WorkoutSet[];
   // Calculated fields
   totalSets: number;
   totalWeight: number;
   uniqueExercises: number;
-  workoutName: string; // Actual workout template name
+  workoutName: string;
+  programContext?: { dayNumber: number; programName: string } | null;
 }
 
 interface WorkoutSet {
@@ -82,7 +84,7 @@ export default function WorkoutLogsPage() {
       const { ensureAuthenticated } = await import('@/lib/supabase');
       await ensureAuthenticated();
 
-      // Get ALL workout_logs for this user (not grouped by assignment)
+      // Only show completed workouts (abandoned sessions with 0 sets are noise)
       const { data: workoutLogs, error } = await supabase
         .from("workout_logs")
         .select(
@@ -95,12 +97,14 @@ export default function WorkoutLogsPage() {
           total_sets_completed,
           total_reps_completed,
           total_weight_lifted,
-          workout_assignment_id
+          workout_assignment_id,
+          overall_difficulty_rating
         `
         )
         .eq("client_id", user.id)
-        .order("started_at", { ascending: false })
-        .limit(100); // Increased limit to show more logs
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(100);
 
       if (error) {
         console.error("❌ Error loading workout logs:", error);
@@ -149,6 +153,37 @@ export default function WorkoutLogsPage() {
             const templateName =
               assignment.workout_templates?.name || "Workout";
             assignmentTemplateMap.set(assignment.id, templateName);
+          });
+        }
+      }
+
+      // Fetch program context (day number + program name) for logs that are part of a program
+      const programContextMap = new Map<string, { dayNumber: number; programName: string }>();
+      if (assignmentIds.length > 0) {
+        const { data: dayAssignments } = await supabase
+          .from("program_day_assignments")
+          .select("workout_assignment_id, day_number, program_assignment_id")
+          .in("workout_assignment_id", assignmentIds);
+
+        if (dayAssignments && dayAssignments.length > 0) {
+          const progAssignmentIds = [...new Set(dayAssignments.map((d: any) => d.program_assignment_id).filter(Boolean))];
+          const { data: progAssignments } = await supabase
+            .from("program_assignments")
+            .select("id, name")
+            .in("id", progAssignmentIds);
+
+          const progNameMap = new Map<string, string>();
+          (progAssignments || []).forEach((pa: any) => {
+            progNameMap.set(pa.id, pa.name || "Program");
+          });
+
+          dayAssignments.forEach((da: any) => {
+            if (da.workout_assignment_id) {
+              programContextMap.set(da.workout_assignment_id, {
+                dayNumber: da.day_number,
+                programName: progNameMap.get(da.program_assignment_id) || "Program",
+              });
+            }
           });
         }
       }
@@ -237,6 +272,9 @@ export default function WorkoutLogsPage() {
             totalWeight,
             uniqueExercises,
             workoutName,
+            programContext: log.workout_assignment_id
+              ? programContextMap.get(log.workout_assignment_id) ?? null
+              : null,
           } as WorkoutLog;
         });
 
@@ -319,7 +357,7 @@ export default function WorkoutLogsPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
                 <p className="text-[color:var(--fc-text-dim)] mb-4">{error}</p>
                 <button type="button" onClick={() => { setError(null); loadWorkoutLogs(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">
                   Retry
@@ -359,10 +397,10 @@ export default function WorkoutLogsPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 min-h-screen px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
           <div className="mx-auto w-full max-w-6xl space-y-6">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+                  <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                     <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                   </Link>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -391,7 +429,7 @@ export default function WorkoutLogsPage() {
 
             {/* Monthly summary hero */}
             {workoutLogs.length > 0 && (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <span className="text-[10px] font-bold font-mono uppercase tracking-widest fc-text-warning">This month</span>
@@ -461,14 +499,14 @@ export default function WorkoutLogsPage() {
 
             {/* Workout Logs List */}
             {filteredLogs.length === 0 ? (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12">
                 <div className="text-center">
-                  <FileText className="mx-auto mb-4 h-16 w-16 fc-text-subtle" />
-                  <h3 className="mb-2 text-xl font-bold fc-text-primary">
-                    No Workout Logs Yet
+                  <FileText className="mx-auto mb-3 h-12 w-12 fc-text-subtle" />
+                  <h3 className="mb-1 text-lg font-bold fc-text-primary">
+                    Your first workout awaits
                   </h3>
-                  <p className="text-sm fc-text-dim">
-                    Complete your first workout to see it here.
+                  <p className="text-sm fc-text-dim max-w-xs mx-auto">
+                    Once you complete a workout, your training history will appear here. Go crush it!
                   </p>
                 </div>
               </div>

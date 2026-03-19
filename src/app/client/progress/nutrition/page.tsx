@@ -359,7 +359,7 @@ export default function NutritionPage() {
   };
 
   const renderDailySummary = () => (
-    <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+    <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -385,7 +385,7 @@ export default function NutritionPage() {
   const renderMeals = () => {
     if (!assignment) {
       return (
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
               <ShieldAlert className="h-6 w-6" />
@@ -403,7 +403,7 @@ export default function NutritionPage() {
 
     if (meals.length === 0) {
       return (
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
           <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
             This meal plan has no meals assigned.
           </p>
@@ -421,7 +421,7 @@ export default function NutritionPage() {
           return (
             <div
               key={meal.id}
-              className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 flex flex-col gap-4"
+              className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-5 flex flex-col gap-4"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -558,7 +558,7 @@ export default function NutritionPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
               <div className="animate-pulse space-y-3">
                 <div className="h-6 rounded bg-[color:var(--fc-glass-highlight)] w-1/3" />
                 <div className="h-4 rounded bg-[color:var(--fc-glass-highlight)] w-1/2" />
@@ -576,7 +576,7 @@ export default function NutritionPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">

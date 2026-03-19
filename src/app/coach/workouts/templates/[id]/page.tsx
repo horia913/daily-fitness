@@ -256,7 +256,7 @@ export default function WorkoutTemplateDetailsPage() {
         <div className="max-w-5xl mx-auto space-y-8">
           <nav className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              <Link href="/coach/training/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+              <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
                 <ArrowLeft className="w-4 h-4 shrink-0" />
                 Back to Programs
               </Link>
@@ -429,12 +429,16 @@ export default function WorkoutTemplateDetailsPage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-1">
-                    <AnimatedNumber
-                      value={template.rating || 0}
-                      decimals={1}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
+                    {template.rating ? (
+                      <AnimatedNumber
+                        value={template.rating}
+                        decimals={1}
+                        className="text-2xl font-bold"
+                        color="var(--fc-text-primary)"
+                      />
+                    ) : (
+                      <span className="text-2xl font-bold" style={{ color: "var(--fc-text-primary)" }}>--</span>
+                    )}
                     <span className="text-sm text-[color:var(--fc-text-dim)]">
                       / 5
                     </span>

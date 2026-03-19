@@ -8,9 +8,9 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Trophy, Search } from "lucide-react";
+import { ArrowLeft, Trophy, Search, Crown, Users, ChevronUp, ChevronDown, Minus } from "lucide-react";
 import Link from "next/link";
-import { getLeaderboard, LeaderboardEntry, LeaderboardType, TimeWindow } from "@/lib/leaderboardService";
+import { getLeaderboard, getLeaderboardBySex, getCurrentChampions, LeaderboardEntry, LeaderboardType, TimeWindow } from "@/lib/leaderboardService";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -40,6 +40,7 @@ function LeaderboardPageContent() {
   const [liftSet, setLiftSet] = useState<LiftSet>("A");
   const [activeExercise, setActiveExercise] = useState<string>("Squat");
   const [metricType, setMetricType] = useState<MetricType>("1rm");
+  const [sexFilter, setSexFilter] = useState<"all" | "M" | "F">("all");
   const [customExerciseId, setCustomExerciseId] = useState<string | null>(null);
   const [customExerciseName, setCustomExerciseName] = useState<string | null>(null);
   const [showExerciseSearch, setShowExerciseSearch] = useState(false);
@@ -48,6 +49,7 @@ function LeaderboardPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [champions, setChampions] = useState<any[]>([]);
 
   const loadLeaderboardData = useCallback(async () => {
     setLoading(true);
@@ -55,8 +57,10 @@ function LeaderboardPageContent() {
     setLoadingStartedAt(Date.now());
     try {
       let leaderboardType: LeaderboardType;
+      let effectiveTimeWindow: TimeWindow;
       
       if (metricType === "tonnage") {
+        effectiveTimeWindow = timeWindow;
         if (timeWindow === "this_week") {
           leaderboardType = "tonnage_week";
         } else if (timeWindow === "this_month") {
@@ -66,23 +70,43 @@ function LeaderboardPageContent() {
         }
       } else {
         leaderboardType = `pr_${metricType}` as LeaderboardType;
+        effectiveTimeWindow = "all_time";
       }
 
       let exerciseId: string | undefined;
       if (customExerciseId) {
         exerciseId = customExerciseId;
       } else {
-        const { data: exerciseData } = await supabase
+        // Try exact match first, then fallback to contains match
+        const { data: exactMatch } = await supabase
           .from("exercises")
           .select("id")
           .ilike("name", activeExercise)
           .limit(1)
           .maybeSingle();
-        
-        exerciseId = exerciseData?.id;
+
+        if (exactMatch?.id) {
+          exerciseId = exactMatch.id;
+        } else {
+          const { data: fuzzyMatch } = await supabase
+            .from("exercises")
+            .select("id")
+            .ilike("name", `%${activeExercise}%`)
+            .limit(1)
+            .maybeSingle();
+          exerciseId = fuzzyMatch?.id;
+        }
       }
 
-      const data = await getLeaderboard(leaderboardType, exerciseId, timeWindow);
+      // For PR metrics, exercise is required — don't return unfiltered data
+      if (!exerciseId && metricType !== "tonnage") {
+        setLeaderboardData([]);
+        return;
+      }
+
+      const data = sexFilter === "all"
+        ? await getLeaderboard(leaderboardType, exerciseId, effectiveTimeWindow)
+        : await getLeaderboardBySex(leaderboardType, exerciseId, effectiveTimeWindow, sexFilter);
       setLeaderboardData(data);
     } catch (error) {
       console.error("Error loading leaderboard:", error);
@@ -92,7 +116,7 @@ function LeaderboardPageContent() {
       setLoading(false);
       setLoadingStartedAt(null);
     }
-  }, [timeWindow, activeExercise, metricType, customExerciseId]);
+  }, [timeWindow, activeExercise, metricType, customExerciseId, sexFilter]);
 
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -113,7 +137,11 @@ function LeaderboardPageContent() {
         timeoutRef.current = null;
       }
     };
-  }, [loadLeaderboardData, timeWindow, activeExercise, metricType, customExerciseId]);
+  }, [loadLeaderboardData, timeWindow, activeExercise, metricType, customExerciseId, sexFilter]);
+
+  useEffect(() => {
+    getCurrentChampions(5).then(setChampions).catch(() => setChampions([]));
+  }, []);
 
   const handleExerciseSearch = async (query: string) => {
     setSearchQuery(query);
@@ -167,7 +195,7 @@ function LeaderboardPageContent() {
   function LeaderboardBody() {
     return (
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10">
           <div className="flex items-center gap-4 flex-1 min-w-0">
             <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
               <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
@@ -188,8 +216,30 @@ function LeaderboardPageContent() {
           </div>
         </div>
 
+        {/* Current Champions */}
+        {champions.length > 0 && (
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Crown className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-bold fc-text-primary">Current Champions</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {champions.map((ch: any, i: number) => (
+                <div key={i} className="flex-shrink-0 fc-glass-soft rounded-xl border border-amber-500/20 p-3 min-w-[140px] text-center">
+                  <p className="text-lg mb-1">🏆</p>
+                  <p className="text-xs font-bold fc-text-primary truncate">{ch.name || "Champion"}</p>
+                  <p className="text-[10px] fc-text-dim truncate">{ch.category || "—"}</p>
+                  {ch.score != null && (
+                    <p className="text-xs font-mono font-bold text-amber-500 mt-1">{ch.score}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {currentUserEntry && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 border-l-4 border-l-[color:var(--fc-accent-blue)]">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 border-l-4 border-l-[color:var(--fc-accent-blue)]">
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-xl font-bold fc-text-primary mb-1">
@@ -204,6 +254,44 @@ function LeaderboardPageContent() {
                 <p className="text-2xl font-bold font-mono fc-text-workouts">#{currentUserEntry.rank}</p>
               </div>
             </div>
+
+            {/* Your neighborhood */}
+            {(() => {
+              const idx = leaderboardData.findIndex(e => e.client_id === user?.id);
+              if (idx < 0) return null;
+              const above = idx > 0 ? leaderboardData[idx - 1] : null;
+              const below = idx < leaderboardData.length - 1 ? leaderboardData[idx + 1] : null;
+              if (!above && !below) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)]">
+                  <p className="text-xs font-bold fc-text-dim uppercase tracking-wider mb-2">Your neighborhood</p>
+                  <div className="space-y-1.5">
+                    {above && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <ChevronUp className="w-4 h-4 text-green-500 shrink-0" />
+                        <span className="font-mono font-bold fc-text-dim w-8">#{above.rank}</span>
+                        <span className="fc-text-primary flex-1 truncate">{above.is_anonymous ? "Anonymous" : above.display_name}</span>
+                        <span className="font-mono text-xs fc-text-dim">{formatScore(above.score, metricType)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 text-sm bg-cyan-500/10 rounded-lg px-2 py-1 border border-cyan-500/20">
+                      <Minus className="w-4 h-4 text-cyan-500 shrink-0" />
+                      <span className="font-mono font-bold text-cyan-500 w-8">#{currentUserEntry.rank}</span>
+                      <span className="fc-text-primary font-semibold flex-1 truncate">You</span>
+                      <span className="font-mono text-xs font-bold text-cyan-500">{formatScore(currentUserEntry.score, metricType)}</span>
+                    </div>
+                    {below && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <ChevronDown className="w-4 h-4 text-red-400 shrink-0" />
+                        <span className="font-mono font-bold fc-text-dim w-8">#{below.rank}</span>
+                        <span className="fc-text-primary flex-1 truncate">{below.is_anonymous ? "Anonymous" : below.display_name}</span>
+                        <span className="font-mono text-xs fc-text-dim">{formatScore(below.score, metricType)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -227,6 +315,25 @@ function LeaderboardPageContent() {
                   : window === "this_week"
                   ? "This Week"
                   : "All Time"}
+              </Button>
+            ))}
+          </div>
+
+          {/* Sex Filter */}
+          <div className="flex gap-1.5 p-1 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]">
+            {([["all", "All"], ["M", "Men"], ["F", "Women"]] as const).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                onClick={() => setSexFilter(value as "all" | "M" | "F")}
+                className={cn(
+                  "fc-btn",
+                  sexFilter === value
+                    ? "fc-btn-primary"
+                    : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
+                )}
+              >
+                {label}
               </Button>
             ))}
           </div>
@@ -338,7 +445,7 @@ function LeaderboardPageContent() {
           </div>
         </div>
 
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-full flex items-center justify-center fc-text-warning" style={{ backgroundColor: "var(--fc-status-warning)", opacity: 0.2 }}>
               <Trophy className="w-6 h-6" />
@@ -372,6 +479,40 @@ function LeaderboardPageContent() {
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Podium for top entries */}
+              {leaderboardData.length >= 2 && (
+                <div className="flex items-end justify-center gap-3 mb-6 py-4">
+                  {[1, 0, 2].map((podiumIdx) => {
+                    const entry = leaderboardData[podiumIdx];
+                    if (!entry) return null;
+                    const heights = ["h-24", "h-20", "h-16"];
+                    const badges = ["🥇", "🥈", "🥉"];
+                    const borders = [
+                      "border-amber-400 bg-gradient-to-t from-amber-500/20 to-transparent",
+                      "border-gray-400 bg-gradient-to-t from-gray-400/20 to-transparent",
+                      "border-amber-700 bg-gradient-to-t from-amber-700/20 to-transparent",
+                    ];
+                    const idx = podiumIdx;
+                    return (
+                      <div key={entry.id} className="flex flex-col items-center gap-1 flex-1 max-w-[120px]">
+                        <span className="text-2xl">{badges[idx]}</span>
+                        <p className="text-xs font-semibold fc-text-primary truncate w-full text-center">
+                          {entry.is_anonymous ? "Anonymous" : entry.display_name}
+                          {entry.client_id === user?.id && (
+                            <span className="text-[10px] text-cyan-500 ml-1">(You)</span>
+                          )}
+                        </p>
+                        <p className="text-xs font-mono font-bold text-[color:var(--fc-accent-cyan)]">
+                          {formatScore(entry.score, metricType)}
+                        </p>
+                        <div className={cn("w-full rounded-t-xl border-t-2", heights[idx], borders[idx])} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Full list */}
               {leaderboardData.map((entry) => (
                 <div
                   key={entry.id}
@@ -401,6 +542,9 @@ function LeaderboardPageContent() {
                     <div className="flex-1">
                       <p className="font-semibold text-[color:var(--fc-text-primary)]">
                         {entry.is_anonymous ? "Anonymous" : entry.display_name}
+                        {entry.client_id === user?.id && (
+                          <span className="text-xs text-cyan-500 ml-2">(You)</span>
+                        )}
                       </p>
                       <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         {entry.time_window && `Updated ${new Date(entry.last_updated).toLocaleDateString()}`}
@@ -421,7 +565,7 @@ function LeaderboardPageContent() {
 
         {/* Motivational Section */}
         {userRank != null && userRank > 3 ? (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
                 <Trophy className="w-8 h-8 text-white" />

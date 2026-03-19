@@ -26,6 +26,8 @@ import {
   ChevronRight,
   Loader2,
   Pencil,
+  Trophy,
+  Coffee,
 } from "lucide-react";
 import { dbToUiScale, DailyWellnessLog } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
@@ -69,6 +71,65 @@ interface DashboardPageData {
   todayWellnessLog: DailyWellnessLog | null;
   checkinStreak: number;
   scoreError: string | null;
+}
+
+function FeaturedChallengeBanner() {
+  const [challenge, setChallenge] = React.useState<{
+    id: string;
+    name: string;
+    end_date: string;
+    reward_description?: string | null;
+  } | null>(null);
+
+  React.useEffect(() => {
+    supabase
+      .from("challenges")
+      .select("id, name, end_date, reward_description")
+      .eq("status", "active")
+      .eq("is_public", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]) setChallenge(data[0]);
+      });
+  }, []);
+
+  if (!challenge) return null;
+
+  const daysLeft = Math.max(
+    0,
+    Math.ceil(
+      (new Date(challenge.end_date).getTime() - Date.now()) /
+        (1000 * 60 * 60 * 24)
+    )
+  );
+
+  return (
+    <section className="mb-6">
+      <Link href={`/client/challenges/${challenge.id}`}>
+        <ClientGlassCard className="p-4 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-500/5 to-transparent hover:opacity-90 transition-opacity">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+              <Trophy className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Active Challenge
+              </p>
+              <p className="text-sm font-semibold fc-text-primary truncate">
+                {challenge.name}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-sm font-bold fc-text-primary">{daysLeft}d</p>
+              <p className="text-[10px] fc-text-dim">left</p>
+            </div>
+            <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
+          </div>
+        </ClientGlassCard>
+      </Link>
+    </section>
+  );
 }
 
 function formatDate(): string {
@@ -377,10 +438,11 @@ export default function ClientDashboard() {
                   </Link>
                 </div>
               ) : (
-                <div className="text-center py-2">
-                  <p className="text-sm fc-text-dim">Rest day</p>
+                <div className="text-center py-3">
+                  <Coffee className="w-6 h-6 mx-auto mb-2 fc-text-dim" />
+                  <p className="text-sm font-semibold fc-text-primary">Rest Day</p>
                   <p className="text-xs fc-text-dim mt-1">
-                    No workout scheduled for today
+                    Recovery is when the magic happens. Stay hydrated.
                   </p>
                 </div>
               )}
@@ -503,20 +565,22 @@ export default function ClientDashboard() {
 
                 {/* Program Progress */}
                 {programProgressData && programProgressData.totalSlots > 0 && (
-                  <ClientGlassCard className="flex-1 p-3 text-center min-w-0 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20">
-                    <div className="flex items-center justify-center gap-1.5 mb-1">
-                      <BarChart3 className="w-4 h-4 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
-                      <span className="text-lg font-bold fc-text-primary truncate">
-                        Week {programProgressData.currentWeek} of {programProgressData.totalWeeks} ({programProgressData.percent}%)
-                      </span>
+                  <ClientGlassCard className="flex-1 p-3 text-center min-w-0">
+                    <div className="flex items-center justify-center mb-1">
+                      <div className="relative w-12 h-12">
+                        <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                          <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3.5" />
+                          <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-accent)" strokeWidth="3.5" strokeLinecap="round"
+                            strokeDasharray={`${Math.min(100, programProgressData.percent) * 1.194} 999`} />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black fc-text-primary">
+                          {programProgressData.percent}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="h-1.5 rounded-full bg-[var(--fc-glass-border)] overflow-hidden mt-1">
-                      <div
-                        className="h-full rounded-full bg-[var(--fc-accent)] transition-all"
-                        style={{ width: `${Math.min(100, programProgressData.percent)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs fc-text-dim mt-1">program</p>
+                    <p className="text-xs fc-text-dim">
+                      Week {programProgressData.currentWeek}/{programProgressData.totalWeeks}
+                    </p>
                   </ClientGlassCard>
                 )}
               </div>
@@ -554,6 +618,9 @@ export default function ClientDashboard() {
               </div>
             </section>
           )}
+
+          {/* Featured Challenge Banner */}
+          <FeaturedChallengeBanner />
 
           {/* View full progress link */}
           <section className="mb-6">

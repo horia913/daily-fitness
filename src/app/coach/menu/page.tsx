@@ -46,7 +46,7 @@ const SECTION_CLIENT_MANAGEMENT = {
 const SECTION_TRAINING = {
   title: "Training",
   items: [
-    { title: "Programs", description: "Create and manage workout programs", icon: BookOpen, href: "/coach/training/programs" },
+    { title: "Programs", description: "Create and manage workout programs", icon: BookOpen, href: "/coach/programs" },
     { title: "Workout Templates", description: "Create and manage workout templates", icon: Layers, href: "/coach/workouts/templates" },
     { title: "Exercise Library", description: "Manage exercises and create custom exercises", icon: Library, href: "/coach/exercises" },
     { title: "Gym Console", description: "Mark workouts complete for clients in person", icon: Activity, href: "/coach/gym-console" },
@@ -204,7 +204,7 @@ export default function CoachMenu() {
                   View All Clients
                 </Button>
               </Link>
-              <Link href="/coach/training/programs">
+              <Link href="/coach/programs">
                 <Button className="fc-btn fc-btn-secondary">
                   <Dumbbell className="w-4 h-4 mr-2" />
                   Programs

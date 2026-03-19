@@ -144,7 +144,6 @@ export default function WorkoutTemplateForm({
     difficulty_level: "Beginner",
   });
   const [loading, setLoading] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [exercises, setExercises] = useState<any[]>([]);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [availableExercises, setAvailableExercises] = useState<any[]>([]);

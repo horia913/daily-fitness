@@ -5,6 +5,7 @@ import { createErrorResponse, handleApiError, validateRequiredFields } from '@/l
 import { createForbiddenResponse } from '@/lib/apiAuth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
+import { normalizeSetType } from '@/lib/setTypeUtils'
 
 /** Request body for POST /api/log-set. Common fields + set-type-specific (optional). */
 interface LogSetRequestBody {
@@ -132,18 +133,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine block type (default to straight_set for backwards compatibility)
+    // Accept both variants (e.g. dropset + drop_set); we store canonical (drop_set) to match templates
     const validBlockTypes = [
       'straight_set',
       'superset',
       'giant_set',
       'amrap',
       'dropset',
+      'drop_set',
       'cluster_set',
       'rest_pause',
       'preexhaust',
+      'pre_exhaustion',
       'emom',
       'tabata',
       'fortime',
+      'for_time',
       'hr_sets',
     ] as const
 
@@ -152,7 +157,8 @@ export async function POST(req: NextRequest) {
     let blockType: BlockType = 'straight_set'
 
     if (incomingBlockType) {
-      if (!(validBlockTypes as readonly string[]).includes(incomingBlockType)) {
+      const normalized = normalizeSetType(incomingBlockType);
+      if (!(validBlockTypes as readonly string[]).includes(incomingBlockType) && !(validBlockTypes as readonly string[]).includes(normalized)) {
         console.error("❌ Invalid set_type:", incomingBlockType, "Valid types:", validBlockTypes);
         return NextResponse.json(
           { 
@@ -163,7 +169,8 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
-      blockType = incomingBlockType as BlockType;
+      // Store canonical form so logs match template set_type (e.g. drop_set not dropset)
+      blockType = (normalized || incomingBlockType) as BlockType;
     }
 
     // Step 1: Get or create workout_log_id (REQUIRED for workout_set_logs)
@@ -543,7 +550,7 @@ export async function POST(req: NextRequest) {
           break
         }
 
-        case 'dropset': {
+        case 'drop_set': {
           insertData.set_number = body.set_number || 1
           const dropsArray = Array.isArray(body.dropset_drops) ? body.dropset_drops : null
           if (dropsArray && dropsArray.length >= 2) {
@@ -613,7 +620,7 @@ export async function POST(req: NextRequest) {
           break
         }
 
-        case 'preexhaust': {
+        case 'pre_exhaustion': {
           insertData.set_number = body.set_number || 1
           insertData.preexhaust_isolation_exercise_id = body.preexhaust_isolation_exercise_id
           insertData.preexhaust_isolation_weight = parseNumber(body.preexhaust_isolation_weight)
@@ -643,7 +650,7 @@ export async function POST(req: NextRequest) {
           break
         }
 
-        case 'fortime': {
+        case 'for_time': {
           if (body.exercise_id) {
             insertData.exercise_id = body.exercise_id
           }
@@ -743,7 +750,7 @@ export async function POST(req: NextRequest) {
       primaryExerciseId &&
       primaryWeight &&
       primaryReps &&
-      ['straight_set', 'superset', 'dropset', 'cluster_set', 'rest_pause'].includes(blockType)
+      ['straight_set', 'superset', 'drop_set', 'cluster_set', 'rest_pause'].includes(blockType)
 
     if (shouldCalculateE1RM && primaryWeight !== null && primaryReps !== null) {
       // e1RM = weight × (1 + 0.0333 × reps)
@@ -788,7 +795,7 @@ export async function POST(req: NextRequest) {
         }
         break
       }
-      case 'dropset':
+      case 'drop_set':
         addPerformanceEntry(body.exercise_id, parseNumber(body.dropset_initial_weight), parseIntNumber(body.dropset_initial_reps))
         break
       case 'cluster_set':
@@ -797,7 +804,7 @@ export async function POST(req: NextRequest) {
       case 'rest_pause':
         addPerformanceEntry(body.exercise_id, parseNumber(body.rest_pause_initial_weight), parseIntNumber(body.rest_pause_initial_reps))
         break
-      case 'preexhaust':
+      case 'pre_exhaustion':
         addPerformanceEntry(body.preexhaust_isolation_exercise_id, parseNumber(body.preexhaust_isolation_weight), parseIntNumber(body.preexhaust_isolation_reps))
         addPerformanceEntry(body.preexhaust_compound_exercise_id, parseNumber(body.preexhaust_compound_weight), parseIntNumber(body.preexhaust_compound_reps))
         break
@@ -809,7 +816,7 @@ export async function POST(req: NextRequest) {
         addPerformanceEntry(body.exercise_id, parseNumber(body.weight), repsPerRound)
         break
       }
-      case 'fortime': {
+      case 'for_time': {
         const targetReps =
           parseIntNumber(body.fortime_target_reps) ??
           parseIntNumber(body.fortime_total_reps)
@@ -1045,7 +1052,7 @@ export async function POST(req: NextRequest) {
             reps: primaryReps,
             workout_assignment_id: workoutAssignmentId,
             completed_at: insertData.completed_at || new Date().toISOString(),
-          })
+          }, supabaseAdmin)
           if (prResult?.isNewPR) {
             storedPRResults.push({
               exercise_id: primaryExerciseId,
@@ -1072,7 +1079,7 @@ export async function POST(req: NextRequest) {
     if (storedPRResults.length > 0) {
       try {
         const { AchievementService } = await import('@/lib/achievementService')
-        const unlocked = await AchievementService.checkAndUnlockAchievements(effectiveClientId, 'pr_count')
+        const unlocked = await AchievementService.checkAndUnlockAchievements(effectiveClientId, 'pr_count', supabaseAdmin)
         for (const a of unlocked) {
           newAchievements.push({
             templateId: a.templateId,

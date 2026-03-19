@@ -1,4 +1,5 @@
-import { supabase } from "./supabase";
+import { supabase as browserSupabase } from "./supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * PersonalRecord interface matching the ACTUAL database schema
@@ -18,7 +19,6 @@ export interface PersonalRecord {
   notes: string | null;
   created_at: string;
   updated_at: string;
-  // Joined from exercises table
   exercises?: {
     id: string;
     name: string;
@@ -33,8 +33,9 @@ export interface PRCheckResult {
 }
 
 /**
- * Check if a set is a new PR and store it in personal_records table
- * Uses ACTUAL database schema: record_value, record_unit, achieved_date, etc.
+ * Check if a set is a new PR and store it in personal_records table.
+ * Accepts optional supabaseClient for server-side calls (bypasses RLS).
+ * Falls back to browser client for client-side usage.
  */
 export async function checkAndStorePR(
   clientId: string,
@@ -44,8 +45,10 @@ export async function checkAndStorePR(
     reps: number;
     workout_assignment_id?: string;
     completed_at?: string;
-  }
+  },
+  supabaseClient?: SupabaseClient
 ): Promise<PRCheckResult | null> {
+  const supabase = supabaseClient || browserSupabase;
   try {
     if (!setData.weight || !setData.reps || setData.weight <= 0 || setData.reps <= 0) {
       return null;
@@ -199,6 +202,7 @@ export async function checkAndStorePR(
  */
 export async function backfillPRs(clientId: string): Promise<number> {
   try {
+    const supabase = browserSupabase;
     // Check if PRs already exist
     const { count: existingCount } = await supabase
       .from("personal_records")
@@ -353,6 +357,7 @@ export async function getPRTimeline(
   exerciseId?: string
 ): Promise<PersonalRecord[]> {
   try {
+    const supabase = browserSupabase;
     let query = supabase
       .from("personal_records")
       .select(
@@ -410,6 +415,7 @@ export async function getPRStats(clientId: string): Promise<{
   mostImproved: PersonalRecord | null;
 }> {
   try {
+    const supabase = browserSupabase;
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisWeekStart = new Date(now);

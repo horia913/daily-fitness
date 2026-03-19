@@ -138,17 +138,21 @@ export function ActiveProgramCard({
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-white/80">Progress</span>
-          <span className="text-xs font-semibold text-white">{completionPercent}% complete</span>
+      {/* Progress Ring */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative w-14 h-14 flex-shrink-0">
+          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+            <circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+            <circle cx="28" cy="28" r="23" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round"
+              strokeDasharray={`${completionPercent * 1.445} 999`} />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white">
+            {completionPercent}%
+          </span>
         </div>
-        <div className="relative h-2 w-full rounded-full overflow-hidden bg-white/20">
-          <div
-            className="h-full rounded-full transition-all duration-300 bg-white"
-            style={{ width: `${completionPercent}%` }}
-          />
+        <div>
+          <p className="text-sm font-bold text-white">{completedDays}/{totalDays} workouts done</p>
+          <p className="text-xs text-white/60">This week&apos;s progress</p>
         </div>
       </div>
 

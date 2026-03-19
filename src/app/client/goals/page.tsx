@@ -51,6 +51,9 @@ import {
   Target as TargetIcon,
   ChevronDown,
   Archive,
+  Leaf,
+  BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
@@ -61,12 +64,12 @@ import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { withTimeout } from "@/lib/withTimeout";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
-const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string }[] = [
-  { id: "training", label: "Training", emoji: "🏋️" },
-  { id: "nutrition", label: "Nutrition", emoji: "🍎" },
-  { id: "checkins", label: "Check-ins", emoji: "📊" },
-  { id: "lifestyle", label: "Lifestyle", emoji: "🌿" },
-  { id: "general", label: "General", emoji: "⭐" },
+const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string; icon: LucideIcon }[] = [
+  { id: "training", label: "Training", emoji: "🏋️", icon: Dumbbell },
+  { id: "nutrition", label: "Nutrition", emoji: "🍎", icon: Apple },
+  { id: "checkins", label: "Check-ins", emoji: "📊", icon: BarChart3 },
+  { id: "lifestyle", label: "Lifestyle", emoji: "🌿", icon: Leaf },
+  { id: "general", label: "General", emoji: "⭐", icon: Star },
 ];
 
 interface Goal {
@@ -1230,14 +1233,21 @@ export default function ClientGoals() {
 
             {/* Overall stats */}
             <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
-              <p className="fc-text-subtle text-sm mb-2">
-                Overall: {goalStatsFromService.active} active goals · {goalStatsFromService.overallAdherence}% adherence
-              </p>
-              <div className="w-full h-2 rounded-full overflow-hidden bg-[color:var(--fc-glass-border)]">
-                <div
-                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)] transition-all"
-                  style={{ width: `${goalStatsFromService.overallAdherence}%` }}
-                />
+              <div className="flex items-center gap-5">
+                <div className="relative w-16 h-16 flex-shrink-0">
+                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="27" fill="none" stroke="var(--fc-glass-border)" strokeWidth="4" />
+                    <circle cx="32" cy="32" r="27" fill="none" stroke="var(--fc-accent-cyan)" strokeWidth="4" strokeLinecap="round"
+                      strokeDasharray={`${goalStatsFromService.overallAdherence * 1.696} 999`} />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-sm font-black fc-text-primary">
+                    {goalStatsFromService.overallAdherence}%
+                  </span>
+                </div>
+                <div>
+                  <p className="text-base font-bold fc-text-primary">Overall Adherence</p>
+                  <p className="text-sm fc-text-dim">{goalStatsFromService.active} active goals</p>
+                </div>
               </div>
             </GlassCard>
 
@@ -1279,7 +1289,7 @@ export default function ClientGoals() {
             </GlassCard>
 
             {/* Pillar sections */}
-            {PILLAR_SECTIONS.map(({ id: pillarId, label, emoji }) => {
+            {PILLAR_SECTIONS.map(({ id: pillarId, label, icon: PillarIcon }) => {
               const pillarGoalsList = getActiveGoalsForPillar(pillarId);
               const pillarStat = getPillarStats(pillarId);
               const count = pillarStat?.count ?? 0;
@@ -1288,8 +1298,9 @@ export default function ClientGoals() {
                 <section key={pillarId}>
                   <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
                     <div className="flex items-center justify-between gap-4 mb-4">
-                      <h2 className="text-lg font-bold fc-text-primary">
-                        {emoji} {label}
+                      <h2 className="text-lg font-bold fc-text-primary flex items-center gap-2">
+                        <PillarIcon className="w-5 h-5" style={{ color: "var(--fc-accent-primary)" }} />
+                        {label}
                         {count > 0 && (
                           <span className="fc-text-dim font-normal ml-2">
                             {count} goal{count !== 1 ? "s" : ""} · {adherence}%
@@ -1299,7 +1310,7 @@ export default function ClientGoals() {
                     </div>
                     {pillarGoalsList.length === 0 ? (
                       <div className="py-4 text-center">
-                        <p className="fc-text-dim text-sm mb-3">No goals yet</p>
+                        <p className="fc-text-dim text-sm mb-3">No goals in this pillar yet. Set one to start tracking!</p>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1434,16 +1445,14 @@ export default function ClientGoals() {
                   >
                     <h2
                       className="text-2xl md:text-3xl font-bold text-center mb-2"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                      style={{ color: "var(--fc-text-primary)" }}
                     >
                       Select Your Goal
                     </h2>
                     <p
                       className="text-center mb-4"
                       style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.7)"
-                          : "rgba(0,0,0,0.7)",
+                        color: "var(--fc-text-dim)",
                       }}
                     >
                       Choose what you want to achieve
@@ -1483,7 +1492,7 @@ export default function ClientGoals() {
                         <div key={category} className="mb-10">
                           <h3
                             className="text-lg md:text-xl font-bold mb-4"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                            style={{ color: "var(--fc-text-primary)" }}
                           >
                             {category}
                           </h3>
@@ -1497,9 +1506,7 @@ export default function ClientGoals() {
                                 }}
                                 className="flex flex-col items-center p-4 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all"
                                 style={{
-                                  background: isDark
-                                    ? "rgba(255,255,255,0.05)"
-                                    : "rgba(0,0,0,0.02)",
+                                  background: "var(--fc-glass-highlight)",
                                   cursor: "pointer",
                                 }}
                               >
@@ -1509,7 +1516,7 @@ export default function ClientGoals() {
                                 <span
                                   className="font-bold text-center text-sm"
                                   style={{
-                                    color: isDark ? "#fff" : "#1A1A1A",
+                                    color: "var(--fc-text-primary)",
                                   }}
                                 >
                                   {preset.title}
@@ -1517,9 +1524,7 @@ export default function ClientGoals() {
                                 <span
                                   className="text-xs text-center mt-1"
                                   style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.6)"
-                                      : "rgba(0,0,0,0.6)",
+color: "var(--fc-text-subtle)",
                                   }}
                                 >
                                   {preset.description}
@@ -1566,7 +1571,7 @@ export default function ClientGoals() {
                             </span>
                             <h2
                               className="text-2xl font-bold"
-                              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                              style={{ color: "var(--fc-text-primary)" }}
                             >
                               {preset.title}
                             </h2>
@@ -1580,7 +1585,7 @@ export default function ClientGoals() {
                               <Label
                                 className="block text-sm font-medium mb-2"
                                 style={{
-                                  color: isDark ? "#fff" : "#1A1A1A",
+                                  color: "var(--fc-text-primary)",
                                 }}
                               >
                                 What&apos;s your target?
@@ -1677,9 +1682,7 @@ export default function ClientGoals() {
                                     <span
                                       className="flex items-center"
                                       style={{
-                                        color: isDark
-                                          ? "rgba(255,255,255,0.6)"
-                                          : "rgba(0,0,0,0.6)",
+color: "var(--fc-text-subtle)",
                                       }}
                                     >
                                       /
@@ -1764,9 +1767,7 @@ export default function ClientGoals() {
                               <p
                                 className="text-xs mt-1"
                                 style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.5)"
-                                    : "rgba(0,0,0,0.5)",
+                                  color: "var(--fc-text-subtle)",
                                 }}
                               >
                                 Suggested: {preset.suggestedUnit}
@@ -1778,7 +1779,7 @@ export default function ClientGoals() {
                               <Label
                                 className="block text-sm font-medium mb-2"
                                 style={{
-                                  color: isDark ? "#fff" : "#1A1A1A",
+                                  color: "var(--fc-text-primary)",
                                 }}
                               >
                                 When do you want to reach it?{" "}
@@ -1811,7 +1812,7 @@ export default function ClientGoals() {
                               <Label
                                 className="block text-sm font-medium mb-3"
                                 style={{
-                                  color: isDark ? "#fff" : "#1A1A1A",
+                                  color: "var(--fc-text-primary)",
                                 }}
                               >
                                 Priority (optional)
@@ -1838,7 +1839,7 @@ export default function ClientGoals() {
                                     <span
                                       className="text-sm capitalize"
                                       style={{
-                                        color: isDark ? "#fff" : "#1A1A1A",
+                                        color: "var(--fc-text-primary)",
                                       }}
                                     >
                                       {level}

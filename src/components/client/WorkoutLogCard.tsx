@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppCard } from "@/components/ui/AppCard";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ChevronRight, Eye } from "lucide-react";
+import { Calendar, ChevronRight, Eye } from "lucide-react";
 
 export interface WorkoutLogCardLog {
   id: string;
@@ -15,6 +15,8 @@ export interface WorkoutLogCardLog {
   total_duration_minutes?: number | null;
   started_at: string;
   completed_at: string | null;
+  overall_difficulty_rating?: number | null;
+  programContext?: { dayNumber: number; programName: string } | null;
   workout_set_logs: Array<{
     weight?: number | null;
     reps?: number | null;
@@ -66,8 +68,14 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
 
   const volumeKg = Math.round(log.totalWeight);
   const detailUrl = `/client/progress/workout-logs/${log.id}`;
+  const rating = log.overall_difficulty_rating;
   const subtitlePills = (
     <div className="flex flex-wrap items-center gap-1.5">
+      {log.programContext && (
+        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-accent)]/15 border border-[color:var(--fc-accent)]/30 text-[color:var(--fc-accent)] font-medium">
+          Day {log.programContext.dayNumber}
+        </span>
+      )}
       {duration != null && (
         <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)]">
           {duration} min
@@ -77,8 +85,13 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
         {log.totalSets} sets
       </span>
       <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)]">
-        {volumeKg.toLocaleString()} kg total
+        {volumeKg.toLocaleString()} kg
       </span>
+      {rating != null && rating > 0 && (
+        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-dim)]">
+          {rating}/5
+        </span>
+      )}
     </div>
   );
 
@@ -88,7 +101,8 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
     <AppCard
       variant="client"
       accentColor="var(--fc-domain-workouts)"
-      eyebrow={formatDateLabel(completedDate)}
+      eyebrow={`COMPLETED · ${formatDateLabel(completedDate)}`}
+      eyebrowIcon={<Calendar className="w-4 h-4" />}
       title={workoutName}
       subtitle={subtitlePills}
       onClick={() => router.push(detailUrl)}

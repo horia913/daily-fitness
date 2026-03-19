@@ -3,11 +3,11 @@
 /**
  * Train Page - Client Training Hub
  *
- * Data: Single get_train_page_data RPC only. No block fetching on this page — blocks load
- * when the user taps "Start Workout" and lands on the workout execution page.
+ * Data: Single get_train_page_data RPC for the initial render. Workout blocks are
+ * prefetched in the background after the page loads so the day preview shows exercises instantly.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -17,6 +17,15 @@ import { ProgramCompletedCard } from "@/components/client/train/ProgramCompleted
 import { WeekStrip } from "@/components/client/train/WeekStrip";
 import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
+import { ActivityWeekSummary } from "@/components/client/activity/ActivityWeekSummary";
+import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
+import {
+  getActivitiesByDateRange,
+  getCurrentWeekBounds,
+  logActivity,
+  type ClientActivity,
+  type LogActivityInput,
+} from "@/lib/clientActivityService";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
@@ -29,7 +38,7 @@ import {
   type PreviewDayStatus,
 } from "@/components/client/train/WorkoutDayPreview";
 import { useToast } from "@/components/ui/toast-provider";
-import { Dumbbell, Calendar } from "lucide-react";
+import { Dumbbell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
 import {
@@ -37,6 +46,7 @@ import {
   type TrainPageRpcResponse,
   type TrainPageRpcExtraWorkoutRow,
 } from "@/lib/trainPageDataMapper";
+import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 
 const WEEKDAY_NAMES = [
   "Monday",
@@ -128,7 +138,19 @@ export default function TrainPage() {
     null,
   );
 
-  // Single RPC only — no block fetch; blocks load on workout execution page when user taps Start
+  // Extra activities state
+  const [weekActivities, setWeekActivities] = useState<ClientActivity[]>([]);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const { start, end } = getCurrentWeekBounds();
+    getActivitiesByDateRange(user.id, start, end)
+      .then(setWeekActivities)
+      .catch(() => {});
+  }, [user?.id]);
+
+  // Single RPC for initial render; blocks are prefetched in background for day preview
   const fetchProgramWeekOnly = useCallback(async (): Promise<TrainPageData> => {
     if (!user?.id) {
       return {
@@ -176,6 +198,33 @@ export default function TrainPage() {
 
   const loading = programLoading;
   const todayWeekday = getTodayWeekday();
+
+  // Background prefetch: load blocks for all templates once page data arrives (no effect on initial render)
+  const [prefetchedBlocks, setPrefetchedBlocks] = useState<Map<string, WorkoutSetEntry[]>>(new Map());
+  const prefetchedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!programWeek?.days?.length) return;
+    const templateIds = [
+      ...new Set(programWeek.days.map((d) => d.templateId).filter(Boolean)),
+    ];
+    if (templateIds.length === 0) return;
+    const key = templateIds.sort().join(",");
+    if (prefetchedForRef.current === key) return;
+    prefetchedForRef.current = key;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+        const blocksMap = await WorkoutBlockService.getWorkoutBlocksForTemplates(templateIds, { lite: true });
+        if (!cancelled) setPrefetchedBlocks(blocksMap);
+      } catch {
+        // Prefetch is best-effort; WorkoutDayPreview will load on-demand as fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [programWeek?.days]);
 
   // Default selected day to today or first day when program first loads (do not override user selection)
   React.useEffect(() => {
@@ -287,6 +336,14 @@ export default function TrainPage() {
     setSelectedRestWeekday(null);
   };
 
+  const handleLogActivity = async (input: LogActivityInput) => {
+    if (!user?.id) return;
+    await logActivity(user.id, input);
+    const { start, end } = getCurrentWeekBounds();
+    const updated = await getActivitiesByDateRange(user.id, start, end);
+    setWeekActivities(updated);
+  };
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -351,7 +408,16 @@ export default function TrainPage() {
                     selectedRestWeekday={selectedRestWeekday}
                   />
 
-                  {/* Section 3c: Workout Day Preview */}
+                  {/* Overdue Workouts — right after the strip so it's impossible to miss */}
+                  <OverdueWorkouts
+                    overdueSlots={programWeek.overdueSlots}
+                    onOpenPreview={handleOpenOverduePreview}
+                    onComplete={handleStartWorkout}
+                    isStarting={isStarting}
+                    startingScheduleId={startingScheduleId}
+                  />
+
+                  {/* Workout Day Preview */}
                   {(selectedDay ||
                     selectedOverdueSlot !== null ||
                     selectedRestWeekday !== null) && (
@@ -372,9 +438,7 @@ export default function TrainPage() {
                           isStarting={isStarting}
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
-                          exerciseCount={exerciseCounts.get(
-                            selectedOverdueSlot.templateId,
-                          )}
+                          blocks={prefetchedBlocks.get(selectedOverdueSlot.templateId) ?? undefined}
                         />
                       ) : selectedRestWeekday !== null ? (
                         <WorkoutDayPreview
@@ -405,70 +469,22 @@ export default function TrainPage() {
                           isStarting={isStarting}
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
-                          exerciseCount={exerciseCounts.get(
-                            selectedDay.templateId,
-                          )}
+                          blocks={prefetchedBlocks.get(selectedDay.templateId) ?? undefined}
                         />
                       ) : null}
                     </div>
                   )}
 
-                  {/* Section 3b: This week's workouts list */}
-                  {programWeek.days.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Calendar className="w-5 h-5 fc-text-dim" />
-                        <h3 className="text-lg font-bold fc-text-primary">
-                          This week&apos;s workouts
-                        </h3>
-                      </div>
-                      <ul className="space-y-2">
-                        {programWeek.days.map((day) => (
-                          <li key={day.scheduleId}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedDay(day);
-                                setSelectedOverdueSlot(null);
-                                setSelectedRestWeekday(null);
-                              }}
-                              className="w-full text-left rounded-xl p-4 fc-surface border border-[color:var(--fc-surface-card-border)] hover:opacity-90 transition-opacity flex items-center justify-between gap-3"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold fc-text-primary truncate flex items-center gap-2">
-                                  {day.workoutName}
-                                  {day.isOptional && (
-                                    <span className="text-[10px] font-normal text-cyan-500 dark:text-cyan-400">
-                                      Optional
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-xs fc-text-dim">
-                                  {day.dayLabel} · ~
-                                  {day.estimatedDuration || 45} min
-                                </p>
-                              </div>
-                              <span className="text-xs font-medium fc-text-dim shrink-0">
-                                {day.isCompleted ? "Done" : "View"}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  {/* Extra Activities — below the workout detail card */}
+                  {!loading && (
+                    <ActivityWeekSummary
+                      activities={weekActivities}
+                      onQuickAdd={() => setShowActivityModal(true)}
+                    />
                   )}
-
-                  {/* Section 4: Overdue Workouts Warning */}
-                  <OverdueWorkouts
-                    overdueSlots={programWeek.overdueSlots}
-                    onOpenPreview={handleOpenOverduePreview}
-                    onComplete={handleStartWorkout}
-                    isStarting={isStarting}
-                    startingScheduleId={startingScheduleId}
-                  />
                 </>
               ) : (
-                /* Section 6: No Program State */
+                /* No Program State */
                 <EmptyState
                   icon={<Dumbbell className="w-6 h-6" />}
                   title="No program assigned yet"
@@ -476,12 +492,18 @@ export default function TrainPage() {
                 />
               )}
 
-              {/* Section 5: Extra Training */}
+              {/* Extra Training (coach-assigned extra workouts) */}
               {!loading && <ExtraTraining workouts={extraWorkouts} />}
             </>
           ) : null}
         </ClientPageShell>
       </AnimatedBackground>
+
+      <LogActivityModal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        onSave={handleLogActivity}
+      />
     </ProtectedRoute>
   );
 }

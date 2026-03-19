@@ -15,6 +15,7 @@ import type { ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { getExerciseVisuals } from "@/lib/exerciseIconMap";
 
 const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -186,7 +187,7 @@ export function WorkoutDayPreview({
             Rest Day
           </span>
           <p className="text-base font-semibold fc-text-primary mb-1">Rest Day</p>
-          <p className="text-sm fc-text-dim">Rest and recover — no workout scheduled</p>
+          <p className="text-sm fc-text-dim">Recovery is when the magic happens. Stay hydrated, stretch, and come back stronger.</p>
         </div>
       </ClientGlassCard>
     );
@@ -247,18 +248,30 @@ export function WorkoutDayPreview({
                   const rest = (ex.rest_seconds ?? block.rest_seconds) != null
                     ? ` · ${(ex.rest_seconds ?? block.rest_seconds)}s rest`
                     : "";
+                  const { Icon: ExIcon, color: exColor } = getExerciseVisuals({
+                    category: undefined,
+                    primaryMuscleGroup: ex.exercise?.primary_muscle_group ?? undefined,
+                  });
                   return (
                     <div
                       key={ex.id}
-                      className="flex items-baseline gap-2 text-sm py-1 border-b border-[color:var(--fc-glass-border)] last:border-0"
+                      className="flex items-center gap-3 py-2 border-b border-[color:var(--fc-glass-border)] last:border-0"
                     >
-                      <span className="font-medium fc-text-primary shrink-0">
-                        {ex.exercise_letter ? `${ex.exercise_letter}. ` : ""}
-                        {ex.exercise?.name ?? "Exercise"}
-                      </span>
-                      <span className="fc-text-dim text-xs shrink-0">
-                        {sets} × {reps}{weight}{rest}
-                      </span>
+                      <div
+                        className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${exColor}18` }}
+                      >
+                        <ExIcon className="w-3.5 h-3.5" style={{ color: exColor }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium fc-text-primary truncate block">
+                          {ex.exercise_letter ? `${ex.exercise_letter}. ` : ""}
+                          {ex.exercise?.name ?? "Exercise"}
+                        </span>
+                        <span className="fc-text-dim text-xs">
+                          {sets} × {reps}{weight}{rest}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}

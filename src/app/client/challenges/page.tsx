@@ -10,7 +10,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges } from "@/lib/challengeService";
+import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges, type ChallengeParticipant } from "@/lib/challengeService";
 import { ChallengeCard } from "@/components/client/ChallengeCard";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -24,9 +24,11 @@ function ChallengesPageContent() {
   const router = useRouter();
 
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
-  const [myChallenges, setMyChallenges] = useState<string[]>([]); // IDs of challenges user is participating in
+  const [myChallenges, setMyChallenges] = useState<string[]>([]);
+  const [invitedChallenges, setInvitedChallenges] = useState<Array<Challenge & { participation: ChallengeParticipant }>>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "my">("all");
+  const [completedChallenges, setCompletedChallenges] = useState<Array<Challenge & { participation: ChallengeParticipant }>>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "my" | "invited" | "history">("all");
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<"fat_loss" | "muscle_gain" | null>(null);
@@ -53,6 +55,12 @@ function ChallengesPageContent() {
           ]);
           setActiveChallenges(active);
           setMyChallenges(myParticipations.map(p => p.id));
+          setInvitedChallenges(
+            myParticipations.filter(p => p.participation?.status === "invited")
+          );
+          setCompletedChallenges(
+            myParticipations.filter(p => p.status === "completed")
+          );
         })(),
         30000,
         "timeout"
@@ -106,7 +114,11 @@ function ChallengesPageContent() {
 
   const displayedChallenges = activeTab === "all"
     ? activeChallenges
-    : activeChallenges.filter(c => myChallenges.includes(c.id));
+    : activeTab === "invited"
+      ? invitedChallenges
+      : activeTab === "history"
+        ? completedChallenges
+        : activeChallenges.filter(c => myChallenges.includes(c.id));
 
   if (authLoading || loading) {
     return (
@@ -203,6 +215,35 @@ function ChallengesPageContent() {
             >
               My challenges
             </button>
+            {invitedChallenges.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("invited")}
+                className={cn(
+                  "pb-2 text-sm font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors flex items-center gap-2",
+                  activeTab === "invited"
+                    ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                    : "fc-text-subtle border-transparent hover:fc-text-primary"
+                )}
+              >
+                Invited
+                <span className="w-5 h-5 rounded-full bg-[var(--fc-accent-cyan)] text-white text-[10px] flex items-center justify-center font-bold">
+                  {invitedChallenges.length}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "history"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              History
+            </button>
           </div>
         </div>
 
@@ -211,12 +252,20 @@ function ChallengesPageContent() {
           <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
             <Trophy className="w-20 h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
             <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
-              {activeTab === "my" ? "No Active Challenges" : "No Challenges Available"}
+              {activeTab === "history"
+                ? "No Past Challenges"
+                : activeTab === "invited"
+                  ? "No Invitations"
+                  : activeTab === "my" ? "No Active Challenges" : "No Challenges Available"}
             </h2>
             <p className="text-sm text-[color:var(--fc-text-dim)]">
-              {activeTab === "my"
-                ? "Join a challenge to start competing."
-                : "Check back later for new challenges."}
+              {activeTab === "history"
+                ? "Completed challenges will appear here."
+                : activeTab === "invited"
+                  ? "No pending challenge invitations."
+                  : activeTab === "my"
+                    ? "Join a challenge to start competing."
+                    : "Check back later for new challenges."}
             </p>
           </GlassCard>
         ) : (
@@ -249,38 +298,38 @@ function ChallengesPageContent() {
               Choose which recomp track you want to compete in
             </p>
 
-            <div className="space-y-3 mb-6">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => setSelectedTrack("fat_loss")}
                 className={cn(
-                  "w-full p-4 rounded-xl text-left transition-all border",
+                  "p-4 rounded-xl text-left transition-all border",
                   selectedTrack === "fat_loss"
                     ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
                     : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
                 )}
               >
-                <p className="font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="font-semibold text-[color:var(--fc-text-primary)] text-sm">
                   Fat Loss Track
                 </p>
                 <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                  Reduce waist measurement while maintaining strength
+                  Reduce waist, maintain strength
                 </p>
               </button>
 
               <button
                 onClick={() => setSelectedTrack("muscle_gain")}
                 className={cn(
-                  "w-full p-4 rounded-xl text-left transition-all border",
+                  "p-4 rounded-xl text-left transition-all border",
                   selectedTrack === "muscle_gain"
                     ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
                     : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
                 )}
               >
-                <p className="font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="font-semibold text-[color:var(--fc-text-primary)] text-sm">
                   Muscle Gain Track
                 </p>
                 <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                  Gain bodyweight multiples in key lifts
+                  Gain bodyweight multiples
                 </p>
               </button>
             </div>

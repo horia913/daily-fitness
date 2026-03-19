@@ -22,6 +22,7 @@ interface StepReviewProps {
   notesEnabled: boolean;
   onSubmit: () => void;
   submitting: boolean;
+  frequencyDays?: number | null;
 }
 
 function formatChange(current: number, previous: number): { text: string; improving: boolean } {
@@ -51,6 +52,13 @@ function formatSinceStart(
   };
 }
 
+function getFrequencyPlaceholder(days?: number | null): string {
+  if (days === 7) return "How did this week go? Energy, adherence, anything to share...";
+  if (days === 30) return "How did this month go? Energy, adherence, anything to share...";
+  if (days != null) return "How did this period go? Energy, adherence, anything to share...";
+  return "How did this period go? Energy, adherence, anything to share...";
+}
+
 export function StepReview({
   bodyData,
   previousMeasurement,
@@ -62,6 +70,7 @@ export function StepReview({
   notesEnabled,
   onSubmit,
   submitting,
+  frequencyDays,
 }: StepReviewProps) {
   const weightChange =
     bodyData.weight_kg != null && previousMeasurement?.weight_kg != null
@@ -215,7 +224,7 @@ export function StepReview({
           <textarea
             value={notesToCoach}
             onChange={(e) => setNotesToCoach(e.target.value)}
-            placeholder="How did this month go? Energy, adherence, anything to share..."
+            placeholder={getFrequencyPlaceholder(frequencyDays)}
             rows={4}
             className="w-full px-4 py-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
           />

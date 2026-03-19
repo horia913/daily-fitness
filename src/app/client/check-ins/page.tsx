@@ -336,38 +336,32 @@ export default function ClientCheckInsPage() {
               {!dataLoading && (
                 <section className="mb-8">
                   <SectionHeader title="More" className="mb-3" />
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <Link href="/client/progress/body-metrics">
-                      <ClientGlassCard className="p-4 flex items-center gap-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color:var(--fc-domain-workouts)]/10 text-[color:var(--fc-domain-workouts)] shrink-0">
-                          <BarChart3 className="w-5 h-5" />
+                      <ClientGlassCard className="p-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
+                          <BarChart3 className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold fc-text-primary">Body Metrics History</p>
-                          <p className="text-sm fc-text-dim">View trends, charts, all measurements</p>
-                        </div>
+                        <p className="font-semibold fc-text-primary text-sm">Body Metrics</p>
+                        <p className="text-xs fc-text-dim">Trends &amp; charts</p>
                       </ClientGlassCard>
                     </Link>
                     <Link href="/client/progress/photos">
-                      <ClientGlassCard className="p-4 flex items-center gap-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color:var(--fc-domain-workouts)]/10 text-[color:var(--fc-domain-workouts)] shrink-0">
-                          <Camera className="w-5 h-5" />
+                      <ClientGlassCard className="p-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
+                          <Camera className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold fc-text-primary">Progress Photos</p>
-                          <p className="text-sm fc-text-dim">View timeline, compare dates</p>
-                        </div>
+                        <p className="font-semibold fc-text-primary text-sm">Progress Photos</p>
+                        <p className="text-xs fc-text-dim">Timeline &amp; compare</p>
                       </ClientGlassCard>
                     </Link>
                     <Link href="/client/progress/mobility">
-                      <ClientGlassCard className="p-4 flex items-center gap-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color:var(--fc-domain-workouts)]/10 text-[color:var(--fc-domain-workouts)] shrink-0">
-                          <Activity className="w-5 h-5" />
+                      <ClientGlassCard className="p-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
+                          <Activity className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold fc-text-primary">Mobility Assessments</p>
-                          <p className="text-sm fc-text-dim">Track flexibility and range of motion</p>
-                        </div>
+                        <p className="font-semibold fc-text-primary text-sm">Mobility</p>
+                        <p className="text-xs fc-text-dim">Flexibility &amp; ROM</p>
                       </ClientGlassCard>
                     </Link>
                     <button
@@ -375,14 +369,12 @@ export default function ClientCheckInsPage() {
                       onClick={() => setShowLogModal(true)}
                       className="w-full text-left"
                     >
-                      <ClientGlassCard className="p-4 flex items-center gap-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color:var(--fc-domain-workouts)]/10 text-[color:var(--fc-domain-workouts)] shrink-0">
-                          <Scale className="w-5 h-5" />
+                      <ClientGlassCard className="p-4 fc-hover-rise fc-press hover:border-[color:var(--fc-glass-border-strong)] transition-all cursor-pointer">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
+                          <Scale className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold fc-text-primary">Quick Weight Log</p>
-                          <p className="text-sm fc-text-dim">Log today&apos;s weight without full check-in</p>
-                        </div>
+                        <p className="font-semibold fc-text-primary text-sm">Quick Weight</p>
+                        <p className="text-xs fc-text-dim">Log without check-in</p>
                       </ClientGlassCard>
                     </button>
                   </div>
@@ -430,7 +422,7 @@ export default function ClientCheckInsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="fc-text-dim text-sm mb-4">No active check-in goals.</p>
+                <p className="fc-text-dim text-sm mb-4">No active check-in goals yet. Add one below to start tracking your progress consistently!</p>
               )}
               <div className="flex flex-col sm:flex-row gap-2">
                 <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>

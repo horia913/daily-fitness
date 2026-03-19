@@ -40,9 +40,6 @@ export default function MealPlanCard({
     <>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]">
-          {mealCount} meal{mealCount !== 1 ? "s" : ""}
-        </span>
-        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]">
           {usageCount} client{usageCount !== 1 ? "s" : ""} assigned
         </span>
         {mealPlan.generated_config ? (

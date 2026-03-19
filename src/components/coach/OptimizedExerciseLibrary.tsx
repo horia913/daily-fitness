@@ -377,12 +377,14 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                   </div>
                   <div className="min-w-0">
                     <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      {exercises.length > 0 
-                        ? (exercises.reduce((sum, e) => sum + (e.rating || 0), 0) / exercises.length).toFixed(1)
-                        : '0.0'
-                      }
+                      {(() => {
+                        const rated = exercises.filter(e => e.rating);
+                        return rated.length > 0
+                          ? (rated.reduce((sum, e) => sum + (e.rating || 0), 0) / rated.length).toFixed(1)
+                          : '--';
+                      })()}
                     </p>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Rating</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Rating</p>
                   </div>
                 </div>
               </CardContent>

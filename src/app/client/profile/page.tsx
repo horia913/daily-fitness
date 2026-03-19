@@ -615,7 +615,7 @@ export default function ClientProfilePage() {
           <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
             <CardHeader className="p-6 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-[var(--fc-status-success)] rounded-2xl flex items-center justify-center">
                   <TargetIcon className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -663,7 +663,7 @@ export default function ClientProfilePage() {
           <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
             <CardHeader className="p-6 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-[var(--fc-status-success)] rounded-2xl flex items-center justify-center">
                   <Activity className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -725,7 +725,7 @@ export default function ClientProfilePage() {
                       {editing && (
                         <button
                           onClick={() => removeGoal(goal)}
-                          className="ml-1 text-red-500 hover:text-red-700"
+                          className="ml-1 hover:opacity-70" style={{ color: "var(--fc-status-error)" }}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -815,7 +815,7 @@ export default function ClientProfilePage() {
           <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
             <CardHeader className="p-6 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-slate-500 to-gray-600 rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-[var(--fc-glass-border)] rounded-2xl flex items-center justify-center">
                   <Settings className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -877,8 +877,8 @@ export default function ClientProfilePage() {
 
               {passwordSuccess ? (
                 <div className="text-center py-6">
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                  <p className="text-lg font-semibold text-green-600">Password changed successfully!</p>
+                  <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--fc-status-success)" }} />
+                  <p className="text-lg font-semibold" style={{ color: "var(--fc-status-success)" }}>Password changed successfully!</p>
                 </div>
               ) : (
                 <div className="space-y-4">

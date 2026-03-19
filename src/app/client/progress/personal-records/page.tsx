@@ -258,7 +258,7 @@ export default function PersonalRecordsPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
                 <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
                 <button type="button" onClick={() => { setLoadError(null); loadPersonalRecords(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
               </div>
@@ -276,7 +276,7 @@ export default function PersonalRecordsPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
                 <div className="animate-pulse space-y-6">
                   <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -302,9 +302,9 @@ export default function PersonalRecordsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-10 fc-page space-y-6">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+              <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                 <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
               </Link>
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -324,7 +324,7 @@ export default function PersonalRecordsPage() {
           </div>
 
           {backfilling ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-8 text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-4" />
               <p className="text-sm text-[color:var(--fc-text-dim)]">
                 Analyzing your workout history...
@@ -334,7 +334,7 @@ export default function PersonalRecordsPage() {
             <>
               {/* PR Summary Hero (Enhanced) */}
               <div
-                className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-8 mb-8"
+                className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-8 mb-8"
               >
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-center md:text-left flex-1">
@@ -437,7 +437,7 @@ export default function PersonalRecordsPage() {
                     return (
                       <div
                         key={record.id}
-                        className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5"
+                        className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div className={`p-2 rounded-lg ${iconClass}`}>
@@ -511,7 +511,7 @@ export default function PersonalRecordsPage() {
                           className={`fc-surface rounded-2xl border p-4 transition-all ${
                             isRecent
                               ? "border-[color:var(--fc-status-success)]/30 bg-[color:var(--fc-status-success)]/5"
-                              : "border-[color:var(--fc-surface-card-border)]"
+                              : "border-[color:var(--fc-glass-border)]"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-4">
@@ -557,7 +557,7 @@ export default function PersonalRecordsPage() {
                   return (
                     <div
                       key={exerciseName}
-                      className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden"
+                      className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] overflow-hidden"
                     >
                       <button
                         type="button"
@@ -631,7 +631,7 @@ export default function PersonalRecordsPage() {
             </>
           ) : (
             <div
-              className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-10 text-center"
+              className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-10 text-center"
             >
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <Trophy className="h-10 w-10 fc-text-warning" />

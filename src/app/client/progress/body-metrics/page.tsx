@@ -329,7 +329,7 @@ function BodyMetricsPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
             </div>
@@ -345,7 +345,7 @@ function BodyMetricsPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
               <div className="animate-pulse space-y-6">
                 <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -366,10 +366,10 @@ function BodyMetricsPageContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
         {/* Header */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+              <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                 <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
               </Link>
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -445,7 +445,7 @@ function BodyMetricsPageContent() {
               ? (lowerIsBetter ? (current - target).toFixed(1) : (target - current).toFixed(1))
               : null;
             goalCards.push(
-              <div key={goal.id} className="fc-surface p-4 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+              <div key={goal.id} className="fc-surface p-4 rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-2 mb-2">
                   <Target className="w-4 h-4 fc-text-subtle" />
                   <span className="font-semibold fc-text-primary">{goal.title}</span>
@@ -485,7 +485,7 @@ function BodyMetricsPageContent() {
         {/* Nutrition vs Body Composition insight — only if nutrition goals + ≥2 body metrics in 30d */}
         {nutritionVsBodyInsight && (
           <section className="mb-8">
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="mb-2 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_10px_20px_rgba(245,158,11,0.25)]">
                   <Activity className="h-6 w-6 text-white" />
@@ -501,7 +501,7 @@ function BodyMetricsPageContent() {
         )}
 
         {metrics.length === 0 ? (
-          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-glass-border)]">
             <EmptyState
               icon={Scale}
               title="No measurements yet"
@@ -512,7 +512,7 @@ function BodyMetricsPageContent() {
         ) : (
           <main className="space-y-8">
             {/* Last vs current comparison */}
-            <section className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <section className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-glass-border)]">
               <h2 className="text-lg font-semibold fc-text-primary mb-1">Body check-in</h2>
               {previous && daysSincePrevious != null && (
                 <p className="text-sm fc-text-dim mb-6">
@@ -698,7 +698,7 @@ function BodyMetricsPageContent() {
             </section>
 
             {/* Tabs: Weight & BF and Measurements */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-glass-border)]">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)]">
                   <TabsTrigger value="weight-bf" className="data-[state=active]:fc-glass">
@@ -1059,7 +1059,7 @@ function BodyMetricsPageContent() {
 
             {/* Log history */}
             <div
-              className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] flex flex-col"
+              className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] flex flex-col"
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold fc-text-primary">Log history</h3>

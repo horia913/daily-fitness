@@ -78,6 +78,22 @@ export interface NutritionPageRpcAssignment {
   } | null;
 }
 
+export interface NutritionPageRpcWeeklyComplianceDay {
+  date: string;
+  meals_completed: number;
+}
+
+export interface NutritionPageRpcFood {
+  id: string;
+  name: string;
+  serving_size?: number;
+  serving_unit?: string;
+  calories_per_serving?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
 export interface NutritionPageRpcResponse {
   hasAssignment: boolean;
   assignmentId?: string;
@@ -86,6 +102,8 @@ export interface NutritionPageRpcResponse {
   dailySelection?: { meal_plan_assignment_id: string } | null;
   meals?: NutritionPageRpcMeal[] | null;
   nutritionGoals?: NutritionPageRpcGoal[] | null;
+  weeklyCompliance?: NutritionPageRpcWeeklyComplianceDay[] | null;
+  allFoods?: NutritionPageRpcFood[] | null;
 }
 
 export interface MappedMealFoodItem {

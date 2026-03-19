@@ -384,7 +384,7 @@ export default function WorkoutTemplateDetails({
                       </span>
                     </div>
                     <p className="text-2xl font-bold fc-text-primary">
-                      {(template as any).rating || 0}
+                      {(template as any).rating || '--'}
                     </p>
                   </div>
                 </div>

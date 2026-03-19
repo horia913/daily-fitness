@@ -12,6 +12,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { getFoodVisuals } from '@/lib/foodIconMap'
 import { useToast } from '@/components/ui/toast-provider'
 import { uploadMealPhoto, validateMealOptionForUpload } from '@/lib/mealPhotoService'
 import type { MealOptionWithFoods, MacroTotals } from '@/lib/mealPlanService'
@@ -237,6 +238,16 @@ export default function MealCardWithOptions({
   // Render Helpers
   // ============================================================================
 
+  const MEAL_TYPE_CATEGORY: Record<string, string> = {
+    breakfast: 'Dairy',
+    lunch: 'Protein',
+    dinner: 'Protein',
+    snack: 'Fruits',
+  }
+  const mealVisuals = getFoodVisuals({ category: MEAL_TYPE_CATEGORY[meal.meal_type] || null })
+  const MealIcon = mealVisuals.Icon
+  const mealIconColor = mealVisuals.color
+
   const getMealCalories = (): number => {
     return currentTotals.calories || 0
   }
@@ -274,7 +285,9 @@ export default function MealCardWithOptions({
             <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{meal.emoji}</span>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${mealIconColor}18` }}>
+                    <MealIcon className="w-4 h-4" style={{ color: mealIconColor }} />
+                  </div>
                   <h3 className="text-lg font-bold fc-text-primary">
                     {meal.name}
                   </h3>
@@ -375,7 +388,9 @@ export default function MealCardWithOptions({
             <div className="p-5">
               <div className="flex justify-between items-start mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{meal.emoji}</span>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${mealIconColor}18` }}>
+                    <MealIcon className="w-4 h-4" style={{ color: mealIconColor }} />
+                  </div>
                   <h3 className="text-lg font-bold fc-text-primary">
                     {meal.name}
                   </h3>

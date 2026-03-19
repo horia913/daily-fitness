@@ -391,7 +391,7 @@ export default function WorkoutTemplatesPage() {
         <div className="relative z-10 min-h-screen pb-32">
           {/* Back to Programs */}
           <div className="max-w-6xl mx-auto px-4 pt-4 sm:px-6">
-            <Link href="/coach/training/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-2">
+            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-2">
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Back to Programs
             </Link>

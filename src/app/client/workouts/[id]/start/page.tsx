@@ -170,10 +170,20 @@ export default function LiveWorkout() {
   const [lastSessionWeightByExerciseId, setLastSessionWeightByExerciseId] =
     useState<Record<string, number>>({});
 
-  // Achievements unlocked during workout (e.g. from PR via log-set)
+  // Celebration queue: PR shows first, then achievements sequentially
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [prCelebrationData, setPrCelebrationData] = useState<PRDetectedPayload | null>(null);
+  const pendingAchievementsRef = useRef<Achievement[]>([]);
+  const showAchievementsAfterPR = useCallback(() => {
+    if (pendingAchievementsRef.current.length > 0) {
+      setTimeout(() => {
+        setNewAchievementsQueue((prev) => [...prev, ...pendingAchievementsRef.current]);
+        setAchievementModalIndex(0);
+        pendingAchievementsRef.current = [];
+      }, 300);
+    }
+  }, []);
 
   // Progression suggestions state
   const [progressionSuggestions, setProgressionSuggestions] = useState<
@@ -4201,9 +4211,10 @@ export default function LiveWorkout() {
                     onAchievementsUnlocked={(achievements) => {
                       const tierToRarity = (tier: string | null): Achievement["rarity"] => {
                         if (!tier) return "uncommon";
-                        if (tier === "platinum") return "epic";
-                        if (tier === "gold") return "rare";
-                        if (tier === "silver") return "uncommon";
+                        if (tier === "platinum") return "legendary";
+                        if (tier === "gold") return "epic";
+                        if (tier === "silver") return "rare";
+                        if (tier === "bronze") return "uncommon";
                         return "common";
                       };
                       const mapped: Achievement[] = achievements.map((a) => ({
@@ -4214,8 +4225,13 @@ export default function LiveWorkout() {
                         rarity: tierToRarity(a.tier),
                         unlocked: true,
                       }));
-                      setNewAchievementsQueue((prev) => [...prev, ...mapped]);
-                      setAchievementModalIndex(0);
+                      // If PR modal is active, defer achievements until it closes
+                      if (prCelebrationData) {
+                        pendingAchievementsRef.current = [...pendingAchievementsRef.current, ...mapped];
+                      } else {
+                        setNewAchievementsQueue((prev) => [...prev, ...mapped]);
+                        setAchievementModalIndex(0);
+                      }
                     }}
                   />
                   {/* Complete Workout Button - Only show on last block when complete */}
@@ -4286,7 +4302,7 @@ export default function LiveWorkout() {
                     )}
                   {/* AMRAP Flow */}
                   {currentType === "amrap" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)]">
                       <div>
                         {!amrapActive ? (
                           <div
@@ -4515,7 +4531,7 @@ export default function LiveWorkout() {
 
                   {/* EMOM Flow */}
                   {currentType === "emom" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)]">
                       <div>
                         {/* Rep-based behaves like AMRAP */}
                         {currentExercise?.meta?.emom_mode === "rep_based" ? (
@@ -4753,7 +4769,7 @@ export default function LiveWorkout() {
                   {/* Tabata Flow */}
                   {currentType === "tabata" && (
                     <div
-                      className="fc-surface rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-status-error)]"
+                      className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)]"
                     >
                       <div>
                         {!intervalActive ? (
@@ -5150,7 +5166,7 @@ export default function LiveWorkout() {
 
                   {/* Cluster Set Flow */}
                   {currentType === "cluster_set" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)]">
                       <div>
                         {/* Header */}
                         <div
@@ -5438,7 +5454,7 @@ export default function LiveWorkout() {
 
                   {/* Rest-Pause Flow */}
                   {currentType === "rest_pause" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)]">
                       <div>
                         {/* Header */}
                         <div
@@ -5749,7 +5765,7 @@ export default function LiveWorkout() {
 
                   {/* For Time Flow */}
                   {currentType === "for_time" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-warning)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-warning)]">
                       <div>
                         {!forTimeActive && forTimeCompletionSecs == null ? (
                           <div
@@ -5938,7 +5954,7 @@ export default function LiveWorkout() {
                                 currentSetData.reps <= 0 ||
                                 isLoggingSet
                               }
-                              className="w-full bg-[linear-gradient(135deg,#4CAF50_0%,#81C784_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="w-full bg-[var(--fc-status-success)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Check className="w-5 h-5 mr-2" /> Complete Set
                             </Button>
@@ -5957,7 +5973,7 @@ export default function LiveWorkout() {
                   {/* Superset / Pre-Exhaustion Flow */}
                   {(currentType === "superset" ||
                     currentType === "pre_exhaustion") && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)]">
                       <div>
                         {/* Header */}
                         <div
@@ -6303,7 +6319,7 @@ export default function LiveWorkout() {
 
                   {/* Giant Set Flow */}
                   {currentType === "giant_set" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.08)] relative z-20">
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] relative z-20">
                       <div>
                         <div
                           className="flex items-center justify-between"
@@ -6467,7 +6483,7 @@ export default function LiveWorkout() {
                     currentType !== "pre_exhaustion" &&
                     currentType !== "cluster_set" &&
                     currentType !== "rest_pause" && (
-                      <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                      <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)]">
                         <div>
                           {/* Header */}
                           <div
@@ -6517,8 +6533,7 @@ export default function LiveWorkout() {
                                 width: "56px",
                                 height: "56px",
                                 borderRadius: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
+                                background: "var(--fc-accent-primary)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -6733,7 +6748,7 @@ export default function LiveWorkout() {
                           {/* Log Button */}
                           <Button
                             onClick={completeSet}
-                            className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none"
+                            className="w-full min-h-[44px] py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none"
                             style={{
                               width: "100%",
                               cursor:
@@ -7249,7 +7264,10 @@ export default function LiveWorkout() {
         {prCelebrationData && (
           <PRCelebrationModal
             visible={!!prCelebrationData}
-            onClose={() => setPrCelebrationData(null)}
+            onClose={() => {
+              setPrCelebrationData(null);
+              showAchievementsAfterPR();
+            }}
             pr={prCelebrationData}
           />
         )}

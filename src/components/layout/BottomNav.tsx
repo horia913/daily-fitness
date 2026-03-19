@@ -1,8 +1,6 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   Home,
   Dumbbell,
@@ -78,15 +76,6 @@ function isSegmentActive(pathname: string, item: NavItem): boolean {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
 
   // Hide nav on workout execution pages
   if (pathname.includes("/workouts/") && pathname.includes("/start")) {
@@ -169,5 +158,5 @@ export default function BottomNav() {
     </nav>
   );
 
-  return createPortal(navContent, document.body);
+  return navContent;
 }

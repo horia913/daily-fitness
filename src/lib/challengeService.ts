@@ -269,11 +269,56 @@ export async function getChallengeParticipants(challengeId: string): Promise<Cha
   }
 }
 
+export interface LeaderboardParticipant extends ChallengeParticipant {
+  display_name: string;
+  avatar_initial: string;
+}
+
 /**
- * Get challenge leaderboard (alias for getChallengeParticipants, ordered by score)
+ * Get challenge leaderboard with real participant names from profiles
  */
-export async function getChallengeLeaderboard(challengeId: string): Promise<ChallengeParticipant[]> {
-  return getChallengeParticipants(challengeId);
+export async function getChallengeLeaderboard(challengeId: string): Promise<LeaderboardParticipant[]> {
+  try {
+    const participants = await getChallengeParticipants(challengeId);
+    if (participants.length === 0) return [];
+
+    const clientIds = participants.map(p => p.client_id);
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, leaderboard_visibility')
+      .in('id', clientIds);
+
+    if (profileError) {
+      console.error('Error fetching participant profiles:', profileError);
+    }
+
+    const profileMap = new Map(
+      (profiles ?? []).map(p => [p.id, p])
+    );
+
+    return participants.map(p => {
+      const profile = profileMap.get(p.client_id);
+      const visibility = profile?.leaderboard_visibility ?? 'public';
+      let displayName = 'Anonymous';
+      let avatarInitial = 'A';
+
+      if (visibility !== 'hidden') {
+        const first = profile?.first_name ?? '';
+        const last = profile?.last_name ?? '';
+        if (visibility === 'anonymous') {
+          displayName = first ? `${first.charAt(0)}.` : 'Anonymous';
+        } else {
+          displayName = [first, last].filter(Boolean).join(' ') || 'Participant';
+        }
+        avatarInitial = first?.charAt(0) || last?.charAt(0) || 'P';
+      }
+
+      return { ...p, display_name: displayName, avatar_initial: avatarInitial };
+    });
+  } catch (error) {
+    console.error('Error in getChallengeLeaderboard:', error);
+    return [];
+  }
 }
 
 export async function getChallengeScoringCategories(challengeId: string): Promise<ChallengeScoringCategory[]> {
@@ -454,6 +499,23 @@ export async function finalizeChallenge(challengeId: string): Promise<{ success:
       rank++;
     }
     const standings = await getChallengeParticipants(challengeId);
+
+    // Check challenge achievements for all participants
+    try {
+      const { AchievementService } = await import('./achievementService');
+      for (const p of standings) {
+        await AchievementService.checkAndUnlockAchievements(p.client_id, 'challenges_completed');
+        if (p.is_winner) {
+          await AchievementService.checkAndUnlockAchievements(p.client_id, 'challenges_won');
+        }
+        if (p.final_rank && p.final_rank <= 3) {
+          await AchievementService.checkAndUnlockAchievements(p.client_id, 'challenges_top3');
+        }
+      }
+    } catch (achErr) {
+      console.error('Error checking challenge achievements:', achErr);
+    }
+
     return { success: true, standings };
   } catch (error) {
     console.error('Error in finalizeChallenge:', error);
@@ -528,6 +590,135 @@ async function getBodyRecompScore(
 }
 
 /**
+ * PR improvement: delta between best 1RM before challenge and best 1RM during challenge.
+ */
+async function getPrImprovementScore(
+  clientId: string,
+  challengeId: string,
+  exerciseId?: string | null
+): Promise<number> {
+  const challenge = await getChallengeDetails(challengeId);
+  if (!challenge) return 0;
+  const start = challenge.start_date;
+  const end = challenge.end_date;
+
+  let queryBefore = supabase
+    .from('personal_records')
+    .select('value')
+    .eq('client_id', clientId)
+    .eq('record_type', '1rm')
+    .lt('achieved_at', start)
+    .order('value', { ascending: false })
+    .limit(1);
+  let queryDuring = supabase
+    .from('personal_records')
+    .select('value')
+    .eq('client_id', clientId)
+    .eq('record_type', '1rm')
+    .gte('achieved_at', start)
+    .lte('achieved_at', end)
+    .order('value', { ascending: false })
+    .limit(1);
+
+  if (exerciseId) {
+    queryBefore = queryBefore.eq('exercise_id', exerciseId);
+    queryDuring = queryDuring.eq('exercise_id', exerciseId);
+  }
+
+  const [{ data: before }, { data: during }] = await Promise.all([queryBefore, queryDuring]);
+  const prBefore = before?.[0]?.value ? Number(before[0].value) : 0;
+  const prDuring = during?.[0]?.value ? Number(during[0].value) : 0;
+  return Math.max(0, Math.round((prDuring - prBefore) * 10) / 10);
+}
+
+/**
+ * Tonnage: total volume (weight x reps) during challenge period.
+ */
+async function getTonnageScore(
+  clientId: string,
+  challengeId: string
+): Promise<number> {
+  const challenge = await getChallengeDetails(challengeId);
+  if (!challenge) return 0;
+  const start = new Date(challenge.start_date).toISOString();
+  const endDate = new Date(challenge.end_date);
+  endDate.setHours(23, 59, 59, 999);
+  const end = endDate.toISOString();
+
+  const { data, error } = await supabase
+    .from('workout_set_logs')
+    .select('weight, reps')
+    .eq('client_id', clientId)
+    .gte('created_at', start)
+    .lte('created_at', end);
+
+  if (error || !data) return 0;
+  return data.reduce((sum, s) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0), 0);
+}
+
+/**
+ * BW multiple: best 1RM / bodyweight for a given exercise.
+ */
+async function getBwMultipleScore(
+  clientId: string,
+  exerciseId?: string | null
+): Promise<number> {
+  let prQuery = supabase
+    .from('personal_records')
+    .select('value')
+    .eq('client_id', clientId)
+    .eq('record_type', '1rm')
+    .order('value', { ascending: false })
+    .limit(1);
+
+  if (exerciseId) prQuery = prQuery.eq('exercise_id', exerciseId);
+
+  const [{ data: prData }, { data: bwData }] = await Promise.all([
+    prQuery,
+    supabase
+      .from('body_metrics')
+      .select('weight_kg')
+      .eq('client_id', clientId)
+      .not('weight_kg', 'is', null)
+      .order('measured_date', { ascending: false })
+      .limit(1),
+  ]);
+
+  const pr = prData?.[0]?.value ? Number(prData[0].value) : 0;
+  const bw = bwData?.[0]?.weight_kg ? Number(bwData[0].weight_kg) : 0;
+  if (bw === 0) return 0;
+  return Math.round((pr / bw) * 100) / 100;
+}
+
+/**
+ * Muscle gain BW multiple: bodyweight gained during challenge as proportion of starting BW.
+ */
+async function getMuscleGainBwMultipleScore(
+  clientId: string,
+  challengeId: string
+): Promise<number> {
+  const challenge = await getChallengeDetails(challengeId);
+  if (!challenge) return 0;
+  const { data: metrics } = await supabase
+    .from('body_metrics')
+    .select('weight_kg, measured_date')
+    .eq('client_id', clientId)
+    .not('weight_kg', 'is', null)
+    .order('measured_date', { ascending: true });
+  if (!metrics?.length) return 0;
+
+  const start = new Date(challenge.start_date);
+  const end = new Date(challenge.end_date);
+  const atStart = metrics.filter((m: any) => new Date(m.measured_date) <= start);
+  const atEnd = metrics.filter((m: any) => new Date(m.measured_date) >= end);
+  const startWeight = atStart.length ? Number(atStart[atStart.length - 1].weight_kg) : Number(metrics[0].weight_kg);
+  const endWeight = atEnd.length ? Number(atEnd[0].weight_kg) : Number(metrics[metrics.length - 1].weight_kg);
+  if (startWeight === 0) return 0;
+  const gain = endWeight - startWeight;
+  return Math.round((gain / startWeight) * 1000) / 1000;
+}
+
+/**
  * Calculate participant total score from scoring categories and approved submissions / workout count / body recomp.
  */
 export async function calculateParticipantScore(
@@ -569,11 +760,19 @@ export async function calculateParticipantScore(
         case 'waist_delta':
           categoryScore = await getBodyRecompScore(clientId, challengeId);
           break;
-        case 'custom':
         case 'pr_improvement':
-        case 'bw_multiple':
+          categoryScore = await getPrImprovementScore(clientId, challengeId, cat.exercise_id);
+          break;
         case 'tonnage':
+          categoryScore = await getTonnageScore(clientId, challengeId);
+          break;
+        case 'bw_multiple':
+          categoryScore = await getBwMultipleScore(clientId, cat.exercise_id);
+          break;
         case 'muscle_gain_bw_multiple':
+          categoryScore = await getMuscleGainBwMultipleScore(clientId, challengeId);
+          break;
+        case 'custom':
         default:
           categoryScore = sub ? Number(sub.claimed_weight) || 0 : 0;
           break;
