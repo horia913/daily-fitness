@@ -59,7 +59,7 @@ export function ScoreBreakdown({ scores }: ScoreBreakdownProps) {
                 <span className="text-sm font-medium fc-text-primary">
                   {item.label}
                 </span>
-                <span className="text-sm font-bold fc-text-primary">
+                <span className="text-cyan-400 text-xl font-bold tabular-nums">
                   {Math.round(item.value)}%
                 </span>
               </div>

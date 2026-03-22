@@ -74,6 +74,7 @@ export default function ProgramsDashboardContent() {
     new Date().toISOString().split("T")[0]
   );
   const [assignNotes, setAssignNotes] = useState<string>("");
+  const [assignProgressionMode, setAssignProgressionMode] = useState<'auto' | 'coach_managed'>('coach_managed');
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
 
   const coachId = user?.id || "";
@@ -185,7 +186,8 @@ export default function ProgramsDashboardContent() {
         selectedClients,
         coachId,
         assignStartDate,
-        assignNotes
+        assignNotes,
+        assignProgressionMode
       );
       await loadPrograms();
       setShowAssignModal(false);
@@ -203,6 +205,7 @@ export default function ProgramsDashboardContent() {
     coachId,
     assignStartDate,
     assignNotes,
+    assignProgressionMode,
     loadPrograms,
   ]);
 
@@ -600,6 +603,60 @@ export default function ProgramsDashboardContent() {
                     border: "1px solid var(--fc-surface-card-border)",
                   }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 fc-text-primary">
+                  Progression Mode
+                </label>
+                <div className="space-y-2">
+                  <label
+                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                    style={{
+                      background: assignProgressionMode === 'coach_managed'
+                        ? 'var(--fc-surface-card-active, var(--fc-surface-sunken))'
+                        : 'var(--fc-surface-sunken)',
+                      border: assignProgressionMode === 'coach_managed'
+                        ? '2px solid var(--fc-domain-workouts, #6366f1)'
+                        : '1px solid var(--fc-surface-card-border)',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="progressionMode"
+                      checked={assignProgressionMode === 'coach_managed'}
+                      onChange={() => setAssignProgressionMode('coach_managed')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="text-sm font-medium fc-text-primary">Coach-managed</p>
+                      <p className="text-xs fc-text-dim">You review and advance weekly</p>
+                    </div>
+                  </label>
+                  <label
+                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                    style={{
+                      background: assignProgressionMode === 'auto'
+                        ? 'var(--fc-surface-card-active, var(--fc-surface-sunken))'
+                        : 'var(--fc-surface-sunken)',
+                      border: assignProgressionMode === 'auto'
+                        ? '2px solid var(--fc-domain-workouts, #6366f1)'
+                        : '1px solid var(--fc-surface-card-border)',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="progressionMode"
+                      checked={assignProgressionMode === 'auto'}
+                      onChange={() => setAssignProgressionMode('auto')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="text-sm font-medium fc-text-primary">Automatic</p>
+                      <p className="text-xs fc-text-dim">Weeks unlock when completed</p>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 

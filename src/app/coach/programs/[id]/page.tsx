@@ -33,6 +33,18 @@ import {
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
+import { cn } from "@/lib/utils";
+import { getCategoryAccent } from "@/lib/workoutCategoryColors";
+
+function templateCategoryString(t: WorkoutTemplate | undefined): string {
+  if (!t) return "";
+  const c = (t as { category?: unknown }).category;
+  if (typeof c === "string") return c;
+  if (c && typeof c === "object" && c !== null && "name" in c) {
+    return String((c as { name?: string }).name ?? "");
+  }
+  return "";
+}
 
 interface Program {
   id: string;
@@ -46,6 +58,21 @@ interface Program {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** Day slot 1–7 for a schedule row (matches program_schedule.program_day or day_number, or day_of_week+1 after mapping). */
+function displayDaySlotForScheduleRow(s: any): number | null {
+  if (typeof s?.program_day === "number" && s.program_day >= 1 && s.program_day <= 7) {
+    return s.program_day;
+  }
+  if (typeof s?.day_number === "number" && s.day_number >= 1 && s.day_number <= 7) {
+    return s.day_number;
+  }
+  if (typeof s?.day_of_week === "number") {
+    const d = s.day_of_week + 1;
+    if (d >= 1 && d <= 7) return d;
+  }
+  return null;
 }
 
 function ProgramDetailsContent() {
@@ -96,18 +123,25 @@ function ProgramDetailsContent() {
       }
       if (Array.isArray(sched)) setSchedule(sched as ProgramSchedule[]);
 
-      // Collect template ids and load their basic info for display
+      // Batch-load template rows (avoids N sequential queries for large programs)
       const templateIds = Array.from(
         new Set((sched || []).map((s: any) => s.template_id).filter(Boolean))
       );
       const map: Record<string, WorkoutTemplate> = {};
-      for (const tid of templateIds) {
-        const { data } = await supabase
+      const CHUNK = 100;
+      for (let i = 0; i < templateIds.length; i += CHUNK) {
+        const chunk = templateIds.slice(i, i + CHUNK);
+        const { data, error } = await supabase
           .from("workout_templates")
           .select("*")
-          .eq("id", tid)
-          .single();
-        if (data) map[tid] = data as WorkoutTemplate;
+          .in("id", chunk);
+        if (error) {
+          console.error("[ProgramDetails] batch workout_templates load:", error);
+          continue;
+        }
+        (data || []).forEach((row: any) => {
+          map[row.id] = row as WorkoutTemplate;
+        });
       }
       setTemplates(map);
     } catch {}
@@ -200,11 +234,20 @@ function ProgramDetailsContent() {
   })();
   const absoluteDetailWeek = detailBlockStartWeek + selectedWeek - 1;
 
-  const scheduleForWeek = (schedule || []).filter(
-    (s) =>
-      (s.week_number || 1) === absoluteDetailWeek &&
-      (!activeDetailBlockId || s.training_block_id === activeDetailBlockId),
-  );
+  const firstTrainingBlockId = trainingBlocks[0]?.id ?? null;
+  const scheduleForWeek = (schedule || []).filter((s) => {
+    if ((s.week_number || 1) !== absoluteDetailWeek) return false;
+    if (!activeDetailBlockId) return true;
+    const rowBlock = (s as any).training_block_id;
+    if (rowBlock == null || rowBlock === "") {
+      // Legacy schedule rows without a block — show only when viewing the first block
+      return (
+        firstTrainingBlockId != null &&
+        activeDetailBlockId === firstTrainingBlockId
+      );
+    }
+    return rowBlock === activeDetailBlockId;
+  });
 
   const GOAL_COLORS_DETAIL: Record<string, string> = {
     hypertrophy: "#06b6d4", strength: "#f97316", power: "#ef4444",
@@ -475,34 +518,33 @@ function ProgramDetailsContent() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)]"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-cyan-400 hover:bg-cyan-500/10"
                 onClick={() => setSelectedWeek((prev) => Math.max(1, prev - 1))}
                 disabled={selectedWeek === 1}
                 aria-label="Previous week"
               >
-                <ChevronLeft className="w-5 h-5 fc-text-primary" />
+                <ChevronLeft className="w-5 h-5" />
               </Button>
-              <span className="text-lg font-bold fc-text-primary">
+              <span className="text-lg font-bold rounded-xl px-4 py-1.5 bg-cyan-500/15 text-cyan-400 tabular-nums">
                 Week {selectedWeek} of {totalWeeks}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)]"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-cyan-400 hover:bg-cyan-500/10"
                 onClick={() => setSelectedWeek((prev) => Math.min(totalWeeks, prev + 1))}
                 disabled={selectedWeek === totalWeeks}
                 aria-label="Next week"
               >
-                <ChevronRight className="w-5 h-5 fc-text-primary" />
+                <ChevronRight className="w-5 h-5" />
               </Button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {dayNames.map((label, idx) => {
+                const cardDay = idx + 1;
                 const scheduled = scheduleForWeek.find(
-                  (s) =>
-                    (s as any).program_day === idx + 1 ||
-                    (s as any).day_of_week === idx
+                  (s) => displayDaySlotForScheduleRow(s) === cardDay
                 );
                 const templateId =
                   (scheduled as any)?.template_id ||
@@ -521,19 +563,29 @@ function ProgramDetailsContent() {
                 };
                 if (!isRest && templateId) {
                   const templateHref = "/coach/workouts/templates/" + templateId;
+                  const accent = getCategoryAccent(
+                    templateCategoryString(templates[templateId])
+                  );
                   return (
                     <Link
                       key={idx}
                       href={templateHref}
-                      className="flex items-center justify-between gap-3 rounded-xl p-4 min-h-[52px] cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)] border border-transparent hover:border-[color:var(--fc-glass-border)]"
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-xl p-4 min-h-[52px] cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)] border border-transparent border-l-2 hover:border-[color:var(--fc-glass-border)] group",
+                        accent.border
+                      )}
                       style={cardStyle}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <Dumbbell
-                            className="w-5 h-5 shrink-0"
-                            style={{ color: getSemanticColor("trust").primary }}
-                          />
+                          <div
+                            className={cn(
+                              "rounded-lg p-1.5 shrink-0",
+                              accent.iconBg
+                            )}
+                          >
+                            <Dumbbell className={cn("w-4 h-4", accent.text)} />
+                          </div>
                           <span
                             className="text-sm font-semibold"
                             style={{ color: isDark ? "#fff" : "#1A1A1A" }}
@@ -542,7 +594,7 @@ function ProgramDetailsContent() {
                           </span>
                         </div>
                         <div
-                          className="text-sm truncate"
+                          className="text-sm truncate group-hover:text-cyan-400 transition-colors"
                           style={{
                             color: isDark
                               ? "rgba(255,255,255,0.8)"
@@ -552,15 +604,14 @@ function ProgramDetailsContent() {
                           {templateName}
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 shrink-0 fc-text-dim" aria-hidden />
+                      <ChevronRight className="w-4 h-4 shrink-0 text-cyan-400/80 group-hover:text-cyan-400" aria-hidden />
                     </Link>
                   );
                 }
                 return (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 rounded-xl p-4 min-h-[52px] opacity-75"
-                    style={cardStyle}
+                    className="flex items-center gap-3 rounded-xl p-4 min-h-[52px] bg-slate-700/40 border border-slate-600/50"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Coffee

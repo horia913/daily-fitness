@@ -19,6 +19,7 @@ import { DatabaseService, Client } from "@/lib/database";
 import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { usePageData } from "@/hooks/usePageData";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function MealPlansPage() {
   const { user } = useAuth();
@@ -217,43 +218,24 @@ export default function MealPlansPage() {
                 </div>
               </GlassCard>
             ) : filteredMealPlans.length === 0 ? (
-              <GlassCard elevation={2} className="p-12 text-center">
-                <div
-                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 8px 24px ${getSemanticColor("success").primary}40`,
-                  }}
-                >
-                  <ChefHat className="w-10 h-10 text-white" />
-                </div>
-                <h3
-                  className="text-xl sm:text-2xl font-bold mb-2"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  {searchQuery ? "No meal plans found" : "No meal plans yet"}
-                </h3>
-                <p
-                  className="mb-6 max-w-md mx-auto"
-                  style={{ color: isDark ? "#A1A1AA" : "#6B7280" }}
-                >
-                  {searchQuery
-                    ? "Try adjusting your search query"
-                    : "Create your first meal plan to get started with nutrition planning."}
-                </p>
-                {!searchQuery && (
-                  <Button
-                    onClick={() => router.push("/coach/nutrition/meal-plans/create")}
-                    className="rounded-xl"
-                    style={{
-                      background: getSemanticColor("success").gradient,
-                      boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Meal Plan
-                  </Button>
-                )}
+              <GlassCard elevation={2} className="p-12">
+                <EmptyState
+                  icon={ChefHat}
+                  title={searchQuery ? "No meal plans found" : "No meal plans yet"}
+                  description={
+                    searchQuery
+                      ? "Try adjusting your search query."
+                      : "Create a meal plan from scratch or use the meal plan generator in Nutrition."
+                  }
+                  action={
+                    !searchQuery
+                      ? {
+                          label: "Create meal plan",
+                          href: "/coach/nutrition/meal-plans/create",
+                        }
+                      : undefined
+                  }
+                />
               </GlassCard>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

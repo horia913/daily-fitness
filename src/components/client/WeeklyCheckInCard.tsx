@@ -12,6 +12,12 @@ function getFrequencyLabel(frequencyDays: number): string {
   return `Every ${frequencyDays} days`;
 }
 
+function getCardTitle(frequencyDays: number): string {
+  if (frequencyDays === 7) return "Weekly Check-In";
+  if (frequencyDays === 30) return "Monthly Check-In";
+  return `${getFrequencyLabel(frequencyDays)} Check-In`;
+}
+
 /** Days since last measurement at which the check-in is considered due (e.g. 7→6, 14→12, 30→25). */
 function getDueThreshold(frequencyDays: number): number {
   if (frequencyDays <= 7) return Math.max(1, frequencyDays - 1);
@@ -64,7 +70,7 @@ export function WeeklyCheckInCard({
             <Scale className="w-6 h-6" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold fc-text-primary">Scheduled Check-In · {getFrequencyLabel(frequencyDays)}</h2>
+            <h2 className="text-lg font-bold fc-text-primary">{getCardTitle(frequencyDays)}</h2>
             {isDue && (
               <p className="text-sm font-medium mt-0.5" style={{ color: "var(--fc-accent)" }}>
                 {isOverdue && overdueDays > 0 ? `Overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}` : "Scheduled check-in due"}

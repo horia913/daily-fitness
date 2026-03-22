@@ -179,7 +179,7 @@ export function RestTimerBar({
               width: `${progressPercentage}%`,
               background: isCompleted
                 ? "var(--fc-status-success)"
-                : "var(--fc-domain-workouts)",
+                : "#06b6d4",
             }}
           />
 
@@ -195,7 +195,7 @@ export function RestTimerBar({
                 style={{
                   background: isCompleted
                     ? "color-mix(in srgb, var(--fc-status-success) 30%, transparent)"
-                    : "color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)",
+                    : "rgba(6, 182, 212, 0.2)",
                 }}
               >
                 <Timer
@@ -203,7 +203,7 @@ export function RestTimerBar({
                   style={{
                     color: isCompleted
                       ? "var(--fc-status-success)"
-                      : "var(--fc-domain-workouts)",
+                      : "#22d3ee",
                   }}
                 />
               </div>
@@ -231,7 +231,7 @@ export function RestTimerBar({
                   width: `${progressPercentage}%`,
                   background: isCompleted
                     ? "var(--fc-status-success)"
-                    : "var(--fc-domain-workouts)",
+                    : "#06b6d4",
                 }}
               />
             </div>
@@ -243,10 +243,7 @@ export function RestTimerBar({
                 e.stopPropagation();
                 handleSkip();
               }}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2"
-              style={{
-                color: "var(--fc-domain-workouts)",
-              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 text-cyan-400"
             >
               Skip
             </button>

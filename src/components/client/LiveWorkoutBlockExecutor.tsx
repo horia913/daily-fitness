@@ -109,6 +109,8 @@ interface LiveWorkoutBlockExecutorProps {
     new_value: number;
     previous_value: number | null;
     unit: string;
+    weight_kg?: number;
+    reps?: number;
   }) => void;
   /** Called when log-set returns new_achievements (e.g. PR-triggered). Parent can show AchievementUnlockModal. */
   onAchievementsUnlocked?: (

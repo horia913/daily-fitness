@@ -46,6 +46,11 @@ export interface TrainPageRpcResponse {
   /** Assignment created_at — used to compute current program week start for "completed this week" filter */
   assignmentStartDate?: string | null
   durationWeeks?: number | null
+  progressionMode?: string | null
+  coachUnlockedWeek?: number | null
+  /** Latest coach review notes for the current week (coach_managed mode) */
+  coachReviewNotes?: string | null
+  coachReviewDate?: string | null
   schedule?: TrainPageRpcScheduleRow[] | null
   completions?: TrainPageRpcCompletionRow[] | null
   extraWorkouts?: TrainPageRpcExtraWorkoutRow[] | null
@@ -67,6 +72,9 @@ const emptyState: ProgramWeekState = {
   completedCount: 0,
   totalSlots: 0,
   currentWeekNumber: 1,
+  progressionMode: 'auto',
+  isWeekCompleteAwaitingReview: false,
+  coachFeedback: null,
 }
 
 /**
@@ -123,7 +131,11 @@ export function rpcResponseToProgramWeekState(
     template_id: '',
   }))
 
-  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots)
+  const assignmentForUnlock = {
+    progression_mode: data.progressionMode ?? 'auto',
+    coach_unlocked_week: data.coachUnlockedWeek ?? null,
+  }
+  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock)
   const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
@@ -134,23 +146,30 @@ export function rpcResponseToProgramWeekState(
   // All-time: for nextSlot, isCompleted, completedCount (week unlock uses all completions)
   const completedScheduleIdsAllTime = new Set(completedSlots.map((c) => c.program_schedule_id))
 
-  // Current program week only: day card shows completed only if completed this week (calendar)
-  const assignmentStartDate = data.assignmentStartDate ?? null
+  // In coach_managed mode, the client can stay on a week indefinitely — date-window
+  // filtering would hide completions that happened after the calculated window expired.
+  // Use all-time completions since each program_schedule_id is unique per week.
+  const progressionModeRaw = data.progressionMode ?? 'auto'
   let completedScheduleIdsCurrentWeek: Set<string>
-  if (assignmentStartDate) {
-    const currentWeekStart = getWeekStartDate(assignmentStartDate, unlockedWeekMax)
-    const currentWeekEnd = new Date(currentWeekStart)
-    currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
-    completedScheduleIdsCurrentWeek = new Set(
-      completions
-        .filter((c) => {
-          const completedAt = new Date(c.completed_at)
-          return completedAt >= currentWeekStart && completedAt < currentWeekEnd
-        })
-        .map((c) => c.program_schedule_id)
-    )
-  } else {
+  if (progressionModeRaw === 'coach_managed') {
     completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+  } else {
+    const assignmentStartDate = data.assignmentStartDate ?? null
+    if (assignmentStartDate) {
+      const currentWeekStart = getWeekStartDate(assignmentStartDate, unlockedWeekMax)
+      const currentWeekEnd = new Date(currentWeekStart)
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
+      completedScheduleIdsCurrentWeek = new Set(
+        completions
+          .filter((c) => {
+            const completedAt = new Date(c.completed_at)
+            return completedAt >= currentWeekStart && completedAt < currentWeekEnd
+          })
+          .map((c) => c.program_schedule_id)
+      )
+    } else {
+      completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+    }
   }
 
   const completedScheduleIds = completedScheduleIdsCurrentWeek
@@ -212,6 +231,19 @@ export function rpcResponseToProgramWeekState(
   const nextSlot = slots.find((s) => !completedScheduleIdsAllTime.has(s.id)) ?? null
   const isCompleted = nextSlot === null && completedCount > 0
 
+  const progressionMode = (data.progressionMode === 'coach_managed' ? 'coach_managed' : 'auto') as 'auto' | 'coach_managed'
+
+  // In coach_managed mode, check if all required slots in the current week are done
+  const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
+  const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
+    requiredCurrentWeekSlots.every(s => completedScheduleIdsAllTime.has(s.id))
+  const isWeekCompleteAwaitingReview =
+    progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !isCompleted
+
+  const coachFeedback = data.coachReviewNotes
+    ? { notes: data.coachReviewNotes, reviewedAt: data.coachReviewDate ?? '' }
+    : null
+
   return {
     hasProgram: true,
     programName: data.programName ?? 'Training Program',
@@ -228,5 +260,8 @@ export function rpcResponseToProgramWeekState(
     completedCount,
     totalSlots,
     currentWeekNumber: unlockedWeekMax,
+    progressionMode,
+    isWeekCompleteAwaitingReview,
+    coachFeedback,
   }
 }

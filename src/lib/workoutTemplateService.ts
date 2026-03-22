@@ -1075,6 +1075,8 @@ export class WorkoutTemplateService {
         const programDay =
           typeof row.program_day === 'number'
             ? row.program_day
+            : typeof row.day_number === 'number'
+            ? row.day_number
             : typeof row.day === 'number'
             ? row.day
             : typeof row.day_of_week === 'number'
@@ -1127,7 +1129,7 @@ export class WorkoutTemplateService {
 
   // ===== PROGRAM ASSIGNMENT MANAGEMENT =====
 
-  static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string): Promise<ProgramAssignment | null> {
+  static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string, progressionMode?: 'auto' | 'coach_managed'): Promise<ProgramAssignment | null> {
     try {
       console.log('[createProgramAssignment] Creating assignment:', {
         clientId,
@@ -1177,6 +1179,12 @@ export class WorkoutTemplateService {
       if (coachId) {
         insertPayload.coach_id = coachId
       }
+      if (progressionMode) {
+        insertPayload.progression_mode = progressionMode
+        if (progressionMode === 'coach_managed') {
+          insertPayload.coach_unlocked_week = 1
+        }
+      }
 
       let data: any = existing
       if (!existing) {
@@ -1189,14 +1197,19 @@ export class WorkoutTemplateService {
         if (insertResponse.error) throw insertResponse.error
         data = insertResponse.data
       } else {
-        const updateResponse = await supabase
-          .from('program_assignments')
-          .update({
+        const updatePayload: Record<string, any> = {
             status: 'active',
             start_date: startDate,
             updated_at: new Date().toISOString(),
             timezone_snapshot: timezoneSnapshot,
-          })
+          }
+        if (progressionMode) {
+          updatePayload.progression_mode = progressionMode
+          updatePayload.coach_unlocked_week = progressionMode === 'coach_managed' ? 1 : null
+        }
+        const updateResponse = await supabase
+          .from('program_assignments')
+          .update(updatePayload)
           .eq('id', existing.id)
           .select('*')
           .single()
@@ -1422,14 +1435,15 @@ export class WorkoutTemplateService {
     clientIds: string[],
     coachId: string | undefined,
     startDate: string,
-    notes?: string
+    notes?: string,
+    progressionMode?: 'auto' | 'coach_managed'
   ): Promise<number> {
     let successCount = 0
     // fetch program days once
     const days = await this.getProgramSchedule(programId)
 
     for (const clientId of clientIds) {
-      const assignment = await this.createProgramAssignment(clientId, programId, startDate, coachId)
+      const assignment = await this.createProgramAssignment(clientId, programId, startDate, coachId, progressionMode)
       if (!assignment) continue
 
       if (days && days.length > 0) {

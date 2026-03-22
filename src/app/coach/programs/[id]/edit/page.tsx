@@ -44,6 +44,7 @@ import { TrainingBlock } from "@/types/trainingBlock";
 import { TrainingBlockHeader } from "@/components/coach/programs/TrainingBlockHeader";
 import { TrainingBlockModal } from "@/components/coach/programs/TrainingBlockModal";
 import { useToast } from "@/components/ui/toast-provider";
+import { cn } from "@/lib/utils";
 
 interface Program {
   id: string;
@@ -201,7 +202,7 @@ function EditProgramContent() {
   const programId = useMemo(() => String(params?.id || ""), [params]);
   const { user } = useAuth();
   const { addToast } = useToast();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { isDark, performanceSettings } = useTheme();
   const { exercises: availableExercises } = useExerciseLibrary(user?.id || "");
 
   const [loading, setLoading] = useState(true);
@@ -218,12 +219,14 @@ function EditProgramContent() {
   const [schedule, setSchedule] = useState<ProgramSchedule[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [selectedDay, setSelectedDay] = useState<number>(1);
-  const [templateExercises, setTemplateExercises] = useState<
-    Record<string, any[]>
-  >({});
   const [templateBlocks, setTemplateBlocks] = useState<Record<string, any[]>>(
     {},
   );
+  /** Accumulated blocks for ProgramVolumeCalculator (chunk-loaded while on Schedule tab) */
+  const [volumeTemplateBlocks, setVolumeTemplateBlocks] = useState<
+    Record<string, any[]>
+  >({});
+  const weekBlocksLoadSeq = useRef(0);
   const [selectedScheduleForProgression, setSelectedScheduleForProgression] =
     useState<ProgramSchedule | null>(null);
   const [showProgressionSuggestions, setShowProgressionSuggestions] =
@@ -257,6 +260,112 @@ function EditProgramContent() {
 
   // The absolute week number to use for DB reads/writes this render cycle
   const absoluteSelectedWeek = blockStartWeek + selectedWeek - 1;
+
+  const scheduleVolumeKey = useMemo(
+    () =>
+      [
+        ...new Set(
+          (schedule || [])
+            .map((s) => s.template_id)
+            .filter((id): id is string => Boolean(id) && id !== "rest"),
+        ),
+      ].sort()
+        .join(","),
+    [schedule],
+  );
+
+  useEffect(() => {
+    setVolumeTemplateBlocks({});
+  }, [programId]);
+
+  // Load set entries + workout_set_entry_exercises only for templates in the selected week (≤ ~6)
+  useEffect(() => {
+    if (!programId) return;
+    let cancelled = false;
+    const seq = ++weekBlocksLoadSeq.current;
+    const weekIds = [
+      ...new Set(
+        schedule
+          .filter(
+            (s) =>
+              (s.week_number || 1) === absoluteSelectedWeek &&
+              (!activeBlockId || s.training_block_id === activeBlockId) &&
+              s.template_id &&
+              s.template_id !== "rest",
+          )
+          .map((s) => s.template_id as string),
+      ),
+    ];
+    (async () => {
+      if (weekIds.length === 0) {
+        if (!cancelled && seq === weekBlocksLoadSeq.current) {
+          setTemplateBlocks({});
+        }
+        return;
+      }
+      try {
+        const { WorkoutBlockService } =
+          await import("@/lib/workoutBlockService");
+        const blocksByTemplate =
+          await WorkoutBlockService.getWorkoutBlocksForTemplates(weekIds, {
+            lite: true,
+          });
+        if (cancelled || seq !== weekBlocksLoadSeq.current) return;
+        const blocksMap: Record<string, any[]> = {};
+        blocksByTemplate.forEach((blocks, templateId) => {
+          blocksMap[templateId] = blocks;
+        });
+        setTemplateBlocks(blocksMap);
+      } catch (error) {
+        console.error("[EditProgram] Week template blocks load failed:", error);
+        if (!cancelled && seq === weekBlocksLoadSeq.current) {
+          setTemplateBlocks({});
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [programId, schedule, absoluteSelectedWeek, activeBlockId]);
+
+  // Background chunk load for volume calculator (avoids one giant query over all templates)
+  useEffect(() => {
+    if (activeTab !== "schedule" || !form?.category || !scheduleVolumeKey) {
+      return;
+    }
+    const allIds = scheduleVolumeKey.split(",").filter(Boolean);
+    if (allIds.length === 0) return;
+
+    let cancelled = false;
+    const CHUNK = 10;
+    (async () => {
+      for (let i = 0; i < allIds.length; i += CHUNK) {
+        if (cancelled) break;
+        const chunk = allIds.slice(i, i + CHUNK);
+        try {
+          const { WorkoutBlockService } =
+            await import("@/lib/workoutBlockService");
+          const map = await WorkoutBlockService.getWorkoutBlocksForTemplates(
+            chunk,
+            { lite: true },
+          );
+          if (cancelled) break;
+          setVolumeTemplateBlocks((prev) => {
+            const next = { ...prev };
+            map.forEach((blocks, id) => {
+              next[id] = blocks;
+            });
+            return next;
+          });
+        } catch (e) {
+          console.error("[EditProgram] Volume calculator chunk load:", e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, form?.category, scheduleVolumeKey]);
 
   // Available exercises list for ExerciseBlockCard
   const availableExercisesList = availableExercises;
@@ -351,88 +460,17 @@ function EditProgramContent() {
         }
       }
 
-      const templateIds = [
-        ...new Set(
-          (sched || []).map((s) => s.template_id).filter(Boolean) || [],
-        ),
-      ];
-
-      // Wave 2: templates list and blocks for scheduled templates in parallel
-      const exercisesMap: Record<string, any[]> = {};
-      const blocksMap: Record<string, any[]> = {};
-      const [listResult, blocksByTemplateResult] = await Promise.all([
-        user?.id
-          ? WorkoutTemplateService.getWorkoutTemplates(user.id, {
-              skipExerciseCount: true,
-            })
-          : Promise.resolve([]),
-        templateIds.length > 0
-          ? (async () => {
-              const { WorkoutBlockService } =
-                await import("@/lib/workoutBlockService");
-              return WorkoutBlockService.getWorkoutBlocksForTemplates(
-                templateIds,
-                { lite: true },
-              );
-            })()
-          : Promise.resolve(new Map<string, any[]>()),
-      ]);
-      const list = listResult || [];
-      const blocksByTemplate =
-        blocksByTemplateResult || new Map<string, any[]>();
+      // Wave 2: coach template list only — blocks/exercises load per selected week (useEffect)
+      const list = user?.id
+        ? await WorkoutTemplateService.getWorkoutTemplates(user.id, {
+            skipExerciseCount: true,
+          })
+        : [];
       if (process.env.NODE_ENV !== "production") {
         console.log("[EditProgram] getWorkoutTemplates rows:", list.length);
-        console.log(
-          "[EditProgram] getWorkoutBlocksForTemplates templateIds:",
-          templateIds.length,
-          "blocks total:",
-          Array.from(blocksByTemplate.values()).flat().length,
-        );
-      }
-
-      if (templateIds.length > 0) {
-        try {
-          blocksByTemplate.forEach((blocks, templateId) => {
-            blocksMap[templateId] = blocks;
-            const exercises: any[] = [];
-            blocks.forEach((block: any) => {
-              if (block.exercises && block.exercises.length > 0) {
-                block.exercises.forEach((exercise: any) => {
-                  exercises.push({
-                    id: exercise.id,
-                    exercise_id: exercise.exercise_id,
-                    exercise: exercise.exercise,
-                    template_id: templateId,
-                    set_entry_id: block.id,
-                    set_type: block.set_type,
-                    set_name: block.set_name,
-                    set_order: block.set_order,
-                    exercise_letter: exercise.exercise_letter,
-                    exercise_order: exercise.exercise_order,
-                    sets: exercise.sets,
-                    reps: exercise.reps,
-                    weight_kg: exercise.weight_kg,
-                    tempo: exercise.tempo,
-                    rir: exercise.rir,
-                    rest_seconds: exercise.rest_seconds,
-                  });
-                });
-              }
-            });
-            exercisesMap[templateId] = exercises;
-          });
-        } catch (error) {
-          console.error("Error loading blocks for program templates:", error);
-          templateIds.forEach((id) => {
-            exercisesMap[id] = [];
-            blocksMap[id] = [];
-          });
-        }
       }
 
       setTemplates(list || []);
-      setTemplateExercises(exercisesMap);
-      setTemplateBlocks(blocksMap);
     } finally {
       if (process.env.NODE_ENV !== "production")
         console.timeEnd("[EditProgram] load");
@@ -717,61 +755,7 @@ function EditProgramContent() {
         }
       }
 
-      const templateIds = [
-        ...new Set(sched?.map((s) => s.template_id).filter(Boolean) || []),
-      ];
-      const exercisesMap: Record<string, any[]> = {};
-      const blocksMap: Record<string, any[]> = {};
-
-      if (templateIds.length > 0) {
-        try {
-          const { WorkoutBlockService } =
-            await import("@/lib/workoutBlockService");
-          const blocksByTemplate =
-            await WorkoutBlockService.getWorkoutBlocksForTemplates(
-              templateIds,
-              { lite: true },
-            );
-          blocksByTemplate.forEach((blocks, templateId) => {
-            blocksMap[templateId] = blocks;
-            const exercises: any[] = [];
-            blocks.forEach((block) => {
-              if (block.exercises && block.exercises.length > 0) {
-                block.exercises.forEach((exercise) => {
-                  exercises.push({
-                    id: exercise.id,
-                    exercise_id: exercise.exercise_id,
-                    exercise: exercise.exercise,
-                    template_id: templateId,
-                    set_entry_id: block.id,
-                    set_type: block.set_type,
-                    set_name: block.set_name,
-                    set_order: block.set_order,
-                    exercise_letter: exercise.exercise_letter,
-                    exercise_order: exercise.exercise_order,
-                    sets: exercise.sets,
-                    reps: exercise.reps,
-                    weight_kg: exercise.weight_kg,
-                    tempo: exercise.tempo,
-                    rir: exercise.rir,
-                    rest_seconds: exercise.rest_seconds,
-                  });
-                });
-              }
-            });
-            exercisesMap[templateId] = exercises;
-          });
-        } catch (error) {
-          console.error("Error loading blocks after schedule change:", error);
-          templateIds.forEach((id) => {
-            exercisesMap[id] = [];
-            blocksMap[id] = [];
-          });
-        }
-      }
-
-      setTemplateExercises(exercisesMap);
-      setTemplateBlocks(blocksMap);
+      // Week-scoped blocks refresh via useEffect when schedule / week updates
     }
   };
 
@@ -808,15 +792,7 @@ function EditProgramContent() {
 
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex items-start gap-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("success").primary
-                  }30`,
-                }}
-              >
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-cyan-500 to-cyan-400 shadow-lg shadow-cyan-500/25">
                 <BookOpen className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -860,57 +836,42 @@ function EditProgramContent() {
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-2">
             <div className="flex gap-2">
               <Button
-                variant={activeTab === "basic" ? "default" : "ghost"}
+                variant="ghost"
                 onClick={() => setActiveTab("basic")}
-                className="flex-1 rounded-xl"
-                style={
+                className={cn(
+                  "flex-1 rounded-xl fc-btn",
                   activeTab === "basic"
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${
-                          getSemanticColor("trust").primary
-                        }30`,
-                      }
-                    : {}
-                }
+                    ? "fc-btn-primary"
+                    : "fc-btn-ghost",
+                )}
               >
                 <BookOpen className="w-4 h-4 mr-2" />
                 <span className="sm:hidden">Info</span>
                 <span className="hidden sm:inline">Basic Info</span>
               </Button>
               <Button
-                variant={activeTab === "schedule" ? "default" : "ghost"}
+                variant="ghost"
                 onClick={() => setActiveTab("schedule")}
-                className="flex-1 rounded-xl"
-                style={
+                className={cn(
+                  "flex-1 rounded-xl fc-btn",
                   activeTab === "schedule"
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${
-                          getSemanticColor("trust").primary
-                        }30`,
-                      }
-                    : {}
-                }
+                    ? "fc-btn-primary"
+                    : "fc-btn-ghost",
+                )}
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 <span className="sm:hidden">Schedule</span>
                 <span className="hidden sm:inline">Weekly Schedule</span>
               </Button>
               <Button
-                variant={activeTab === "progression" ? "default" : "ghost"}
+                variant="ghost"
                 onClick={() => setActiveTab("progression")}
-                className="flex-1 rounded-xl"
-                style={
+                className={cn(
+                  "flex-1 rounded-xl fc-btn",
                   activeTab === "progression"
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${
-                          getSemanticColor("trust").primary
-                        }30`,
-                      }
-                    : {}
-                }
+                    ? "fc-btn-primary"
+                    : "fc-btn-ghost",
+                )}
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 <span className="sm:hidden">Progression</span>
@@ -1188,14 +1149,7 @@ function EditProgramContent() {
                 <Button
                   onClick={onSave}
                   disabled={saving || !form.name.trim()}
-                  className="rounded-xl"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                    opacity: saving || !form.name.trim() ? 0.5 : 1,
-                  }}
+                  className="fc-btn fc-btn-primary rounded-xl disabled:opacity-50"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
@@ -1343,12 +1297,7 @@ function EditProgramContent() {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           {hasWorkout ? (
-                            <Dumbbell
-                              className="w-5 h-5"
-                              style={{
-                                color: getSemanticColor("trust").primary,
-                              }}
-                            />
+                            <Dumbbell className="w-5 h-5 text-cyan-400" />
                           ) : (
                             <Coffee
                               className="w-5 h-5"
@@ -1434,12 +1383,7 @@ function EditProgramContent() {
               {/* Info Card */}
               <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-start gap-3">
-                  <Info
-                    className="w-5 h-5 flex-shrink-0 mt-0.5"
-                    style={{
-                      color: getSemanticColor("trust").primary,
-                    }}
-                  />
+                  <Info className="w-5 h-5 flex-shrink-0 mt-0.5 text-cyan-400" />
                   <p
                     className="text-sm"
                     style={{
@@ -1469,7 +1413,10 @@ function EditProgramContent() {
                   templates={templates.map((t) => ({
                     ...t,
                     category: t.category || "",
-                    blocks: templateBlocks[t.id] || [],
+                    blocks:
+                      volumeTemplateBlocks[t.id] ??
+                      templateBlocks[t.id] ??
+                      [],
                   }))}
                 />
               )}

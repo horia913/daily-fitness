@@ -1,6 +1,6 @@
 /**
  * Scheduling Service
- * Centralized service for managing coach sessions, availability, and clipcards
+ * Centralized service for managing coach sessions and availability
  * Provides consistent interface across client and coach screens
  */
 
@@ -32,33 +32,6 @@ export interface CoachAvailability {
   end_time: string;
   is_active: boolean;
   created_at?: string;
-}
-
-export interface Clipcard {
-  id: string;
-  client_id: string;
-  coach_id: string;
-  clipcard_type_id: string;
-  sessions_total: number;
-  sessions_used: number;
-  sessions_remaining: number;
-  start_date: string;
-  end_date: string;
-  is_active: boolean; // Instead of status enum
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface ClipcardType {
-  id: string;
-  coach_id: string;
-  name: string;
-  sessions_count: number;
-  validity_days: number;
-  price: number;
-  is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
 }
 
 // ============================================================================
@@ -299,150 +272,6 @@ export async function deleteAvailability(availabilityId: string): Promise<boolea
   }
 }
 
-// ============================================================================
-// Clipcards (Session Packs & Monthly Credits)
-// ============================================================================
-
-/**
- * Get clipcards for a client
- * @param clientId - Client UUID
- * @param activeOnly - If true, only return active (non-expired, non-exhausted) clipcards
- */
-export async function getClientClipcards(
-  clientId: string,
-  activeOnly: boolean = true
-): Promise<Clipcard[]> {
-  try {
-    let query = supabase
-      .from('clipcards')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('start_date', { ascending: false });
-
-    if (activeOnly) {
-      query = query.eq('is_active', true);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching clipcards:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error in getClientClipcards:', error);
-    return [];
-  }
-}
-
-/**
- * Get active clipcard for a client (most recent active one)
- */
-export async function getActiveClipcardForClient(
-  clientId: string
-): Promise<Clipcard | null> {
-  try {
-    const { data, error } = await supabase
-      .from('clipcards')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('is_active', true)
-      .order('start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching active clipcard:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in getActiveClipcardForClient:', error);
-    return null;
-  }
-}
-
-/**
- * Create a new clipcard
- */
-export async function createClipcardEntry(
-  clipcard: Omit<Clipcard, 'id' | 'sessions_remaining' | 'created_at' | 'updated_at'>
-): Promise<Clipcard | null> {
-  try {
-    // Calculate sessions_remaining
-    const sessions_remaining = clipcard.sessions_total - clipcard.sessions_used;
-
-    const { data, error } = await supabase
-      .from('clipcards')
-      .insert([{ ...clipcard, sessions_remaining }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating clipcard:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in createClipcardentry:', error);
-    return null;
-  }
-}
-
-/**
- * Use a session from a clipcard (increment sessions_used)
- */
-export async function useClipcardSession(clipcardId: string): Promise<boolean> {
-  try {
-    // Get current clipcard
-    const { data: clipcard, error: fetchError } = await supabase
-      .from('clipcards')
-      .select('*')
-      .eq('id', clipcardId)
-      .single();
-
-    if (fetchError || !clipcard) {
-      console.error('Error fetching clipcard:', fetchError);
-      return false;
-    }
-
-    // Check if sessions available
-    if (clipcard.sessions_remaining <= 0) {
-      console.error('No sessions remaining on clipcard');
-      return false;
-    }
-
-    // Increment sessions_used
-    const newSessionsUsed = clipcard.sessions_used + 1;
-    const newSessionsRemaining = clipcard.sessions_total - newSessionsUsed;
-    const newIsActive = newSessionsRemaining > 0; // Deactivate if no sessions left
-
-    const { error: updateError } = await supabase
-      .from('clipcards')
-      .update({
-        sessions_used: newSessionsUsed,
-        sessions_remaining: newSessionsRemaining,
-        is_active: newIsActive,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', clipcardId);
-
-    if (updateError) {
-      console.error('Error updating clipcard:', updateError);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in useClipcardSession:', error);
-    return false;
-  }
-}
-
 /**
  * Bulk create sessions
  */
@@ -507,85 +336,6 @@ export async function bulkUpdateSessions(
   } catch (error) {
     console.error('Error in bulkUpdateSessions:', error);
     return { success: false, updated: 0, errors: [error] };
-  }
-}
-
-/**
- * Helper: Check if client has active clipcard
- */
-export async function hasActiveClipcardcard(clientId: string): Promise<boolean> {
-  const clipcard = await getActiveClipcardForClient(clientId);
-  return clipcard !== null && clipcard.sessions_remaining > 0;
-}
-
-// ============================================================================
-// Clipcard Types (Templates)
-// ============================================================================
-
-/**
- * Get all clipcard types for a coach
- */
-export async function getClipcardTypes(coachId: string): Promise<ClipcardType[]> {
-  try {
-    const { data, error } = await supabase
-      .from('clipcard_types')
-      .select('*')
-      .eq('coach_id', coachId)
-      .eq('is_active', true)
-      .order('sessions_count', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching clipcard types:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error in getClipcardTypes:', error);
-    return [];
-  }
-}
-
-/**
- * Create clipcard from type/template
- */
-export async function createClipcardFromType(
-  clientId: string,
-  coachId: string,
-  clipcardTypeId: string
-): Promise<Clipcard | null> {
-  try {
-    // Get the type
-    const { data: type, error: typeError } = await supabase
-      .from('clipcard_types')
-      .select('*')
-      .eq('id', clipcardTypeId)
-      .single();
-
-    if (typeError || !type) {
-      console.error('Error fetching clipcard type:', typeError);
-      return null;
-    }
-
-    // Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(startDate.getDate() + type.validity_days);
-
-    // Create clipcard
-    return await createClipcardEntry({
-      client_id: clientId,
-      coach_id: coachId,
-      clipcard_type_id: clipcardTypeId,
-      sessions_total: type.sessions_count,
-      sessions_used: 0,
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
-      is_active: true
-    });
-  } catch (error) {
-    console.error('Error in createClipcardFromType:', error);
-    return null;
   }
 }
 

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { getCategoryAccent } from '@/lib/workoutCategoryColors'
 import { 
   Dumbbell, 
   Clock,
@@ -62,6 +64,7 @@ export default function WorkoutTemplateCard({
   onView
 }: WorkoutTemplateCardProps) {
   const [showActions, setShowActions] = useState(false)
+  const accent = getCategoryAccent(template.category?.name || '')
 
   const difficultyStyles = {
     'Beginner': 'fc-text-success',
@@ -112,9 +115,11 @@ export default function WorkoutTemplateCard({
   if (viewMode === 'list') {
     return (
       <div 
-        className={`fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer ${
+        className={cn(
+          'fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
+          accent.border,
           isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
-        }`}
+        )}
         onClick={() => onSelect(template.id)}
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
@@ -124,8 +129,8 @@ export default function WorkoutTemplateCard({
             {/* Template Image */}
             <div className="relative w-20 h-20 fc-glass-soft rounded-2xl overflow-hidden flex-shrink-0 border border-[color:var(--fc-glass-border)]">
               <div className="w-full h-full flex items-center justify-center">
-                <div className="fc-icon-tile fc-icon-workouts">
-                  <CategoryIcon className="w-6 h-6" />
+                <div className={cn('rounded-lg p-2', accent.iconBg)}>
+                  <CategoryIcon className={cn('w-6 h-6', accent.text)} />
                 </div>
               </div>
               {template.category && (
@@ -259,9 +264,11 @@ export default function WorkoutTemplateCard({
   // Grid view
   return (
     <div 
-      className={`fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer ${
+      className={cn(
+        'fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
+        accent.border,
         isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
-      }`}
+      )}
       onClick={() => onSelect(template.id)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
@@ -271,8 +278,8 @@ export default function WorkoutTemplateCard({
         <div className="absolute inset-0 fc-glass-soft"></div>
 
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className="fc-icon-tile fc-icon-workouts">
-            <CategoryIcon className="w-6 h-6" />
+          <div className={cn('rounded-lg p-3', accent.iconBg)}>
+            <CategoryIcon className={cn('w-6 h-6', accent.text)} />
           </div>
         </div>
         

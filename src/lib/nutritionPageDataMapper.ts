@@ -285,6 +285,8 @@ export interface MappedNutritionPageData {
   targetProtein: number;
   targetCarbs: number;
   targetFat: number;
+  weeklyCompliance: NutritionPageRpcWeeklyComplianceDay[];
+  allFoods: NutritionPageRpcFood[];
 }
 
 export function mapNutritionPageRpcToPageData(rpc: NutritionPageRpcResponse): MappedNutritionPageData {
@@ -321,6 +323,8 @@ export function mapNutritionPageRpcToPageData(rpc: NutritionPageRpcResponse): Ma
   const targetProtein = Number(mealPlans?.target_protein ?? 0);
   const targetCarbs = Number(mealPlans?.target_carbs ?? 0);
   const targetFat = Number(mealPlans?.target_fat ?? 0);
+  const weeklyCompliance = Array.isArray(rpc.weeklyCompliance) ? rpc.weeklyCompliance : [];
+  const allFoods = Array.isArray(rpc.allFoods) ? rpc.allFoods : [];
 
   return {
     hasAssignment,
@@ -335,5 +339,7 @@ export function mapNutritionPageRpcToPageData(rpc: NutritionPageRpcResponse): Ma
     targetProtein,
     targetCarbs,
     targetFat,
+    weeklyCompliance,
+    allFoods,
   };
 }

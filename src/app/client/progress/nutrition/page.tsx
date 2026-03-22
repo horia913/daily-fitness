@@ -12,6 +12,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
 import { getNutritionComplianceTrend } from "@/lib/nutritionLogService";
+import {
+  getOverridesForAssignment,
+  applyOverridesToLines,
+} from "@/lib/clientMealOverrideService";
 import { NutritionComplianceChart } from "@/components/progress/NutritionComplianceChart";
 import type { NutritionComplianceDay } from "@/lib/nutritionLogService";
 
@@ -189,10 +193,81 @@ export default function NutritionPage() {
           completionMap.set(c.meal_id, c as MealCompletion);
         });
 
-        // 4) Build meals with totals
+        const overrides = await getOverridesForAssignment(assignmentData.id);
+
+        type Row = {
+          meal_food_item_id: string;
+          meal_id: string;
+          meal_option_id: string | null;
+          food_id: string;
+          food_name: string;
+          quantity: number | string | null;
+          unit: string | null;
+        };
+        const baseLines: Row[] = [];
+        for (const meal of mealsData || []) {
+          for (const item of (meal as any).meal_food_items || []) {
+            const fi = item as MealFoodItem & { meal_option_id?: string | null };
+            if (!fi.food?.id) continue;
+            baseLines.push({
+              meal_food_item_id: fi.id,
+              meal_id: (meal as any).id,
+              meal_option_id: fi.meal_option_id ?? null,
+              food_id: fi.food.id,
+              food_name: fi.food.name,
+              quantity: fi.quantity,
+              unit: fi.unit,
+            });
+          }
+        }
+        const effectiveLines = applyOverridesToLines(baseLines, overrides);
+        const extraFoodIds = effectiveLines.map((l) => l.food_id);
+        const { data: extraFoods } = await supabase
+          .from("foods")
+          .select("id, name, calories, protein, carbs, fat")
+          .in("id", [...new Set(extraFoodIds)]);
+
+        const foodMacro = new Map<
+          string,
+          { id: string; name: string; calories: number; protein: number; carbs: number; fat: number }
+        >();
+        (extraFoods || []).forEach((f: any) =>
+          foodMacro.set(f.id, {
+            id: f.id,
+            name: f.name,
+            calories: Number(f.calories) || 0,
+            protein: Number(f.protein) || 0,
+            carbs: Number(f.carbs) || 0,
+            fat: Number(f.fat) || 0,
+          })
+        );
+
+        const byMeal = new Map<string, MealFoodItem[]>();
+        for (const line of effectiveLines) {
+          const f = foodMacro.get(line.food_id);
+          if (!f) continue;
+          const item: MealFoodItem = {
+            id: line.meal_food_item_id || `override-${line.key}`,
+            quantity: Number(line.quantity) || 0,
+            unit: line.unit,
+            food: {
+              id: f.id,
+              name: f.name,
+              calories: f.calories,
+              protein: f.protein,
+              carbs: f.carbs,
+              fat: f.fat,
+            },
+          };
+          const list = byMeal.get(line.meal_id) || [];
+          list.push(item);
+          byMeal.set(line.meal_id, list);
+        }
+
+        // 4) Build meals with totals (per-client overrides applied)
         const builtMeals: Meal[] =
           mealsData?.map((meal: any) => {
-            const foodItems = (meal.meal_food_items || []) as MealFoodItem[];
+            const foodItems = byMeal.get(meal.id) || [];
             const totals = foodItems.reduce(
               (acc, item) => {
                 const calories =

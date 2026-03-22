@@ -20,6 +20,8 @@ export interface ProgramProgressionRule {
   
   // Exercise information
   exercise_id: string
+  /** Client-specific swap target (client_program_progression_rules only) */
+  override_exercise_id?: string | null
   exercise_order: number
   exercise_letter?: string
   exercise?: {
@@ -332,6 +334,7 @@ export class ProgramProgressionService {
         load_percentage: rule.load_percentage ?? null,
         pyramid_order: rule.pyramid_order ?? null,
         ladder_order: rule.ladder_order ?? null,
+        override_exercise_id: null,
       }))
 
       const { error: insertError } = await supabase
@@ -570,9 +573,11 @@ export class ProgramProgressionService {
 
       const firstRule = blockRules[0]
 
-      // Get exercise details for all exercises in this block
+      // Get exercise details for all exercises in this block (include swap targets)
       const exerciseIds = Array.from(
-        new Set(blockRules.map(r => r.exercise_id).filter(Boolean))
+        new Set(
+          blockRules.flatMap((r) => [r.exercise_id, (r as { override_exercise_id?: string | null }).override_exercise_id].filter(Boolean) as string[])
+        )
       )
       const { data: exercises } = await supabase
         .from('exercises')
@@ -599,7 +604,8 @@ export class ProgramProgressionService {
       const blockExercises: WorkoutBlockExercise[] = blockRules
         .sort((a, b) => a.exercise_order - b.exercise_order)
         .map((rule) => {
-          const exercise = exerciseMap.get(rule.exercise_id)
+          const resolvedExerciseId = String(rule.override_exercise_id ?? rule.exercise_id ?? '')
+          const exercise = resolvedExerciseId ? exerciseMap.get(resolvedExerciseId) : undefined
           
           // Get special table data for this specific exercise
           const exerciseTimeProtocols = blockTimeProtocols.filter(
@@ -617,7 +623,7 @@ export class ProgramProgressionService {
           
           const exerciseData = {
             id: rule.id || '',
-            exercise_id: rule.exercise_id,
+            exercise_id: resolvedExerciseId || rule.exercise_id,
             exercise_order: rule.exercise_order,
             exercise_letter: rule.exercise_letter || null,
             sets: rule.sets ?? null,
@@ -1417,6 +1423,133 @@ export class ProgramProgressionService {
     } catch (error) {
       console.error('Error bulk creating progression rules:', error)
       return false
+    }
+  }
+
+  /**
+   * Coach: update one client_program_progression_rules row (whitelist columns only).
+   */
+  static async updateClientProgramProgressionRule(
+    ruleId: string,
+    patch: Record<string, unknown>
+  ): Promise<{ ok: boolean; error?: string }> {
+    const allowed = new Set([
+      'sets',
+      'reps',
+      'rest_seconds',
+      'tempo',
+      'rir',
+      'weight_kg',
+      'load_percentage',
+      'override_exercise_id',
+      'notes',
+    ])
+    const payload: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(patch)) {
+      if (!allowed.has(k)) continue
+      if (k === 'reps' && v != null) payload[k] = String(v)
+      else payload[k] = v
+    }
+    if (Object.keys(payload).length === 0) return { ok: true }
+    payload.updated_at = new Date().toISOString()
+    try {
+      const { error } = await supabase
+        .from('client_program_progression_rules')
+        .update(payload)
+        .eq('id', ruleId)
+      if (error) return { ok: false, error: error.message }
+      return { ok: true }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Update failed' }
+    }
+  }
+
+  /**
+   * Reset client progression rules to master program rules (full assignment or single week).
+   */
+  static async resetClientProgramProgressionRules(
+    programId: string,
+    programAssignmentId: string,
+    clientId: string,
+    weekNumber?: number
+  ): Promise<{ ok: boolean; error?: string }> {
+    const mapRule = (rule: any) => ({
+      client_id: clientId,
+      program_assignment_id: programAssignmentId,
+      week_number: rule.week_number ?? 1,
+      block_id: rule.block_id ?? null,
+      block_type: rule.block_type ?? null,
+      block_order: rule.block_order ?? null,
+      block_name: rule.block_name ?? null,
+      exercise_id: rule.exercise_id ?? null,
+      exercise_order: rule.exercise_order ?? null,
+      exercise_letter: rule.exercise_letter ?? null,
+      sets: rule.sets ?? null,
+      reps:
+        rule.reps !== undefined && rule.reps !== null
+          ? String(rule.reps)
+          : null,
+      rest_seconds: rule.rest_seconds ?? null,
+      tempo: rule.tempo ?? null,
+      rir: rule.rir ?? null,
+      second_exercise_id: rule.second_exercise_id ?? null,
+      compound_exercise_id: rule.compound_exercise_id ?? null,
+      first_exercise_reps: rule.first_exercise_reps ?? null,
+      second_exercise_reps: rule.second_exercise_reps ?? null,
+      isolation_reps: rule.isolation_reps ?? null,
+      compound_reps: rule.compound_reps ?? null,
+      rest_between_pairs: rule.rest_between_pairs ?? null,
+      exercise_reps: rule.exercise_reps ?? null,
+      drop_set_reps: rule.drop_set_reps ?? null,
+      weight_reduction_percentage: rule.weight_reduction_percentage ?? null,
+      reps_per_cluster: rule.reps_per_cluster ?? null,
+      clusters_per_set: rule.clusters_per_set ?? null,
+      intra_cluster_rest: rule.intra_cluster_rest ?? null,
+      rest_pause_duration: rule.rest_pause_duration ?? null,
+      max_rest_pauses: rule.max_rest_pauses ?? null,
+      rounds: rule.rounds ?? null,
+      work_seconds: rule.work_seconds ?? null,
+      rest_after_exercise: rule.rest_after_exercise ?? null,
+      rest_after_set: rule.rest_after_set ?? null,
+      duration_minutes: rule.duration_minutes ?? null,
+      emom_mode: rule.emom_mode ?? null,
+      target_reps: rule.target_reps ?? null,
+      time_cap_minutes: rule.time_cap_minutes ?? null,
+      notes: rule.notes ?? null,
+      weight_kg: rule.weight_kg ?? null,
+      load_percentage: rule.load_percentage ?? null,
+      pyramid_order: rule.pyramid_order ?? null,
+      ladder_order: rule.ladder_order ?? null,
+      override_exercise_id: null,
+    })
+
+    try {
+      if (weekNumber !== undefined) {
+        const { error: delErr } = await supabase
+          .from('client_program_progression_rules')
+          .delete()
+          .eq('program_assignment_id', programAssignmentId)
+          .eq('week_number', weekNumber)
+        if (delErr) return { ok: false, error: delErr.message }
+        const { data: master, error: mErr } = await supabase
+          .from('program_progression_rules')
+          .select('*')
+          .eq('program_id', programId)
+          .eq('week_number', weekNumber)
+        if (mErr) return { ok: false, error: mErr.message }
+        if (!master?.length) return { ok: true }
+        const { error: insErr } = await supabase
+          .from('client_program_progression_rules')
+          .insert(master.map(mapRule))
+        if (insErr) return { ok: false, error: insErr.message }
+        return { ok: true }
+      }
+      const deleted = await this.deleteClientProgramProgressionRules(programAssignmentId)
+      if (!deleted) return { ok: false, error: 'Failed to clear client rules' }
+      const copied = await this.copyProgramRulesToClient(programId, programAssignmentId, clientId)
+      return copied ? { ok: true } : { ok: false, error: 'Failed to copy master rules' }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Reset failed' }
     }
   }
 }

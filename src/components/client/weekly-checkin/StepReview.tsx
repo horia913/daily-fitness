@@ -236,7 +236,7 @@ export function StepReview({
           type="button"
           onClick={onSubmit}
           disabled={submitting || bodyData.weight_kg == null || bodyData.weight_kg <= 0}
-          className="fc-btn fc-btn-primary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="fc-btn fc-btn-primary min-h-[44px] px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {submitting ? (
             <>

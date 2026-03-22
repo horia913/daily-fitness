@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -29,6 +29,7 @@ import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/toast-provider'
 import { NutritionComplianceChart } from '@/components/progress/NutritionComplianceChart'
+import ClientMealEditor from '@/components/coach/client-views/ClientMealEditor'
 
 interface ClientMealsViewProps {
   clientId: string
@@ -36,6 +37,7 @@ interface ClientMealsViewProps {
 
 interface MealPlanAssignment {
   id: string
+  meal_plan_id: string
   start_date: string
   end_date?: string
   status?: string
@@ -85,7 +87,6 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   const [mealPlans, setMealPlans] = useState<MealPlanAssignment[]>([])
   const [mealPlanCompliance, setMealPlanCompliance] = useState<MealPlanCompliance | null>(null)
   const [macroAdherence, setMacroAdherence] = useState<MacroAdherence | null>(null)
-  const [unifiedCompliance, setUnifiedCompliance] = useState<number>(0)
   const [complianceTrend, setComplianceTrend] = useState<Array<{ date: string; compliance: number }>>([])
   // Phase N4/N5: today's plan selection + 7-day history; assign-another flow; Today's Plan block
   const [todaySelectionAssignmentId, setTodaySelectionAssignmentId] = useState<string | null>(null)
@@ -147,9 +148,6 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         start.toISOString().split('T')[0],
         end.toISOString().split('T')[0]
       ).then(setComplianceTrend).catch(() => setComplianceTrend([]))
-      
-      // 5. Calculate unified compliance
-      calculateUnifiedCompliance()
     } catch (error) {
       console.error('Error loading nutrition data:', error)
     } finally {
@@ -827,27 +825,46 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const calculateUnifiedCompliance = () => {
-    let compliance = 0
-    
-    if (nutritionMode === 'meal_plan' && mealPlanCompliance) {
-      compliance = mealPlanCompliance.compliancePercentage
-    } else if (nutritionMode === 'goal_based' && macroAdherence) {
-      compliance = macroAdherence.sevenDayAdherence
-    } else if (nutritionMode === 'hybrid' && mealPlanCompliance && macroAdherence) {
-      // Weighted: 60% meal plan + 40% macro adherence
-      compliance = Math.round(
-        mealPlanCompliance.compliancePercentage * 0.6 + 
-        macroAdherence.sevenDayAdherence * 0.4
-      )
+  const unifiedCompliance = useMemo(() => {
+    if (nutritionMode === 'meal_plan') {
+      const p = mealPlanCompliance?.compliancePercentage
+      return typeof p === 'number' && !Number.isNaN(p) ? p : 0
     }
-    
-    setUnifiedCompliance(compliance)
-  }
-
-  useEffect(() => {
-    calculateUnifiedCompliance()
+    if (nutritionMode === 'goal_based') {
+      const a = macroAdherence?.sevenDayAdherence
+      return typeof a === 'number' && !Number.isNaN(a) ? a : 0
+    }
+    if (nutritionMode === 'hybrid') {
+      const mp = mealPlanCompliance?.compliancePercentage
+      const ma = macroAdherence?.sevenDayAdherence
+      const mpOk = typeof mp === 'number' && !Number.isNaN(mp)
+      const maOk = typeof ma === 'number' && !Number.isNaN(ma)
+      if (mpOk && maOk) return Math.round(mp! * 0.6 + ma! * 0.4)
+      if (mpOk) return mp!
+      if (maOk) return ma!
+      return 0
+    }
+    return 0
   }, [nutritionMode, mealPlanCompliance, macroAdherence])
+
+  const loadCoachClientsForAssignModal = useCallback(async (): Promise<Client[]> => {
+    const coachUserId = user?.id ?? ''
+    let coachClients = await DatabaseService.getClients(coachUserId)
+    if (!coachUserId) return coachClients
+    if (!coachClients.some((c) => c.client_id === clientId)) {
+      const { data: row } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('coach_id', coachUserId)
+        .eq('client_id', clientId)
+        .maybeSingle()
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', clientId).maybeSingle()
+      if (row && prof) {
+        coachClients = [...coachClients, { ...row, profiles: prof } as Client]
+      }
+    }
+    return coachClients
+  }, [clientId, user?.id])
 
   const handleDeactivateAssignment = async (assignmentId: string) => {
     if (!confirm('Deactivate this plan assignment? The client will no longer see it, but history is preserved.')) return
@@ -877,9 +894,15 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     try {
       const plans = await MealPlanService.getMealPlans(user?.id ?? '')
       setCoachMealPlans(plans)
-      setShowAssignModal(true)
-      setSelectedPlanForAssign(null)
+      const coachClients = await loadCoachClientsForAssignModal()
+      setAssignModalClients(coachClients)
       setAssignModalSelectedClients([clientId])
+      if (plans.length === 1) {
+        setSelectedPlanForAssign(plans[0])
+      } else {
+        setSelectedPlanForAssign(null)
+      }
+      setShowAssignModal(true)
     } catch (error) {
       console.error('Error loading meal plans:', error)
       addToast({ title: "Couldn't load meal plans.", variant: "destructive" })
@@ -888,7 +911,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
 
   const handleSelectPlanToAssign = async (plan: MealPlan) => {
     try {
-      const coachClients = await DatabaseService.getClients(user?.id ?? '')
+      const coachClients = await loadCoachClientsForAssignModal()
       setAssignModalClients(coachClients)
       setAssignModalSelectedClients([clientId])
       setSelectedPlanForAssign(plan)
@@ -972,7 +995,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
 
       {/* Mode-Specific Views */}
       {nutritionMode === 'none' ? (
-        <NoPlanState onRefetch={loadAllData} />
+        <NoPlanState onAssignMealPlan={handleOpenAssignAnother} />
       ) : nutritionMode === 'meal_plan' ? (
         <MealPlanModeView
           mealPlans={mealPlans}
@@ -1015,6 +1038,21 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
           onCancelEditLabel={() => { setEditingLabelId(null); setEditingLabelValue(''); }}
         />
       ) : null}
+
+      {user?.id &&
+        mealPlans.some((a) => a.is_active) &&
+        (() => {
+          const active = mealPlans.find((a) => a.is_active)
+          if (!active?.meal_plan_id) return null
+          return (
+            <ClientMealEditor
+              assignmentId={active.id}
+              mealPlanId={active.meal_plan_id}
+              coachProfileId={user.id}
+              onChanged={loadAllData}
+            />
+          )
+        })()}
 
       {/* Assign Another Plan flow: plan picker then modal (Phase N4) */}
       {showAssignModal && (
@@ -1066,8 +1104,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
 }
 
 // No Plan/Goals State
-function NoPlanState({ onRefetch }: { onRefetch: () => void }) {
-  const { addToast } = useToast()
+function NoPlanState({ onAssignMealPlan }: { onAssignMealPlan: () => void }) {
   return (
     <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
       <EmptyState
@@ -1080,9 +1117,8 @@ function NoPlanState({ onRefetch }: { onRefetch: () => void }) {
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Button
           variant="fc-primary"
-          onClick={() => {
-            addToast({ title: "Meal plan assignment is not available yet", variant: "default" })
-          }}
+          type="button"
+          onClick={() => onAssignMealPlan()}
         >
           Assign meal plan
         </Button>
@@ -1243,15 +1279,15 @@ function MealPlanModeView({
           <div className="p-4 sm:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-                <p className="text-3xl font-bold fc-text-primary">{compliance.loggedMeals}</p>
+                <p className="text-3xl font-bold text-cyan-400 tabular-nums">{compliance.loggedMeals}</p>
                 <p className="text-sm fc-text-dim">Logged Today</p>
               </div>
               <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-                <p className="text-3xl font-bold fc-text-primary">{compliance.totalMeals}</p>
+                <p className="text-3xl font-bold text-cyan-400 tabular-nums">{compliance.totalMeals}</p>
                 <p className="text-sm fc-text-dim">Total Meals</p>
               </div>
               <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-                <p className="text-3xl font-bold fc-text-primary">{compliance.compliancePercentage}%</p>
+                <p className="text-3xl font-bold text-cyan-400 tabular-nums">{compliance.compliancePercentage}%</p>
                 <p className="text-sm fc-text-dim">Compliance</p>
               </div>
             </div>
@@ -1262,8 +1298,10 @@ function MealPlanModeView({
               {compliance.todayMeals.map(meal => (
                 <div
                   key={meal.id}
-                  className={`fc-glass-soft rounded-xl border p-3 flex items-center gap-3 ${
-                    meal.logged ? 'border-[color:var(--fc-status-success)]' : 'border-[color:var(--fc-glass-border)]'
+                  className={`fc-glass-soft rounded-xl border-l-2 border-l-emerald-500 p-3 flex items-center gap-3 border-y border-r ${
+                    meal.logged
+                      ? 'border-[color:var(--fc-status-success)]'
+                      : 'border-[color:var(--fc-glass-border)]'
                   }`}
                 >
                   <span className="text-lg">{meal.emoji}</span>
@@ -1445,7 +1483,7 @@ function GoalBasedModeView({ adherence }: { adherence: MacroAdherence | null }) 
           <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold fc-text-primary">7-Day Adherence</h4>
-              <span className="text-lg font-bold fc-text-primary">{adherence.sevenDayAdherence}%</span>
+              <span className="text-lg font-bold text-cyan-400 tabular-nums">{adherence.sevenDayAdherence}%</span>
             </div>
             <p className="text-xs fc-text-dim mb-3">
               Days within 10% of calorie target: {adherence.trend.filter(t => t.withinTarget).length} / {adherence.trend.length}
@@ -2114,7 +2152,15 @@ function MacroCard({
 }) {
   const percentage = target > 0 ? Math.min((consumed / target) * 100, 100) : 0
   const color = percentage >= 90 && percentage <= 110 ? 'fc-text-success' : percentage > 120 ? 'fc-text-error' : 'fc-text-warning'
-  
+  const barBg =
+    label === 'Protein'
+      ? 'bg-cyan-500'
+      : label === 'Carbs'
+        ? 'bg-amber-500'
+        : label === 'Fat'
+          ? 'bg-emerald-500'
+          : 'bg-cyan-500/80'
+
   return (
     <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-3 text-center">
       <Icon className={`w-4 h-4 mb-1 ${color} mx-auto`} />
@@ -2123,7 +2169,12 @@ function MacroCard({
         {Math.round(consumed)} / {target > 0 ? Math.round(target) : '—'} {unit}
       </div>
       {target > 0 && (
-        <div className="text-xs fc-text-dim mt-1">{Math.round(percentage)}%</div>
+        <>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+            <div className={`h-full rounded-full ${barBg}`} style={{ width: `${Math.min(100, percentage)}%` }} />
+          </div>
+          <div className="text-xs fc-text-dim mt-1">{Math.round(percentage)}%</div>
+        </>
       )}
     </div>
   )

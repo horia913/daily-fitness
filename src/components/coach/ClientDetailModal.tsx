@@ -81,9 +81,9 @@ export default function ClientDetailModal({ client, onClose, onSelectFunction }:
       iconBg: 'fc-icon-habits'
     },
     {
-      id: 'clipcards',
-      title: 'ClipCards',
-      description: 'Manage session credits & packages',
+      id: 'subscription',
+      title: 'Subscription',
+      description: 'Coaching plan and renewal dates',
       icon: CreditCard,
       iconBg: 'fc-icon-neutral'
     },

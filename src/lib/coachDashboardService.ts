@@ -787,15 +787,33 @@ export function sortAlertsByPriority(alerts: ClientAlert[]): ClientAlert[] {
  */
 export interface ClientMetrics {
   clientId: string;
-  lastActive: string | null; // ISO date string (most recent of workout or check-in)
+  lastActive: string | null;
+  /** Completed workouts since Monday 00:00 UTC (ISO week); rows need non-null `completed_at`. */
   workoutsThisWeek: number;
   checkinStreak: number;
   programStatus: 'active' | 'noProgram' | 'endingSoon';
   programEndDate: string | null;
-  latestStress: number | null; // UI scale 1-5
-  latestSoreness: number | null; // UI scale 1-5
+  latestStress: number | null;
+  latestSoreness: number | null;
   trainedToday: boolean;
   checkedInToday: boolean;
+  activeProgramName: string | null;
+  programCurrentWeek: number | null;
+  programDurationWeeks: number | null;
+  mealCompliance7dPct: number | null;
+  lastCheckinDate: string | null;
+  /** Coach-managed progression: true when client has completed all required days and needs review */
+  weekReviewNeeded: boolean;
+  /** The week number that is complete and awaiting review */
+  completedWeekNumber: number | null;
+  /** The program_id for the active assignment (needed for review modal) */
+  activeProgramId: string | null;
+  /** The assignment ID (needed for review modal) */
+  activeProgramAssignmentId: string | null;
+  /** Nearest active membership end date from clipcards (subscription UX). */
+  subscriptionEndDate: string | null;
+  /** True when subscription ends within 7 days and not cancelled. */
+  subscriptionExpiringSoon: boolean;
 }
 
 /**
@@ -809,22 +827,36 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
 
   const db = supabaseClient ?? supabase;
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    const todayStart = `${todayStr}T00:00:00.000Z`;
-    const todayEnd = `${todayStr}T23:59:59.999Z`;
-    
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
-    const sevenDaysAgoStart = `${sevenDaysAgoStr}T00:00:00.000Z`;
-    
-    const sevenDaysFromNow = new Date(today);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
+    /**
+     * All "today" / rolling windows use UTC calendar dates so server TZ (e.g. dev on Windows
+     * in Europe) cannot shift `toISOString()` vs local `setHours(0)` and zero out counts.
+     *
+     * "This week" for workouts = ISO week, Monday 00:00:00.000Z → matches
+     * `get_coach_dashboard` SQL: `completed_at >= date_trunc('week', CURRENT_DATE)::timestamptz`
+     * when the DB session uses UTC (Supabase default).
+     */
+    const now = new Date();
+    const todayUtcStr = now.toISOString().slice(0, 10);
+    const todayStart = `${todayUtcStr}T00:00:00.000Z`;
+    const todayEnd = `${todayUtcStr}T23:59:59.999Z`;
 
-    // Batch fetch workout logs (last 7 days + today)
+    const sevenDaysAgoMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const sevenDaysAgoStr = new Date(sevenDaysAgoMs).toISOString().slice(0, 10);
+    const sevenDaysAgoStart = `${sevenDaysAgoStr}T00:00:00.000Z`;
+
+    const sevenDaysFromNowStr = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth();
+    const day = now.getUTCDate();
+    const wd = now.getUTCDay();
+    const deltaToMonday = wd === 0 ? -6 : 1 - wd;
+    const weekStartUtcIso = new Date(Date.UTC(y, m, day + deltaToMonday, 0, 0, 0, 0)).toISOString();
+    const weekStartMs = Date.parse(weekStartUtcIso);
+
+    // Batch fetch workout logs (rolling 7d UTC window for last-active / trained-today)
     const { data: workoutLogs, error: workoutsError } = await db
       .from('workout_logs')
       .select('client_id, completed_at')
@@ -843,17 +875,17 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       .select('client_id, log_date, stress_level, soreness_level, sleep_hours, sleep_quality')
       .in('client_id', clientIds)
       .gte('log_date', sevenDaysAgoStr)
-      .lte('log_date', todayStr)
+      .lte('log_date', todayUtcStr)
       .order('log_date', { ascending: false });
 
     if (wellnessError) {
       console.error('Error fetching wellness logs:', wellnessError);
     }
 
-    // Batch fetch active programs (end_date does not exist; compute from start_date + duration_weeks)
+    // Batch fetch active programs (first row per client via order + dedupe below)
     const { data: activePrograms, error: programsError } = await db
       .from('program_assignments')
-      .select('client_id, start_date, duration_weeks, status')
+      .select('id, client_id, program_id, name, start_date, duration_weeks, status, progression_mode, coach_unlocked_week')
       .in('client_id', clientIds)
       .eq('status', 'active')
       .order('updated_at', { ascending: false });
@@ -862,12 +894,118 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       console.error('Error fetching active programs:', programsError);
     }
 
+    const programRows = (activePrograms || []) as Array<{
+      id: string;
+      client_id: string;
+      program_id: string;
+      name: string | null;
+      start_date: string;
+      duration_weeks: number | null;
+      status: string;
+      progression_mode: string | null;
+      coach_unlocked_week: number | null;
+    }>;
+    const firstProgramByClient = new Map<string, (typeof programRows)[0]>();
+    for (const row of programRows) {
+      if (!firstProgramByClient.has(row.client_id)) {
+        firstProgramByClient.set(row.client_id, row);
+      }
+    }
+    const assignmentIds = [...new Set([...firstProgramByClient.values()].map((r) => r.id))];
+
+    const programIdsForNames = [...new Set([...firstProgramByClient.values()].map((r) => r.program_id).filter(Boolean))];
+    const [{ data: programNameRows }, { data: progressRows }, { data: mealCompletionRows }, { data: clipRows }] = await Promise.all([
+      programIdsForNames.length
+        ? db.from('workout_programs').select('id, name').in('id', programIdsForNames)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] | null }),
+      assignmentIds.length
+        ? db.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIds)
+        : Promise.resolve({ data: [] as { program_assignment_id: string; current_week_number: number | null }[] | null }),
+      db
+        .from('meal_completions')
+        .select('client_id, completed_at')
+        .in('client_id', clientIds)
+        .gte('completed_at', sevenDaysAgoStart),
+      db
+        .from('clipcards')
+        .select('client_id, end_date, is_active, subscription_status')
+        .in('client_id', clientIds)
+        .eq('is_active', true),
+    ]);
+
+    const programNameById = new Map((programNameRows || []).map((p: { id: string; name: string }) => [p.id, p.name]));
+    const currentWeekByAssignment = new Map(
+      (progressRows || []).map((r: { program_assignment_id: string; current_week_number: number | null }) => [
+        r.program_assignment_id,
+        r.current_week_number,
+      ])
+    );
+
+    const nearestSubByClient = new Map<string, { end_date: string; cancelled: boolean }>();
+    for (const row of clipRows || []) {
+      const r = row as {
+        client_id: string;
+        end_date: string;
+        subscription_status?: string | null;
+      };
+      if (!r.client_id || !r.end_date) continue;
+      if (r.end_date < todayUtcStr) continue;
+      const cancelled = String(r.subscription_status || '').toLowerCase() === 'cancelled';
+      const prev = nearestSubByClient.get(r.client_id);
+      if (!prev || r.end_date < prev.end_date) {
+        nearestSubByClient.set(r.client_id, { end_date: r.end_date, cancelled });
+      }
+    }
+
+    const mealDaysByClient = new Map<string, Set<string>>();
+    for (const row of mealCompletionRows || []) {
+      const cid = (row as { client_id: string; completed_at: string }).client_id;
+      const day = new Date((row as { completed_at: string }).completed_at).toISOString().slice(0, 10);
+      if (!mealDaysByClient.has(cid)) mealDaysByClient.set(cid, new Set());
+      mealDaysByClient.get(cid)!.add(day);
+    }
+
+    // Batch: detect which coach_managed assignments need a week review
+    const coachManagedAssignments = programRows.filter(r => r.progression_mode === 'coach_managed');
+    const reviewNeededByAssignment = new Map<string, number>(); // assignment_id -> completed week number
+    if (coachManagedAssignments.length > 0) {
+      const cmIds = coachManagedAssignments.map(a => a.id);
+      const cmProgramIds = [...new Set(coachManagedAssignments.map(a => a.program_id))];
+      const [{ data: scheduleRows }, { data: completionRows }] = await Promise.all([
+        db.from('program_schedule').select('id, program_id, week_number, is_optional').in('program_id', cmProgramIds),
+        db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', cmIds),
+      ]);
+      const scheduleByProgram = new Map<string, typeof scheduleRows>();
+      for (const s of (scheduleRows ?? [])) {
+        const list = scheduleByProgram.get(s.program_id) ?? [];
+        list.push(s);
+        scheduleByProgram.set(s.program_id, list);
+      }
+      const completionsByAssignment = new Map<string, Set<string>>();
+      for (const c of (completionRows ?? [])) {
+        const set = completionsByAssignment.get(c.program_assignment_id) ?? new Set();
+        set.add(c.program_schedule_id);
+        completionsByAssignment.set(c.program_assignment_id, set);
+      }
+      for (const a of coachManagedAssignments) {
+        const currentWeek = a.coach_unlocked_week ?? 1;
+        const slots = (scheduleByProgram.get(a.program_id) ?? []).filter(s => s.week_number === currentWeek);
+        const required = slots.filter(s => !s.is_optional);
+        if (required.length === 0) continue;
+        const completed = completionsByAssignment.get(a.id) ?? new Set();
+        const allDone = required.every(s => completed.has(s.id));
+        if (allDone) {
+          reviewNeededByAssignment.set(a.id, currentWeek);
+        }
+      }
+    }
+
     // Batch fetch all wellness logs for streak calculation (last 365 days)
     const { data: allWellnessLogs, error: allWellnessError } = await db
       .from('daily_wellness_logs')
       .select('client_id, log_date, sleep_hours, sleep_quality, stress_level, soreness_level')
       .in('client_id', clientIds)
-      .lte('log_date', todayStr)
+      .lte('log_date', todayUtcStr)
       .order('log_date', { ascending: false })
       .limit(10000); // Reasonable limit for streak calculation
 
@@ -917,11 +1055,36 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       }
     });
 
-    const programsByClient = new Map<string, { end_date: string | null }>();
-    (activePrograms || []).forEach((p: any) => {
+    const programsByClient = new Map<
+      string,
+      { end_date: string | null; assignmentId: string; programId: string; assignmentName: string | null; durationWeeks: number | null }
+    >();
+    for (const p of programRows) {
       if (!programsByClient.has(p.client_id)) {
         const end_date = computeProgramEndDate(p.start_date, p.duration_weeks);
-        programsByClient.set(p.client_id, { end_date });
+        programsByClient.set(p.client_id, {
+          end_date,
+          assignmentId: p.id,
+          programId: p.program_id,
+          assignmentName: p.name,
+          durationWeeks: p.duration_weeks,
+        });
+      }
+    }
+
+    const lastCompleteCheckinByClient = new Map<string, string>();
+    (allWellnessLogs || []).forEach((w: any) => {
+      if (
+        w.sleep_hours != null &&
+        w.sleep_quality != null &&
+        w.stress_level != null &&
+        w.soreness_level != null &&
+        w.log_date
+      ) {
+        const prev = lastCompleteCheckinByClient.get(w.client_id);
+        if (!prev || w.log_date > prev) {
+          lastCompleteCheckinByClient.set(w.client_id, w.log_date);
+        }
       }
     });
 
@@ -932,20 +1095,20 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       const clientAllWellness = allWellnessByClient.get(clientId) || new Set();
       const program = programsByClient.get(clientId);
 
-      // Workouts this week
+      // Workouts this calendar week (ISO week, Mon UTC) — same idea as get_coach_dashboard.week_workout_count
       const workoutsThisWeek = clientWorkouts.filter((w) => {
-        const dateStr = w.completed_at.split('T')[0];
-        return dateStr >= sevenDaysAgoStr;
+        const t = Date.parse(w.completed_at);
+        return !Number.isNaN(t) && t >= weekStartMs;
       }).length;
 
-      // Trained today
+      // Trained today (UTC calendar day)
       const trainedToday = clientWorkouts.some((w) => {
-        const dateStr = w.completed_at.split('T')[0];
-        return dateStr === todayStr;
+        const t = Date.parse(w.completed_at);
+        return !Number.isNaN(t) && t >= Date.parse(todayStart) && t <= Date.parse(todayEnd);
       });
 
       // Checked in today
-      const checkedInToday = clientWellness.some((w) => w.log_date === todayStr);
+      const checkedInToday = clientWellness.some((w) => w.log_date === todayUtcStr);
 
       // Last active (most recent of workout or check-in)
       let lastActive: string | null = null;
@@ -963,15 +1126,14 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
 
       // Check-in streak
       let checkinStreak = 0;
-      if (clientAllWellness.has(todayStr)) {
+      if (clientAllWellness.has(todayUtcStr)) {
         checkinStreak = 1;
-        let checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - 1);
+        const cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         for (let i = 0; i < 365; i++) {
-          const dateStr = checkDate.toISOString().split('T')[0];
+          cursor.setUTCDate(cursor.getUTCDate() - 1);
+          const dateStr = cursor.toISOString().slice(0, 10);
           if (clientAllWellness.has(dateStr)) {
             checkinStreak++;
-            checkDate.setDate(checkDate.getDate() - 1);
           } else {
             break;
           }
@@ -985,7 +1147,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
         programEndDate = program.end_date;
         if (program.end_date) {
           const endDate = new Date(program.end_date + 'T12:00:00Z');
-          const daysUntil = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntil = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
           if (daysUntil >= 0 && daysUntil <= 7) {
             programStatus = 'endingSoon';
           } else {
@@ -1001,6 +1163,34 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       const latestStress = latestWellness?.stress_level != null ? dbToUiScale(latestWellness.stress_level) : null;
       const latestSoreness = latestWellness?.soreness_level != null ? dbToUiScale(latestWellness.soreness_level) : null;
 
+      const progAssignmentRow = firstProgramByClient.get(clientId);
+      let activeProgramName: string | null = null;
+      let programCurrentWeek: number | null = null;
+      let programDurationWeeks: number | null = null;
+      if (progAssignmentRow) {
+        activeProgramName =
+          programNameById.get(progAssignmentRow.program_id) ?? progAssignmentRow.name ?? null;
+        const cw = currentWeekByAssignment.get(progAssignmentRow.id);
+        programCurrentWeek = cw ?? null;
+        programDurationWeeks = progAssignmentRow.duration_weeks ?? null;
+      }
+
+      const mealDays = mealDaysByClient.get(clientId);
+      const mealCompliance7dPct =
+        mealDays != null ? Math.min(100, Math.round((mealDays.size / 7) * 100)) : null;
+
+      const lastCheckinDate = lastCompleteCheckinByClient.get(clientId) ?? null;
+
+      const assignmentRow = firstProgramByClient.get(clientId);
+      const reviewWeek = assignmentRow ? reviewNeededByAssignment.get(assignmentRow.id) : undefined;
+
+      const sub = nearestSubByClient.get(clientId);
+      const subEnd = sub && !sub.cancelled ? sub.end_date : null;
+      const subExpiring =
+        !!subEnd &&
+        new Date(subEnd + 'T12:00:00Z') >= now &&
+        new Date(subEnd + 'T12:00:00Z') <= new Date(sevenDaysFromNowStr + 'T12:00:00Z');
+
       metricsMap.set(clientId, {
         clientId,
         lastActive,
@@ -1012,6 +1202,17 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
         latestSoreness,
         trainedToday,
         checkedInToday,
+        activeProgramName,
+        programCurrentWeek,
+        programDurationWeeks,
+        mealCompliance7dPct,
+        lastCheckinDate,
+        weekReviewNeeded: reviewWeek != null,
+        completedWeekNumber: reviewWeek ?? null,
+        activeProgramId: assignmentRow?.program_id ?? null,
+        activeProgramAssignmentId: assignmentRow?.id ?? null,
+        subscriptionEndDate: subEnd,
+        subscriptionExpiringSoon: subExpiring,
       });
     }
 

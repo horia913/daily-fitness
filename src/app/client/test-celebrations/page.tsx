@@ -20,6 +20,8 @@ const samplePRs: Record<string, PRDetectedPayload> = {
     new_value: 120,
     previous_value: 110,
     unit: "kg",
+    weight_kg: 120,
+    reps: 10,
   },
   weight_first: {
     type: "weight",
@@ -27,6 +29,8 @@ const samplePRs: Record<string, PRDetectedPayload> = {
     new_value: 180,
     previous_value: null,
     unit: "kg",
+    weight_kg: 180,
+    reps: 5,
   },
   reps_with_prev: {
     type: "reps",
@@ -34,6 +38,8 @@ const samplePRs: Record<string, PRDetectedPayload> = {
     new_value: 15,
     previous_value: 12,
     unit: "reps",
+    weight_kg: 0,
+    reps: 15,
   },
   reps_first: {
     type: "reps",
@@ -41,6 +47,8 @@ const samplePRs: Record<string, PRDetectedPayload> = {
     new_value: 8,
     previous_value: null,
     unit: "reps",
+    weight_kg: 0,
+    reps: 8,
   },
   big_improvement: {
     type: "weight",
@@ -48,6 +56,8 @@ const samplePRs: Record<string, PRDetectedPayload> = {
     new_value: 80,
     previous_value: 60,
     unit: "kg",
+    weight_kg: 80,
+    reps: 6,
   },
 };
 
@@ -204,9 +214,12 @@ export default function TestCelebrationsPage() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-lg font-bold" style={{ color: textPrimary }}>Celebration Test Lab</h1>
             <p className="text-xs" style={{ color: textDim }}>Preview PR & Achievement modals without completing workouts</p>
+            <Link href="/client/preview-ui" className="text-xs font-medium text-cyan-500 hover:text-cyan-400 mt-1 inline-block">
+              Open full UI preview lab (modals + Train accents) →
+            </Link>
           </div>
         </div>
       </div>
@@ -335,6 +348,7 @@ export default function TestCelebrationsPage() {
         visible={showPR}
         onClose={sequenceRunning ? handlePRCloseInSequence : () => setShowPR(false)}
         pr={selectedPR}
+        bodyWeightKg={78}
       />
 
       <AchievementUnlockModal

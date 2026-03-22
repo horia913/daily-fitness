@@ -59,6 +59,8 @@ interface ClientStatus {
     sessionId: string;
     workoutLogId: string;
     workoutAssignmentId: string;
+    templateName: string | null;
+    setsLogged: number;
     startedAt: string;
     currentBlock: number;
     currentExercise: string;
@@ -173,7 +175,7 @@ function ClientCard({
       ? `Week ${status.currentWeek}, Day ${status.currentDay}`
       : null;
   const workoutLabel = status.activeSession
-    ? status.nextWorkout?.workoutName ?? "—"
+    ? status.activeSession.templateName ?? status.nextWorkout?.workoutName ?? "—"
     : status.nextWorkout?.workoutName ?? (status.status === "program_completed" ? "Program complete" : status.status === "no_program" ? "No program" : "—");
   const blockSetLabel =
     status.activeSession &&
@@ -196,6 +198,11 @@ function ClientCard({
         <p className="text-sm font-medium text-[color:var(--fc-text-primary)] truncate">{workoutLabel}</p>
         {blockSetLabel && (
           <p className="text-xs text-[color:var(--fc-text-dim)] truncate mt-0.5">{blockSetLabel}</p>
+        )}
+        {status.activeSession && (
+          <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
+            Sets logged: {status.activeSession.setsLogged}
+          </p>
         )}
       </div>
       {/* Coach note */}
@@ -827,7 +834,7 @@ function GymConsoleContent() {
               className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Training
+              Back to Programs
             </Link>
             <Link href="/coach">
               <Button variant="ghost" size="icon" className="shrink-0 fc-btn fc-btn-ghost">
@@ -866,18 +873,25 @@ function GymConsoleContent() {
         <div className="flex-1 overflow-auto overflow-x-hidden min-w-0">
           <div className="max-w-7xl mx-auto p-4 min-w-0">
             {consoleClientIds.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <User className="h-16 w-16 text-[color:var(--fc-text-dim)] opacity-30 mb-4" />
-                <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                  No clients in console
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+                <User className="w-12 h-12 mx-auto mb-4 text-[color:var(--fc-text-dim)]" />
+                <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-2">
+                  No active sessions on the console
                 </h2>
-                <p className="text-[color:var(--fc-text-dim)] mt-2 max-w-sm">
-                  Add up to 6 clients to manage them during a live gym session.
+                <p className="text-sm text-[color:var(--fc-text-dim)] max-w-md mb-4">
+                  Add up to {MAX_CONSOLE_CLIENTS} clients from your roster to see live workout status, log sets,
+                  and mark workouts complete during floor coaching.
                 </p>
-                <Button className="mt-6" onClick={() => setAddModalOpen(true)}>
+                <Button className="fc-btn fc-btn-primary mb-3" onClick={() => setAddModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add clients to console
                 </Button>
+                <Link
+                  href="/coach/clients"
+                  className="text-sm text-[color:var(--fc-accent-cyan)] hover:underline font-medium"
+                >
+                  Browse client roster →
+                </Link>
               </div>
             ) : (
               <>

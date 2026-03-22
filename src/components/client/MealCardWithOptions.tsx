@@ -313,7 +313,7 @@ export default function MealCardWithOptions({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                  <div className="bg-[color:var(--fc-status-success)]/20 backdrop-blur-md border border-[color:var(--fc-status-success)]/30 text-[color:var(--fc-status-success)] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <div className="bg-cyan-500/15 backdrop-blur-md border border-cyan-500/35 text-cyan-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" />
                     Logged
                   </div>
@@ -485,7 +485,7 @@ export default function MealCardWithOptions({
                   <Button
                     type="button"
                     onClick={() => onMarkComplete(meal.id, currentOption?.id ?? null)}
-                    className="w-full min-h-[44px] rounded-xl flex items-center justify-center gap-2 font-semibold text-base bg-[color:var(--fc-accent-cyan)] hover:opacity-90 text-white border-0"
+                    className="w-full min-h-[44px] rounded-xl flex items-center justify-center gap-2 font-semibold text-base bg-gradient-to-r from-cyan-600 to-cyan-400 text-white border-0 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-shadow"
                   >
                     <CheckCircle className="w-5 h-5" />
                     Mark Complete

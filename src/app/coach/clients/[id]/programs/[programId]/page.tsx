@@ -3,12 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useTheme } from '@/contexts/ThemeContext'
 import { useToast } from '@/components/ui/toast-provider'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Button } from '@/components/ui/button'
-import ProtectedRoute from '@/components/ProtectedRoute'
+import { useCoachClient } from '@/contexts/CoachClientContext'
 import {
   ArrowLeft,
   Calendar,
@@ -26,6 +23,10 @@ import {
   X,
 } from 'lucide-react'
 import Link from 'next/link'
+import ClientProgressionEditor from '@/components/coach/client-views/ClientProgressionEditor'
+import { WeekReviewModal } from '@/components/coach/WeekReviewModal'
+import { cn } from '@/lib/utils'
+import { getCategoryAccent } from '@/lib/workoutCategoryColors'
 
 interface ProgramAssignment {
   id: string
@@ -36,6 +37,8 @@ interface ProgramAssignment {
   status: string
   total_days: number
   created_at: string
+  progression_mode?: string
+  coach_unlocked_week?: number | null
   workout_programs?: {
     id: string
     name: string
@@ -52,26 +55,22 @@ interface ScheduleItem {
   template_id: string
   week_number: number
   day_of_week: number
+  /** 1-based ordering when present (aligns with program_progress.current_day_number); else derived from day_of_week */
+  day_number?: number | null
   workout_templates?: {
     id: string
     name: string
     description?: string
     estimated_duration?: number
     difficulty_level?: string
+    category?: string | null
   }
-}
-
-interface ClientProfile {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
 }
 
 function ClientProgramDetailsContent() {
   const params = useParams()
   const router = useRouter()
-  const { performanceSettings } = useTheme()
+  const { clientName: contextClientName } = useCoachClient()
   const { addToast } = useToast()
   
   const clientId = params.id as string
@@ -79,7 +78,6 @@ function ClientProgramDetailsContent() {
   
   const [assignment, setAssignment] = useState<ProgramAssignment | null>(null)
   const [schedule, setSchedule] = useState<ScheduleItem[]>([])
-  const [client, setClient] = useState<ClientProfile | null>(null)
   const [progress, setProgress] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   // Skip-day state
@@ -88,6 +86,15 @@ function ClientProgramDetailsContent() {
   const [skippingId, setSkippingId] = useState<string | null>(null)
   const [skipReason, setSkipReason] = useState('')
   const [skipLoading, setSkipLoading] = useState(false)
+  const [weekPicker, setWeekPicker] = useState(1)
+  const [weekSaving, setWeekSaving] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
+
+  useEffect(() => {
+    if (progress?.current_week_number) {
+      setWeekPicker(progress.current_week_number)
+    }
+  }, [progress])
 
   const difficultyColors: Record<string, string> = {
     'beginner': 'fc-text-success',
@@ -136,15 +143,6 @@ function ClientProgramDetailsContent() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Load client profile
-      const { data: clientData } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('id', clientId)
-        .single()
-      
-      if (clientData) setClient(clientData)
-
       // Load program assignment with program details
       const { data: assignmentData, error: assignmentError } = await supabase
         .from('program_assignments')
@@ -247,6 +245,39 @@ function ClientProgramDetailsContent() {
     }
   }
 
+  const handleSetCurrentWeek = async () => {
+    if (!assignment) return
+    setWeekSaving(true)
+    try {
+      const slots = schedule.filter((s) => s.week_number === weekPicker)
+      slots.sort((a, b) => {
+        const da = a.day_number ?? (a.day_of_week ?? 0) + 1
+        const db = b.day_number ?? (b.day_of_week ?? 0) + 1
+        return da - db
+      })
+      const first = slots[0]
+      const dayNum = first?.day_number ?? (first != null ? (first.day_of_week ?? 0) + 1 : 1)
+      const { error } = await supabase.from('program_progress').upsert(
+        {
+          program_assignment_id: assignment.id,
+          current_week_number: weekPicker,
+          current_day_number: dayNum,
+          is_completed: false,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'program_assignment_id' }
+      )
+      if (error) throw error
+      addToast({ title: `Client moved to week ${weekPicker}`, variant: 'default' })
+      await loadData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Failed to update current week', variant: 'destructive' })
+    } finally {
+      setWeekSaving(false)
+    }
+  }
+
   const handleSkipDay = async (scheduleId: string) => {
     if (!assignment) return
     setSkipLoading(true)
@@ -278,7 +309,7 @@ function ClientProgramDetailsContent() {
   }
 
   const program = assignment?.workout_programs
-  const clientName = client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client' : 'Client'
+  const clientName = contextClientName || 'Client'
 
   // Group schedule by week
   const scheduleByWeek = schedule.reduce((acc, item) => {
@@ -292,51 +323,46 @@ function ClientProgramDetailsContent() {
 
   if (loading) {
     return (
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl fc-page">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 rounded-xl bg-[color:var(--fc-glass-highlight)] w-1/3"></div>
-              <div className="h-4 rounded-xl bg-[color:var(--fc-glass-highlight)] w-2/3"></div>
-              <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
-            </div>
+      <div className="fc-page max-w-7xl mx-auto w-full">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 rounded-xl bg-[color:var(--fc-glass-highlight)] w-1/3"></div>
+            <div className="h-4 rounded-xl bg-[color:var(--fc-glass-highlight)] w-2/3"></div>
+            <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
           </div>
         </div>
-      </AnimatedBackground>
+      </div>
     )
   }
 
   if (!assignment || !program) {
     return (
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl fc-page">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 fc-text-error" />
-            <h2 className="text-xl font-bold fc-text-primary mb-2">Program Not Found</h2>
-            <p className="fc-text-dim mb-4">This program assignment could not be found.</p>
-            <Link href={`/coach/clients/${clientId}`}>
-              <Button className="fc-btn fc-btn-primary">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Client Hub
-              </Button>
-            </Link>
-          </div>
+      <div className="fc-page max-w-7xl mx-auto w-full">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 fc-text-error" />
+          <h2 className="text-xl font-bold fc-text-primary mb-2">Program Not Found</h2>
+          <p className="fc-text-dim mb-4">This program assignment could not be found.</p>
+          <Link
+            href={`/coach/clients/${clientId}`}
+            className="inline-flex p-3 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)] mx-auto"
+            aria-label="Back to client hub"
+          >
+            <ArrowLeft className="w-5 h-5" aria-hidden />
+          </Link>
         </div>
-      </AnimatedBackground>
+      </div>
     )
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      
-      <div className="relative z-10 mx-auto w-full max-w-7xl fc-page flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
+      <div className="fc-page flex flex-col w-full max-w-7xl mx-auto" style={{ gap: "var(--fc-gap-sections)" }}>
         {/* Back */}
-        <Link href={`/coach/clients/${clientId}`} className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-4 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Client Hub
+        <Link
+          href={`/coach/clients/${clientId}`}
+          className="fc-surface inline-flex p-2.5 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-highlight)]/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]"
+          aria-label="Back to client hub"
+        >
+          <ArrowLeft className="w-5 h-5" aria-hidden />
         </Link>
 
         {/* Header */}
@@ -461,31 +487,105 @@ function ClientProgramDetailsContent() {
           </div>
         </div>
 
-        {/* Progress Section */}
-        {progress && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-            <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
-              <Target className="w-5 h-5 fc-text-workouts" />
-              Client Progress
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                <p className="text-sm fc-text-dim">Current Week</p>
-                <p className="text-2xl font-bold fc-text-primary">{progress.current_week_number ?? ((progress as any).current_week_index != null ? (progress as any).current_week_index + 1 : 1)}</p>
-              </div>
-              <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                <p className="text-sm fc-text-dim">Current Day</p>
-                <p className="text-2xl font-bold fc-text-primary">{progress.current_day_number ?? ((progress as any).current_day_index != null ? (progress as any).current_day_index + 1 : 1)}</p>
-              </div>
-              <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                <p className="text-sm fc-text-dim">Status</p>
-                <p className={`text-lg font-bold ${progress.is_completed ? 'fc-text-success' : 'fc-text-warning'}`}>
-                  {progress.is_completed ? 'Completed' : 'In Progress'}
-                </p>
-              </div>
+        {/* Progress Section — week control works even before a program_progress row exists */}
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 fc-text-workouts" />
+            Client Progress
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <p className="text-sm fc-text-dim">Current Week</p>
+              <p className="text-2xl font-bold fc-text-primary">
+                {progress?.current_week_number ??
+                  ((progress as { current_week_index?: number } | null)?.current_week_index != null
+                    ? (progress as { current_week_index: number }).current_week_index + 1
+                    : '—')}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <p className="text-sm fc-text-dim">Current Day</p>
+              <p className="text-2xl font-bold fc-text-primary">
+                {progress?.current_day_number ??
+                  ((progress as { current_day_index?: number } | null)?.current_day_index != null
+                    ? (progress as { current_day_index: number }).current_day_index + 1
+                    : '—')}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <p className="text-sm fc-text-dim">Status</p>
+              <p
+                className={`text-lg font-bold ${
+                  progress?.is_completed ? 'fc-text-success' : progress ? 'fc-text-warning' : 'fc-text-dim'
+                }`}
+              >
+                {!progress ? 'Not started' : progress.is_completed ? 'Completed' : 'In Progress'}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <p className="text-sm fc-text-dim">Progression</p>
+              <p className="text-lg font-bold fc-text-primary">
+                {assignment.progression_mode === 'coach_managed' ? 'Coach-managed' : 'Automatic'}
+              </p>
+              {assignment.progression_mode === 'coach_managed' && assignment.coach_unlocked_week && (
+                <p className="text-xs fc-text-dim mt-1">Unlocked up to Week {assignment.coach_unlocked_week}</p>
+              )}
             </div>
           </div>
-        )}
+          <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)] flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs fc-text-dim block mb-1">Set current week</label>
+              <select
+                value={weekPicker}
+                onChange={(e) => setWeekPicker(Number(e.target.value))}
+                className="text-sm fc-glass rounded-lg px-3 py-2 border border-[color:var(--fc-glass-border)] fc-text-primary bg-transparent min-w-[140px]"
+              >
+                {Array.from({ length: Math.max(1, program.duration_weeks || 1) }, (_, i) => i + 1).map((w) => (
+                  <option key={w} value={w}>
+                    Week {w} of {program.duration_weeks}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              type="button"
+              className="fc-btn fc-btn-primary"
+              disabled={weekSaving || assignment.status === 'completed'}
+              onClick={() => {
+                if (
+                  !confirm(
+                    `Move client to week ${weekPicker}? Their unlocked schedule will follow this week (day resets to first training day in that week).`
+                  )
+                ) {
+                  return
+                }
+                void handleSetCurrentWeek()
+              }}
+            >
+              {weekSaving ? 'Saving…' : 'Apply week'}
+            </Button>
+            {assignment.progression_mode === 'coach_managed' && (
+              <Button
+                type="button"
+                className="fc-btn fc-btn-secondary"
+                onClick={() => setShowReviewModal(true)}
+              >
+                Review Week {assignment.coach_unlocked_week ?? weekPicker}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <ClientProgressionEditor
+          programAssignmentId={assignment.id}
+          programId={programId}
+          clientId={clientId}
+          durationWeeks={program.duration_weeks || 1}
+          defaultWeek={
+            progress?.current_week_number ??
+            (progress?.current_week_index != null ? progress.current_week_index + 1 : 1)
+          }
+        />
 
         {/* Description */}
         {program.description && (
@@ -501,7 +601,8 @@ function ClientProgramDetailsContent() {
             <Calendar className="w-5 h-5 fc-text-workouts" />
             Weekly Schedule
           </h2>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="overflow-x-auto min-w-0 -mx-1 px-1">
+            <div className="grid grid-cols-7 gap-2 min-w-[36rem] sm:min-w-0">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
               // Get workouts for this day across all weeks (just show week 1 as example)
               const dayWorkouts = schedule.filter(s => s.day_of_week === index && s.week_number === 1)
@@ -510,16 +611,42 @@ function ClientProgramDetailsContent() {
                   <h4 className="font-semibold fc-text-primary mb-2">{day}</h4>
                   {dayWorkouts.length > 0 ? (
                     <div className="space-y-1">
-                      {dayWorkouts.map((item, idx) => (
-                        <div key={idx} className="text-xs p-2 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                          <div className="font-medium fc-text-primary truncate">
-                            {item.workout_templates?.name || 'Workout'}
+                      {dayWorkouts.map((item, idx) => {
+                        const cat =
+                          typeof item.workout_templates?.category === 'string'
+                            ? item.workout_templates.category
+                            : ''
+                        const accent = getCategoryAccent(cat)
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'text-xs p-2 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] border-l-2 flex items-start gap-2',
+                              accent.border
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                'rounded-md p-1 shrink-0',
+                                accent.iconBg
+                              )}
+                              aria-hidden
+                            >
+                              <Dumbbell
+                                className={cn('w-3 h-3', accent.text)}
+                              />
+                            </div>
+                            <div className="min-w-0 text-left flex-1">
+                              <div className="font-medium fc-text-primary truncate">
+                                {item.workout_templates?.name || 'Workout'}
+                              </div>
+                              <div className="fc-text-subtle">
+                                {item.workout_templates?.estimated_duration || 60}m
+                              </div>
+                            </div>
                           </div>
-                          <div className="fc-text-subtle">
-                            {item.workout_templates?.estimated_duration || 60}m
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="text-xs fc-text-subtle">Rest</div>
@@ -527,6 +654,7 @@ function ClientProgramDetailsContent() {
                 </div>
               )
             })}
+            </div>
           </div>
         </div>
 
@@ -549,23 +677,42 @@ function ClientProgramDetailsContent() {
                     const isSkipped = skippedScheduleIds.has(item.id)
                     const isDone = isCompleted || isSkipped
                     const isSkipping = skippingId === item.id
+                    const cat =
+                      typeof item.workout_templates?.category === 'string'
+                        ? item.workout_templates.category
+                        : ''
+                    const accent = getCategoryAccent(cat)
 
                     return (
                       <div
                         key={item.id || idx}
-                        className={`p-4 rounded-xl fc-glass-soft border transition-colors ${
+                        className={cn(
+                          'p-4 rounded-xl fc-glass-soft border transition-colors border-l-2',
                           isCompleted
                             ? 'border-[color:var(--fc-text-success)] opacity-75'
                             : isSkipped
                             ? 'border-[color:var(--fc-text-warning)] opacity-75'
-                            : 'border-[color:var(--fc-glass-border)]'
-                        }`}
+                            : 'border-[color:var(--fc-glass-border)]',
+                          accent.border
+                        )}
                       >
                         {/* Card header — name + status badge */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-start gap-2 mb-2">
+                          <div
+                            className={cn(
+                              'rounded-lg p-2 shrink-0',
+                              accent.iconBg
+                            )}
+                            aria-hidden
+                          >
+                            <Dumbbell
+                              className={cn('w-4 h-4', accent.text)}
+                            />
+                          </div>
+                          <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
                           <Link
                             href={`/coach/workouts/templates/${item.template_id}`}
-                            className="font-semibold fc-text-primary truncate hover:underline text-sm"
+                            className="font-semibold fc-text-primary truncate hover:underline text-sm min-w-0 flex-1"
                           >
                             {item.workout_templates?.name || 'Workout'}
                           </Link>
@@ -581,6 +728,7 @@ function ClientProgramDetailsContent() {
                               Skipped
                             </span>
                           )}
+                          </div>
                         </div>
 
                         {/* Day/duration meta */}
@@ -650,15 +798,23 @@ function ClientProgramDetailsContent() {
             ))}
           </div>
         </div>
-      </div>
-    </AnimatedBackground>
+
+      {assignment && (
+        <WeekReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onComplete={() => {
+            setShowReviewModal(false)
+            loadData()
+          }}
+          programAssignmentId={assignment.id}
+          programId={assignment.program_id}
+          weekNumber={assignment.coach_unlocked_week ?? weekPicker}
+          clientName={clientName}
+        />
+      )}
+  </div>
   )
 }
 
-export default function ClientProgramDetailsPage() {
-  return (
-    <ProtectedRoute requiredRole="coach">
-      <ClientProgramDetailsContent />
-    </ProtectedRoute>
-  )
-}
+export default ClientProgramDetailsContent

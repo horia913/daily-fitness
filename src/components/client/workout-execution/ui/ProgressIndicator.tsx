@@ -27,7 +27,7 @@ export function ProgressIndicator({
         <span className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
           {label} {current} of {total}
         </span>
-        <span className="text-xs font-bold font-mono fc-text-primary">
+        <span className="text-xs font-bold font-mono text-cyan-400 tabular-nums">
           {Math.round(percentage)}%
         </span>
       </div>
@@ -48,7 +48,7 @@ export function ProgressIndicator({
                 <div
                   key={i}
                   className="flex-1 h-full min-w-0 rounded-sm first:rounded-l-full last:rounded-r-full transition-colors"
-                  style={{ background: filled ? "var(--fc-domain-workouts)" : "transparent" }}
+                  style={{ background: filled ? "#06b6d4" : "transparent" }}
                 />
               );
             })}
@@ -56,8 +56,8 @@ export function ProgressIndicator({
         ) : (
           <Progress
             value={percentage}
-            className="h-2"
-            style={{ background: "var(--fc-surface-sunken)" } as React.CSSProperties}
+            className="h-2 bg-[color:var(--fc-surface-sunken)]"
+            indicatorClassName="bg-gradient-to-r from-cyan-600 to-cyan-400"
           />
         ))}
     </div>

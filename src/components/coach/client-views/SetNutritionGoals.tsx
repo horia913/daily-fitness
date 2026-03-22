@@ -245,7 +245,9 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
               Nutrition Targets
             </h3>
             <p className="text-sm fc-text-dim">
-              Set daily macro targets for this client. They'll track their food intake against these goals.
+              Set daily macro targets for this client. Values are saved to their nutrition goals and show on the{" "}
+              <span className="font-medium fc-text-primary">Fuel</span> screen (same data the client app reads from
+              their goals).
             </p>
           </div>
         </div>

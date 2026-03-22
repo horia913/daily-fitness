@@ -61,6 +61,8 @@ interface WorkoutAssignmentModalProps {
   onClose: () => void;
   onSuccess: () => void;
   preselectedTemplate?: WorkoutTemplate;
+  /** Profile UUID (`profiles.id` / `clients.client_id`); pre-selects that client and skips the client step when continuing. */
+  preselectedClientProfileId?: string | null;
 }
 
 type Step = "workouts" | "clients" | "review";
@@ -70,6 +72,7 @@ export default function WorkoutAssignmentModal({
   onClose,
   onSuccess,
   preselectedTemplate,
+  preselectedClientProfileId,
 }: WorkoutAssignmentModalProps) {
   const { isDark, getThemeStyles } = useTheme();
   const { addToast } = useToast();
@@ -213,12 +216,22 @@ export default function WorkoutAssignmentModal({
   }, []);
 
   useEffect(() => {
+    if (!isOpen || !preselectedClientProfileId || clients.length === 0) return;
+    const match = clients.find(
+      (c) => c.client_profile_id === preselectedClientProfileId
+    );
+    if (match) setSelectedClients([match.id]);
+  }, [isOpen, preselectedClientProfileId, clients]);
+
+  useEffect(() => {
     if (isOpen) {
       loadData();
       // Set preselected template if provided
       if (preselectedTemplate) {
         setSelectedWorkouts([preselectedTemplate.id]);
-        setCurrentStep("clients"); // Skip to client selection if workout is preselected
+        setCurrentStep(
+          preselectedClientProfileId ? "workouts" : "clients"
+        );
       } else {
         setCurrentStep("workouts");
       }
@@ -241,7 +254,7 @@ export default function WorkoutAssignmentModal({
     return () => {
       restoreBackgroundScroll();
     };
-  }, [isOpen, preselectedTemplate, loadData]);
+  }, [isOpen, preselectedTemplate, preselectedClientProfileId, loadData]);
 
   // Filter functions
   const filteredWorkouts = workoutTemplates.filter(
@@ -429,7 +442,14 @@ export default function WorkoutAssignmentModal({
   const nextStep = () => {
     switch (currentStep) {
       case "workouts":
-        setCurrentStep("clients");
+        if (
+          preselectedClientProfileId &&
+          selectedClients.length > 0
+        ) {
+          setCurrentStep("review");
+        } else {
+          setCurrentStep("clients");
+        }
         break;
       case "clients":
         setCurrentStep("review");
@@ -446,7 +466,14 @@ export default function WorkoutAssignmentModal({
         setCurrentStep("workouts");
         break;
       case "review":
-        setCurrentStep("clients");
+        if (
+          preselectedClientProfileId &&
+          selectedClients.length > 0
+        ) {
+          setCurrentStep("workouts");
+        } else {
+          setCurrentStep("clients");
+        }
         break;
     }
   };

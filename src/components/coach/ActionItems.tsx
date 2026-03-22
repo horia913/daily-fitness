@@ -51,16 +51,16 @@ export default function ActionItems() {
     },
     {
       id: 3,
-      title: "John Smith's ClipCard expires in 3 days",
+      title: "John Smith's subscription expires in 3 days",
       description: "Renewal required for continued access",
       icon: AlertTriangle,
       priority: "urgent",
       urgency: "expiring",
-      href: "/coach/clipcards",
+      href: "/coach/clients",
       timeAgo: "30 minutes ago",
       clientName: "John Smith",
       actionText: "Renew",
-      category: "clipcards"
+      category: "subscription"
     },
     {
       id: 4,

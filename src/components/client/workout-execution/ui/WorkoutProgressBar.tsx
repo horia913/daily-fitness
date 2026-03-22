@@ -67,12 +67,9 @@ export function WorkoutProgressBar({
             )}
           </div>
           <div
-            className={`text-xs font-bold font-mono tabular-nums transition-transform duration-300 ${
+            className={`text-xs font-bold font-mono tabular-nums text-cyan-400 transition-transform duration-300 ${
               isPulsing ? "scale-110" : "scale-100"
             }`}
-            style={{
-              color: "var(--fc-domain-workouts)",
-            }}
           >
             {Math.round(clampedProgress)}%
           </div>
@@ -86,10 +83,9 @@ export function WorkoutProgressBar({
           }}
         >
           <div
-            className="h-full transition-all duration-500 ease-out"
+            className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-cyan-600 to-cyan-400"
             style={{
               width: `${clampedProgress}%`,
-              background: "var(--fc-domain-workouts)",
             }}
           />
         </div>

@@ -64,16 +64,16 @@ export async function GET() {
           signals: { coachProgramCompliancePct: null },
           exclusions: { excludedClientIds: [], reasons: {} },
         },
+        todaysSessions: [],
       })
     }
 
     const clients = raw.clients ?? []
     const todaysSessions = raw.todaysSessions ?? []
     const totalClients = raw.totalClients ?? 0
-    const totalWorkoutsThisWeek = raw.totalWorkoutsThisWeek ?? 0
     const programCompliance = raw.programCompliance ?? null
+    const rpcAlerts = raw.alerts ?? {}
 
-    const sessionClientIds = new Set(todaysSessions.map((s: { client_id: string }) => s.client_id))
     const trainedTodaySet = new Set(
       clients.filter((c: { trained_today?: boolean }) => c.trained_today).map((c: { client_id: string }) => c.client_id)
     )
@@ -91,7 +91,7 @@ export async function GET() {
       last_checkin_date?: string
       active_program_name?: string
       week_workout_count?: number
-      week_checkin_count?: number
+      checkin_streak?: number
       trained_today?: boolean
       checked_in_today?: boolean
       has_active_meal_plan?: boolean
@@ -103,7 +103,7 @@ export async function GET() {
       avatarUrl: c.avatar_url ?? null,
       trainedToday: c.trained_today ?? false,
       checkedInToday: c.checked_in_today ?? false,
-      checkinStreak: c.week_checkin_count ?? 0,
+      checkinStreak: c.checkin_streak ?? 0,
       lastWorkoutDate: c.last_workout_at ? c.last_workout_at.split('T')[0] : null,
       lastCheckinDate: c.last_checkin_date ?? null,
       programCompliance: null as number | null,
@@ -123,11 +123,23 @@ export async function GET() {
       avgProgramCompliance: programCompliance ?? 0,
       avgCheckinCompliance: 0,
       alerts: {
-        noCheckIn3Days: [],
+        noCheckIn3Days: (rpcAlerts.noCheckIn3Days ?? []).map((a: { client_id: string; first_name?: string; last_name?: string; detail?: string }) => ({
+          clientId: a.client_id,
+          clientName: `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || 'Client',
+          detail: a.detail ?? 'No check-in for 3+ days',
+          type: 'noCheckIn3Days' as const,
+          severity: 'medium' as const,
+        })),
         highStress: [],
         highSoreness: [],
         lowSleep: [],
-        missedWorkouts: [],
+        missedWorkouts: (rpcAlerts.noWorkoutThisWeek ?? []).map((a: { client_id: string; first_name?: string; last_name?: string; detail?: string }) => ({
+          clientId: a.client_id,
+          clientName: `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || 'Client',
+          detail: a.detail ?? 'No workout this week',
+          type: 'missedWorkouts' as const,
+          severity: 'medium' as const,
+        })),
         programEnding: [],
         noProgram: [],
         noMealPlan: [],
@@ -147,7 +159,7 @@ export async function GET() {
       exclusions: { excludedClientIds: [] as string[], reasons: {} as Record<string, string> },
     }
 
-    return NextResponse.json({ briefing, controlRoom })
+    return NextResponse.json({ briefing, controlRoom, todaysSessions })
   } catch (err: unknown) {
     console.error('[coach/dashboard] Unexpected error:', err)
     return NextResponse.json(

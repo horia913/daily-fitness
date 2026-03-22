@@ -17,6 +17,7 @@ import { ProgramCompletedCard } from "@/components/client/train/ProgramCompleted
 import { WeekStrip } from "@/components/client/train/WeekStrip";
 import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
+import { TrainStatsRow } from "@/components/client/train/TrainStatsRow";
 import { ActivityWeekSummary } from "@/components/client/activity/ActivityWeekSummary";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
 import {
@@ -38,7 +39,7 @@ import {
   type PreviewDayStatus,
 } from "@/components/client/train/WorkoutDayPreview";
 import { useToast } from "@/components/ui/toast-provider";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Clock, MessageSquare, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
 import {
@@ -120,6 +121,9 @@ interface TrainPageData {
   programWeek: ProgramWeekState | null;
   extraWorkouts: ExtraWorkout[];
   exerciseCounts: Map<string, number>;
+  /** Consecutive workout days streak (same metric as dashboard `get_client_dashboard`). */
+  workoutStreak: number;
+  templateCategories: Map<string, string>;
 }
 
 export default function TrainPage() {
@@ -137,6 +141,7 @@ export default function TrainPage() {
   const [selectedRestWeekday, setSelectedRestWeekday] = useState<number | null>(
     null,
   );
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
 
   // Extra activities state
   const [weekActivities, setWeekActivities] = useState<ClientActivity[]>([]);
@@ -157,16 +162,25 @@ export default function TrainPage() {
         programWeek: null,
         extraWorkouts: [],
         exerciseCounts: new Map(),
+        workoutStreak: 0,
+        templateCategories: new Map(),
       };
     }
     const todayWeekday = getTodayWeekday();
-    const { data: rpcData, error: rpcError } = await supabase.rpc("get_train_page_data", {
-      p_client_id: user.id,
-      p_today_weekday: todayWeekday,
-    });
+    const [{ data: rpcData, error: rpcError }, dashRes] = await Promise.all([
+      supabase.rpc("get_train_page_data", {
+        p_client_id: user.id,
+        p_today_weekday: todayWeekday,
+      }),
+      supabase.rpc("get_client_dashboard"),
+    ]);
     if (rpcError) {
       throw new Error(rpcError.message || "Failed to load train page data");
     }
+    const workoutStreak = dashRes.error
+      ? 0
+      : Number((dashRes.data as Record<string, unknown> | null)?.streak) || 0;
+
     const data = (rpcData ?? null) as TrainPageRpcResponse | null;
     const programWeek = data
       ? rpcResponseToProgramWeekState(data, todayWeekday)
@@ -176,10 +190,37 @@ export default function TrainPage() {
       : [];
     const exerciseCounts = buildExerciseCountsFromRpc(data);
     const extraWorkouts = buildExtraWorkoutsFromRpc(extraFromRpc, exerciseCounts);
+
+    const templateIdSet = new Set<string>();
+    for (const s of data?.schedule ?? []) {
+      if (s.template_id) templateIdSet.add(s.template_id);
+    }
+    for (const w of extraFromRpc) {
+      if (w.template_id) templateIdSet.add(w.template_id);
+    }
+    const templateIds = [...templateIdSet];
+    const templateCategories = new Map<string, string>();
+    if (templateIds.length > 0) {
+      const { data: catRows } = await supabase
+        .from("workout_templates")
+        .select("id, category")
+        .in("id", templateIds);
+      for (const row of catRows ?? []) {
+        const id = (row as { id?: string }).id;
+        if (id)
+          templateCategories.set(
+            id,
+            String((row as { category?: string | null }).category ?? ""),
+          );
+      }
+    }
+
     return {
       programWeek,
       extraWorkouts,
       exerciseCounts,
+      workoutStreak,
+      templateCategories,
     };
   }, [user?.id]);
 
@@ -195,9 +236,20 @@ export default function TrainPage() {
   const extraWorkouts: ExtraWorkout[] = programData?.extraWorkouts ?? [];
   const exerciseCounts =
     programData?.exerciseCounts ?? new Map<string, number>();
+  const workoutStreak = programData?.workoutStreak ?? 0;
+  const templateCategories =
+    programData?.templateCategories ?? new Map<string, string>();
 
   const loading = programLoading;
   const todayWeekday = getTodayWeekday();
+
+  useEffect(() => {
+    if (!programWeek?.coachFeedback || !programWeek?.programAssignmentId) return;
+    try {
+      const key = `coach_feedback_dismissed_${programWeek.programAssignmentId}_${programWeek.currentWeekNumber}`;
+      if (localStorage.getItem(key) === '1') setFeedbackDismissed(true);
+    } catch {}
+  }, [programWeek?.programAssignmentId, programWeek?.currentWeekNumber, programWeek?.coachFeedback]);
 
   // Background prefetch: load blocks for all templates once page data arrives (no effect on initial render)
   const [prefetchedBlocks, setPrefetchedBlocks] = useState<Map<string, WorkoutSetEntry[]>>(new Map());
@@ -344,6 +396,15 @@ export default function TrainPage() {
     setWeekActivities(updated);
   };
 
+  const activityMinutesThisWeek = weekActivities.reduce(
+    (sum, a) => sum + a.duration_minutes,
+    0,
+  );
+  const workoutsCompletedThisWeek =
+    programWeek?.hasProgram && !programWeek.isCompleted
+      ? programWeek.days.filter((d) => d.isCompleted).length
+      : 0;
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -357,6 +418,14 @@ export default function TrainPage() {
               Training
             </h1>
           </header>
+
+          {!loading && !error && (
+            <TrainStatsRow
+              workoutsCompletedThisWeek={workoutsCompletedThisWeek}
+              activityMinutesThisWeek={activityMinutesThisWeek}
+              workoutStreakDays={workoutStreak}
+            />
+          )}
 
           {error && (
             <ClientGlassCard className="p-6 text-center mb-6">
@@ -393,6 +462,53 @@ export default function TrainPage() {
                     startingScheduleId={startingScheduleId}
                     exerciseCounts={exerciseCounts}
                   />
+
+                  {/* Coach Feedback Card (dismissible, coach_managed mode) */}
+                  {programWeek.coachFeedback && !feedbackDismissed && (
+                    <ClientGlassCard className="p-4 mb-4 border-l-[3px] border-l-[color:var(--fc-domain-workouts)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <MessageSquare className="w-5 h-5 mt-0.5 shrink-0 fc-text-workouts" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-1">Coach feedback</p>
+                            <p className="text-sm fc-text-primary leading-relaxed">{programWeek.coachFeedback.notes}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setFeedbackDismissed(true);
+                            try {
+                              const key = `coach_feedback_dismissed_${programWeek.programAssignmentId}_${programWeek.currentWeekNumber}`;
+                              localStorage.setItem(key, '1');
+                            } catch {}
+                          }}
+                          className="shrink-0 p-1 rounded-lg fc-text-dim hover:fc-text-primary transition-colors"
+                          aria-label="Dismiss"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </ClientGlassCard>
+                  )}
+
+                  {/* Waiting for Coach Review (coach_managed mode, week complete) */}
+                  {programWeek.isWeekCompleteAwaitingReview && (
+                    <ClientGlassCard className="p-5 mb-4 text-center border border-[color:var(--fc-status-warning)]/30">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-[color:var(--fc-status-warning)]/15 flex items-center justify-center">
+                          <Clock className="w-6 h-6 text-[color:var(--fc-status-warning)]" />
+                        </div>
+                        <div>
+                          <p className="font-semibold fc-text-primary mb-1">
+                            All workouts this week completed!
+                          </p>
+                          <p className="text-sm fc-text-dim leading-relaxed">
+                            Waiting for your coach to review Week {programWeek.currentWeekNumber} and advance you to Week {programWeek.currentWeekNumber + 1}.
+                          </p>
+                        </div>
+                      </div>
+                    </ClientGlassCard>
+                  )}
 
                   {/* Section 3: Week Overview Strip */}
                   <WeekStrip
@@ -493,7 +609,12 @@ export default function TrainPage() {
               )}
 
               {/* Extra Training (coach-assigned extra workouts) */}
-              {!loading && <ExtraTraining workouts={extraWorkouts} />}
+              {!loading && (
+                <ExtraTraining
+                  workouts={extraWorkouts}
+                  templateCategories={templateCategories}
+                />
+              )}
             </>
           ) : null}
         </ClientPageShell>

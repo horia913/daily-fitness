@@ -9,6 +9,8 @@ interface AthleteScoreRingProps {
   animated?: boolean;
   size?: number;
   strokeWidth?: number;
+  /** When true, progress arc uses cyan accent (dashboard spec) while center tier label stays tier-based */
+  accentStroke?: boolean;
 }
 
 export function AthleteScoreRing({
@@ -17,6 +19,7 @@ export function AthleteScoreRing({
   animated = true,
   size = 240,
   strokeWidth = 14,
+  accentStroke = false,
 }: AthleteScoreRingProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
   const hasAnimated = useRef(false);
@@ -36,6 +39,7 @@ export function AthleteScoreRing({
 
   // Generate unique gradient ID
   const gradientId = `athlete-score-gradient-${tier || "none"}`;
+  const accentGradientId = `${gradientId}-accent-cyan`;
 
   // Animate score on mount
   useEffect(() => {
@@ -141,10 +145,13 @@ export function AthleteScoreRing({
         className="transform -rotate-90"
       >
         <defs>
-          {/* Gradient for the ring */}
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={tierInfo.color} />
             <stop offset="100%" stopColor={tierInfo.colorEnd} />
+          </linearGradient>
+          <linearGradient id={accentGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#0891b2" />
+            <stop offset="100%" stopColor="#22d3ee" />
           </linearGradient>
         </defs>
 
@@ -164,7 +171,7 @@ export function AthleteScoreRing({
           cy={center}
           r={radius}
           fill="none"
-          stroke={`url(#${gradientId})`}
+          stroke={`url(#${accentStroke ? accentGradientId : gradientId})`}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={currentOffset}

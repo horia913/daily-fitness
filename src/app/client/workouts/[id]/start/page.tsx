@@ -174,6 +174,8 @@ export default function LiveWorkout() {
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [prCelebrationData, setPrCelebrationData] = useState<PRDetectedPayload | null>(null);
+  /** Latest body weight (kg) for PR tier multiplier; one fetch per page load */
+  const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(null);
   const pendingAchievementsRef = useRef<Achievement[]>([]);
   const showAchievementsAfterPR = useCallback(() => {
     if (pendingAchievementsRef.current.length > 0) {
@@ -542,6 +544,36 @@ export default function LiveWorkout() {
       console.error("Error loading assignment:", error);
     });
   }, [assignmentId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user?.id || cancelled) return;
+        const { data, error } = await supabase
+          .from("body_metrics")
+          .select("weight_kg")
+          .eq("client_id", user.id)
+          .not("weight_kg", "is", null)
+          .order("measured_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled || error) return;
+        const w = data?.weight_kg;
+        if (w != null && Number(w) > 0) {
+          setClientBodyWeightKg(Number(w));
+        }
+      } catch {
+        /* non-blocking */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const refetchAssignment = useCallback(() => {
     if (assignmentId) loadAssignment().catch(() => {});
@@ -7269,6 +7301,7 @@ export default function LiveWorkout() {
               showAchievementsAfterPR();
             }}
             pr={prCelebrationData}
+            bodyWeightKg={clientBodyWeightKg}
           />
         )}
 

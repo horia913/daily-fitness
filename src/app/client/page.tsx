@@ -19,7 +19,6 @@ import { ScoreBreakdown } from "@/components/client-ui/ScoreBreakdown";
 import { AthleteScore } from "@/types/athleteScore";
 import Link from "next/link";
 import {
-  Flame,
   Dumbbell,
   BarChart3,
   CheckCircle,
@@ -233,6 +232,26 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
   };
 }
 
+function achievementHighlightClass(tier: string | null | undefined): string {
+  if (!tier) {
+    return "border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20";
+  }
+  const t = tier.toLowerCase();
+  if (t.includes("diamond")) {
+    return "border border-cyan-300/35 bg-cyan-500/10 text-cyan-100 dark:text-cyan-200";
+  }
+  if (t.includes("gold") || t.includes("platinum")) {
+    return "border border-amber-300/40 bg-amber-100/15 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200";
+  }
+  if (t.includes("silver")) {
+    return "border border-slate-400/35 bg-slate-500/10 text-slate-800 dark:text-slate-200";
+  }
+  if (t.includes("bronze")) {
+    return "border border-[#CD7F32]/45 bg-[#CD7F32]/12 text-amber-900 dark:text-amber-200";
+  }
+  return "border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20";
+}
+
 export default function ClientDashboard() {
   const { user, profile } = useAuth();
 
@@ -346,6 +365,7 @@ export default function ClientDashboard() {
                   score={athleteScore?.score ?? null}
                   tier={athleteScore?.tier ?? null}
                   animated={true}
+                  accentStroke
                 />
 
                 {/* Score Breakdown */}
@@ -376,7 +396,7 @@ export default function ClientDashboard() {
                           return (
                             <div
                               key={point.date}
-                              className="flex-1 min-w-0 rounded-t bg-[var(--fc-accent)]/60 transition-all"
+                              className="flex-1 min-w-0 rounded-t bg-cyan-500/60 transition-all"
                               style={{ height: `${Math.max(pct, 8)}%` }}
                             />
                           );
@@ -544,8 +564,8 @@ export default function ClientDashboard() {
                 {/* Streak */}
                 <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <Flame className="w-4 h-4 fc-text-warning" />
-                    <span className="text-lg font-bold fc-text-primary">
+                    <span className="text-base" aria-hidden>🔥</span>
+                    <span className="text-lg font-bold text-amber-400 tabular-nums">
                       {streak}
                     </span>
                   </div>
@@ -553,10 +573,10 @@ export default function ClientDashboard() {
                 </ClientGlassCard>
 
                 {/* Weekly Progress */}
-                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-cyan-500/40 bg-cyan-950/20 dark:bg-cyan-950/30">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <Dumbbell className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                    <span className="text-lg font-bold fc-text-primary">
+                    <Dumbbell className="w-4 h-4 text-cyan-400" />
+                    <span className="text-lg font-bold text-cyan-400 tabular-nums">
                       {weeklyProgress.current}/{weeklyProgress.goal || 0}
                     </span>
                   </div>
@@ -570,7 +590,7 @@ export default function ClientDashboard() {
                       <div className="relative w-12 h-12">
                         <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
                           <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3.5" />
-                          <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-accent)" strokeWidth="3.5" strokeLinecap="round"
+                          <circle cx="24" cy="24" r="19" fill="none" stroke="#06b6d4" strokeWidth="3.5" strokeLinecap="round"
                             strokeDasharray={`${Math.min(100, programProgressData.percent) * 1.194} 999`} />
                         </svg>
                         <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black fc-text-primary">
@@ -600,7 +620,7 @@ export default function ClientDashboard() {
                   </span>
                 )}
                 {dashboardData.highlights.latestAchievement != null && (
-                  <span className="px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20">
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${achievementHighlightClass(dashboardData.highlights.latestAchievement.tier)}`}>
                     🎖️ Latest: {dashboardData.highlights.latestAchievement.name}
                     {dashboardData.highlights.latestAchievement.tier
                       ? ` — ${dashboardData.highlights.latestAchievement.tier}`
@@ -608,7 +628,11 @@ export default function ClientDashboard() {
                   </span>
                 )}
                 {dashboardData.highlights.bestLeaderboardRank != null && (
-                  <span className="px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border border-blue-400/30 bg-blue-50 dark:bg-blue-900/20">
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-medium fc-text-primary border ${
+                    dashboardData.highlights.bestLeaderboardRank.rank <= 3
+                      ? "border-amber-400/40 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                      : "border-blue-400/30 bg-blue-50 dark:bg-blue-900/20"
+                  }`}>
                     📊 #{dashboardData.highlights.bestLeaderboardRank.rank}
                     {dashboardData.highlights.bestLeaderboardRank.exerciseName
                       ? ` on ${dashboardData.highlights.bestLeaderboardRank.exerciseName} leaderboard`

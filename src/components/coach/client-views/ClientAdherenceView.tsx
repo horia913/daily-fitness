@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, CheckCircle, XCircle, Calendar } from 'lucide-react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { BarChart3, CheckCircle, XCircle, Calendar, Apple, Dumbbell } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getPeriodBounds } from '@/lib/metrics/period'
 import { getNutritionCompliance } from '@/lib/metrics/nutrition'
@@ -18,7 +20,9 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
     nutritionAdherence: null as number | null,
     hasNutritionGoals: false,
     weeklyAverage: 0,
-    thisWeek: { completed: 0, missed: 0, total: 0 }
+    thisWeek: { completed: 0, missed: 0, total: 0 },
+    /** Mon–Sun: whether that program day has required slots and all are completed (non-skipped). */
+    weekActivityStrip: [] as { hasSlot: boolean; done: boolean }[],
   })
 
   useEffect(() => {
@@ -54,6 +58,10 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
         let workoutAdherence = 0
         let weeklyAverage = 0
         let thisWeek = { completed: 0, missed: 0, total: 0 }
+        let weekActivityStrip: { hasSlot: boolean; done: boolean }[] = Array.from(
+          { length: 7 },
+          () => ({ hasSlot: false, done: false })
+        )
 
         if (assignment && !cancelled) {
           const { data: progress } = await supabase
@@ -64,7 +72,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           const weekNum = progress?.current_week_number ?? 1
           const { data: slots } = await supabase
             .from('program_schedule')
-            .select('id, is_optional')
+            .select('id, is_optional, day_of_week')
             .eq('program_id', assignment.program_id)
             .eq('week_number', weekNum)
           const requiredSlots = (slots || []).filter((s: { is_optional?: boolean }) => !s.is_optional)
@@ -72,18 +80,37 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           const requiredScheduleIds = new Set(requiredSlots.map((s: { id: string }) => s.id))
           const { data: completions } = await supabase
             .from('program_day_completions')
-            .select('id, program_schedule_id, program_schedule!inner(week_number)')
+            .select('program_schedule_id, notes')
             .eq('program_assignment_id', assignment.id)
-          const completedInWeek = (completions || []).filter((c: { program_schedule_id: string; program_schedule?: { week_number?: number } | { week_number?: number }[] }) => {
-            const ps = (c as { program_schedule?: { week_number?: number } | { week_number?: number }[] }).program_schedule
-            const weekNumVal = Array.isArray(ps) ? ps[0]?.week_number : ps?.week_number
-            return (weekNumVal ?? 0) === weekNum
-          })
-          const completedRequired = completedInWeek.filter((c: { program_schedule_id: string }) => requiredScheduleIds.has(c.program_schedule_id)).length
+          const completedForWeek = (completions || []).filter(
+            (c: { program_schedule_id: string; notes?: string | null }) =>
+              requiredScheduleIds.has(c.program_schedule_id) &&
+              !String(c.notes || '').startsWith('Skipped by coach')
+          )
+          const completedRequired = completedForWeek.length
           const completed = Math.min(assigned, completedRequired)
           workoutAdherence = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
           weeklyAverage = workoutAdherence
           thisWeek = { completed, missed: Math.max(0, assigned - completed), total: assigned }
+
+          const completedIds = new Set(
+            completedForWeek.map((c: { program_schedule_id: string }) => c.program_schedule_id)
+          )
+          const requiredByDay: Record<number, string[]> = {}
+          for (const s of requiredSlots as { id: string; day_of_week?: number }[]) {
+            const dow =
+              typeof s.day_of_week === 'number' && s.day_of_week >= 0 && s.day_of_week <= 6
+                ? s.day_of_week
+                : 0
+            if (!requiredByDay[dow]) requiredByDay[dow] = []
+            requiredByDay[dow].push(s.id)
+          }
+          weekActivityStrip = Array.from({ length: 7 }, (_, dow) => {
+            const ids = requiredByDay[dow] || []
+            const hasSlot = ids.length > 0
+            const done = hasSlot && ids.every((id) => completedIds.has(id))
+            return { hasSlot, done }
+          })
         }
 
         let nutritionAdherence: number | null = null
@@ -111,7 +138,8 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
             nutritionAdherence,
             hasNutritionGoals: hasMealPlan || hasNutritionGoals,
             weeklyAverage,
-            thisWeek
+            thisWeek,
+            weekActivityStrip,
           })
         }
       } catch (err) {
@@ -120,7 +148,8 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           nutritionAdherence: null,
           hasNutritionGoals: false,
           weeklyAverage: 0,
-          thisWeek: { completed: 0, missed: 0, total: 0 }
+          thisWeek: { completed: 0, missed: 0, total: 0 },
+          weekActivityStrip: [],
         })
       } finally {
         if (!cancelled) setLoading(false)
@@ -134,6 +163,38 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
     return (
       <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 text-center fc-text-dim">
         Loading adherence…
+      </div>
+    )
+  }
+
+  const showSetupHint =
+    adherenceData.thisWeek.total === 0 &&
+    adherenceData.nutritionAdherence == null &&
+    !adherenceData.hasNutritionGoals
+
+  if (showSetupHint) {
+    return (
+      <div className="text-center py-12 px-4 fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <BarChart3 className="w-12 h-12 mx-auto mb-4 text-[color:var(--fc-text-dim)]" />
+        <h3 className="text-lg font-semibold mb-2 fc-text-primary">No adherence data yet</h3>
+        <p className="text-sm text-[color:var(--fc-text-dim)] mb-6 max-w-md mx-auto">
+          Assign an active program and a meal plan (or nutrition goals) to track how consistently this client
+          follows their plan.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button asChild variant="outline" className="fc-btn fc-btn-secondary">
+            <Link href={`/coach/clients/${clientId}/workouts`}>
+              <Dumbbell className="w-4 h-4 mr-2" />
+              Workouts &amp; programs
+            </Link>
+          </Button>
+          <Button asChild className="fc-btn fc-btn-primary">
+            <Link href={`/coach/clients/${clientId}/meals`}>
+              <Apple className="w-4 h-4 mr-2" />
+              Meals &amp; nutrition
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -218,16 +279,20 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
       <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
         <h3 className="text-xl font-semibold fc-text-primary mb-4">7-Day Activity</h3>
         <p className="text-xs fc-text-dim mb-3">Program week — completed vs scheduled above.</p>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-2 min-w-0 overflow-x-auto">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => {
-            const isCompleted = false
+            const cell = adherenceData.weekActivityStrip[i]
+            const isCompleted = cell?.done === true
+            const noSlot = cell && !cell.hasSlot
             return (
-              <div key={i} className="text-center">
+              <div key={i} className="text-center min-w-[2.5rem]">
                 <div
                   className={`w-full aspect-square flex items-center justify-center mb-2 rounded-2xl border ${
-                    isCompleted
-                      ? 'bg-[color:var(--fc-domain-workouts)] fc-text-primary border-transparent'
-                      : 'fc-glass-soft border-[color:var(--fc-glass-border)] fc-text-subtle'
+                    noSlot
+                      ? 'opacity-30 fc-glass-soft border-[color:var(--fc-glass-border)]'
+                      : isCompleted
+                        ? 'bg-[color:var(--fc-domain-workouts)] fc-text-primary border-transparent'
+                        : 'fc-glass-soft border-[color:var(--fc-glass-border)] fc-text-subtle'
                   }`}
                 >
                   <CheckCircle className="w-5 h-5" />

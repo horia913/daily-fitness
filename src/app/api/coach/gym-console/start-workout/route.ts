@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots)
+      assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots, state.assignment ?? undefined)
     } catch (lockErr: unknown) {
       const err = lockErr as { code?: string; message?: string }
       if (err.code === 'WEEK_LOCKED') {

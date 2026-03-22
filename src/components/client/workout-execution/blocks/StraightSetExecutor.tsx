@@ -622,9 +622,12 @@ export function StraightSetExecutor({
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm fc-text-primary">
-                    Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                    {setEntry.reps_completed ?? "—"} reps
+                  <span className="text-sm fc-text-primary flex items-center gap-2 min-w-0">
+                    <CheckCircle className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden />
+                    <span>
+                      Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
+                      {setEntry.reps_completed ?? "—"} reps
+                    </span>
                   </span>
                   <div className="relative flex items-center">
                     <button
@@ -734,7 +737,7 @@ export function StraightSetExecutor({
               setViewingSetIndex((i) => Math.max(0, i - 1));
             }}
             disabled={viewingSetIndex === 0}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-95 transition-transform"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 transition-transform"
             aria-label="Previous set"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -755,7 +758,7 @@ export function StraightSetExecutor({
                 ? "Log at least one set to review previous sets"
                 : undefined
             }
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-95 transition-transform"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 transition-transform"
             aria-label={
               loggedSetsList.length === 0
                 ? "Next set (log a set first to review)"

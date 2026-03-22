@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
-import { Progress } from "@/components/ui/progress";
-import { Play, Loader2 } from "lucide-react";
+import { Play, Loader2, Dumbbell, ChevronRight } from "lucide-react";
 import { ProgramWeekState, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
@@ -57,12 +56,10 @@ export function ActiveProgramCard({
 
   useEffect(() => {
     if (!programId) return;
-    // Use cache if we already have blocks for this program
     if (cachedProgramIdRef.current === programId && cachedBlocksRef.current) {
       setTrainingBlocks(cachedBlocksRef.current);
       return;
     }
-    // Don't start a second request if one is already in flight for this programId (Strict Mode)
     if (inFlightProgramIdRef.current === programId) return;
     inFlightProgramIdRef.current = programId;
     cachedProgramIdRef.current = programId;
@@ -82,17 +79,14 @@ export function ActiveProgramCard({
     ? getCurrentBlock(trainingBlocks, currentUnlockedWeek)
     : null;
 
-  // Calculate completion percentage
   const completedDays = days.filter((d) => d.isCompleted).length;
   const totalDays = days.length;
   const completionPercent = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
 
-  // Get next workout — skip todaySlot if it's already completed
   const nextWorkout = (todaySlot && !todaySlot.isCompleted)
     ? todaySlot
     : days.find((d) => !d.isCompleted);
 
-  // Get exercise count from map if available
   const exerciseCount = nextWorkout && exerciseCounts
     ? exerciseCounts.get(nextWorkout.templateId) || 0
     : 0;
@@ -106,13 +100,15 @@ export function ActiveProgramCard({
     }
   };
 
+  const gradId = "active-program-ring-grad";
+
   return (
-    <ClientGlassCard className="p-6 mb-6 border-l-4 border-cyan-400 bg-cyan-600 text-white">
-      {/* Slightly darker cyan (600) for better contrast with white text */}
+    <ClientGlassCard
+      className="p-6 mb-6 border border-[color:var(--fc-glass-border)] shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h2 className="text-xl font-bold text-white mb-1 drop-shadow-sm">Today&apos;s Workout</h2>
-          {/* Training block badge — one line when present */}
+          <h2 className="text-xl font-bold fc-text-primary mb-1">Active program</h2>
           {blockInfo && (
             <div className="flex items-center gap-2 mb-1">
               <span
@@ -128,53 +124,82 @@ export function ActiveProgramCard({
                   : TRAINING_BLOCK_GOALS[blockInfo.block.goal]}
               </span>
               {blockInfo.block.name && (
-                <span className="text-xs text-white/80 truncate">{blockInfo.block.name}</span>
+                <span className="text-xs fc-text-dim truncate">{blockInfo.block.name}</span>
               )}
             </div>
           )}
-          <p className="text-sm text-white/80">
+          <p className="text-sm fc-text-dim">
             Week {currentUnlockedWeek} of {totalWeeks} · Day {completedDays + 1} of {totalDays}
           </p>
         </div>
       </div>
 
-      {/* Progress Ring */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative w-14 h-14 flex-shrink-0">
-          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-            <circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-            <circle cx="28" cy="28" r="23" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round"
-              strokeDasharray={`${completionPercent * 1.445} 999`} />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white">
-            {completionPercent}%
-          </span>
-        </div>
-        <div>
-          <p className="text-sm font-bold text-white">{completedDays}/{totalDays} workouts done</p>
-          <p className="text-xs text-white/60">This week&apos;s progress</p>
+      {/* Progress bar — cyan gradient */}
+      <div className="mb-4">
+        <div className="h-2.5 w-full rounded-full bg-[color:var(--fc-surface-sunken)] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-300"
+            style={{ width: `${completionPercent}%` }}
+          />
         </div>
       </div>
 
-      {/* Next Up Section */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative w-14 h-14 flex-shrink-0">
+          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+            <defs>
+              <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#06b6d4" />
+                <stop offset="100%" stopColor="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <circle cx="28" cy="28" r="23" fill="none" stroke="var(--fc-glass-border)" strokeWidth="4" />
+            <circle
+              cx="28"
+              cy="28"
+              r="23"
+              fill="none"
+              stroke={`url(#${gradId})`}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={`${completionPercent * 1.445} 999`}
+            />
+          </svg>
+        </div>
+        <div>
+          <p className="text-cyan-400 font-bold text-2xl tabular-nums">{completionPercent}%</p>
+          <p className="text-sm font-bold fc-text-primary">
+            {completedDays}/{totalDays} <span className="font-semibold fc-text-dim">workouts</span>
+          </p>
+          <p className="text-xs fc-text-dim">This week&apos;s progress</p>
+        </div>
+      </div>
+
       {!isRestDay && nextWorkout ? (
         <>
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚡</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-white/80">NEXT UP</span>
+          <div className="mb-4 flex items-center gap-3 rounded-r-lg border-l-2 border-l-cyan-500 pl-3 pr-1 py-2">
+            <div
+              className="rounded-lg bg-cyan-500/20 p-2 shrink-0"
+              aria-hidden
+            >
+              <Dumbbell className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-1 drop-shadow-sm">{nextWorkout.workoutName}</h3>
-            <p className="text-sm text-white/80">
-              {exerciseCount > 0 ? `${exerciseCount} exercises` : "Workout"} • ~{nextWorkout.estimatedDuration || 45} min
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider fc-text-dim">Up next</span>
+              </div>
+              <h3 className="text-lg font-bold fc-text-primary mb-1">{nextWorkout.workoutName}</h3>
+              <p className="text-sm fc-text-dim">
+                {exerciseCount > 0 ? `${exerciseCount} exercises` : "Workout"} • ~{nextWorkout.estimatedDuration || 45} min
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 shrink-0 text-cyan-400" aria-hidden />
           </div>
 
-          {/* Start Button — dark surface (previous card color) */}
           <button
             onClick={handleStart}
             disabled={isStarting && startingScheduleId === nextWorkout.scheduleId}
-            className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed bg-[color:var(--fc-surface-card)] border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-surface-sunken)]"
+            className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
           >
             {isStarting && startingScheduleId === nextWorkout.scheduleId ? (
               <>
@@ -191,8 +216,8 @@ export function ActiveProgramCard({
         </>
       ) : (
         <div className="text-center py-4">
-          <p className="text-base font-semibold text-white mb-1">Rest day</p>
-          <p className="text-sm text-white/80">No workout scheduled for today</p>
+          <p className="text-base font-semibold fc-text-primary mb-1">Rest day</p>
+          <p className="text-sm fc-text-dim">No workout scheduled for today</p>
         </div>
       )}
     </ClientGlassCard>

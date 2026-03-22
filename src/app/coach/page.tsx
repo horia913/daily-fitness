@@ -25,6 +25,10 @@ import {
   Trophy,
 } from "lucide-react";
 import { type MorningBriefing, type ClientAlert, sortAlertsByPriority } from "@/lib/coachDashboardService";
+import {
+  attentionCardSurfaceStyle,
+  computeClientAttentionFromSummary,
+} from "@/lib/coachClientAttention";
 function CoachDashboardContent() {
   const { user, profile } = useAuth();
   const { performanceSettings } = useTheme();
@@ -129,8 +133,12 @@ function CoachDashboardContent() {
   };
 
   const allAlerts = getAllAlerts();
-  const visibleAlerts = allAlerts.slice(0, 5);
-  const hasMoreAlerts = allAlerts.length > 5;
+  const urgentAlerts = allAlerts.filter((a) => a.severity === "high");
+  const warningAlerts = allAlerts.filter((a) => a.severity === "medium");
+  const infoAlerts = allAlerts.filter((a) => a.severity === "low");
+  const orderedAlerts = [...urgentAlerts, ...warningAlerts, ...infoAlerts];
+  const visibleAlerts = orderedAlerts.slice(0, 5);
+  const hasMoreAlerts = orderedAlerts.length > 5;
 
   // Filter and sort client summaries
   const filteredAndSortedClients = briefing?.clientSummaries
@@ -246,7 +254,7 @@ function CoachDashboardContent() {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fc-surface rounded-xl p-4 text-center" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 8%, transparent)" }}>
-                    <div className="text-2xl font-bold fc-text-primary">
+                    <div className="text-2xl font-bold text-cyan-400 tabular-nums">
                       {briefing.clientsTrainedToday} / {briefing.activeClients}
                     </div>
                     <div className="text-xs fc-text-dim mt-0.5 flex items-center justify-center gap-1">
@@ -255,7 +263,7 @@ function CoachDashboardContent() {
                     </div>
                   </div>
                   <div className="fc-surface rounded-xl p-4 text-center" style={{ background: "color-mix(in srgb, var(--fc-domain-meals) 8%, transparent)" }}>
-                    <div className="text-2xl font-bold fc-text-primary">
+                    <div className="text-2xl font-bold text-cyan-400 tabular-nums">
                       {briefing.clientsCheckedInToday} / {briefing.activeClients}
                     </div>
                     <div className="text-xs fc-text-dim mt-0.5 flex items-center justify-center gap-1">
@@ -264,7 +272,7 @@ function CoachDashboardContent() {
                     </div>
                   </div>
                   <div className="fc-surface rounded-xl p-4 text-center" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 8%, transparent)" }}>
-                    <div className="text-2xl font-bold fc-text-primary">
+                    <div className="text-2xl font-bold text-cyan-400 tabular-nums">
                       {programCompliance != null ? `${programCompliance}%` : "—"}
                     </div>
                     <div className="text-xs fc-text-dim mt-0.5 flex items-center justify-center gap-1">
@@ -273,7 +281,7 @@ function CoachDashboardContent() {
                     </div>
                   </div>
                   <div className="fc-surface rounded-xl p-4 text-center" style={{ background: "color-mix(in srgb, var(--fc-accent-cyan) 8%, transparent)" }}>
-                    <div className="text-2xl font-bold fc-text-primary">
+                    <div className="text-2xl font-bold text-cyan-400 tabular-nums">
                       {briefing.activeClients} / {briefing.totalClients}
                     </div>
                     <div className="text-xs fc-text-dim mt-0.5 flex items-center justify-center gap-1">
@@ -335,29 +343,23 @@ function CoachDashboardContent() {
                         return "low";
                       };
                       const severity = getAlertSeverity();
-                      const borderClass =
+                      const attentionWrap =
                         severity === "high"
-                          ? "border-l-4 border-red-500"
+                          ? "fc-attention-urgent"
                           : severity === "medium"
-                            ? "border-l-4 border-amber-500"
-                            : "border-l-4 border-blue-500";
-                      const bgClass =
-                        severity === "high"
-                          ? "bg-red-50/50 dark:bg-red-900/10"
-                          : severity === "medium"
-                            ? "bg-amber-50/50 dark:bg-amber-900/10"
-                            : "bg-blue-50/50 dark:bg-blue-900/10";
+                            ? "fc-attention-warning"
+                            : "fc-attention-info";
                       const iconColorClass =
                         severity === "high"
-                          ? "text-red-500 dark:text-red-400"
+                          ? "fc-text-error"
                           : severity === "medium"
-                            ? "text-amber-500 dark:text-amber-400"
-                            : "text-blue-500 dark:text-blue-400";
+                            ? "fc-text-warning"
+                            : "fc-text-info";
 
                       return (
                         <Link key={`${alert.clientId}-${idx}`} href={`/coach/clients/${alert.clientId}`}>
                           <div
-                            className={`fc-surface rounded-xl p-4 flex items-center gap-3 transition-all hover:translate-y-[-1px] cursor-pointer ${borderClass} ${bgClass}`}
+                            className={`fc-surface rounded-xl p-4 flex items-center gap-3 transition-all hover:translate-y-[-1px] cursor-pointer ${attentionWrap}`}
                           >
                             <div className={`w-9 h-9 rounded-lg flex items-center justify-center fc-surface-elevated ${iconColorClass}`}>
                               {getAlertIcon()}
@@ -366,14 +368,14 @@ function CoachDashboardContent() {
                               <div className="text-sm font-medium fc-text-primary">{alert.clientName}</div>
                               <p className="text-xs fc-text-dim">{alert.detail}</p>
                             </div>
-                            <ChevronRight className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+                            <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                           </div>
                         </Link>
                       );
                     })}
                     {hasMoreAlerts && (
-                      <Link href="/coach/clients" className="block text-center text-xs fc-text-dim hover:fc-text-primary transition-colors mt-2">
-                        See all {allAlerts.length} alerts →
+                      <Link href="/coach/clients" className="block text-center text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors mt-2">
+                        See all {orderedAlerts.length} alerts →
                       </Link>
                     )}
                   </div>
@@ -422,9 +424,28 @@ function CoachDashboardContent() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {filteredAndSortedClients.map((client) => (
-                      <Link key={client.clientId} href={`/coach/clients/${client.clientId}`}>
-                        <div className="fc-surface rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] cursor-pointer">
+                    {filteredAndSortedClients.map((client) => {
+                      const dashAttention = computeClientAttentionFromSummary(client);
+                      const workoutAgo = client.lastWorkoutDate
+                        ? formatDaysAgo(client.lastWorkoutDate)
+                        : null;
+                      const checkinAgo = client.lastCheckinDate
+                        ? formatDaysAgo(client.lastCheckinDate)
+                        : null;
+                      const sameTouchDay =
+                        !!client.lastWorkoutDate &&
+                        !!client.lastCheckinDate &&
+                        client.lastWorkoutDate.slice(0, 10) === client.lastCheckinDate.slice(0, 10);
+                      return (
+                      <Link
+                        key={client.clientId}
+                        href={`/coach/clients/${client.clientId}`}
+                        className="block w-full rounded-2xl border-0 outline-none no-underline text-inherit focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)]"
+                      >
+                        <div
+                          className="rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] cursor-pointer backdrop-blur-md"
+                          style={attentionCardSurfaceStyle(dashAttention.level)}
+                        >
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm fc-text-primary flex-shrink-0"
                             style={{
@@ -449,15 +470,41 @@ function CoachDashboardContent() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 text-xs fc-text-dim">
+                            {dashAttention.reasons.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
+                                {dashAttention.level === "urgent" && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
+                                    Urgent
+                                  </span>
+                                )}
+                                {dashAttention.level === "warning" && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                    Review
+                                  </span>
+                                )}
+                                <span className="text-[10px] fc-text-dim leading-tight truncate">
+                                  {dashAttention.reasons.slice(0, 2).join(" · ")}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 text-xs fc-text-dim flex-wrap">
                               {client.checkinStreak > 0 && (
                                 <span className="flex items-center gap-1">
                                   <Flame className="w-3 h-3" />
                                   {client.checkinStreak}
                                 </span>
                               )}
-                              {client.lastWorkoutDate && (
-                                <span>Last workout: {formatDaysAgo(client.lastWorkoutDate)}</span>
+                              {sameTouchDay && workoutAgo ? (
+                                <span>Last activity: {workoutAgo}</span>
+                              ) : (
+                                <>
+                                  {client.lastWorkoutDate && (
+                                    <span>Workout: {workoutAgo}</span>
+                                  )}
+                                  {client.lastCheckinDate && (
+                                    <span>Check-in: {checkinAgo}</span>
+                                  )}
+                                </>
                               )}
                               {/* Wellness indicators */}
                               {client.latestStress != null && (
@@ -476,10 +523,11 @@ function CoachDashboardContent() {
                               )}
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                         </div>
                       </Link>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </section>

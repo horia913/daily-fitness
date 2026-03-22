@@ -3,8 +3,10 @@
 import React from "react";
 import { AppCard } from "@/components/ui/AppCard";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Copy, UserPlus, Eye, FileText } from "lucide-react";
+import { Edit, Trash2, Copy, UserPlus, Eye, Dumbbell } from "lucide-react";
 import { WorkoutTemplate } from "@/lib/workoutTemplateService";
+import { getCategoryAccent } from "@/lib/workoutCategoryColors";
+import { cn } from "@/lib/utils";
 
 interface WorkoutTemplateCardProps {
   template: WorkoutTemplate;
@@ -59,6 +61,7 @@ export default function WorkoutTemplateCard({
   onAssign,
 }: WorkoutTemplateCardProps) {
   const primaryCategory = getPrimaryCategory(template);
+  const accent = getCategoryAccent(primaryCategory);
   const exerciseCount =
     template.exercise_count ??
     (Array.isArray(template.exercises) ? template.exercises.length : 0);
@@ -80,9 +83,13 @@ export default function WorkoutTemplateCard({
   return (
     <AppCard
       variant="coach"
-      accentColor="var(--fc-domain-workouts)"
+      className={cn("border-l-2", accent.border)}
       eyebrow={eyebrow}
-      eyebrowIcon={<FileText className="w-4 h-4" />}
+      eyebrowIcon={
+        <span className={cn("rounded-lg p-2", accent.iconBg)}>
+          <Dumbbell className={cn("w-4 h-4", accent.text)} />
+        </span>
+      }
       title={template.name}
       subtitle={subtitlePills}
       onClick={onOpenDetails}

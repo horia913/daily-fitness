@@ -1140,6 +1140,8 @@ export async function POST(req: NextRequest) {
               previous_value:
                 storedPRResults[0].prResult.pr?.previous_record_value ?? null,
               unit: storedPRResults[0].prResult.pr?.record_unit ?? 'kg',
+              weight_kg: primaryWeight,
+              reps: primaryReps,
             }
           : null,
       new_achievements: newAchievements,

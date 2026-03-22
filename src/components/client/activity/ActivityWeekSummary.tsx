@@ -69,11 +69,13 @@ export function ActivityWeekSummary({
             <div className="flex items-center gap-4 mb-2 pb-2 border-b border-[color:var(--fc-glass-border)]">
               <span className="text-xs fc-text-dim flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
-                {activities.length} activit{activities.length === 1 ? "y" : "ies"}
+                <span className="text-cyan-400 font-bold tabular-nums">{activities.length}</span>
+                <span>activit{activities.length === 1 ? "y" : "ies"}</span>
               </span>
               <span className="text-xs fc-text-dim flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {totalDuration} min total
+                <span className="font-bold fc-text-primary tabular-nums">{totalDuration}</span>
+                <span>min total</span>
               </span>
             </div>
           )}

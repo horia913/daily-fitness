@@ -342,7 +342,7 @@ export default function ClientCheckInsPage() {
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
                           <BarChart3 className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <p className="font-semibold fc-text-primary text-sm">Body Metrics</p>
+                        <p className="font-semibold fc-text-primary text-sm">Body Metrics History</p>
                         <p className="text-xs fc-text-dim">Trends &amp; charts</p>
                       </ClientGlassCard>
                     </Link>
@@ -360,7 +360,7 @@ export default function ClientCheckInsPage() {
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
                           <Activity className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <p className="font-semibold fc-text-primary text-sm">Mobility</p>
+                        <p className="font-semibold fc-text-primary text-sm">Mobility Assessments</p>
                         <p className="text-xs fc-text-dim">Flexibility &amp; ROM</p>
                       </ClientGlassCard>
                     </Link>
@@ -373,7 +373,7 @@ export default function ClientCheckInsPage() {
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}>
                           <Scale className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
                         </div>
-                        <p className="font-semibold fc-text-primary text-sm">Quick Weight</p>
+                        <p className="font-semibold fc-text-primary text-sm">Quick Weight Log</p>
                         <p className="text-xs fc-text-dim">Log without check-in</p>
                       </ClientGlassCard>
                     </button>

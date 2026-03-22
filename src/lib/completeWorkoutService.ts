@@ -249,7 +249,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     // 6-pre. Get program_id, slots, and completions for week lock check + progression
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
-      .select('program_id')
+      .select('program_id, progression_mode, coach_unlocked_week')
       .eq('id', programAssignmentId)
       .single()
 
@@ -266,7 +266,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       const targetSlot = allSlots.find(s => s.id === programScheduleId)
       if (targetSlot) {
         try {
-          assertWeekUnlocked(targetSlot.week_number, allSlots, completedSlots)
+          assertWeekUnlocked(targetSlot.week_number, allSlots, completedSlots, assignment)
         } catch (lockErr: any) {
           if (lockErr.code === 'WEEK_LOCKED') {
             console.warn('[completeWorkoutService] Week lock rejected completion:', lockErr.message)

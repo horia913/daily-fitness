@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { PrefetchService } from '@/lib/prefetch'
 import { isPrefetchDisabled } from '@/lib/featureFlags'
 import { isLiveWorkoutRoute } from '@/lib/workoutMode'
+import { resolvePrefetchUserRole } from '@/lib/prefetchRole'
 import { usePathname } from 'next/navigation'
 
 interface PrefetchProviderProps {
@@ -12,7 +13,7 @@ interface PrefetchProviderProps {
 }
 
 export function PrefetchProvider({ children }: PrefetchProviderProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const pathname = usePathname()
   const prefetchedRoutes = useRef(new Set<string>())
 
@@ -21,7 +22,7 @@ export function PrefetchProvider({ children }: PrefetchProviderProps) {
     if (isPrefetchDisabled) return
     if (!user) return
 
-    const userRole = user.user_metadata?.role || 'client'
+    const userRole = resolvePrefetchUserRole(pathname, profile, user)
     const routeKey = `${userRole}_${pathname}`
 
     // Skip if we've already prefetched this route
@@ -52,7 +53,7 @@ export function PrefetchProvider({ children }: PrefetchProviderProps) {
       // Fallback for browsers without requestIdleCallback
       setTimeout(prefetchData, 100)
     }
-  }, [user, pathname])
+  }, [user, profile, pathname])
 
   // Pre-fetch data for client routes
   const prefetchClientRoutes = async (userId: string, pathname: string) => {
@@ -105,14 +106,14 @@ export function PrefetchProvider({ children }: PrefetchProviderProps) {
 
 // Hook for manual prefetching
 export function usePrefetch() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   const prefetchRoute = async (route: string) => {
     if (isLiveWorkoutRoute(route)) return
     if (isPrefetchDisabled) return
     if (!user) return
 
-    const userRole = user.user_metadata?.role || 'client'
+    const userRole = resolvePrefetchUserRole(route, profile, user)
     
     if (userRole === 'client') {
       await prefetchClientRoutes(user.id, route)

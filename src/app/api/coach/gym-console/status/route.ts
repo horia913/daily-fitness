@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
         sessionId: string
         workoutLogId: string
         workoutAssignmentId: string
+        templateName: string | null
+        setsLogged: number
         startedAt: string
         currentBlock: number
         currentExercise: string
@@ -128,6 +130,8 @@ export async function POST(request: NextRequest) {
           sessionId: session.session_id,
           workoutLogId: session.workout_log_id ?? '',
           workoutAssignmentId: session.workout_assignment_id ?? '',
+          templateName: session.template_name ?? null,
+          setsLogged: session.sets_logged ?? 0,
           startedAt: session.started_at,
           currentBlock: 0,
           currentExercise: '—',

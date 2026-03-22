@@ -251,7 +251,7 @@ export class DatabaseService {
       await ensureAuthenticated()
       
       const { data, error } = await supabase
-        .from('workouts')
+        .from('workout_templates')
         .select('*')
         .eq('coach_id', coachId)
         .order('created_at', { ascending: false })
@@ -399,7 +399,7 @@ export class DatabaseService {
           .eq('coach_id', coachId)
           .eq('status', 'active'),
         supabase
-          .from('workouts')
+          .from('workout_templates')
           .select('id', { count: 'exact' })
           .eq('coach_id', coachId)
       ])

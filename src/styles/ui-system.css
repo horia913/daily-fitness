@@ -24,6 +24,8 @@
   --fc-status-success: #059669;
   --fc-status-warning: #d97706;
   --fc-status-error: #dc2626;
+  --fc-status-info: #2563eb;
+  --fc-status-inactive: #6b7280;
 
   --fc-domain-workouts: #0284c7;
   --fc-domain-meals: #16a34a;
@@ -109,6 +111,8 @@
   --fc-status-success: #10b981;
   --fc-status-warning: #fbbf24;
   --fc-status-error: #ef4444;
+  --fc-status-info: #3b82f6;
+  --fc-status-inactive: #9ca3af;
 
   --fc-domain-workouts: #38bdf8;
   --fc-domain-meals: #4ade80;
@@ -283,9 +287,18 @@
 }
 
 .fc-btn-primary {
-  background: var(--fc-accent-cyan);
-  color: #000000;
-  box-shadow: var(--fc-glow-cyan);
+  background: linear-gradient(90deg, #0891b2 0%, #22d3ee 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow:
+    0 10px 15px -3px rgba(6, 182, 212, 0.25),
+    0 4px 6px -4px rgba(6, 182, 212, 0.15);
+}
+
+.fc-btn-primary:hover {
+  box-shadow:
+    0 10px 15px -3px rgba(6, 182, 212, 0.4),
+    0 4px 6px -4px rgba(6, 182, 212, 0.2);
 }
 
 .fc-btn-secondary {
@@ -495,6 +508,55 @@
 
 .fc-text-error {
   color: var(--fc-status-error);
+}
+
+.fc-text-info {
+  color: var(--fc-status-info);
+}
+
+.fc-text-inactive {
+  color: var(--fc-status-inactive);
+}
+
+/* Coach attention: subtle full-card tint only (no left stripe) */
+.fc-attention-urgent {
+  background: color-mix(in srgb, var(--fc-status-error) 8%, transparent);
+}
+
+.fc-attention-warning {
+  background: color-mix(in srgb, var(--fc-status-warning) 8%, transparent);
+}
+
+.fc-attention-good {
+  background: color-mix(in srgb, var(--fc-status-success) 5%, transparent);
+}
+
+.fc-attention-info {
+  background: color-mix(in srgb, var(--fc-status-info) 8%, transparent);
+}
+
+.dark .fc-attention-info {
+  background: color-mix(in srgb, var(--fc-status-info) 12%, transparent);
+}
+
+.fc-attention-inactive {
+  background: color-mix(in srgb, var(--fc-status-inactive) 6%, transparent);
+}
+
+.dark .fc-attention-urgent {
+  background: color-mix(in srgb, var(--fc-status-error) 12%, transparent);
+}
+
+.dark .fc-attention-warning {
+  background: color-mix(in srgb, var(--fc-status-warning) 12%, transparent);
+}
+
+.dark .fc-attention-good {
+  background: color-mix(in srgb, var(--fc-status-success) 8%, transparent);
+}
+
+.dark .fc-attention-inactive {
+  background: color-mix(in srgb, var(--fc-status-inactive) 10%, transparent);
 }
 
 .fc-pill {

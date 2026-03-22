@@ -66,8 +66,7 @@ function isSegmentActive(pathname: string, item: NavItem): boolean {
            pathname.startsWith("/client/progress") ||
            pathname.startsWith("/client/goals") ||
            pathname.startsWith("/client/habits") ||
-           pathname.startsWith("/client/challenges") ||
-           pathname.startsWith("/client/clipcards");
+           pathname.startsWith("/client/challenges");
   }
   
   // Default: exact match or starts with href + "/"
@@ -139,14 +138,22 @@ export default function BottomNav() {
               <div className="relative z-10">
                 <Icon
                   className={`w-5 h-5 transition-colors duration-200 ${
-                    isActive ? "fc-text-primary" : "fc-text-dim"
+                    isActive
+                      ? "text-cyan-400"
+                      : pathname.startsWith("/coach")
+                        ? "text-gray-500"
+                        : "fc-text-dim"
                   }`}
                 />
               </div>
 
               <span
                 className={`text-[10px] font-semibold leading-none relative z-10 transition-colors duration-200 ${
-                  isActive ? "fc-text-primary" : "fc-text-dim"
+                  isActive
+                    ? "text-cyan-400"
+                    : pathname.startsWith("/coach")
+                      ? "text-gray-500"
+                      : "fc-text-dim"
                 }`}
               >
                 {item.label}

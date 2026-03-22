@@ -64,10 +64,10 @@ const NAV_CARDS: NavCard[] = [
     description: "Join fitness challenges",
   },
   {
-    href: "/client/clipcards",
-    title: "Training Pass",
+    href: "/client/profile",
+    title: "Subscription",
     icon: CreditCard,
-    description: "Manage your training passes",
+    description: "Your coaching plan on Profile",
   },
 ];
 

@@ -36,9 +36,11 @@ import {
   Shield,
   Sparkles,
   Eye,
-  Settings
+  Settings,
+  UserPlus,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import AdherenceTrendChart, { type TrendData } from '@/components/coach/AdherenceTrendChart'
 
@@ -754,15 +756,48 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
 
           {filteredClients.length === 0 && (
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="text-center py-6 sm:py-12 p-3 sm:p-6">
-                <Users className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-2 sm:mb-4" />
-                <h3 className="text-lg font-medium text-[color:var(--fc-text-primary)] mb-2">No clients found</h3>
-                <p className="text-[color:var(--fc-text-dim)] mb-2 sm:mb-4">
-                  {selectedClient !== 'all'
-                    ? 'Try selecting a different client or period'
-                    : 'No clients are currently assigned to you'
-                  }
+              <CardContent className="text-center py-12 px-4 sm:px-6">
+                <Users className="w-12 h-12 mx-auto mb-4 text-[color:var(--fc-text-dim)]" />
+                <h3 className="text-lg font-semibold mb-2 text-[color:var(--fc-text-primary)]">
+                  {searchQuery.trim()
+                    ? 'No clients match your search'
+                    : selectedClient !== 'all'
+                      ? 'No clients match your filters'
+                      : 'No clients yet'}
+                </h3>
+                <p className="text-sm text-[color:var(--fc-text-dim)] mb-4 max-w-md mx-auto">
+                  {searchQuery.trim()
+                    ? 'Try another name or clear the search to see your full roster.'
+                    : selectedClient !== 'all'
+                      ? 'Try a different client or time period, or clear filters to see everyone.'
+                      : 'Add clients to your roster to track adherence, workouts, and nutrition in one place.'}
                 </p>
+                {searchQuery.trim() ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="fc-btn fc-btn-secondary"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    Clear search
+                  </Button>
+                ) : selectedClient !== 'all' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="fc-btn fc-btn-secondary"
+                    onClick={() => setSelectedClient('all')}
+                  >
+                    Show all clients
+                  </Button>
+                ) : (
+                  <Button asChild className="fc-btn fc-btn-primary">
+                    <Link href="/coach/clients/add">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add your first client
+                    </Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

@@ -157,11 +157,14 @@ export function WorkoutDayPreview({
   const canStart = scheduleId && status !== "rest" && status !== "completed";
   const isStartingThis = isStarting && startingScheduleId === scheduleId;
 
+  /** Solid surface so content stays readable over the page gradient (avoid heavy /50 glass fills). */
   const cardClass = cn(
     "rounded-xl overflow-hidden transition-colors",
-    status === "completed" && "bg-green-50/50 dark:bg-green-900/10",
-    status === "missed" && "bg-amber-50/50 dark:bg-amber-900/10",
-    status === "upcoming" && "opacity-90",
+    "bg-[color:var(--fc-glass-base)] backdrop-blur-none shadow-lg",
+    (status === "today" || status === "upcoming") && "border-l-2 border-cyan-500",
+    status === "completed" && "border-l-4 border-emerald-500/80",
+    status === "missed" && "border-l-4 border-amber-500/80",
+    status === "upcoming" && "ring-1 ring-white/5",
     status === "rest" && "bg-[color:var(--fc-surface-sunken)]"
   );
 
@@ -311,8 +314,8 @@ export function WorkoutDayPreview({
           <Button
             onClick={() => scheduleId && onStartWorkout(scheduleId)}
             disabled={isStartingThis}
-            className="w-full h-12 rounded-xl font-bold"
-            style={{ background: "var(--fc-accent-cyan)" }}
+            variant="fc-primary"
+            className="w-full h-12 rounded-xl font-bold uppercase tracking-wider shadow-lg shadow-cyan-500/25"
           >
             {isStartingThis ? (
               <>

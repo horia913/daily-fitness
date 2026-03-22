@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Activity,
@@ -19,11 +19,14 @@ import {
   ImageIcon,
 } from 'lucide-react'
 import { getClientAnalytics, type ClientAnalyticsData } from '@/lib/clientAnalyticsService'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { WellnessTrendsCard } from '@/components/client/WellnessTrendsCard'
 import type { DailyWellnessLog } from '@/lib/wellnessService'
 
 interface ClientAnalyticsViewProps {
   clientId: string
+  /** Optional actions shown at the top of the trends section (e.g. report / export). */
+  toolbar?: React.ReactNode
 }
 
 function getWeekStartMonday(): string {
@@ -35,7 +38,7 @@ function getWeekStartMonday(): string {
   return monday.toISOString().split('T')[0]
 }
 
-export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewProps) {
+export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyticsViewProps) {
   const [data, setData] = useState<ClientAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,24 +97,30 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
 
   if (error || !data) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
-        <p className="fc-text-subtle">{error ?? 'No data available.'}</p>
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8">
+        <EmptyState
+          icon={BarChart3}
+          title={error ? 'Could not load analytics' : 'No analytics yet'}
+          description={
+            error
+              ? error
+              : 'As this client logs workouts, check-ins, and meals, charts and trends will appear here.'
+          }
+          actionHref={`/coach/clients/${clientId}/progress`}
+          actionLabel="View progress"
+        />
       </div>
     )
   }
 
   const { overview, goals, workout, body, wellness, photos, nutrition, habits } = data
-  const adherenceColor =
-    overview.overallAdherencePct == null
-      ? 'fc-text-dim'
-      : overview.overallAdherencePct >= 80
-        ? 'text-[color:var(--fc-status-success)]'
-        : overview.overallAdherencePct >= 60
-          ? 'text-amber-500'
-          : 'text-[color:var(--fc-status-error)]'
-
   return (
     <div className="space-y-8">
+      {toolbar && (
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:justify-end">
+          {toolbar}
+        </div>
+      )}
       {/* SECTION 1: Overview Summary Cards */}
       <section>
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Overview</h2>
@@ -121,7 +130,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Target className="w-5 h-5" />
             </div>
-            <p className={`text-2xl font-bold leading-tight ${adherenceColor}`}>
+            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
               {overview.overallAdherencePct != null ? `${overview.overallAdherencePct}%` : '—'}
             </p>
             <p className="text-xs fc-text-dim">Overall Adherence</p>
@@ -132,7 +141,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Dumbbell className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold fc-text-primary leading-tight">
+            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
               {overview.trainingVolumeThisWeek >= 1000
                 ? `${(overview.trainingVolumeThisWeek / 1000).toFixed(1)}k`
                 : overview.trainingVolumeThisWeek}
@@ -153,7 +162,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Flame className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold fc-text-primary leading-tight">{overview.checkinStreak}</p>
+            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">{overview.checkinStreak}</p>
             <p className="text-xs fc-text-dim">Check-in streak</p>
             <p className="text-xs fc-text-subtle mt-1">Best: {overview.bestStreak}</p>
           </div>
@@ -179,7 +188,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
                 </p>
                 <div className="mt-2 h-1.5 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[color:var(--fc-accent)]"
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
                     style={{ width: `${overview.programProgress.pct}%` }}
                   />
                 </div>
@@ -195,7 +204,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Calendar className="w-5 h-5" />
             </div>
-            <p className="text-2xl font-bold fc-text-primary leading-tight">
+            <p className="text-2xl font-bold text-cyan-400 tabular-nums leading-tight">
               {overview.daysActiveLast30} <span className="text-sm font-normal fc-text-dim">/ {overview.totalDays30}</span>
             </p>
             <p className="text-xs fc-text-dim">Days active (30d)</p>
@@ -211,13 +220,13 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
             <h3 className="text-base font-medium fc-text-primary mb-3">Workout adherence (this week)</h3>
             {workout.scheduledThisWeek > 0 ? (
               <>
-                <p className="text-2xl font-bold fc-text-primary">
+                <p className="text-2xl font-bold text-cyan-400 tabular-nums">
                   {workout.completedThisWeek} / {workout.scheduledThisWeek} completed
                   {workout.programAdherenceThisWeek != null && ` (${workout.programAdherenceThisWeek}%)`}
                 </p>
                 <div className="mt-2 h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[color:var(--fc-status-success)]"
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
                     style={{
                       width: `${workout.programAdherenceThisWeek ?? 0}%`,
                     }}
@@ -239,7 +248,7 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
                     <div key={w.weekStart} className="flex-1 flex flex-col items-center gap-1">
                       <div className="w-full fc-progress-track rounded-t relative flex-1 min-h-[40px] overflow-hidden">
                         <div
-                          className="absolute bottom-0 w-full fc-progress-fill transition-all"
+                          className="absolute bottom-0 w-full rounded-t bg-gradient-to-t from-cyan-500 to-cyan-400 transition-all"
                           style={{ height: `${pct}%` }}
                         />
                       </div>
@@ -266,13 +275,26 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
               <div>
                 <h3 className="text-base font-medium fc-text-primary mb-3">Weight</h3>
                 <div className="flex items-end gap-1 h-24">
-                  {body.measurements.slice(0, 12).reverse().map((m) => (
-                    <div key={m.id} className="flex-1 flex flex-col items-center gap-1">
+                  {(() => {
+                    const slice = body.measurements.slice(0, 12).reverse();
+                    const ws = slice
+                      .map((m) => m.weight_kg)
+                      .filter((w): w is number => w != null && !Number.isNaN(w));
+                    const wMin = ws.length ? Math.min(...ws) : 0;
+                    const wMax = ws.length ? Math.max(...ws) : 1;
+                    const span = Math.max(wMax - wMin, 1e-6);
+                    return slice.map((m) => {
+                      const h =
+                        m.weight_kg != null
+                          ? Math.min(100, Math.max(4, ((m.weight_kg - wMin) / span) * 100))
+                          : 4;
+                      return (
+                    <div key={m.id} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                       <div className="w-full fc-progress-track rounded-t relative flex-1 min-h-[32px] overflow-hidden">
                         <div
-                          className="absolute bottom-0 w-full bg-[color:var(--fc-accent)]/70"
+                          className="absolute bottom-0 w-full rounded-t bg-cyan-500/85"
                           style={{
-                            height: `${Math.min(100, ((m.weight_kg ?? 0) / 150) * 100)}%`,
+                            height: `${h}%`,
                           }}
                         />
                       </div>
@@ -280,7 +302,9 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
                         {new Date(m.measured_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
                 {body.firstMeasurement && body.measurements[0] && (
                   <p className="text-sm fc-text-subtle mt-2">
@@ -309,9 +333,20 @@ export default function ClientAnalyticsView({ clientId }: ClientAnalyticsViewPro
                 {photos.slice(0, 10).map((p) => (
                   <div
                     key={p.date}
-                    className="flex-shrink-0 w-24 h-24 rounded-xl bg-[color:var(--fc-glass-highlight)] flex items-center justify-center border border-[color:var(--fc-glass-border)]"
+                    className="flex-shrink-0 w-24 h-24 rounded-xl bg-[color:var(--fc-glass-highlight)] overflow-hidden border border-[color:var(--fc-glass-border)] relative"
                   >
-                    <ImageIcon className="w-8 h-8 fc-text-dim" />
+                    {p.previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.previewUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 fc-text-dim" />
+                      </div>
+                    )}
                     <span className="sr-only">{p.date}</span>
                   </div>
                 ))}

@@ -10,7 +10,7 @@ import type { BodyMeasurement } from "./measurementService";
 import { getLogRange, getCheckinStreak, getBestStreak } from "./wellnessService";
 import type { DailyWellnessLog } from "./wellnessService";
 import { getWeeklyVolume } from "./volumeAnalytics";
-import { getPhotoTimeline } from "./progressPhotoService";
+import { getPhotoTimelineWithPreviews } from "./progressPhotoService";
 import { getClientCheckInConfig } from "./checkInConfigService";
 import { getPeriodBounds } from "./metrics/period";
 import { getNutritionCompliance } from "./metrics/nutrition";
@@ -67,7 +67,7 @@ export interface ClientAnalyticsData {
     logs: DailyWellnessLog[];
     weeklyAverages: Array<{ weekStart: string; sleep: number; stress: number; soreness: number }>;
   };
-  photos: { date: string; types: string[]; weight_kg?: number | null }[];
+  photos: { date: string; types: string[]; weight_kg?: number | null; previewUrl?: string | null }[];
   nutrition: {
     hasGoalsOrPlan: boolean;
     adherencePct: number | null;
@@ -102,7 +102,7 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
     getFirstMeasurement(clientId),
     getLogRange(clientId, NINETY_DAYS_AGO_STR, TODAY),
     getWeeklyVolume(clientId, 12),
-    getPhotoTimeline(clientId),
+    getPhotoTimelineWithPreviews(clientId, 12),
     getCheckinStreak(clientId),
     getBestStreak(clientId),
     getClientCheckInConfig(clientId),
@@ -131,6 +131,7 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
   let programAdherenceThisWeek: number | null = null;
   let scheduledThisWeek = 0;
   let completedThisWeek = 0;
+  let programAdherencePriorWeek: number | null = null;
 
   if (assignment?.id) {
     const [{ data: progress }, { data: schedule }, { data: completions }] = await Promise.all([
@@ -147,6 +148,16 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
     const slotIds = new Set(requiredSlotsThisWeek.map((s: { id: string }) => s.id));
     completedThisWeek = (completions ?? []).filter((c: { program_schedule_id: string }) => slotIds.has(c.program_schedule_id)).length;
     programAdherenceThisWeek = scheduledThisWeek > 0 ? Math.round((completedThisWeek / scheduledThisWeek) * 100) : null;
+
+    if (weekNum > 1) {
+      const prevWeek = weekNum - 1;
+      const slotsPrev = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === prevWeek);
+      const requiredPrev = slotsPrev.filter((s: { is_optional?: boolean }) => !s.is_optional);
+      const prevIds = new Set(requiredPrev.map((s: { id: string }) => s.id));
+      const donePrev = (completions ?? []).filter((c: { program_schedule_id: string }) => prevIds.has(c.program_schedule_id)).length;
+      programAdherencePriorWeek =
+        requiredPrev.length > 0 ? Math.round((donePrev / requiredPrev.length) * 100) : null;
+    }
   }
 
   const hasMealPlan = (mealPlanRes.data?.length ?? 0) > 0;
@@ -291,10 +302,20 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
   const currentWeekVol = vol.length > 0 ? vol[vol.length - 1].totalVolume : 0;
   const previousWeekVol = vol.length > 1 ? vol[vol.length - 2].totalVolume : 0;
 
+  let overallAdherenceTrend: "up" | "down" | "same" = "same";
+  if (
+    programAdherenceThisWeek != null &&
+    programAdherencePriorWeek != null
+  ) {
+    const d = programAdherenceThisWeek - programAdherencePriorWeek;
+    if (d >= 5) overallAdherenceTrend = "up";
+    else if (d <= -5) overallAdherenceTrend = "down";
+  }
+
   return {
     overview: {
       overallAdherencePct,
-      overallAdherenceTrend: "same",
+      overallAdherenceTrend,
       trainingVolumeThisWeek: currentWeekVol,
       trainingVolumeLastWeek: previousWeekVol,
       trainingVolumeTrend: currentWeekVol > previousWeekVol ? "up" : currentWeekVol < previousWeekVol ? "down" : "same",

@@ -433,7 +433,9 @@ export async function getCurrentWeekProgressionRules(
       .select('reps, sets, weight_kg')
       .eq('program_assignment_id', assignmentId)
       .eq('week_number', currentWeek)
-      .eq('exercise_id', exerciseId)
+      .or(
+        `exercise_id.eq.${exerciseId},override_exercise_id.eq.${exerciseId}`
+      )
       .maybeSingle();
 
     if (error || !rules) return null;

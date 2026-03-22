@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
     // STEP 2b: WEEK LOCK — reject if the chosen slot is in a locked week
     // ========================================================================
     try {
-      assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots)
+      assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots, state.assignment ?? undefined)
       console.log('[start-from-progress] STEP 2b — week lock OK, week', chosenSlot.week_number, 'is unlocked')
     } catch (lockErr: any) {
       if (lockErr.code === 'WEEK_LOCKED') {

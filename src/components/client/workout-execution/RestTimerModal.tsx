@@ -145,7 +145,7 @@ export function RestTimerModal({
             <div className="absolute left-5 top-0 h-full w-[1px] bg-white/5" aria-hidden />
             <div className="flex items-start justify-between gap-4 relative z-10">
               <div>
-                <div className="flex items-center gap-2 text-[color:var(--fc-accent)] mb-1">
+                <div className="flex items-center gap-2 text-cyan-400 mb-1">
                   <span className="text-lg font-semibold tracking-tight">
                     Set {lastSet.setNumber} of {lastSet.totalSets} completed
                   </span>
@@ -196,7 +196,7 @@ export function RestTimerModal({
                 cy="100"
                 r="90"
                 fill="none"
-                stroke="var(--fc-domain-workouts, #3B82F6)"
+                stroke="#06b6d4"
                 strokeWidth="6"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
@@ -206,7 +206,7 @@ export function RestTimerModal({
             </svg>
             <div className="absolute inset-6 rounded-full border border-white/5 bg-[length:20px_20px]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)" }} aria-hidden />
             <div className="relative z-10 text-center">
-              <span className="text-4xl sm:text-5xl font-bold font-mono tracking-tighter fc-text-primary tabular-nums">
+              <span className="text-4xl sm:text-5xl font-bold font-mono tracking-tighter text-cyan-400 tabular-nums">
                 {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
               </span>
               <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">Next: {nextLabel}</p>

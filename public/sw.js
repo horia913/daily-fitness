@@ -1,7 +1,8 @@
 // Service Worker for DailyFitness PWA
 // Handles push notifications and offline functionality
 
-const CACHE_NAME = 'dailyfitness-v1'
+// Bump when fetch/caching rules change so old stale caches (esp. /_next/*) are dropped.
+const CACHE_NAME = 'dailyfitness-v2'
 const urlsToCache = [
   '/',
   '/manifest.json'
@@ -70,8 +71,21 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Cache-first for same-origin only
+  // Same-origin only below
   if (url.origin !== self.location.origin) return
+
+  // NEVER cache-first Next.js assets or documents — this was serving stale JS/CSS/HTML
+  // after code changes (UI looked "unchanged" forever).
+  if (url.pathname.startsWith('/_next/')) {
+    return
+  }
+  const accept = event.request.headers.get('accept') || ''
+  if (accept.includes('text/html')) {
+    return
+  }
+  if (url.pathname.includes('webpack-hmr') || url.pathname.includes('turbopack')) {
+    return
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {

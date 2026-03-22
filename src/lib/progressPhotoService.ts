@@ -2,7 +2,7 @@
  * Progress Photos Service
  * Client progress-photos timeline: upload by (client_id, photo_date, photo_type).
  * Writes to table progress_photos and Storage path {clientId}/{dateStr}/{type}.jpg.
- * Used by: weekly check-in flow, client progress/photos page, coach ClientProgressView.
+ * Used by: weekly check-in flow, client progress/photos page, coach progress hub (photos section).
  */
 
 import { supabase } from "./supabase";
@@ -29,7 +29,7 @@ export interface ProgressPhoto {
 /**
  * Generate signed URL for a photo path (for private buckets)
  */
-async function getSignedUrl(photoPath: string, expiresIn: number = 3600): Promise<string | null> {
+export async function getSignedUrl(photoPath: string, expiresIn: number = 3600): Promise<string | null> {
   try {
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
@@ -265,6 +265,63 @@ export async function getPhotoTimeline(
     types: Array.from(info.types),
     weight_kg: info.weight_kg,
   }));
+}
+
+/** Timeline rows with a signed preview URL per date (first photo path for that day). */
+export async function getPhotoTimelineWithPreviews(
+  clientId: string,
+  maxDates = 10
+): Promise<
+  Array<{
+    date: string;
+    types: string[];
+    weight_kg?: number | null;
+    previewUrl: string | null;
+  }>
+> {
+  const { data, error } = await supabase
+    .from("progress_photos")
+    .select("photo_date, photo_type, weight_kg, photo_path")
+    .eq("client_id", clientId)
+    .order("photo_date", { ascending: false });
+
+  if (error || !data?.length) return [];
+
+  const byDate = new Map<
+    string,
+    { types: Set<string>; weight_kg?: number | null; path?: string }
+  >();
+  for (const p of data as Array<{
+    photo_date: string;
+    photo_type: string;
+    weight_kg?: number | null;
+    photo_path?: string | null;
+  }>) {
+    const d = p.photo_date;
+    if (!byDate.has(d)) {
+      byDate.set(d, {
+        types: new Set(),
+        weight_kg: p.weight_kg,
+        path: p.photo_path ?? undefined,
+      });
+    }
+    const g = byDate.get(d)!;
+    g.types.add(p.photo_type);
+    if (!g.path && p.photo_path) g.path = p.photo_path;
+  }
+
+  const slice = Array.from(byDate.entries()).slice(0, maxDates);
+  return Promise.all(
+    slice.map(async ([date, info]) => {
+      const previewUrl = info.path ? await getSignedUrl(info.path, 3600) : null;
+      return {
+        date,
+        types: Array.from(info.types),
+        weight_kg: info.weight_kg,
+        previewUrl,
+      };
+    })
+  );
 }
 
 /**

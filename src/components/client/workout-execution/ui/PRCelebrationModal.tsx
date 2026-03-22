@@ -1,11 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Button } from "@/components/ui/button";
-import { Trophy } from "lucide-react";
-import confetti from "canvas-confetti";
+import { getPRTier, PR_TIERS, type PRTier } from "@/lib/prTiers";
 
 export interface PRDetectedPayload {
   type: "weight" | "reps";
@@ -13,66 +10,114 @@ export interface PRDetectedPayload {
   new_value: number;
   previous_value: number | null;
   unit: string;
+  /** Logged set weight (kg); included by log-set API for celebration UI */
+  weight_kg?: number;
+  /** Logged set reps; included by log-set API for celebration UI */
+  reps?: number;
 }
 
 interface PRCelebrationModalProps {
   visible: boolean;
   onClose: () => void;
   pr: PRDetectedPayload | null;
+  bodyWeightKg?: number | null;
 }
 
-function PRCelebrationContent({ visible, onClose, pr }: PRCelebrationModalProps) {
-  const { isDark } = useTheme();
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [entered, setEntered] = useState(false);
-  const confettiFired = useRef(false);
+const TIER_SHORT: Record<string, string> = {
+  Iron: "Iron",
+  Bronze: "Brnz",
+  Silver: "Slvr",
+  Gold: "Gold",
+  Platinum: "Plat",
+  Diamond: "Diam",
+  Champion: "Chmp",
+  Titan: "Titn",
+  Olympian: "Olym",
+};
 
-  const fireConfetti = useCallback(() => {
-    if (confettiFired.current) return;
-    confettiFired.current = true;
-    const gold = ["#FFD700", "#FFA500", "#FFEC8B"];
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: gold,
-      ticks: 120,
-      gravity: 0.9,
-      scalar: 1.1,
-    });
-    setTimeout(() => {
-      confetti({
-        particleCount: 40,
-        spread: 100,
-        origin: { y: 0.5, x: 0.3 },
-        colors: gold,
-        ticks: 100,
-      });
-      confetti({
-        particleCount: 40,
-        spread: 100,
-        origin: { y: 0.5, x: 0.7 },
-        colors: gold,
-        ticks: 100,
-      });
-    }, 300);
-  }, []);
+const CONFETTI_COLORS = ["#06b6d4", "#f59e0b", "#FFD700", "#ffffff", "#22d3ee", "#a855f7"];
+
+function useConfettiPieces(visible: boolean, key: string) {
+  const [pieces, setPieces] = useState<
+    { id: string; left: string; delay: string; color: string; duration: string }[]
+  >([]);
 
   useEffect(() => {
-    if (visible && pr) {
-      setIsAnimating(true);
-      confettiFired.current = false;
-      setEntered(false);
-      fireConfetti();
-      const enterTimer = setTimeout(() => setEntered(true), 500);
-      const animTimer = setTimeout(() => setIsAnimating(false), 3000);
-      return () => { clearTimeout(enterTimer); clearTimeout(animTimer); };
-    } else {
-      setEntered(false);
-      confettiFired.current = false;
+    if (!visible) {
+      setPieces([]);
+      return;
     }
-  }, [visible, pr, fireConfetti]);
+    const count = 36;
+    const next: typeof pieces = [];
+    for (let i = 0; i < count; i++) {
+      const seed = key.length + i * 17;
+      const pseudo = ((seed * 9301 + 49297) % 233280) / 233280;
+      const left = `${(pseudo * 100).toFixed(2)}%`;
+      const delay = `${(pseudo * 2).toFixed(2)}s`;
+      const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      const duration = `${2.5 + (i % 5) * 0.15}s`;
+      next.push({
+        id: `${key}-${i}`,
+        left,
+        delay,
+        color,
+        duration,
+      });
+    }
+    setPieces(next);
+  }, [visible, key]);
 
+  return pieces;
+}
+
+function PRCelebrationContent({
+  visible,
+  onClose,
+  pr,
+  bodyWeightKg = null,
+}: PRCelebrationModalProps) {
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const weightKg =
+    pr?.weight_kg ??
+    (pr?.type === "weight" ? pr.new_value : null);
+  const repsVal =
+    pr?.reps ?? (pr?.type === "reps" ? pr.new_value : null);
+
+  const tier: PRTier = useMemo(() => {
+    const w = weightKg != null && weightKg > 0 ? weightKg : pr?.new_value ?? 0;
+    return getPRTier(w, bodyWeightKg ?? null);
+  }, [weightKg, bodyWeightKg, pr?.new_value]);
+
+  const confettiKey = pr
+    ? `${pr.exercise_name}-${pr.new_value}-${pr.type}`
+    : "none";
+  const confettiPieces = useConfettiPieces(visible && !!pr, confettiKey);
+
+  const clearDismiss = useCallback(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
+
+  const handleDismiss = useCallback(() => {
+    clearDismiss();
+    onClose();
+  }, [clearDismiss, onClose]);
+
+  useEffect(() => {
+    if (!visible || !pr) {
+      clearDismiss();
+      return;
+    }
+    clearDismiss();
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      onClose();
+    }, 8000);
+    return clearDismiss;
+  }, [visible, pr, onClose, clearDismiss]);
 
   if (!visible || !pr) return null;
 
@@ -82,155 +127,116 @@ function PRCelebrationContent({ visible, onClose, pr }: PRCelebrationModalProps)
       : null;
 
   const improvementText =
-    improvement != null
+    improvement != null && improvement > 0
       ? pr.type === "weight"
-        ? `+${improvement} ${pr.unit}`
-        : `+${improvement} reps`
+        ? `+${improvement.toFixed(1)} ${pr.unit} improvement from previous PR`
+        : `+${improvement} reps improvement from previous PR`
       : null;
 
-  const improvementPct =
-    improvement != null && pr.previous_value && pr.previous_value > 0
-      ? Math.round((improvement / pr.previous_value) * 100)
-      : null;
+  const currentIndex = PR_TIERS.findIndex((t) => t.name === tier.name);
+
+  const weightLabel =
+    weightKg != null && weightKg >= 0
+      ? `${Number(weightKg).toFixed(Number(weightKg) % 1 === 0 ? 0 : 1)} kg`
+      : "—";
+  const repsLabel = repsVal != null ? String(repsVal) : "—";
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "16px",
-        background: "rgba(0, 0, 0, 0.75)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-      }}
-      onClick={onClose}
+      className="fixed inset-0 z-[99999] flex flex-col items-center justify-center px-3 py-6 bg-black/80 backdrop-blur-md"
+      style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      onClick={handleDismiss}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pr-celebration-title"
     >
-      {/* Edge glow */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          boxShadow: "inset 0 0 120px 40px rgba(255, 215, 0, 0.12)",
-        }}
-      />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        {confettiPieces.map((p) => (
+          <div
+            key={p.id}
+            className="pr-confetti-piece"
+            style={{
+              left: p.left,
+              top: "-12px",
+              backgroundColor: p.color,
+              animationDelay: p.delay,
+              animationDuration: p.duration,
+            }}
+          />
+        ))}
+      </div>
 
       <div
-        style={{
-          position: "relative",
-          maxWidth: "420px",
-          width: "100%",
-          padding: "32px 24px",
-          textAlign: "center" as const,
-          background: "var(--fc-glass-base, #1c2333)",
-          border: "2px solid #FFD700",
-          borderRadius: "24px",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          boxShadow: "0 20px 60px rgba(255, 215, 0, 0.4)",
-          transform: entered ? "translateY(0) scale(1)" : "translateY(40px) scale(0.95)",
-          opacity: entered ? 1 : 0,
-          transition: "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
-          maxHeight: "90vh",
-          overflowY: "auto" as const,
-        }}
+        className="relative w-full max-w-[min(100%,380px)] max-h-[min(92vh,640px)] overflow-y-auto rounded-2xl border border-white/10 bg-[color:var(--fc-glass-base,#1c2333)] px-4 py-6 text-center shadow-[0_0_24px_rgba(6,182,212,0.12)]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Trophy icon with pulsing badge */}
-        <div className="mb-5 relative">
-          <div
-            className="w-28 h-28 mx-auto rounded-full flex items-center justify-center relative"
-            style={{
-              background: "linear-gradient(135deg, #FFD700, #FFA500)",
-              boxShadow: isAnimating
-                ? "0 8px 40px rgba(255, 215, 0, 0.6)"
-                : "0 8px 32px rgba(255, 215, 0, 0.4)",
-              transition: "box-shadow 0.3s ease",
-            }}
-          >
-            <Trophy className="w-14 h-14 text-white" />
-            <div
-              className="absolute inset-0 rounded-full"
-              style={{
-                border: "4px solid #FFD700",
-                opacity: 0.4,
-                animation: isAnimating ? "pulse 1.2s ease-in-out infinite" : "none",
-              }}
-            />
-          </div>
-          {/* Pulsing NEW RECORD badge */}
-          <div
-            className="absolute -top-1 left-1/2 -translate-x-1/2"
-            style={{
-              animation: isAnimating ? "pulse-fire 1.5s ease-in-out infinite" : "none",
-            }}
-          >
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg">
-              NEW RECORD
-            </span>
-          </div>
+        <p
+          id="pr-celebration-title"
+          className="text-xs font-bold uppercase tracking-[0.25em] mb-2"
+          style={{ color: tier.color }}
+        >
+          {tier.name}
+        </p>
+
+        <div className="text-[80px] leading-none mb-2 select-none" aria-hidden>
+          {tier.icon}
         </div>
 
-        <h2
-          className="text-2xl font-black mb-1 fc-text-primary tracking-tight"
-          style={{
-            animation: entered ? "celebrate 0.8s ease-out" : "none",
-          }}
-        >
-          PERSONAL RECORD!
+        <h2 className="text-xl sm:text-2xl font-black fc-text-primary mb-4 px-1">
+          {pr.exercise_name}
         </h2>
 
-        <h3 className="text-lg font-bold mb-3" style={{ color: "#FFD700" }}>
-          {pr.exercise_name}
-        </h3>
-
-        <div className="space-y-1 mb-3">
-          <p className="text-2xl font-black fc-text-primary tabular-nums">
-            {pr.new_value} {pr.type === "weight" ? pr.unit : "reps"}
-          </p>
-          {pr.previous_value != null && (
-            <p
-              className="text-sm"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
-              Previous best: {pr.previous_value}{" "}
-              {pr.type === "weight" ? pr.unit : "reps"}
+        <div className="flex items-stretch justify-center gap-3 mb-4">
+          <div className="flex-1 min-w-0 rounded-xl border border-cyan-500/40 bg-cyan-500/5 px-3 py-3">
+            <p className="text-[10px] uppercase tracking-wider fc-text-dim mb-1">Weight</p>
+            <p className="text-lg sm:text-xl font-black font-mono text-cyan-400 tabular-nums">
+              {weightLabel}
             </p>
-          )}
-          {improvementText && (
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-lg font-bold" style={{ color: "#7CB342" }}>
-                {improvementText}
-              </span>
-              {improvementPct !== null && (
-                <span
-                  className="px-2 py-0.5 rounded-full text-xs font-bold"
-                  style={{
-                    background: "rgba(124, 179, 66, 0.15)",
-                    color: "#7CB342",
-                  }}
-                >
-                  +{improvementPct}%
-                </span>
-              )}
-            </div>
-          )}
+          </div>
+          <span className="self-center text-2xl font-light text-white/30">×</span>
+          <div className="flex-1 min-w-0 rounded-xl border border-cyan-500/40 bg-cyan-500/5 px-3 py-3">
+            <p className="text-[10px] uppercase tracking-wider fc-text-dim mb-1">Reps</p>
+            <p className="text-lg sm:text-xl font-black font-mono text-cyan-400 tabular-nums">
+              {repsLabel}
+            </p>
+          </div>
         </div>
 
-        <Button
-          variant="energy"
-          size="lg"
-          onClick={onClose}
-          className="w-full font-bold"
+        {improvementText && (
+          <p className="text-sm font-semibold text-amber-400 mb-5 px-1">{improvementText}</p>
+        )}
+
+        <div className="mb-5 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex gap-1 min-w-min justify-center">
+            {PR_TIERS.map((t, i) => {
+              const active = i === currentIndex;
+              return (
+                <div
+                  key={t.name}
+                  className={`flex flex-col items-center shrink-0 w-8 sm:w-9 ${active ? "scale-105" : "opacity-45"}`}
+                >
+                  <span className="text-sm sm:text-base leading-none mb-0.5">{t.icon}</span>
+                  <span
+                    className={`text-[7px] sm:text-[8px] font-bold uppercase leading-tight text-center ${
+                      active ? "text-cyan-400" : "fc-text-dim"
+                    }`}
+                  >
+                    {TIER_SHORT[t.name] ?? t.name.slice(0, 4)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] fc-text-dim mt-2">▲ You are here</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-shadow text-base"
         >
-          Nice! Continue
-        </Button>
+          SMASHED IT! 💪
+        </button>
       </div>
     </div>
   );

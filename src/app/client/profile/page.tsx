@@ -52,12 +52,13 @@ import {
   UserCheck,
   Trophy,
   Zap,
-  Target as TargetIcon
+  Target as TargetIcon,
+  CreditCard
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
-import { ClientPageShell, ClientGlassCard, SectionHeader, SecondaryButton, PrimaryButton } from '@/components/client-ui'
+import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton } from '@/components/client-ui'
 
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
@@ -118,6 +119,11 @@ export default function ClientProfilePage() {
     medical_conditions: '',
     injuries: ''
   })
+
+  const [subscriptionCard, setSubscriptionCard] = useState<{
+    headline: string
+    subline: string
+  } | null>(null)
 
   useEffect(() => {
     // Check URL for viewAs parameter
@@ -198,6 +204,58 @@ export default function ClientProfilePage() {
       }
     }
   }, [user?.id, viewAsUserId, loadProfile])
+
+  useEffect(() => {
+    const uid = viewAsUserId || user?.id
+    if (!uid) {
+      setSubscriptionCard(null)
+      return
+    }
+    void (async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data, error } = await supabase
+        .from('clipcards')
+        .select(
+          'subscription_plan_label, start_date, end_date, subscription_status, is_active'
+        )
+        .eq('client_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (error) {
+        setSubscriptionCard(null)
+        return
+      }
+      const rows = (data || []) as Array<{
+        subscription_plan_label: string | null
+        start_date: string
+        end_date: string
+        subscription_status: string | null
+        is_active: boolean | null
+      }>
+      const row = rows.find((r) => {
+        if (!r.is_active) return false
+        const st = String(r.subscription_status || '').toLowerCase()
+        if (st === 'cancelled' || st === 'expired') return false
+        return r.end_date >= today
+      })
+      if (!row) {
+        setSubscriptionCard(null)
+        return
+      }
+      setSubscriptionCard({
+        headline: row.subscription_plan_label || 'Active subscription',
+        subline: `Started ${new Date(row.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })} · Ends ${new Date(row.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}`,
+      })
+    })()
+  }, [user?.id, viewAsUserId])
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -498,6 +556,23 @@ export default function ClientProfilePage() {
               </div>
             </div>
           </header>
+
+          {subscriptionCard && (
+            <ClientGlassCard className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5 fc-text-subtle" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold uppercase tracking-widest fc-text-dim mb-1">
+                    My subscription
+                  </h2>
+                  <p className="font-semibold fc-text-primary">{subscriptionCard.headline}</p>
+                  <p className="text-sm fc-text-dim mt-1">{subscriptionCard.subline}</p>
+                </div>
+              </div>
+            </ClientGlassCard>
+          )}
 
           {/* Profile Mini Hub — Achievements, Goal History, Profile Information, Menu */}
           <section>

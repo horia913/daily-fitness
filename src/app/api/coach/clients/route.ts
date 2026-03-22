@@ -94,6 +94,17 @@ export async function GET() {
           latestSoreness: null,
           trainedToday: false,
           checkedInToday: false,
+          activeProgramName: null,
+          programCurrentWeek: null,
+          programDurationWeeks: null,
+          mealCompliance7dPct: null,
+          lastCheckinDate: null,
+          weekReviewNeeded: false,
+          completedWeekNumber: null,
+          activeProgramId: null,
+          activeProgramAssignmentId: null,
+          subscriptionEndDate: null,
+          subscriptionExpiringSoon: false,
         },
       }
     })

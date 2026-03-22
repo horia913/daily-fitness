@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Target, Calendar, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/toast-provider'
@@ -52,7 +54,7 @@ interface GoalRow {
   title: string
   description: string | null
   category: string
-  pillar: string
+  pillar?: string | null
   goal_type: string | null
   target_value: number | null
   target_date: string | null
@@ -68,6 +70,19 @@ interface GoalRow {
   updated_at: string
 }
 
+function pillarLabel(goal: GoalRow): string {
+  const key = goal.pillar ?? goal.category
+  return PILLAR_LABELS[key] ?? key ?? 'General'
+}
+
+function initialPillar(g: GoalRow): Pillar {
+  const p = g.pillar as Pillar | undefined
+  if (p && PILLAR_LABELS[p]) return p
+  const c = g.category as Pillar | undefined
+  if (c && PILLAR_LABELS[c]) return c
+  return 'general'
+}
+
 interface ClientGoalsViewProps {
   clientId: string
 }
@@ -77,7 +92,8 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
   const { addToast } = useToast()
   const [goals, setGoals] = useState<GoalRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showGoalModal, setShowGoalModal] = useState(false)
+  const [goalBeingEdited, setGoalBeingEdited] = useState<GoalRow | null>(null)
 
   const loadGoals = useCallback(async () => {
     try {
@@ -118,6 +134,16 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
         )
       : null
 
+  const openCreateGoal = () => {
+    setGoalBeingEdited(null)
+    setShowGoalModal(true)
+  }
+
+  const openEditGoal = (g: GoalRow) => {
+    setGoalBeingEdited(g)
+    setShowGoalModal(true)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -131,26 +157,28 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
   if (goals.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
-          <Target className="w-12 h-12 mx-auto mb-4 fc-text-subtle" />
-          <h3 className="text-lg font-semibold fc-text-primary mb-2">No goals set for this client</h3>
-          <p className="text-sm fc-text-dim mb-6">Create a goal to track progress together.</p>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="fc-btn fc-btn-primary gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Create Goal
-          </Button>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8">
+          <EmptyState
+            icon={Target}
+            title="No goals set for this client"
+            description="Create a goal to track progress together."
+            actionLabel="Create goal"
+            onAction={() => openCreateGoal()}
+          />
         </div>
-        {showCreateModal && (
+        {showGoalModal && (
           <CoachCreateGoalModal
             clientId={clientId}
             coachId={user?.id ?? ''}
-            onClose={() => setShowCreateModal(false)}
+            existingGoal={goalBeingEdited}
+            onClose={() => {
+              setShowGoalModal(false)
+              setGoalBeingEdited(null)
+            }}
             onSuccess={() => {
-              setShowCreateModal(false)
-              loadGoals()
+              setShowGoalModal(false)
+              setGoalBeingEdited(null)
+              void loadGoals()
             }}
           />
         )}
@@ -177,7 +205,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
               </div>
             </div>
             <Button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openCreateGoal()}
               variant="outline"
               size="sm"
               className="gap-2 fc-btn fc-btn-secondary"
@@ -252,7 +280,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
                         <h4 className="fc-text-primary mb-1 text-lg font-semibold">{goal.title}</h4>
                         <div className="flex flex-wrap gap-2">
                           <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                            {PILLAR_LABELS[goal.pillar] ?? goal.pillar}
+                            {pillarLabel(goal)}
                           </span>
                           <span
                             className={`fc-pill fc-pill-glass text-xs ${
@@ -282,13 +310,13 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
                           <span className="fc-text-subtle">
                             {currentVal != null ? currentVal : '—'} / {targetVal != null ? targetVal : '—'} {unit}
                           </span>
-                          <span className="font-semibold fc-text-workouts">
+                          <span className="font-bold text-cyan-400 tabular-nums">
                             {Math.min(100, Math.max(0, progress))}%
                           </span>
                         </div>
                         <div className="fc-progress-track h-3 rounded-full overflow-hidden">
                           <div
-                            className="fc-progress-fill h-full transition-all duration-500"
+                            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
                             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                           />
                         </div>
@@ -299,6 +327,17 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
                         Created {new Date(goal.created_at).toLocaleDateString()}
                       </p>
                     )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="fc-btn fc-btn-secondary"
+                        onClick={() => openEditGoal(goal)}
+                      >
+                        Edit goal
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -307,14 +346,19 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
         </div>
       </div>
 
-      {showCreateModal && (
+      {showGoalModal && (
         <CoachCreateGoalModal
           clientId={clientId}
           coachId={user?.id ?? ''}
-          onClose={() => setShowCreateModal(false)}
+          existingGoal={goalBeingEdited}
+          onClose={() => {
+            setShowGoalModal(false)
+            setGoalBeingEdited(null)
+          }}
           onSuccess={() => {
-            setShowCreateModal(false)
-            loadGoals()
+            setShowGoalModal(false)
+            setGoalBeingEdited(null)
+            void loadGoals()
           }}
         />
       )}
@@ -327,17 +371,84 @@ interface CoachCreateGoalModalProps {
   coachId: string
   onClose: () => void
   onSuccess: () => void
+  existingGoal?: GoalRow | null
 }
 
-function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCreateGoalModalProps) {
+function CoachCreateGoalModal({
+  clientId,
+  coachId,
+  onClose,
+  onSuccess,
+  existingGoal = null,
+}: CoachCreateGoalModalProps) {
   const { addToast } = useToast()
+  const isEdit = existingGoal != null
+
   const [title, setTitle] = useState('')
   const [pillar, setPillar] = useState<Pillar>('general')
   const [targetValue, setTargetValue] = useState('')
   const [targetUnit, setTargetUnit] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [goalType, setGoalType] = useState('')
+  const [currentValueStr, setCurrentValueStr] = useState('')
+  const [progressPctStr, setProgressPctStr] = useState('')
+  const [status, setStatus] = useState('active')
+  const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (existingGoal) {
+      setTitle(existingGoal.title)
+      setPillar(initialPillar(existingGoal))
+      setTargetValue(
+        existingGoal.target_value != null ? String(existingGoal.target_value) : ''
+      )
+      setTargetUnit(existingGoal.target_unit ?? '')
+      setTargetDate(
+        existingGoal.target_date
+          ? existingGoal.target_date.split('T')[0]
+          : ''
+      )
+      setGoalType(existingGoal.goal_type ?? '')
+      setCurrentValueStr(
+        existingGoal.current_value != null ? String(existingGoal.current_value) : ''
+      )
+      setProgressPctStr(
+        existingGoal.progress_percentage != null
+          ? String(existingGoal.progress_percentage)
+          : ''
+      )
+      setStatus(existingGoal.status || 'active')
+      setDescription(existingGoal.description ?? '')
+    } else {
+      setTitle('')
+      setPillar('general')
+      setTargetValue('')
+      setTargetUnit('')
+      setTargetDate('')
+      setGoalType('')
+      setCurrentValueStr('')
+      setProgressPctStr('')
+      setStatus('active')
+      setDescription('')
+    }
+  }, [existingGoal])
+
+  const handleDelete = async () => {
+    if (!existingGoal || !confirm('Delete this goal?')) return
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase.from('goals').delete().eq('id', existingGoal.id)
+      if (error) throw error
+      addToast({ title: 'Goal deleted', variant: 'default' })
+      onSuccess()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not delete goal', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -346,41 +457,79 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
     setIsSubmitting(true)
     try {
       const parsed = parseFloat(targetValue)
-      if (isNaN(parsed)) {
+      if (Number.isNaN(parsed)) {
         addToast({ title: 'Please enter a valid number for target.', variant: 'destructive' })
         return
       }
 
-      const { error } = await supabase.from('goals').insert({
-        client_id: clientId,
-        coach_id: coachId,
-        title,
-        pillar,
-        target_value: parsed,
-        target_unit: targetUnit || 'units',
-        target_date: targetDate || null,
-        goal_type: goalType || null,
-        current_value: 0,
-        status: 'active',
-        priority: 'medium',
-        start_date: new Date().toISOString().split('T')[0],
-        progress_percentage: 0,
-        category: 'other',
-      })
+      const cur =
+        currentValueStr.trim() === '' ? null : Number(currentValueStr)
+      const pct =
+        progressPctStr.trim() === '' ? null : Number(progressPctStr)
+      if (isEdit) {
+        if (cur != null && Number.isNaN(cur)) {
+          addToast({ title: 'Invalid current value', variant: 'destructive' })
+          return
+        }
+        if (pct != null && Number.isNaN(pct)) {
+          addToast({ title: 'Invalid progress %', variant: 'destructive' })
+          return
+        }
+        const completed_date =
+          status === 'completed'
+            ? (existingGoal!.completed_date ??
+              new Date().toISOString().split('T')[0])
+            : null
 
-      if (error) throw error
+        const { error } = await supabase
+          .from('goals')
+          .update({
+            title,
+            pillar,
+            target_value: parsed,
+            target_unit: targetUnit || 'units',
+            target_date: targetDate || null,
+            goal_type: goalType || null,
+            current_value: cur,
+            progress_percentage: pct,
+            status,
+            completed_date,
+            description: description.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingGoal!.id)
 
-      addToast({ title: 'Goal created', variant: 'default' })
-      setTitle('')
-      setTargetValue('')
-      setTargetUnit('')
-      setTargetDate('')
-      setGoalType('')
+        if (error) throw error
+        addToast({ title: 'Goal updated', variant: 'default' })
+      } else {
+        const { error } = await supabase.from('goals').insert({
+          client_id: clientId,
+          coach_id: coachId,
+          title,
+          pillar,
+          target_value: parsed,
+          target_unit: targetUnit || 'units',
+          target_date: targetDate || null,
+          goal_type: goalType || null,
+          current_value: 0,
+          status: 'active',
+          priority: 'medium',
+          start_date: new Date().toISOString().split('T')[0],
+          progress_percentage: 0,
+          category: 'other',
+          description: description.trim() || null,
+        })
+
+        if (error) throw error
+        addToast({ title: 'Goal created', variant: 'default' })
+      }
+
       onSuccess()
     } catch (error) {
-      console.error('Error creating goal:', error)
+      console.error('Error saving goal:', error)
       addToast({
-        title: error instanceof Error ? error.message : 'Failed to create goal. Please try again.',
+        title:
+          error instanceof Error ? error.message : 'Failed to save goal. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -398,7 +547,9 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold fc-text-primary">Create Goal for Client</h2>
+          <h2 className="text-xl font-bold fc-text-primary">
+            {isEdit ? 'Edit goal' : 'Create goal for client'}
+          </h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 fc-press">
             <X className="w-4 h-4" />
           </Button>
@@ -406,7 +557,7 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Goal Title *</label>
+            <label className="text-sm font-medium fc-text-subtle block mb-2">Goal title *</label>
             <input
               type="text"
               placeholder="e.g., Run 5K, Hit 150g protein daily"
@@ -414,6 +565,16 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
               onChange={(e) => setTitle(e.target.value)}
               required
               className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium fc-text-subtle block mb-2">Description (optional)</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary resize-y min-h-[60px]"
             />
           </div>
 
@@ -457,7 +618,7 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
 
           {GOAL_TYPE_OPTIONS[pillar]?.length > 0 && (
             <div>
-              <label className="text-sm font-medium fc-text-subtle block mb-2">Goal Type (optional)</label>
+              <label className="text-sm font-medium fc-text-subtle block mb-2">Goal type (optional)</label>
               <select
                 value={goalType}
                 onChange={(e) => setGoalType(e.target.value)}
@@ -483,17 +644,65 @@ function CoachCreateGoalModal({ clientId, coachId, onClose, onSuccess }: CoachCr
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
+          {isEdit && (
+            <>
+              <div>
+                <label className="text-sm font-medium fc-text-subtle block mb-2">Current value</label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={currentValueStr}
+                  onChange={(e) => setCurrentValueStr(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium fc-text-subtle block mb-2">Progress % (0–100)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={progressPctStr}
+                  onChange={(e) => setProgressPctStr(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium fc-text-subtle block mb-2">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent px-3 py-2 text-sm fc-text-primary"
+                >
+                  <option value="active">active</option>
+                  <option value="completed">completed</option>
+                  <option value="paused">paused</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-2 pt-4">
             <Button
               type="submit"
               disabled={isSubmitting || !title || !targetValue}
               className="flex-1 fc-btn fc-btn-primary"
             >
-              {isSubmitting ? 'Creating…' : 'Create Goal'}
+              {isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
             </Button>
             <Button type="button" variant="outline" onClick={onClose} className="flex-1 fc-btn fc-btn-secondary">
               Cancel
             </Button>
+            {isEdit && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full sm:w-auto sm:ml-auto"
+                disabled={isSubmitting}
+                onClick={() => void handleDelete()}
+              >
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </div>

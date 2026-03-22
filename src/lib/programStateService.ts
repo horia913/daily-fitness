@@ -32,6 +32,8 @@ export interface ProgramAssignment {
   duration_weeks: number | null
   total_days: number | null
   created_at: string
+  progression_mode: 'auto' | 'coach_managed'
+  coach_unlocked_week: number | null
 }
 
 export interface ProgramScheduleSlot {
@@ -87,7 +89,7 @@ export async function getActiveProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -112,7 +114,7 @@ export async function getRecentlyCompletedProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week')
     .eq('client_id', clientId)
     .eq('status', 'completed')
     .order('created_at', { ascending: false })
@@ -445,21 +447,27 @@ export function getOverdueSlots(
 /**
  * Compute the max unlocked week number.
  *
- * - Week 1 is always unlocked.
- * - Week W+1 is unlocked only if ALL slots in week W (and all prior) are complete.
- * - The returned value is the lowest week that still has incomplete slots,
- *   i.e. the "current unlocked week" the client should be working on.
- * - If every slot is complete, returns the last week number.
+ * Coach-managed mode: coach controls the max unlocked week via coach_unlocked_week.
+ * Auto mode (default): completion-driven — week W+1 unlocks only when all
+ * required slots in week W (and prior) are complete.
+ *
+ * If every slot is complete, returns the last week number.
  */
 export function computeUnlockedWeekMax(
   slots: ProgramScheduleSlot[],
-  completedSlots: CompletedSlot[]
+  completedSlots: CompletedSlot[],
+  assignment?: { progression_mode?: string; coach_unlocked_week?: number | null }
 ): number {
+  if (
+    assignment?.progression_mode === 'coach_managed' &&
+    assignment?.coach_unlocked_week != null
+  ) {
+    return assignment.coach_unlocked_week
+  }
+
   if (slots.length === 0) return 1
 
-  // Distinct week numbers in ascending order
   const weekNumbers = [...new Set(slots.map(s => s.week_number))].sort((a, b) => a - b)
-
   const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
 
   for (const weekNum of weekNumbers) {
@@ -470,12 +478,10 @@ export function computeUnlockedWeekMax(
       requiredSlots.every(s => completedScheduleIds.has(s.id))
 
     if (!allComplete) {
-      // This week has incomplete slots — it is the current unlocked week
       return weekNum
     }
   }
 
-  // All weeks fully complete — return the last week number
   return weekNumbers[weekNumbers.length - 1]
 }
 
@@ -488,9 +494,10 @@ export function computeUnlockedWeekMax(
 export function assertWeekUnlocked(
   targetWeekNumber: number,
   slots: ProgramScheduleSlot[],
-  completedSlots: CompletedSlot[]
+  completedSlots: CompletedSlot[],
+  assignment?: { progression_mode?: string; coach_unlocked_week?: number | null }
 ): void {
-  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots)
+  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots, assignment)
 
   if (targetWeekNumber > unlockedWeekMax) {
     const err: any = new Error(

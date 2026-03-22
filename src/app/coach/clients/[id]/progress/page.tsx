@@ -1,130 +1,75 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { useCoachClient } from "@/contexts/CoachClientContext";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { Button } from "@/components/ui/button";
-import ClientProgressView from "@/components/coach/client-views/ClientProgressView";
-import { CheckInConfigEditor } from "@/components/coach/CheckInConfigEditor";
+import { TrendingUp } from "lucide-react";
+import CoachClientProgressHub from "@/components/coach/client-views/CoachClientProgressHub";
 import { GenerateReportModal } from "@/components/coach/GenerateReportModal";
-import { exportBodyMetricsCsv } from "@/lib/exportBodyMetricsCsv";
-import { supabase } from "@/lib/supabase";
-import { ArrowLeft, TrendingUp, FileText, Download } from "lucide-react";
-import Link from "next/link";
 
-export default function ClientProgressPage() {
+function ProgressHubWithSearchParams({
+  clientId,
+  onOpenReport,
+}: {
+  clientId: string;
+  onOpenReport: () => void;
+}) {
+  return <CoachClientProgressHub clientId={clientId} onOpenReport={onOpenReport} />;
+}
+
+export default function ClientProgressMergedPage() {
   const params = useParams();
-  const { user, loading: authLoading } = useAuth();
-  const { performanceSettings } = useTheme();
+  const { user } = useAuth();
+  const { clientName } = useCoachClient();
   const [showReportModal, setShowReportModal] = useState(false);
-  const [clientName, setClientName] = useState<string | undefined>();
 
   const clientId = params.id as string;
 
-  useEffect(() => {
-    if (!clientId) return;
-    supabase
-      .from("profiles")
-      .select("first_name, last_name")
-      .eq("id", clientId)
-      .single()
-      .then(({ data }) => {
-        if (data)
-          setClientName(
-            `${(data as { first_name?: string }).first_name ?? ""} ${(data as { last_name?: string }).last_name ?? ""}`.trim()
-          );
-      });
-  }, [clientId]);
-
-  if (authLoading) {
-    return (
-      <ProtectedRoute requiredRole="coach">
-        <AnimatedBackground>
-          {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <GlassCard elevation={2} className="fc-glass fc-card p-8">
-              <div className="animate-pulse space-y-4">
-                <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
-            </GlassCard>
-          </div>
-        </AnimatedBackground>
-      </ProtectedRoute>
-    );
-  }
-
   return (
-    <ProtectedRoute requiredRole="coach">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex items-center gap-4">
-              <Link href={`/coach/clients/${clientId}`} className="fc-glass fc-card inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-                <ArrowLeft className="w-5 h-5 shrink-0" />
-                Back to Client Hub
-              </Link>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                  <TrendingUp className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                    Check-ins & Metrics
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    Scheduled check-ins, measurements, and photos.
-                  </p>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => setShowReportModal(true)}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Generate Report
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => exportBodyMetricsCsv(clientId, clientName)}
-                  >
-                    <Download className="w-4 h-4" />
-                    Export Data
-                  </Button>
-                </div>
-              </div>
+    <div className="space-y-6">
+      <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-6 lg:p-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="flex gap-3 min-w-0 flex-1">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-          </GlassCard>
-
-          {user?.id && (
-            <GenerateReportModal
-              open={showReportModal}
-              onClose={() => setShowReportModal(false)}
-              coachId={user.id}
-              clientId={clientId}
-              clientName={clientName}
-            />
-          )}
-
-          <ClientProgressView clientId={clientId} />
-
-          {user?.id && (
-            <div className="mt-8">
-              <CheckInConfigEditor coachId={user.id} clientId={clientId} />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Check-ins &amp; Assessments
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mt-1.5 leading-relaxed text-pretty max-w-prose">
+                Body metrics, wellness, photos, FMS, goals, and analytics in one hub.
+              </p>
             </div>
-          )}
+          </div>
         </div>
-      </AnimatedBackground>
-    </ProtectedRoute>
+      </GlassCard>
+
+      <Suspense
+        fallback={
+          <div className="space-y-6">
+            <div className="animate-pulse h-12 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]" />
+            <div className="animate-pulse h-64 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]" />
+          </div>
+        }
+      >
+        <ProgressHubWithSearchParams
+          clientId={clientId}
+          onOpenReport={() => setShowReportModal(true)}
+        />
+      </Suspense>
+
+      {user?.id && (
+        <GenerateReportModal
+          open={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          coachId={user.id}
+          clientId={clientId}
+          clientName={clientName}
+        />
+      )}
+    </div>
   );
 }

@@ -280,43 +280,20 @@ export const UpdateSessionSchema = SessionSchema.partial().extend({
 })
 
 // ============================================================================
-// CLIPCARD SCHEMAS
+// SUBSCRIPTION (clipcards table — subscription rows, no session packs in UI)
 // ============================================================================
 
-export const ClipcardSchema = z.object({
+export const SubscriptionClipcardRowSchema = z.object({
   coach_id: z.string().uuid('Invalid coach ID'),
   client_id: z.string().uuid('Invalid client ID'),
-  clipcard_type_id: z.string().uuid('Invalid clipcard type ID'),
-  sessions_total: z.number().int('Sessions total must be an integer').min(1, 'Sessions total must be at least 1'),
-  sessions_used: z.number().int('Sessions used must be an integer').min(0).optional().default(0),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
-  is_active: z.boolean().default(true),
-})
-
-export const CreateClipcardSchema = ClipcardSchema
-
-export const UpdateClipcardSchema = ClipcardSchema.partial().extend({
-  id: z.string().uuid('Invalid clipcard ID'),
-})
-
-// ============================================================================
-// CLIPCARD TYPE SCHEMAS
-// ============================================================================
-
-export const ClipcardTypeSchema = z.object({
-  coach_id: z.string().uuid('Invalid coach ID'),
-  name: z.string().min(1, 'Clipcard type name is required').max(200, 'Name must be 200 characters or less'),
-  sessions_count: z.number().int('Sessions count must be an integer').min(1, 'Sessions count must be at least 1'),
-  validity_days: z.number().int('Validity days must be an integer').min(1, 'Validity days must be at least 1'),
-  price: z.number().min(0, 'Price must be 0 or greater'),
-  is_active: z.boolean().default(true),
-})
-
-export const CreateClipcardTypeSchema = ClipcardTypeSchema
-
-export const UpdateClipcardTypeSchema = ClipcardTypeSchema.partial().extend({
-  id: z.string().uuid('Invalid clipcard type ID'),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be YYYY-MM-DD'),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be YYYY-MM-DD'),
+  plan_duration_months: z.number().int().min(1).max(120),
+  subscription_plan_label: z.string().min(1).max(200),
+  amount_paid: z.number().optional().nullable(),
+  subscription_notes: z.string().max(2000).optional().nullable(),
+  subscription_status: z.enum(['active', 'expired', 'cancelled']).optional(),
+  is_active: z.boolean().optional(),
 })
 
 // ============================================================================

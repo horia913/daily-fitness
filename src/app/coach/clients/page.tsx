@@ -9,9 +9,15 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Grid3x3, List, UserPlus, Users, Flame, Dumbbell, ClipboardCheck } from "lucide-react";
+import { Search, Grid3x3, List, UserPlus, Users, Flame, Dumbbell, ClipboardCheck, Clock, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { type ClientMetrics } from "@/lib/coachDashboardService";
+import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
+import {
+  computeClientAttention,
+  attentionCardSurfaceStyle,
+  attentionPriority,
+} from "@/lib/coachClientAttention";
 import { dbToUiScale } from "@/lib/wellnessService";
 import { withTimeout } from "@/lib/withTimeout";
 interface Client {
@@ -28,6 +34,10 @@ type StatusFilter = "all" | "active" | "inactive" | "pending";
 type SortOption = "name" | "lastActive" | "streak" | "workouts" | "needsAttention";
 type QuickFilter = "all" | "needsAttention" | "trainedToday" | "checkedInToday";
 
+function getAttention(client: Client) {
+  return computeClientAttention(client.status, client.metrics);
+}
+
 function ClientManagementContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
@@ -43,6 +53,13 @@ function ClientManagementContent() {
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const loadingRef = useRef(false);
   const didLoadRef = useRef(false);
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    assignmentId: string;
+    programId: string;
+    weekNumber: number;
+    clientName: string;
+  }>({ isOpen: false, assignmentId: '', programId: '', weekNumber: 0, clientName: '' });
 
   const loadClients = useCallback(async (signal?: AbortSignal) => {
     if (!user) return;
@@ -135,28 +152,24 @@ function ClientManagementContent() {
     return "var(--fc-status-error)";
   };
 
-  // Get program status label and color
-  const getProgramStatus = (status: ClientMetrics['programStatus'], endDate: string | null) => {
+  /** Program callouts: only non-default states (hide redundant "Active" next to program name). */
+  const getProgramStatus = (
+    status: ClientMetrics["programStatus"],
+    _endDate: string | null
+  ): { label: string | null; color: string } => {
     switch (status) {
-      case 'active':
-        return { label: 'Active', color: 'var(--fc-status-success)' };
-      case 'endingSoon':
-        return { label: 'Ending Soon', color: 'var(--fc-status-warning)' };
-      case 'noProgram':
-        return { label: 'No Program', color: 'var(--fc-text-dim)' };
+      case "active":
+        return { label: null, color: "var(--fc-status-success)" };
+      case "endingSoon":
+        return { label: "Ending Soon", color: "var(--fc-status-warning)" };
+      case "noProgram":
+        return { label: "No Program", color: "var(--fc-text-dim)" };
     }
   };
 
-  // Check if client needs attention
   const needsAttention = (client: Client): boolean => {
-    const { metrics } = client;
-    if (!metrics.lastActive) return true;
-    const relative = formatRelativeTime(metrics.lastActive);
-    if (relative.color === "var(--fc-status-error)") return true;
-    if (metrics.programStatus === 'noProgram') return true;
-    if (metrics.latestStress != null && metrics.latestStress >= 4) return true;
-    if (metrics.latestSoreness != null && metrics.latestSoreness >= 4) return true;
-    return false;
+    const { level } = getAttention(client);
+    return level === "urgent" || level === "warning" || level === "inactive";
   };
 
   const filteredClients = clients
@@ -206,36 +219,6 @@ function ClientManagementContent() {
           return 0;
       }
     });
-
-  const getStatusColor = (status: Client["status"]) => {
-    switch (status) {
-      case "active":
-        return getSemanticColor("success").primary;
-      case "inactive":
-        return getSemanticColor("neutral").primary;
-      case "pending":
-        return getSemanticColor("neutral").primary;
-      case "at-risk":
-        return getSemanticColor("warning").primary;
-      default:
-        return getSemanticColor("neutral").primary;
-    }
-  };
-
-  const getStatusLabel = (status: Client["status"]) => {
-    switch (status) {
-      case "active":
-        return "Active";
-      case "inactive":
-        return "Inactive";
-      case "pending":
-        return "Pending";
-      case "at-risk":
-        return "At Risk";
-      default:
-        return status;
-    }
-  };
 
   const activeCount = clients.filter((c) => c.status === "active").length;
   const inactiveCount = clients.filter((c) => c.status === "inactive").length;
@@ -411,27 +394,38 @@ function ClientManagementContent() {
               {filteredClients.map((client) => {
                 const relative = formatRelativeTime(client.metrics.lastActive);
                 const programStatus = getProgramStatus(client.metrics.programStatus, client.metrics.programEndDate);
-                const atRisk = needsAttention(client);
+                const attention = getAttention(client);
                 const isInactiveOrPending = client.status === "inactive" || client.status === "pending";
+                const checkinRel = formatRelativeTime(client.metrics.lastCheckinDate);
+                const sameActivityAndCheckin =
+                  !!client.metrics.lastActive &&
+                  !!client.metrics.lastCheckinDate &&
+                  client.metrics.lastActive.slice(0, 10) === client.metrics.lastCheckinDate.slice(0, 10);
+                const weekLabel =
+                  client.metrics.programCurrentWeek != null && client.metrics.programDurationWeeks != null
+                    ? `Week ${client.metrics.programCurrentWeek} of ${client.metrics.programDurationWeeks}`
+                    : null;
+                const displayAttentionReasons =
+                  sameActivityAndCheckin
+                    ? attention.reasons.filter((r) => !r.startsWith("Check-in "))
+                    : attention.reasons;
                 return (
-                  <Link key={client.id} href={`/coach/clients/${client.id}`}>
+                  <Link
+                    key={client.id}
+                    href={`/coach/clients/${client.id}`}
+                    className="group block w-full max-w-full rounded-2xl border-0 outline-none text-inherit no-underline focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)]"
+                  >
                     <GlassCard
                       elevation={2}
-                      className={`fc-glass fc-card overflow-hidden transition-all hover:scale-102 hover:shadow-2xl cursor-pointer ${atRisk ? "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10" : ""} ${isInactiveOrPending ? "opacity-80" : ""}`}
-                      borderColor={getStatusColor(client.status)}
+                      className={`fc-card overflow-hidden transition-all hover:scale-102 hover:shadow-2xl cursor-pointer rounded-2xl ${isInactiveOrPending ? "opacity-90" : ""}`}
+                      borderColor="var(--fc-surface-card-border)"
+                      surfaceStyle={attentionCardSurfaceStyle(attention.level)}
                     >
-                      {/* Status indicator bar */}
-                      <div
-                        className={`h-2 ${atRisk ? "bg-amber-500" : ""}`}
-                        style={!atRisk ? { background: getStatusColor(client.status) } : undefined}
-                      />
-
                       <div className="p-6">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-4">
+                        <div className="flex items-start mb-3">
+                          <div className="flex items-center gap-4 min-w-0">
                             <div
-                              className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold"
+                              className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0"
                               style={{
                                 background: getSemanticColor("trust").gradient,
                                 color: "#fff",
@@ -439,72 +433,178 @@ function ClientManagementContent() {
                             >
                               {client.name.charAt(0)}
                             </div>
-                            <div>
-                              <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                            <div className="min-w-0">
+                              <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)] truncate">
                                 {client.name}
                               </h3>
-                              <p className="text-sm text-[color:var(--fc-text-dim)] truncate max-w-[180px]">
+                              <p className="text-sm text-[color:var(--fc-text-dim)] truncate">
                                 {client.email}
                               </p>
                             </div>
                           </div>
-                          <span
-                            className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0"
-                            style={{
-                              background: `${getStatusColor(client.status)}20`,
-                              color: getStatusColor(client.status),
-                            }}
-                          >
-                            {getStatusLabel(client.status)}
-                          </span>
                         </div>
 
-                        {/* Last Active */}
-                        <div className="mb-3">
-                          <div className="text-sm font-medium" style={{ color: relative.color }}>
-                            {relative.text}
+                        {displayAttentionReasons.length > 0 && (
+                          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {attention.level === "urgent" && (
+                              <span
+                                className="shrink-0 font-semibold leading-none"
+                                style={{
+                                  fontSize: 11,
+                                  padding: "3px 9px",
+                                  borderRadius: 9999,
+                                  backgroundColor: "color-mix(in srgb, var(--fc-status-error) 24%, transparent)",
+                                  color: "var(--fc-status-error)",
+                                }}
+                              >
+                                Urgent
+                              </span>
+                            )}
+                            {attention.level === "warning" && (
+                              <span
+                                className="shrink-0 font-semibold leading-none"
+                                style={{
+                                  fontSize: 11,
+                                  padding: "3px 9px",
+                                  borderRadius: 9999,
+                                  backgroundColor: "color-mix(in srgb, var(--fc-status-warning) 26%, transparent)",
+                                  color: "var(--fc-status-warning)",
+                                }}
+                              >
+                                Review
+                              </span>
+                            )}
+                            {attention.level === "inactive" && displayAttentionReasons.length > 0 && (
+                              <span
+                                className="shrink-0 font-semibold leading-none fc-text-subtle"
+                                style={{
+                                  fontSize: 11,
+                                  padding: "3px 9px",
+                                  borderRadius: 9999,
+                                  backgroundColor: "var(--fc-glass-highlight)",
+                                }}
+                              >
+                                {client.status === "pending" ? "Pending" : "Inactive"}
+                              </span>
+                            )}
+                            <p className="text-[11px] text-[color:var(--fc-text-dim)] leading-snug min-w-0 flex-1">
+                              {displayAttentionReasons.slice(0, 2).join(" · ")}
+                            </p>
                           </div>
-                          <div className="text-xs fc-text-dim">Last active</div>
-                        </div>
+                        )}
 
-                        {/* Metrics row */}
-                        <div className="flex items-center justify-between gap-2 mb-3 text-xs">
+                        {client.metrics.weekReviewNeeded && client.metrics.completedWeekNumber != null && (
+                          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 truncate">
+                                  Week {client.metrics.completedWeekNumber} review needed
+                                </span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setReviewModal({
+                                    isOpen: true,
+                                    assignmentId: client.metrics.activeProgramAssignmentId ?? '',
+                                    programId: client.metrics.activeProgramId ?? '',
+                                    weekNumber: client.metrics.completedWeekNumber!,
+                                    clientName: client.name,
+                                  });
+                                }}
+                                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-colors shrink-0"
+                              >
+                                Review
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {sameActivityAndCheckin ? (
+                          <div className="mb-3 text-xs">
+                            <div className="text-sm font-medium" style={{ color: relative.color }}>
+                              {relative.text}
+                            </div>
+                            <div className="fc-text-dim">Last activity & check-in</div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                            <div>
+                              <div className="text-sm font-medium" style={{ color: relative.color }}>
+                                {relative.text}
+                              </div>
+                              <div className="fc-text-dim">Last activity</div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium" style={{ color: checkinRel.color }}>
+                                {checkinRel.text}
+                              </div>
+                              <div className="fc-text-dim">Last check-in</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {client.metrics.activeProgramName && (
+                          <p className="text-xs text-cyan-400/70 font-medium mb-1 truncate" title={client.metrics.activeProgramName}>
+                            {client.metrics.activeProgramName}
+                            {weekLabel ? ` · ${weekLabel}` : ""}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 mb-3 text-xs flex-wrap">
                           <div className="flex items-center gap-1">
                             <Dumbbell className="w-3 h-3 fc-text-dim" />
-                            <span className="fc-text-primary font-medium">{client.metrics.workoutsThisWeek}</span>
+                            <span className="text-cyan-400 font-bold tabular-nums">{client.metrics.workoutsThisWeek}</span>
                             <span className="fc-text-dim">this week</span>
                           </div>
+                          {client.metrics.mealCompliance7dPct != null && (
+                            <span className="fc-text-dim">
+                              Meals: <span className="text-cyan-400 font-bold tabular-nums">{client.metrics.mealCompliance7dPct}%</span> (7d)
+                            </span>
+                          )}
                           {client.metrics.checkinStreak > 0 && (
                             <div className="flex items-center gap-1">
                               <Flame className="w-3 h-3" style={{ color: "var(--fc-status-warning)" }} />
-                              <span className="fc-text-primary font-medium">{client.metrics.checkinStreak}</span>
+                              <span className="text-cyan-400 font-bold tabular-nums">{client.metrics.checkinStreak}</span>
                             </div>
                           )}
-                          <div className="text-xs" style={{ color: programStatus.color }}>
-                            {programStatus.label}
-                          </div>
+                          {client.metrics.subscriptionExpiringSoon && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold">
+                              <CreditCard className="w-3 h-3" />
+                              Sub ending
+                            </span>
+                          )}
+                          {programStatus.label != null && (
+                            <div className="text-xs" style={{ color: programStatus.color }}>
+                              {programStatus.label}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Wellness indicators */}
-                        <div className="flex items-center gap-2">
-                          {client.metrics.latestStress != null ? (
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ background: getWellnessColor(client.metrics.latestStress) }}
-                              title={`Stress: ${client.metrics.latestStress}/5`}
-                            />
-                          ) : (
-                            <div className="w-2 h-2 rounded-full fc-text-dim opacity-30" />
-                          )}
-                          {client.metrics.latestSoreness != null ? (
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ background: getWellnessColor(client.metrics.latestSoreness) }}
-                              title={`Soreness: ${client.metrics.latestSoreness}/5`}
-                            />
-                          ) : (
-                            <div className="w-2 h-2 rounded-full fc-text-dim opacity-30" />
-                          )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {client.metrics.latestStress != null ? (
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: getWellnessColor(client.metrics.latestStress) }}
+                                title={`Stress: ${client.metrics.latestStress}/5`}
+                              />
+                            ) : (
+                              <div className="w-2 h-2 rounded-full fc-text-dim opacity-30" />
+                            )}
+                            {client.metrics.latestSoreness != null ? (
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: getWellnessColor(client.metrics.latestSoreness) }}
+                                title={`Soreness: ${client.metrics.latestSoreness}/5`}
+                              />
+                            ) : (
+                              <div className="w-2 h-2 rounded-full fc-text-dim opacity-30" />
+                            )}
+                          </div>
+                          <span className="text-xs font-semibold text-cyan-400">View client →</span>
                         </div>
                       </div>
                     </GlassCard>
@@ -518,15 +618,24 @@ function ClientManagementContent() {
               <div className="space-y-2">
                 {filteredClients.map((client) => {
                   const relative = formatRelativeTime(client.metrics.lastActive);
+                  const checkinRel = formatRelativeTime(client.metrics.lastCheckinDate);
+                  const sameActivityAndCheckin =
+                    !!client.metrics.lastActive &&
+                    !!client.metrics.lastCheckinDate &&
+                    client.metrics.lastActive.slice(0, 10) === client.metrics.lastCheckinDate.slice(0, 10);
                   const programStatus = getProgramStatus(client.metrics.programStatus, client.metrics.programEndDate);
-                  const atRisk = needsAttention(client);
+                  const attention = getAttention(client);
                   const isInactiveOrPending = client.status === "inactive" || client.status === "pending";
+                  const displayAttentionReasons =
+                    sameActivityAndCheckin
+                      ? attention.reasons.filter((r) => !r.startsWith("Check-in "))
+                      : attention.reasons;
                   return (
                     <Link
                       key={client.id}
                       href={`/coach/clients/${client.id}`}
-                      className={`flex items-center gap-4 p-4 rounded-lg transition-all hover:scale-[1.01] fc-glass-soft cursor-pointer block ${atRisk ? "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10" : ""} ${isInactiveOrPending ? "opacity-80" : ""}`}
-                      style={!atRisk ? { borderLeft: `4px solid ${getStatusColor(client.status)}` } : undefined}
+                      className={`flex items-center gap-4 p-4 rounded-xl transition-all hover:scale-[1.01] cursor-pointer w-full border-0 outline-none backdrop-blur-md focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)] ${isInactiveOrPending ? "opacity-90" : ""}`}
+                      style={attentionCardSurfaceStyle(attention.level)}
                     >
                       {/* Avatar */}
                       <div
@@ -545,21 +654,55 @@ function ClientManagementContent() {
                           <h4 className="font-semibold truncate text-[color:var(--fc-text-primary)]">
                             {client.name}
                           </h4>
-                          <span
-                            className="px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0"
-                            style={{
-                              background: `${getStatusColor(client.status)}20`,
-                              color: getStatusColor(client.status),
-                            }}
-                          >
-                            {getStatusLabel(client.status)}
-                          </span>
                         </div>
-                        <div className="flex items-center gap-4 text-xs fc-text-dim">
-                          <span style={{ color: relative.color }}>{relative.text}</span>
+                        {displayAttentionReasons.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
+                            {attention.level === "urgent" && (
+                              <span
+                                className="shrink-0 font-semibold leading-none"
+                                style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 9999,
+                                  backgroundColor: "color-mix(in srgb, var(--fc-status-error) 24%, transparent)",
+                                  color: "var(--fc-status-error)",
+                                }}
+                              >
+                                Urgent
+                              </span>
+                            )}
+                            {attention.level === "warning" && (
+                              <span
+                                className="shrink-0 font-semibold leading-none"
+                                style={{
+                                  fontSize: 10,
+                                  padding: "2px 8px",
+                                  borderRadius: 9999,
+                                  backgroundColor: "color-mix(in srgb, var(--fc-status-warning) 26%, transparent)",
+                                  color: "var(--fc-status-warning)",
+                                }}
+                              >
+                                Review
+                              </span>
+                            )}
+                            <span className="text-[10px] text-[color:var(--fc-text-dim)] leading-tight truncate min-w-0">
+                              {displayAttentionReasons.slice(0, 2).join(" · ")}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 text-xs fc-text-dim flex-wrap">
+                          {sameActivityAndCheckin ? (
+                            <span style={{ color: relative.color }}>{relative.text} · activity & check-in</span>
+                          ) : (
+                            <>
+                              <span style={{ color: relative.color }}>Activity {relative.text}</span>
+                              <span style={{ color: checkinRel.color }}>Check-in {checkinRel.text}</span>
+                            </>
+                          )}
                           <span className="flex items-center gap-1">
                             <Dumbbell className="w-3 h-3" />
-                            {client.metrics.workoutsThisWeek} this week
+                            <span className="text-cyan-400 font-bold tabular-nums">{client.metrics.workoutsThisWeek}</span>
+                            <span className="fc-text-dim">this week</span>
                           </span>
                           {client.metrics.checkinStreak > 0 && (
                             <span className="flex items-center gap-1">
@@ -572,9 +715,20 @@ function ClientManagementContent() {
 
                       {/* Right side: Program status and wellness */}
                       <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-xs text-right" style={{ color: programStatus.color }}>
-                          {programStatus.label}
-                        </div>
+                        {client.metrics.subscriptionExpiringSoon && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            title="Membership ending soon"
+                          >
+                            <CreditCard className="w-3 h-3" />
+                            Sub
+                          </span>
+                        )}
+                        {programStatus.label != null && (
+                          <div className="text-xs text-right" style={{ color: programStatus.color }}>
+                            {programStatus.label}
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5">
                           {client.metrics.latestStress != null ? (
                             <div
@@ -604,6 +758,20 @@ function ClientManagementContent() {
           )}
         </main>
       </div>
+
+      <WeekReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal(prev => ({ ...prev, isOpen: false }))}
+        onComplete={() => {
+          didLoadRef.current = false;
+          loadingRef.current = false;
+          loadClients();
+        }}
+        programAssignmentId={reviewModal.assignmentId}
+        programId={reviewModal.programId}
+        weekNumber={reviewModal.weekNumber}
+        clientName={reviewModal.clientName}
+      />
     </AnimatedBackground>
   );
 }

@@ -1535,6 +1535,12 @@ export default function EnhancedClientWorkouts({
                             key={item.id}
                             title={name}
                             subtitle={dayLabel}
+                            category={
+                              typeof item.workout_templates?.category ===
+                              "string"
+                                ? item.workout_templates.category
+                                : null
+                            }
                             onStart={() => startWorkout(asDaily)}
                           />
                         );

@@ -88,7 +88,7 @@ export function LargeInput({
           max={max}
           autoFocus={autoFocus}
           disabled={disabled}
-          className="text-2xl sm:text-3xl p-3 sm:p-4 text-center font-bold font-mono h-14 sm:h-16 border-2 rounded-xl fc-text-primary w-full"
+          className="text-2xl sm:text-3xl p-3 sm:p-4 text-center font-bold font-mono h-14 sm:h-16 border-2 rounded-xl fc-text-primary w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-0 focus-visible:border-cyan-500/60"
           style={{
             background: 'var(--fc-surface-card)',
             borderColor: 'var(--fc-surface-card-border)',
