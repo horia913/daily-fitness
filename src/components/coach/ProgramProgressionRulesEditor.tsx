@@ -7,9 +7,8 @@ import {
   ProgramProgressionService,
   ProgramProgressionRule,
 } from "@/lib/programProgressionService";
-import { Save, RefreshCw, Replace, AlertCircle } from "lucide-react";
+import { Save, RefreshCw, Replace, AlertCircle, Info } from "lucide-react";
 import { Exercise, WorkoutTemplate } from "@/lib/workoutTemplateService";
-import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { supabase } from "@/lib/supabase";
 import {
   Select,
@@ -20,9 +19,16 @@ import {
 } from "@/components/ui/select";
 import ExerciseDetailForm from "@/components/features/workouts/ExerciseDetailForm";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
-import type { TrainingBlock } from "@/types/trainingBlock";
-import { generateProgression, type GenerationResult } from "@/lib/progressionGenerator";
-import { ProgressionPreview } from "@/components/coach/ProgressionPreview";
+import { type TrainingBlock, PROGRESSION_PROFILES } from "@/types/trainingBlock";
+import {
+  generateProgression,
+  TIER_3_SKIP,
+  type GenerationResult,
+} from "@/lib/progressionGenerator";
+import {
+  ProgressionPreview,
+  SET_TYPE_SHORT,
+} from "@/components/coach/ProgressionPreview";
 
 interface ProgramProgressionRulesEditorProps {
   programId: string;
@@ -98,35 +104,59 @@ export default function ProgramProgressionRulesEditor({
   const [hasExistingWeeks, setHasExistingWeeks] = useState(false);
   const [applySummary, setApplySummary] = useState<string | null>(null);
 
+  // Which set_entries are included in auto-progression (Primary).
+  // Excluded entries keep their Week-1 values unchanged.
+  const [progressExercises, setProgressExercises] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  /** Prop and/or loaded rules may carry the block id; preview + apply need a stable id. */
+  const resolvedTrainingBlockId = useMemo(() => {
+    if (trainingBlockId && String(trainingBlockId).trim() !== "") {
+      return trainingBlockId;
+    }
+    for (const bf of blockForms) {
+      for (const r of bf.rules) {
+        const id = r.training_block_id;
+        if (id != null && String(id).trim() !== "") {
+          return id as string;
+        }
+      }
+    }
+    return undefined;
+  }, [trainingBlockId, blockForms]);
+
   // Fetch active training block when block context is available (for progression profile / Mode 1)
   useEffect(() => {
-    if (!trainingBlockId) {
+    if (!resolvedTrainingBlockId) {
       setActiveBlock(null);
       return;
     }
     let cancelled = false;
     (async () => {
-      const block = await TrainingBlockService.getTrainingBlock(trainingBlockId);
+      const block = await TrainingBlockService.getTrainingBlock(
+        resolvedTrainingBlockId,
+      );
       if (cancelled) return;
       setActiveBlock(block ?? null);
     })();
     return () => {
       cancelled = true;
     };
-  }, [trainingBlockId]);
+  }, [resolvedTrainingBlockId]);
 
   // Check if Week 2+ already have rules (for overwrite warning).
   // Query by training_block_id + week > current to avoid the schedule-ID mismatch
   // that exists across weeks of the same block.
   useEffect(() => {
-    if (!trainingBlockId || !programId || !isFirstWeekOfBlock) return;
+    if (!resolvedTrainingBlockId || !programId || !isFirstWeekOfBlock) return;
     if (!activeBlock || activeBlock.progression_profile === "none") return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from("program_progression_rules")
         .select("id")
-        .eq("training_block_id", trainingBlockId)
+        .eq("training_block_id", resolvedTrainingBlockId)
         .gt("week_number", weekNumber)
         .limit(1);
       if (!cancelled) setHasExistingWeeks((data?.length ?? 0) > 0);
@@ -134,11 +164,17 @@ export default function ProgramProgressionRulesEditor({
     return () => {
       cancelled = true;
     };
-  }, [programId, trainingBlockId, weekNumber, isFirstWeekOfBlock, activeBlock?.progression_profile]);
+  }, [
+    programId,
+    resolvedTrainingBlockId,
+    weekNumber,
+    isFirstWeekOfBlock,
+    activeBlock?.progression_profile,
+  ]);
 
   useEffect(() => {
     loadRules();
-  }, [programId, programScheduleId, weekNumber, trainingBlockId]);
+  }, [programId, programScheduleId, weekNumber, resolvedTrainingBlockId]);
 
   const loadRules = async () => {
     try {
@@ -150,7 +186,7 @@ export default function ProgramProgressionRulesEditor({
           programId,
           weekNumber,
           programScheduleId,
-          trainingBlockId
+          resolvedTrainingBlockId
         );
 
       // If no rules exist and we have a schedule ID, try to copy workout data
@@ -174,7 +210,7 @@ export default function ProgramProgressionRulesEditor({
                 programScheduleId,
                 scheduleData.template_id,
                 weekNumber,
-                trainingBlockId ?? undefined
+                resolvedTrainingBlockId ?? undefined
               );
 
             if (success) {
@@ -182,7 +218,8 @@ export default function ProgramProgressionRulesEditor({
                 await ProgramProgressionService.getProgressionRules(
                   programId,
                   weekNumber,
-                  programScheduleId
+                  programScheduleId,
+                  resolvedTrainingBlockId
                 );
               setIsPlaceholder(newIsPlaceholder);
               const grouped = groupRulesByBlock(newRules);
@@ -265,8 +302,126 @@ export default function ProgramProgressionRulesEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFirstWeekOfBlock, activeBlock, blockForms]);
 
+  const effectiveGenerationResult = useMemo((): GenerationResult => {
+    if (!generationResult.weekRules.length) return generationResult;
+
+    // Baseline Week-1 rule values keyed by set_entry_id.
+    const baselineBySetEntryId = new Map<string, ProgramProgressionRule>();
+    for (const group of blockForms) {
+      for (const rule of group.rules) {
+        if (rule?.set_entry_id) baselineBySetEntryId.set(rule.set_entry_id, rule);
+      }
+    }
+
+    const included = progressExercises;
+
+    const excludedSetEntryIds = new Set<string>();
+    for (const group of blockForms) {
+      for (const rule of group.rules) {
+        if (!rule?.set_entry_id) continue;
+        if (!included.has(rule.set_entry_id) && !TIER_3_SKIP.has(rule.set_type)) {
+          excludedSetEntryIds.add(rule.set_entry_id);
+        }
+      }
+    }
+
+    const effectiveWeekRules = generationResult.weekRules.map((gw) => {
+      const effectiveRules = gw.rules.map((r) => {
+        const setEntryId = (r as any).set_entry_id as string | undefined;
+        if (!setEntryId) return r;
+        if (included.has(setEntryId)) return r;
+
+        const base = baselineBySetEntryId.get(setEntryId);
+        if (!base) return r;
+
+        const { id, created_at, updated_at, ...rest } = base as any;
+        return {
+          ...(JSON.parse(JSON.stringify(rest)) as Omit<ProgramProgressionRule, "id">),
+          week_number: gw.weekNumber,
+        } as ProgramProgressionRule;
+      });
+
+      const effectiveChanges = gw.changes.filter((c) => {
+        if (c.set_entry_id) return !excludedSetEntryIds.has(c.set_entry_id);
+        return true;
+      });
+
+      return { ...gw, rules: effectiveRules, changes: effectiveChanges };
+    });
+
+    // Recompute summary counts for tier 1/2 based on selection.
+    const tier1_2SetEntryIds = new Set<string>();
+    for (const group of blockForms) {
+      for (const rule of group.rules) {
+        if (!rule?.set_entry_id) continue;
+        if (TIER_3_SKIP.has(rule.set_type)) continue;
+        tier1_2SetEntryIds.add(rule.set_entry_id);
+      }
+    }
+
+    const selectedCount = Array.from(tier1_2SetEntryIds).filter((id) =>
+      included.has(id),
+    ).length;
+    const excludedCount = tier1_2SetEntryIds.size - selectedCount;
+
+    return {
+      weekRules: effectiveWeekRules,
+      summary: {
+        autoProgressed: selectedCount,
+        unchanged: excludedCount,
+        unchangedTypes: [],
+      },
+    };
+  }, [generationResult, progressExercises, blockForms]);
+
+  const tier1_2SetEntryIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const group of blockForms) {
+      for (const rule of group.rules) {
+        if (!rule?.set_entry_id) continue;
+        if (TIER_3_SKIP.has(rule.set_type)) continue;
+        ids.add(rule.set_entry_id);
+      }
+    }
+    return Array.from(ids);
+  }, [blockForms]);
+
+  // Initialize selection to ALL exercises (default behavior) whenever the week-1 rule set changes.
+  useEffect(() => {
+    if (!isFirstWeekOfBlock) return;
+    if (!activeBlock) return;
+    if (activeBlock.progression_profile === "none") return;
+    if (blockForms.length === 0) return;
+
+    const ids = new Set<string>();
+    for (const group of blockForms) {
+      for (const rule of group.rules) {
+        if (rule?.set_entry_id) ids.add(rule.set_entry_id);
+      }
+    }
+    setProgressExercises(ids);
+  }, [isFirstWeekOfBlock, activeBlock?.id, activeBlock?.progression_profile, blockForms]);
+
+  const toggleExerciseIncluded = (setEntryId: string, included: boolean) => {
+    setProgressExercises((prev) => {
+      const next = new Set(prev);
+      if (included) next.add(setEntryId);
+      else next.delete(setEntryId);
+      return next;
+    });
+  };
+
+  const selectAllExercises = (allIds: string[]) => {
+    setProgressExercises(new Set(allIds));
+  };
+
+  const deselectAllExercises = () => {
+    setProgressExercises(new Set());
+  };
+
   const handleApplyProgression = async () => {
-    if (!trainingBlockId || generationResult.weekRules.length === 0) return;
+    if (!resolvedTrainingBlockId || generationResult.weekRules.length === 0)
+      return;
     setIsApplyingProgression(true);
     try {
       // weekNumber is the absolute program week of this block's Week 1.
@@ -287,7 +442,7 @@ export default function ProgramProgressionRulesEditor({
       );
       if (!ok) throw new Error("Failed to clear existing Week 2+ rules");
 
-      const flatRules = generationResult.weekRules.flatMap((gw) => gw.rules);
+      const flatRules = effectiveGenerationResult.weekRules.flatMap((gw) => gw.rules);
       const firstRule = blockForms[0]?.rules[0];
       const programIdVal = firstRule?.program_id ?? programId;
 
@@ -307,7 +462,7 @@ export default function ProgramProgressionRulesEditor({
           // Use the schedule ID that belongs to this specific target week, not the
           // source week's schedule ID that the cloned rule carries.
           program_schedule_id: weekToScheduleId.get(absoluteWeek) ?? programScheduleId,
-          training_block_id: r.training_block_id ?? trainingBlockId,
+          training_block_id: r.training_block_id ?? resolvedTrainingBlockId,
           week_number: absoluteWeek,
         };
       });
@@ -316,10 +471,13 @@ export default function ProgramProgressionRulesEditor({
       if (!inserted) throw new Error("Failed to insert generated rules");
 
       // Build and store the apply summary message
-      const { autoProgressed, unchanged, unchangedTypes } = generationResult.summary;
+      const { autoProgressed, unchanged, unchangedTypes } =
+        effectiveGenerationResult.summary;
       const unchangedNote =
         unchanged > 0
-          ? `, ${unchanged} unchanged (${unchangedTypes.map((t) => t.toUpperCase()).join(", ")})`
+          ? unchangedTypes.length > 0
+            ? `, ${unchanged} unchanged (${unchangedTypes.map((t) => t.toUpperCase()).join(", ")})`
+            : `, ${unchanged} excluded (maintenance / static)`
           : "";
       setApplySummary(
         `Applied: ${autoProgressed} exercise${autoProgressed !== 1 ? "s" : ""} progressed${unchangedNote}.`
@@ -337,12 +495,14 @@ export default function ProgramProgressionRulesEditor({
   };
 
   const handleEditManually = async () => {
-    if (!activeBlock || !trainingBlockId) return;
+    if (!activeBlock || !resolvedTrainingBlockId) return;
     try {
-      await TrainingBlockService.updateTrainingBlock(trainingBlockId, {
+      await TrainingBlockService.updateTrainingBlock(resolvedTrainingBlockId, {
         progression_profile: "none",
       });
-      const updated = await TrainingBlockService.getTrainingBlock(trainingBlockId);
+      const updated = await TrainingBlockService.getTrainingBlock(
+        resolvedTrainingBlockId,
+      );
       setActiveBlock(updated);
       onUpdate?.();
     } catch (err) {
@@ -1071,7 +1231,7 @@ export default function ProgramProgressionRulesEditor({
         programScheduleId,
         scheduleData.template_id,
         weekNumber,
-        trainingBlockId ?? undefined
+        resolvedTrainingBlockId ?? undefined
       );
 
       if (success) {
@@ -1106,40 +1266,6 @@ export default function ProgramProgressionRulesEditor({
       </div>
     );
   }
-
-  const buildDisplayExercise = (block: BlockFormState) => {
-    const exerciseData: any = {
-      ...block.formValue,
-      exercise_type: block.blockType,
-      set_name: block.blockName,
-      set_order: block.blockOrder,
-    };
-
-    if (!exerciseData.exercise && exerciseData.exercise_id) {
-      exerciseData.exercise = findExerciseMeta(exerciseData.exercise_id);
-    }
-
-    if (exerciseData.superset_exercise_id && !exerciseData.superset_exercise) {
-      exerciseData.superset_exercise = findExerciseMeta(
-        exerciseData.superset_exercise_id
-      );
-    }
-
-    if (
-      Array.isArray(exerciseData.giant_set_exercises) &&
-      exerciseData.giant_set_exercises.length > 0
-    ) {
-      exerciseData.giant_set_exercises = exerciseData.giant_set_exercises.map(
-        (item: any) => ({
-          ...item,
-          exercise:
-            item.exercise || findExerciseMeta(item.exercise_id) || undefined,
-        })
-      );
-    }
-
-    return exerciseData;
-  };
 
   return (
     <div className="space-y-6">
@@ -1177,20 +1303,84 @@ export default function ProgramProgressionRulesEditor({
         </div>
       </div>
 
+      {/* Block metadata missing — preview cannot run without a loaded training_blocks row */}
+      {isFirstWeekOfBlock &&
+        !loading &&
+        !activeBlock &&
+        blockForms.length > 0 && (
+          <div className="rounded-xl border px-4 py-3 text-sm flex gap-3 items-start fc-glass-soft border-[color:var(--fc-glass-border)]">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" aria-hidden />
+            <p className="fc-text-dim leading-relaxed min-w-0">
+              Progression settings could not be loaded for this program day. Ensure this
+              schedule row is linked to a{" "}
+              <strong className="fc-text-primary">training block</strong> (see Weekly
+              Schedule / program setup). Without that link, automatic progression cannot
+              run.
+            </p>
+          </div>
+        )}
+
+      {/* Explains why the week-to-week generator is hidden (common when block is still "manual") */}
+      {isFirstWeekOfBlock &&
+        activeBlock &&
+        blockForms.length > 0 &&
+        activeBlock.progression_profile === "none" && (
+          <div className="rounded-xl border px-4 py-3 text-sm flex gap-3 items-start fc-glass-soft border-[color:var(--fc-glass-border)]">
+            <Info className="w-5 h-5 shrink-0 mt-0.5 text-cyan-400" aria-hidden />
+            <div className="space-y-1.5 min-w-0 fc-text-primary">
+              <p className="font-semibold">
+                Automatic progression preview is off for this block
+              </p>
+              <p className="fc-text-dim leading-relaxed">
+                The training block is set to{" "}
+                <span className="font-medium fc-text-primary">
+                  {PROGRESSION_PROFILES.none}
+                </span>
+                . To generate and preview changes for weeks 2 and beyond, open the
+                training block menu (⋯) above, choose{" "}
+                <strong>Edit Block Details</strong>, then
+                pick a <strong>Progression profile</strong> (for example{" "}
+                <strong>Volume Ramp</strong> for hypertrophy, or{" "}
+                <strong>Intensity Ramp</strong> for strength).
+              </p>
+            </div>
+          </div>
+        )}
+
+      {isFirstWeekOfBlock &&
+        activeBlock &&
+        activeBlock.progression_profile !== "none" &&
+        blockForms.length > 0 &&
+        (Number(activeBlock.duration_weeks) || 0) < 2 && (
+          <div className="rounded-xl border px-4 py-3 text-sm flex gap-3 items-start fc-glass-soft border-[color:var(--fc-glass-border)]">
+            <Info className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" aria-hidden />
+            <p className="fc-text-dim leading-relaxed min-w-0">
+              This block is only <strong className="fc-text-primary">one week</strong>{" "}
+              long. Add at least a second week in{" "}
+              <strong className="fc-text-primary">Edit training block</strong> to use
+              the progression generator.
+            </p>
+          </div>
+        )}
+
       {/* Progression Preview (profile-based, first week of block only) — collapsed by default */}
       {isFirstWeekOfBlock &&
         activeBlock &&
         activeBlock.progression_profile !== "none" &&
         blockForms.length > 0 &&
-        generationResult.weekRules.length > 0 && (
+        effectiveGenerationResult.weekRules.length > 0 && (
           <ProgressionPreview
-            weekRules={generationResult.weekRules}
-            summary={generationResult.summary}
+            weekRules={effectiveGenerationResult.weekRules}
+            summary={effectiveGenerationResult.summary}
             profile={activeBlock.progression_profile}
             hasExistingWeeks={hasExistingWeeks}
             onApply={handleApplyProgression}
             onEditManually={handleEditManually}
             isApplying={isApplyingProgression}
+            progressExercises={progressExercises}
+            onSelectAll={() => selectAllExercises(tier1_2SetEntryIds)}
+            onDeselectAll={deselectAllExercises}
+            onSetExerciseIncluded={toggleExerciseIncluded}
           />
         )}
 
@@ -1216,21 +1406,19 @@ export default function ProgramProgressionRulesEditor({
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {blockForms.map((block, index) => {
-            const exerciseData = buildDisplayExercise(block);
+        <div className="border-t border-black/5 dark:border-white/5 divide-y divide-black/5 dark:divide-white/5">
+          {blockForms.map((block) => {
+            const typeEyebrow =
+              SET_TYPE_SHORT[block.blockType] ??
+              block.blockType.replace(/_/g, " ");
             return (
-              <ExerciseBlockCard
-                key={block.key}
-                exercise={exerciseData}
-                index={index}
-                availableExercises={exercises}
-                renderMode="form"
-              >
+              <div key={block.key} className="py-2 first:pt-1">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                  {typeEyebrow}
+                </p>
                 <ExerciseDetailForm
                   exercise={{
                     ...block.formValue,
-                    // Ensure all fields are properly passed
                     load_percentage: block.formValue.load_percentage || undefined,
                     weight_kg: block.formValue.weight_kg || undefined,
                   }}
@@ -1240,7 +1428,7 @@ export default function ProgramProgressionRulesEditor({
                   allowTypeChange={false}
                   allowStructureEditing={false}
                 />
-              </ExerciseBlockCard>
+              </div>
             );
           })}
         </div>

@@ -95,7 +95,7 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
       rest_seconds: block.rest_seconds?.toString() || "",
       notes: block.set_notes || "",
       set_name: block.set_name,
-      // RIR, Tempo, Notes from first exercise (for blocks that support these)
+      // Prescribed RPE (`rir`), tempo, notes from first exercise (for blocks that support these)
       rir: firstExercise?.rir?.toString() || "",
       // Tempo: for time-based blocks, not stored in time_protocols (not in schema)
       // For other blocks, get from first exercise

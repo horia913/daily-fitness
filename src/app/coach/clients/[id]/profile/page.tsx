@@ -116,7 +116,7 @@ export default function ClientProfilePage() {
             className="text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
             asChild
           >
-            <Link href="/coach/habits">Assign habits library</Link>
+            <Link href="/coach/goals?tab=habits">Assign habits library</Link>
           </Button>
         </div>
         <ClientHabitsView clientId={clientId} />

@@ -91,6 +91,8 @@ interface LiveWorkoutBlockExecutorProps {
         sets: number;
         avgRpe: number | null;
         date: string;
+        workout_log_id?: string;
+        setDetails?: import("@/lib/clientProgressionService").LastSessionSetRow[];
       } | null;
       personalBest: {
         maxWeight: number | null;
@@ -124,6 +126,8 @@ interface LiveWorkoutBlockExecutorProps {
       currentMetricValue: number;
     }>,
   ) => void;
+  /** Exit workout (confirm + navigate). Passed to block layout header back control. */
+  onExitWorkout?: () => void;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -152,6 +156,7 @@ export default function LiveWorkoutBlockExecutor({
   onExerciseChanged,
   onPRDetected,
   onAchievementsUnlocked,
+  onExitWorkout,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
   const { user: authUser } = useAuth();
@@ -1029,6 +1034,7 @@ export default function LiveWorkoutBlockExecutor({
     onSetLogUpsert: onSetLogUpsert ?? (() => {}),
     onSetEditSaved: onSetEditSaved ?? (() => {}),
     loggedSets: loggedSets ?? [],
+    onWorkoutBack: onExitWorkout,
   };
 
   // Route to appropriate component based on block type

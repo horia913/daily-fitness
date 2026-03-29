@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { computeExerciseCountsByTemplateIds } from '@/lib/workoutTemplateExerciseCounts'
 
 export async function GET() {
   try {
@@ -41,9 +42,49 @@ export async function GET() {
       )
     }
 
-    const templates = (templatesData ?? []).map((t: Record<string, unknown>) => ({
+    const rawList = templatesData ?? []
+    const templateIds = rawList.map((t: { id: string }) => t.id).filter(Boolean)
+
+    const zeroCounts = (): Record<string, number> =>
+      Object.fromEntries(templateIds.map((id) => [id, 0]))
+
+    let exerciseCounts: Record<string, number> = zeroCounts()
+
+    if (templateIds.length > 0) {
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'count_exercises_by_template_ids',
+        { p_template_ids: templateIds }
+      )
+
+      if (!rpcError && Array.isArray(rpcData)) {
+        exerciseCounts = zeroCounts()
+        for (const row of rpcData as { template_id?: string; exercise_count?: number | string }[]) {
+          const tid = row?.template_id
+          if (tid) {
+            exerciseCounts[tid] = Number(row.exercise_count) || 0
+          }
+        }
+      } else {
+        if (rpcError) {
+          console.warn(
+            '[coach/workouts/templates] count_exercises_by_template_ids RPC unavailable or failed; using parallel fallback:',
+            rpcError.message
+          )
+        }
+        const empty = zeroCounts()
+        const fallback = await Promise.race([
+          computeExerciseCountsByTemplateIds(supabase, templateIds),
+          new Promise<Record<string, number>>((resolve) =>
+            setTimeout(() => resolve(empty), 14_000)
+          ),
+        ])
+        exerciseCounts = { ...empty, ...fallback }
+      }
+    }
+
+    const templates = rawList.map((t: Record<string, unknown>) => ({
       ...t,
-      exercise_count: (t.exercise_count as number) ?? 0,
+      exercise_count: exerciseCounts[t.id as string] ?? 0,
     }))
 
     const assignmentCountByTemplate: Record<string, number> = {}

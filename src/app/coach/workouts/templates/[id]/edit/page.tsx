@@ -8,7 +8,6 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { useTheme } from "@/contexts/ThemeContext";
 import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
 import WorkoutTemplateService, {
@@ -74,7 +73,8 @@ export default function EditWorkoutTemplatePage() {
         WorkoutTemplateService.getWorkoutTemplateById(templateId, { skipExerciseCount: true }),
         (async () => {
           const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
-          return WorkoutBlockService.getWorkoutBlocks(templateId, { lite: true });
+          // Full enrichment (drop_sets, cluster_sets, time_protocols, etc.) — lite skips those and breaks non-straight-set blocks in the editor.
+          return WorkoutBlockService.getWorkoutBlocks(templateId);
         })(),
       ]);
       if (process.env.NODE_ENV !== "production") {
@@ -156,45 +156,34 @@ export default function EditWorkoutTemplatePage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen pb-32">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-            <Link href="/coach/workouts/templates" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Templates
-            </Link>
-          </div>
-          <nav className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] px-4 sm:px-6 py-4">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
-              <div className="flex items-center gap-4">
+          <nav className="sticky top-0 z-50 border-b border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg-deep)]/85 backdrop-blur-md px-4 sm:px-6">
+            <div className="max-w-7xl mx-auto flex min-h-11 max-h-12 items-center justify-between gap-2 py-2">
+              <h1 className="text-lg font-semibold fc-text-primary truncate min-w-0">
+                Edit template
+              </h1>
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wide ${isDirty ? "text-amber-600 dark:text-amber-400" : "text-[color:var(--fc-text-dim)]"}`}
+                >
+                  {isDirty ? "Unsaved" : "Saved"}
+                </span>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={handleClose}
-                  className="fc-btn fc-btn-ghost h-10 w-10 rounded-xl"
+                  className="h-8 text-xs px-2"
+                  aria-label="Back"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                  Back
                 </Button>
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight fc-text-primary">
-                    Edit Template
-                  </h1>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-sm fc-text-dim">
-                      {template.name}
-                    </span>
-                    {!isDirty ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--fc-accent-green)]" />
-                        <span className="text-[11px] font-bold uppercase tracking-wider fc-text-dim">Saved</span>
-                      </>
-                    ) : (
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Unsaved changes</span>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           </nav>
-          <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+          <p className="max-w-7xl mx-auto px-4 sm:px-6 -mt-1 mb-1 text-xs text-[color:var(--fc-text-dim)] truncate">
+            {template.name}
+          </p>
+          <div className="max-w-7xl mx-auto space-y-3 p-4 sm:p-6 pt-2">
             {isOpen && (
               <WorkoutTemplateForm
                 isOpen={isOpen}

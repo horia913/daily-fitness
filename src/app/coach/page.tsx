@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AnimatedEntry } from "@/components/ui/AnimatedEntry";
-import Link from "next/link";
+import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import {
   Users,
   Dumbbell,
@@ -23,12 +23,14 @@ import {
   Flame,
   Utensils,
   Trophy,
+  Clock,
 } from "lucide-react";
 import { type MorningBriefing, type ClientAlert, sortAlertsByPriority } from "@/lib/coachDashboardService";
 import {
-  attentionCardSurfaceStyle,
+  attentionListRowClass,
   computeClientAttentionFromSummary,
 } from "@/lib/coachClientAttention";
+import { cn } from "@/lib/utils";
 function CoachDashboardContent() {
   const { user, profile } = useAuth();
   const { performanceSettings } = useTheme();
@@ -42,6 +44,13 @@ function CoachDashboardContent() {
   const [sortBy, setSortBy] = useState<"name" | "lastActive" | "streak" | "compliance">("name");
   const loadingRef = useRef(false);
   const didLoadRef = useRef(false);
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    assignmentId: string;
+    programId: string;
+    weekNumber: number;
+    clientName: string;
+  }>({ isOpen: false, assignmentId: "", programId: "", weekNumber: 0, clientName: "" });
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
     if (!user) return;
@@ -138,7 +147,25 @@ function CoachDashboardContent() {
   const infoAlerts = allAlerts.filter((a) => a.severity === "low");
   const orderedAlerts = [...urgentAlerts, ...warningAlerts, ...infoAlerts];
   const visibleAlerts = orderedAlerts.slice(0, 5);
-  const hasMoreAlerts = orderedAlerts.length > 5;
+
+  const weekReviewQueue = useMemo(() => {
+    if (!briefing) return [];
+    return briefing.clientSummaries.filter(
+      (c) =>
+        c.weekReviewNeeded &&
+        c.completedWeekNumber != null &&
+        c.activeProgramAssignmentId &&
+        c.activeProgramId,
+    );
+  }, [briefing]);
+
+  const recentCheckinQueue = useMemo(() => {
+    if (!briefing) return [];
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 2);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return briefing.clientSummaries.filter((c) => c.lastCheckinDate && c.lastCheckinDate >= cutoffStr);
+  }, [briefing]);
 
   // Filter and sort client summaries
   const filteredAndSortedClients = briefing?.clientSummaries
@@ -201,12 +228,15 @@ function CoachDashboardContent() {
               <p className="text-[11px] fc-text-dim font-mono mt-1">{dateStr}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                href="/coach/menu"
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/coach/menu";
+                }}
                 className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
               >
                 Menu
-              </Link>
+              </button>
               <div className="w-10 h-10 rounded-full fc-surface-elevated border border-[color:var(--fc-glass-border)] flex items-center justify-center font-bold fc-text-primary text-sm">
                 {profile?.first_name?.[0] || user?.email?.[0] || "C"}
               </div>
@@ -293,11 +323,94 @@ function CoachDashboardContent() {
               </section>
             </AnimatedEntry>
 
-            {/* ===== ATTENTION REQUIRED ===== */}
+            {/* ===== WEEK REVIEWS ===== */}
+            <AnimatedEntry delay={80} animation="fade-up">
+              <section className="mb-6">
+                <h3 className="text-xs font-semibold uppercase tracking-widest fc-text-dim mb-3">
+                  Week reviews
+                </h3>
+                {weekReviewQueue.length === 0 ? (
+                  <div className="fc-surface rounded-xl p-4 text-center">
+                    <p className="text-xs fc-text-dim">No pending week reviews</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col border-y border-white/5">
+                    {weekReviewQueue.map((c) => (
+                      <button
+                        key={c.clientId}
+                        type="button"
+                        onClick={() =>
+                          setReviewModal({
+                            isOpen: true,
+                            assignmentId: c.activeProgramAssignmentId!,
+                            programId: c.activeProgramId!,
+                            weekNumber: c.completedWeekNumber!,
+                            clientName: `${c.firstName} ${c.lastName}`.trim() || "Client",
+                          })
+                        }
+                        className="flex w-full items-center gap-3 border-b border-white/5 py-3 pl-2 text-left transition-colors hover:bg-white/[0.02] border-l-[3px] border-l-amber-500"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg fc-surface-elevated fc-text-warning">
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium fc-text-primary">
+                            {c.firstName} {c.lastName}
+                          </div>
+                          <p className="text-xs fc-text-dim">Week {c.completedWeekNumber} ready for review</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </AnimatedEntry>
+
+            {/* ===== RECENT CHECK-INS (WELLNESS) ===== */}
+            <AnimatedEntry delay={90} animation="fade-up">
+              <section className="mb-6">
+                <h3 className="text-xs font-semibold uppercase tracking-widest fc-text-dim mb-3">
+                  Recent check-ins
+                </h3>
+                <p className="text-[11px] fc-text-dim mb-2">Clients with a wellness log in the last ~48 hours</p>
+                {recentCheckinQueue.length === 0 ? (
+                  <div className="fc-surface rounded-xl p-4 text-center">
+                    <p className="text-xs fc-text-dim">No recent wellness check-ins</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col border-y border-white/5">
+                    {recentCheckinQueue.map((c) => (
+                      <button
+                        key={c.clientId}
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/coach/clients/${c.clientId}/progress`;
+                        }}
+                        className="flex w-full items-center gap-3 border-b border-white/5 py-3 pl-2 text-left transition-colors hover:bg-white/[0.02] border-l-[3px] border-l-purple-500"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg fc-surface-elevated text-purple-400">
+                          <ClipboardCheck className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium fc-text-primary">
+                            {c.firstName} {c.lastName}
+                          </div>
+                          <p className="text-xs fc-text-dim">Last log {c.lastCheckinDate}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </AnimatedEntry>
+
+            {/* ===== CLIENTS NEEDING ATTENTION (ALERTS) ===== */}
             <AnimatedEntry delay={100} animation="fade-up">
               <section className="mb-6">
                 <h3 className="text-xs font-semibold uppercase tracking-widest fc-text-dim mb-3">
-                  Attention Required
+                  Clients needing attention
                 </h3>
                 {visibleAlerts.length === 0 ? (
                   <div className="fc-surface rounded-xl p-6 text-center">
@@ -305,7 +418,7 @@ function CoachDashboardContent() {
                     <p className="text-xs fc-text-dim">No alerts at this time</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="flex flex-col border-y border-white/5">
                     {visibleAlerts.map((alert, idx) => {
                       const getAlertIcon = () => {
                         switch (alert.type) {
@@ -343,12 +456,12 @@ function CoachDashboardContent() {
                         return "low";
                       };
                       const severity = getAlertSeverity();
-                      const attentionWrap =
+                      const rowAccent =
                         severity === "high"
-                          ? "fc-attention-urgent"
+                          ? "border-l-[color:var(--fc-status-error)] bg-red-500/[0.06] dark:bg-red-500/[0.10]"
                           : severity === "medium"
-                            ? "fc-attention-warning"
-                            : "fc-attention-info";
+                            ? "border-l-[color:var(--fc-status-warning)] bg-amber-500/[0.06] dark:bg-amber-500/[0.10]"
+                            : "border-l-[color:var(--fc-status-info)] bg-cyan-500/[0.06] dark:bg-cyan-500/[0.10]";
                       const iconColorClass =
                         severity === "high"
                           ? "fc-text-error"
@@ -357,27 +470,28 @@ function CoachDashboardContent() {
                             : "fc-text-info";
 
                       return (
-                        <Link key={`${alert.clientId}-${idx}`} href={`/coach/clients/${alert.clientId}`}>
-                          <div
-                            className={`fc-surface rounded-xl p-4 flex items-center gap-3 transition-all hover:translate-y-[-1px] cursor-pointer ${attentionWrap}`}
-                          >
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center fc-surface-elevated ${iconColorClass}`}>
-                              {getAlertIcon()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium fc-text-primary">{alert.clientName}</div>
-                              <p className="text-xs fc-text-dim">{alert.detail}</p>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                        <button
+                          key={`${alert.clientId}-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            window.location.href = `/coach/clients/${alert.clientId}`;
+                          }}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center gap-3 border-b border-white/5 py-3 pl-2 text-left transition-colors hover:bg-white/[0.02] border-l-[3px]",
+                            rowAccent,
+                          )}
+                        >
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg fc-surface-elevated ${iconColorClass}`}>
+                            {getAlertIcon()}
                           </div>
-                        </Link>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium fc-text-primary">{alert.clientName}</div>
+                            <p className="text-xs fc-text-dim">{alert.detail}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                        </button>
                       );
                     })}
-                    {hasMoreAlerts && (
-                      <Link href="/coach/clients" className="block text-center text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors mt-2">
-                        See all {orderedAlerts.length} alerts →
-                      </Link>
-                    )}
                   </div>
                 )}
               </section>
@@ -423,7 +537,7 @@ function CoachDashboardContent() {
                     <p className="text-xs fc-text-dim">Try adjusting your search</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="flex flex-col border-y border-white/5">
                     {filteredAndSortedClients.map((client) => {
                       const dashAttention = computeClientAttentionFromSummary(client);
                       const workoutAgo = client.lastWorkoutDate
@@ -437,15 +551,17 @@ function CoachDashboardContent() {
                         !!client.lastCheckinDate &&
                         client.lastWorkoutDate.slice(0, 10) === client.lastCheckinDate.slice(0, 10);
                       return (
-                      <Link
+                      <button
                         key={client.clientId}
-                        href={`/coach/clients/${client.clientId}`}
-                        className="block w-full rounded-2xl border-0 outline-none no-underline text-inherit focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)]"
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/coach/clients/${client.clientId}`;
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 border-b border-white/5 py-3 pl-2 text-left outline-none transition-colors hover:bg-white/[0.02] focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)] sm:gap-4",
+                          attentionListRowClass(dashAttention.level),
+                        )}
                       >
-                        <div
-                          className="rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] cursor-pointer backdrop-blur-md"
-                          style={attentionCardSurfaceStyle(dashAttention.level)}
-                        >
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm fc-text-primary flex-shrink-0"
                             style={{
@@ -523,9 +639,8 @@ function CoachDashboardContent() {
                               )}
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                        </div>
-                      </Link>
+                          <ChevronRight className="hidden h-4 w-4 shrink-0 text-cyan-400 sm:block" />
+                      </button>
                     );
                     })}
                   </div>
@@ -537,19 +652,35 @@ function CoachDashboardContent() {
             <AnimatedEntry delay={200} animation="fade-up">
               <section className="mb-4">
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/coach/clients"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = "/coach/clients";
+                    }}
                     className="fc-btn fc-btn-secondary fc-press h-11 px-4 text-sm inline-flex items-center gap-2"
                   >
                     <Users className="w-4 h-4" />
                     View Clients
-                  </Link>
+                  </button>
                 </div>
               </section>
             </AnimatedEntry>
           </>
         )}
       </div>
+
+      <WeekReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal((prev) => ({ ...prev, isOpen: false }))}
+        onComplete={() => {
+          didLoadRef.current = false;
+          refetchDashboard();
+        }}
+        programAssignmentId={reviewModal.assignmentId}
+        programId={reviewModal.programId}
+        weekNumber={reviewModal.weekNumber}
+        clientName={reviewModal.clientName}
+      />
     </AnimatedBackground>
   );
 }

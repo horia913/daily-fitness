@@ -117,7 +117,8 @@ function buildInlineExerciseLines(blocks: any[]): InlineExerciseLine[] {
 }
 
 function ProgramDetailsContent() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
   const [program, setProgram] = useState<Program | null>(null);

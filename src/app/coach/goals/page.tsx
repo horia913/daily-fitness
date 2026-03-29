@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { CoachHabitsLibraryPage } from '@/components/coach/CoachHabitsLibraryPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
@@ -103,7 +105,7 @@ const nutrientOptions = [
   { value: 'water', label: 'Water', unit: 'L' },
 ]
 
-export default function CoachGoals() {
+function CoachGoalsContent() {
   const { isDark, getThemeStyles, performanceSettings } = useTheme()
   const { addToast } = useToast()
   const theme = getThemeStyles()
@@ -480,6 +482,26 @@ export default function CoachGoals() {
                         Set outcomes and auto-track progress from workouts and metrics.
                       </p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-full md:w-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = '/coach/goals'
+                      }}
+                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-glass-soft fc-text-primary"
+                    >
+                      Goals
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = '/coach/goals?tab=habits'
+                      }}
+                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-text-dim hover:fc-text-primary"
+                    >
+                      Habits
+                    </button>
                   </div>
                 </div>
               </GlassCard>
@@ -1042,5 +1064,33 @@ export default function CoachGoals() {
         </div>
       </AnimatedBackground>
     </ProtectedRoute>
+  )
+}
+
+function GoalsHabitsHubInner() {
+  const searchParams = useSearchParams()
+  if (searchParams.get('tab') === 'habits') {
+    return <CoachHabitsLibraryPage />
+  }
+  return <CoachGoalsContent />
+}
+
+function GoalsHabitsHubFallback() {
+  return (
+    <ProtectedRoute requiredRole="coach">
+      <AnimatedBackground>
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          <div className="rounded-2xl p-8 bg-[color:var(--fc-glass-highlight)] animate-pulse min-h-[12rem]" />
+        </div>
+      </AnimatedBackground>
+    </ProtectedRoute>
+  )
+}
+
+export default function CoachGoalsPage() {
+  return (
+    <Suspense fallback={<GoalsHabitsHubFallback />}>
+      <GoalsHabitsHubInner />
+    </Suspense>
   )
 }

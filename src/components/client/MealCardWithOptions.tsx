@@ -69,6 +69,10 @@ interface MealCardWithOptionsProps {
   onUndo?: () => void
   /** Fuel mode: add photo to completion (optional). Parent calls addPhotoToCompletion and refetches. */
   onAddPhoto?: (mealId: string, file: File) => Promise<void>
+  /** Opens full meal detail (e.g. `/client/nutrition/meals/[id]`). */
+  onOpenMealDetails?: () => void
+  /** When food row has an id, parent can navigate to food detail. */
+  onFoodClick?: (foodId: string) => void
 }
 
 // ============================================================================
@@ -82,6 +86,8 @@ export default function MealCardWithOptions({
   onMarkComplete,
   onUndo,
   onAddPhoto,
+  onOpenMealDetails,
+  onFoodClick,
 }: MealCardWithOptionsProps) {
   const isFuelMode = !!onMarkComplete
   const { isDark, getThemeStyles } = useTheme()
@@ -260,8 +266,9 @@ export default function MealCardWithOptions({
     })
   }
 
-  // Surface card class
-  const surfaceCard = "fc-surface rounded-3xl border border-[color:var(--fc-surface-card-border)] relative overflow-hidden"
+  // Flat meal row (no card chrome; parent may use divide-y)
+  const surfaceCard =
+    "relative overflow-hidden border-b border-white/5 bg-transparent"
 
   // ============================================================================
   // Render
@@ -283,16 +290,25 @@ export default function MealCardWithOptions({
           // ===== LOGGED MEAL =====
           <>
             <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${mealIconColor}18` }}>
+              <div className="flex justify-between items-start mb-1 gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${mealIconColor}18` }}>
                     <MealIcon className="w-4 h-4" style={{ color: mealIconColor }} />
                   </div>
-                  <h3 className="text-lg font-bold fc-text-primary">
+                  <h3 className="text-lg font-bold fc-text-primary truncate">
                     {meal.name}
                   </h3>
+                  {onOpenMealDetails && (
+                    <button
+                      type="button"
+                      onClick={onOpenMealDetails}
+                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                    >
+                      Details
+                    </button>
+                  )}
                 </div>
-                <span className="text-sm font-bold font-mono text-[color:var(--fc-text-dim)]">
+                <span className="text-sm font-bold font-mono text-[color:var(--fc-text-dim)] shrink-0 text-right">
                   Completed{meal.logged_at ? ` ${formatTime(meal.logged_at)}` : ''}
                 </span>
               </div>
@@ -343,8 +359,18 @@ export default function MealCardWithOptions({
               <div className="px-5 py-2 border-t border-[color:var(--fc-glass-border)]">
                 <ul className="space-y-1">
                   {completedItems.map((item, idx) => (
-                    <li key={item.food?.id ?? idx} className="flex justify-between items-center text-sm">
-                      <span className="fc-text-primary truncate pr-2">{item.food?.name ?? 'Unknown'}</span>
+                    <li key={item.food?.id ?? idx} className="flex justify-between items-center text-sm gap-2">
+                      {onFoodClick && item.food?.id ? (
+                        <button
+                          type="button"
+                          onClick={() => onFoodClick(item.food!.id)}
+                          className="fc-text-primary truncate pr-2 text-left min-h-[44px] hover:underline"
+                        >
+                          {item.food?.name ?? 'Unknown'}
+                        </button>
+                      ) : (
+                        <span className="fc-text-primary truncate pr-2">{item.food?.name ?? 'Unknown'}</span>
+                      )}
                       <span className="font-mono text-[color:var(--fc-text-dim)] shrink-0">
                         {Math.round(item.quantity)}g
                       </span>
@@ -386,16 +412,25 @@ export default function MealCardWithOptions({
           <>
             {/* Header */}
             <div className="p-5">
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${mealIconColor}18` }}>
+              <div className="flex justify-between items-start mb-1 gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${mealIconColor}18` }}>
                     <MealIcon className="w-4 h-4" style={{ color: mealIconColor }} />
                   </div>
-                  <h3 className="text-lg font-bold fc-text-primary">
+                  <h3 className="text-lg font-bold fc-text-primary truncate">
                     {meal.name}
                   </h3>
+                  {onOpenMealDetails && (
+                    <button
+                      type="button"
+                      onClick={onOpenMealDetails}
+                      className="shrink-0 text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                    >
+                      Details
+                    </button>
+                  )}
                 </div>
-                <span className="text-sm font-bold font-mono text-[color:var(--fc-text-dim)]">
+                <span className="text-sm font-bold font-mono text-[color:var(--fc-text-dim)] shrink-0">
                   Not Logged
                 </span>
               </div>
@@ -455,8 +490,18 @@ export default function MealCardWithOptions({
             <div className="px-5 pb-3">
               <ul className="space-y-1">
                 {currentItems.map((item, idx) => (
-                  <li key={item.food?.id ?? idx} className="flex justify-between items-center text-sm">
-                    <span className="fc-text-primary truncate pr-2">{item.food?.name ?? 'Unknown'}</span>
+                  <li key={item.food?.id ?? idx} className="flex justify-between items-center text-sm gap-2">
+                    {onFoodClick && item.food?.id ? (
+                      <button
+                        type="button"
+                        onClick={() => onFoodClick(item.food!.id)}
+                        className="fc-text-primary truncate pr-2 text-left min-h-[44px] hover:underline"
+                      >
+                        {item.food?.name ?? 'Unknown'}
+                      </button>
+                    ) : (
+                      <span className="fc-text-primary truncate pr-2">{item.food?.name ?? 'Unknown'}</span>
+                    )}
                     <span className="font-mono text-[color:var(--fc-text-dim)] shrink-0">
                       {Math.round(item.quantity)}g
                     </span>

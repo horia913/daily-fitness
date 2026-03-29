@@ -57,6 +57,8 @@ interface AchievementCardProps {
   achievement: Achievement;
   onClick?: () => void;
   className?: string;
+  /** Flat list row (no GlassCard chrome) for dense achievement lists */
+  dense?: boolean;
 }
 
 function TierBadges({ unlockedTiers }: { unlockedTiers: string[] }) {
@@ -83,15 +85,164 @@ function TierBadges({ unlockedTiers }: { unlockedTiers: string[] }) {
   );
 }
 
+type AchievementRowProps = Pick<
+  AchievementCardProps,
+  "achievement" | "onClick" | "className"
+>;
+
+function AchievementDenseRow({
+  achievement,
+  onClick,
+  className = "",
+}: AchievementRowProps) {
+  const { isDark } = useTheme();
+  const rarity = rarityColors[achievement.rarity];
+  const earned =
+    achievement.unlocked ||
+    (achievement.unlockedTiers && achievement.unlockedTiers.length > 0);
+  const inProgress =
+    !earned &&
+    achievement.progress !== undefined &&
+    achievement.progress > 0;
+
+  const iconBox = (
+    <div
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+      style={{
+        background: earned
+          ? `linear-gradient(135deg, ${rarity.gradient.join(", ")})`
+          : isDark
+            ? "rgba(255,255,255,0.08)"
+            : "rgba(0,0,0,0.06)",
+        boxShadow: earned ? `0 2px 8px ${rarity.glow}30` : undefined,
+      }}
+    >
+      {earned ? (
+        achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
+          <span className="text-xl">{achievement.icon}</span>
+        ) : (
+          <Trophy className="h-5 w-5" style={{ color: rarity.color }} />
+        )
+      ) : inProgress ? (
+        achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
+          <span className="text-xl opacity-60">{achievement.icon}</span>
+        ) : (
+          <Trophy className="h-5 w-5 opacity-60" style={{ color: rarity.color }} />
+        )
+      ) : (
+        <Lock
+          className="h-5 w-5"
+          style={{
+            color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)",
+          }}
+        />
+      )}
+    </div>
+  );
+
+  const inner = (
+    <>
+      {iconBox}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4
+            className="truncate text-sm font-bold"
+            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+          >
+            {achievement.name}
+          </h4>
+          <span
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold capitalize ${RARITY_BADGE_CLASS[achievement.rarity]} ${!earned ? "opacity-70" : ""}`}
+          >
+            {achievement.rarity}
+          </span>
+          {achievement.isMastered && (
+            <span className="rounded bg-gradient-to-r from-violet-500 to-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+              Mastered
+            </span>
+          )}
+        </div>
+        <p
+          className="mt-0.5 line-clamp-2 text-xs"
+          style={{
+            color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)",
+          }}
+        >
+          {achievement.description}
+        </p>
+        {inProgress && achievement.progress !== undefined && (
+          <div className="mt-2">
+            <div
+              className="mb-0.5 h-1.5 overflow-hidden rounded-full"
+              style={{
+                background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+              }}
+            >
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${achievement.progress}%`,
+                  background: `linear-gradient(90deg, ${rarity.gradient.join(", ")})`,
+                }}
+              />
+            </div>
+            <p className="text-[10px]" style={{ color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}>
+              {Math.round(achievement.progress)}% · {achievement.requirement || "In progress"}
+            </p>
+          </div>
+        )}
+        {earned && achievement.unlockedAt && (
+          <p
+            className="mt-1 text-[10px]"
+            style={{ color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}
+          >
+            Unlocked {new Date(achievement.unlockedAt).toLocaleDateString()}
+          </p>
+        )}
+        {!earned && !inProgress && achievement.requirement && (
+          <p
+            className="mt-0.5 text-[10px]"
+            style={{ color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)" }}
+          >
+            {achievement.requirement}
+          </p>
+        )}
+      </div>
+    </>
+  );
+
+  const rowClass = `flex w-full min-h-[52px] items-start gap-3 border-b border-white/5 py-3 text-left transition-colors hover:bg-white/[0.02] ${className}`;
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={rowClass}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={rowClass}>{inner}</div>;
+}
+
 export function AchievementCard({
   achievement,
   onClick,
   className = "",
+  dense = false,
 }: AchievementCardProps) {
   const { isDark } = useTheme();
   const rarity = rarityColors[achievement.rarity];
   const hasTiers = achievement.unlockedTiers !== undefined && achievement.unlockedTiers.length >= 0;
   const earnedTiers = achievement.unlockedTiers || [];
+
+  if (dense) {
+    return (
+      <AchievementDenseRow
+        achievement={achievement}
+        onClick={onClick}
+        className={className}
+      />
+    );
+  }
 
   // Fully unlocked or partially unlocked (has at least one tier earned)
   if (achievement.unlocked || earnedTiers.length > 0) {

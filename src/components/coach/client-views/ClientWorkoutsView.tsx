@@ -1142,7 +1142,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="p-4 sm:p-6 space-y-2">
+        <div className="flex flex-col border-t border-white/5 p-4 sm:p-6">
           {recentLogs.length === 0 ? (
             <EmptyState
               variant="compact"
@@ -1158,7 +1158,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                   key={log.id}
                   href={`/coach/clients/${clientId}/workout-logs/${log.id}`}
                   className={cn(
-                    'block fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 p-4 hover:border-[color:var(--fc-domain-workouts)]/40 transition-colors',
+                    'block border-b border-white/5 py-3 pl-2 transition-colors last:border-b-0 hover:bg-white/[0.02] border-l-2',
                     accent.border
                   )}
                 >

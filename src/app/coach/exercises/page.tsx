@@ -17,18 +17,18 @@ export default function ExerciseLibrary() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 space-y-6">
-          <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4">
-            <ArrowLeft className="w-4 h-4 shrink-0" />
-            Back to Training
+        <div className="relative z-10 mx-auto w-full max-w-7xl space-y-3 px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+          <Link
+            href="/coach/training"
+            className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+            Training
           </Link>
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary border-b-2 border-[color:var(--fc-accent-primary)] pb-1 w-fit">
-                Exercise Archive
-              </h1>
-              <p className="text-sm fc-text-dim mt-1 font-mono">Database index</p>
-            </div>
+          <header className="mb-3 flex min-h-10 items-center justify-between gap-3">
+            <h1 className="text-lg font-semibold tracking-tight fc-text-primary sm:text-xl">
+              Exercise library
+            </h1>
           </header>
 
           <OptimizedExerciseLibrary coachId={user?.id || ''} />

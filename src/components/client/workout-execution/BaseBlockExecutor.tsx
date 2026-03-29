@@ -1,50 +1,33 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { ChevronLeft } from "lucide-react";
 import { BlockDetailsGrid, BlockDetail } from "./ui/BlockDetailsGrid";
-import { ProgressIndicator } from "./ui/ProgressIndicator";
 import { InstructionsBox } from "./ui/InstructionsBox";
-import { BlockTypeBadge } from "./ui/BlockTypeBadge";
 import { NavigationControls } from "./ui/NavigationControls";
 import { ProgressionNudge } from "./ui/ProgressionNudge";
 import { ExerciseActionButtons } from "./ui/ExerciseActionButtons";
+import { LastSessionSetsSection } from "./ui/LastSessionSetsSection";
 import { BaseBlockExecutorProps } from "./types";
-import { WorkoutBlockType, WorkoutBlockExercise } from "@/types/workoutBlocks";
+import { WorkoutBlockType, WorkoutBlockExercise, WORKOUT_BLOCK_CONFIGS } from "@/types/workoutBlocks";
 
 interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
-  // Section 1: Exercise Name
   exerciseName: string;
-
-  // Section 2: Block Details
   blockDetails: BlockDetail[];
-
-  // Section 3: Instructions
   instructions?: string;
-
-  // Section 4: Progress
   currentSet: number;
   totalSets: number;
   progressLabel?: string;
-
-  // Section 5: Logging Inputs (rendered by child)
+  /** Set navigator + weight/reps (sticky at bottom). */
   loggingInputs: React.ReactNode;
-
-  // Section 6: Log Button
   logButton: React.ReactNode;
-
-  // Section 7: Navigation
   showNavigation?: boolean;
-
-  // Optional: Exercise actions
   currentExercise?: WorkoutBlockExercise;
   showRestTimer?: boolean;
-
-  // Progression suggestion (inherited from BaseBlockExecutorProps)
   progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
-
-  // Apply suggestion callback — pass from executor so layout can wire the nudge Apply button
   onApplySuggestion?: (weight: number | null, reps: number | null) => void;
+  /** Renders after prescription, before exercise nav (e.g. logged set history). */
+  aboveStickyContent?: React.ReactNode;
 }
 
 export function BaseBlockExecutorLayout({
@@ -52,27 +35,27 @@ export function BaseBlockExecutorLayout({
   exerciseName,
   blockDetails,
   instructions,
-  currentSet,
-  totalSets,
-  progressLabel = "Set",
+  currentSet: _currentSet,
+  totalSets: _totalSets,
+  progressLabel: _progressLabel = "Set",
   loggingInputs,
   logButton,
   showNavigation = true,
   currentExercise,
-  showRestTimer = false,
+  showRestTimer: _showRestTimer = false,
   allBlocks = [],
   currentBlockIndex = 0,
+  currentExerciseIndex = 0,
   onBlockChange,
   onVideoClick,
   onAlternativesClick,
-  onRestTimerClick,
+  onRestTimerClick: _onRestTimerClick,
   progressionSuggestion,
   previousPerformanceMap,
   onApplySuggestion,
+  onWorkoutBack,
+  aboveStickyContent,
 }: BaseBlockExecutorLayoutProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
-
   const totalBlocks = allBlocks.length || 1;
   const canGoPrevious = currentBlockIndex > 0;
   const canGoNext = currentBlockIndex < totalBlocks - 1;
@@ -91,38 +74,63 @@ export function BaseBlockExecutorLayout({
     }
   };
 
+  const setType =
+    (block.block.set_type as WorkoutBlockType) || "straight_set";
+  const typeDisplay =
+    (WORKOUT_BLOCK_CONFIGS[setType]?.name ?? "Straight Set").toUpperCase();
+  const exerciseCount = block.block.exercises?.length ?? 1;
+  const exercisePos = (currentExerciseIndex ?? 0) + 1;
+
+  const previousPerfEntry =
+    currentExercise?.exercise_id && previousPerformanceMap
+      ? previousPerformanceMap.get(currentExercise.exercise_id)
+      : undefined;
+  const lastWorkoutForLastWeek = previousPerfEntry?.lastWorkout ?? null;
+
   return (
-    <div className="fc-surface rounded-2xl p-5 border border-[color:var(--fc-surface-card-border)]">
-      <div className="flex items-center justify-between mb-4">
-        <BlockTypeBadge
-          blockType={block.block.set_type}
-          blockName={block.block.set_name}
-        />
-        <div className="text-right">
-          <div className="text-xs fc-text-dim font-mono">
-            Set {block.block.set_order}
-          </div>
+    <div className="flex flex-col border-b border-white/5">
+      {/* Scroll is the app <main>; avoid nested overflow-y here or the middle pane gets no height and won’t scroll. */}
+      {/* ~56px two-line header; set index lives only in bottom set navigator */}
+      <header className="shrink-0 border-b border-white/5 px-4 pb-1 pt-2">
+        <div className="flex h-7 items-center gap-2">
+          {onWorkoutBack ? (
+            <button
+              type="button"
+              onClick={onWorkoutBack}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] fc-text-dim transition-all active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          ) : (
+            <span className="w-9 shrink-0" aria-hidden />
+          )}
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold fc-text-primary">
+            {exerciseName}
+          </h1>
+          <span className="min-w-[3.25rem] shrink-0" aria-hidden />
         </div>
-      </div>
+        <p className="mt-0.5 pl-[2.75rem] text-xs uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+          {typeDisplay}
+          {exerciseCount > 1
+            ? ` · Exercise ${exercisePos} of ${exerciseCount}`
+            : ""}
+        </p>
+      </header>
 
-      {/* Progression Nudge — shows "Last time" context + suggestion + Apply button */}
-      <ProgressionNudge
-        suggestion={progressionSuggestion}
-        previousPerformance={
-          currentExercise?.exercise_id && previousPerformanceMap
-            ? previousPerformanceMap.get(currentExercise.exercise_id) ?? null
-            : null
-        }
-        onApplySuggestion={onApplySuggestion}
-      />
+      <div className="flex flex-col gap-3 px-4 pb-2 pt-2">
+        <ProgressionNudge
+          suggestion={progressionSuggestion}
+          previousPerformance={
+            currentExercise?.exercise_id && previousPerformanceMap
+              ? previousPerformanceMap.get(currentExercise.exercise_id) ?? null
+              : null
+          }
+          onApplySuggestion={onApplySuggestion}
+        />
 
-      {/* Section 1: Exercise Name */}
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold fc-text-primary">
-          {exerciseName}
-        </h2>
         {shouldShowHeaderActions && (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <ExerciseActionButtons
               exercise={currentExercise as WorkoutBlockExercise}
               onVideoClick={onVideoClick}
@@ -130,30 +138,13 @@ export function BaseBlockExecutorLayout({
             />
           </div>
         )}
-      </div>
 
-      <div className="space-y-5">
-        {/* Section 2: Block Details Grid */}
         <BlockDetailsGrid details={blockDetails} />
 
-        {/* Section 3: Instructions */}
         {instructions && <InstructionsBox instructions={instructions} />}
 
-        {/* Section 4: Progress Indicator */}
-        <ProgressIndicator
-          current={currentSet}
-          total={totalSets}
-          label={progressLabel}
-          showBar={true}
-        />
+        {aboveStickyContent}
 
-        {/* Section 5: Logging Inputs */}
-        <div className="space-y-4">{loggingInputs}</div>
-
-        {/* Section 6: Log Button */}
-        {logButton}
-
-        {/* Section 7: Navigation */}
         {showNavigation && (
           <NavigationControls
             currentBlock={currentBlockIndex + 1}
@@ -165,6 +156,15 @@ export function BaseBlockExecutorLayout({
           />
         )}
       </div>
+
+      <div className="workout-input-area shrink-0">
+        <div className="mx-auto w-full max-w-lg space-y-3 sm:max-w-none">
+          {loggingInputs}
+          {logButton}
+        </div>
+      </div>
+
+      <LastSessionSetsSection lastWorkout={lastWorkoutForLastWeek} />
     </div>
   );
 }

@@ -479,7 +479,7 @@ export default function WorkoutLogsPage() {
 
             {/* Sticky filter bar */}
             {workoutLogs.length > 0 && (
-              <nav className="sticky top-0 z-10 flex items-center gap-3 overflow-x-auto py-4 -mx-4 px-4 sm:mx-0 sm:px-0 mb-2 fc-glass-soft rounded-xl border-b border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg-base)]/80 backdrop-blur-xl">
+              <nav className="sticky top-0 z-10 my-3 flex flex-wrap items-center gap-2 overflow-x-auto bg-[color:var(--fc-bg-base)]/80 py-2 backdrop-blur-xl">
                 {(["all", "this_month", "this_week"] as const).map((key) => (
                   <button
                     key={key}
@@ -511,7 +511,7 @@ export default function WorkoutLogsPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex flex-col border-y border-white/5">
                 {filteredLogs.map((log) => (
                   <WorkoutLogCard key={log.id} log={log} />
                 ))}

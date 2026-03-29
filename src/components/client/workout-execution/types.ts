@@ -37,6 +37,8 @@ export interface BaseBlockExecutorProps {
   onPlateCalculatorClick?: () => void;
   onToolsClick?: () => void;
   onRestTimerClick?: () => void;
+  /** Exit workout (e.g. confirm + navigate away). Wired from start page only. */
+  onWorkoutBack?: () => void;
   onSetComplete?: (completedSets: number) => void;
   /** Called when a set is logged and rest timer will show; pass data for completion hero + next preview */
   onLastSetLoggedForRest?: (data: {
@@ -57,7 +59,15 @@ export interface BaseBlockExecutorProps {
    * fetched from workout_exercise_logs → workout_set_details.
    */
   previousPerformanceMap?: Map<string, {
-    lastWorkout: { weight: number | null; reps: number | null; sets: number; avgRpe: number | null; date: string } | null;
+    lastWorkout: {
+      weight: number | null;
+      reps: number | null;
+      sets: number;
+      avgRpe: number | null;
+      date: string;
+      workout_log_id?: string;
+      setDetails?: import("@/lib/clientProgressionService").LastSessionSetRow[];
+    } | null;
     personalBest: { maxWeight: number | null; maxReps: number | null; date: string } | null;
   }>;
   /** Register undo handler for the last logged set (for "Set saved — Undo" toast). Called with a function that removes last set from local state. */

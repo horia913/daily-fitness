@@ -72,7 +72,7 @@ export default function MealDetailPage() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
-  const mealId = params.id as string;
+  const mealId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [meal, setMeal] = useState<Meal | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export default function MealDetailPage() {
     try {
       setLoading(true);
       setLoadError(null);
-      if (!user?.id) {
+      if (!mealId || !user?.id) {
         setLoading(false);
         return;
       }

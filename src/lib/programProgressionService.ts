@@ -4,6 +4,24 @@ import { supabase } from './supabase'
 import { WorkoutBlockService } from './workoutBlockService'
 import { WorkoutBlock, WorkoutBlockExercise } from '@/types/workoutBlocks'
 
+/**
+ * Coerce values for INTEGER DB columns. Column `rir` stores prescribed RPE: parse the
+ * full token (no `10 - rir`, no reps-style "12-15" → first segment only).
+ */
+function coerceIntegerField(field: string, raw: unknown): number | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.round(raw)
+  const s = String(raw).trim()
+  if (s === '') return undefined
+  if (field === 'rir') {
+    const n = Number(s.replace(/,/g, ''))
+    return Number.isFinite(n) ? Math.round(n) : undefined
+  }
+  const head = s.split('-')[0]?.trim() ?? ''
+  const numValue = parseInt(head, 10)
+  return Number.isNaN(numValue) ? undefined : numValue
+}
+
 export interface ProgramProgressionRule {
   id?: string
   program_id?: string
@@ -36,6 +54,7 @@ export interface ProgramProgressionRule {
   reps?: string | null
   rest_seconds?: number | null
   tempo?: string | null
+  /** Prescribed RPE (1–10). DB column name is `rir`. */
   rir?: number | null
   weight_kg?: number | null
   load_percentage?: number | null
@@ -149,18 +168,13 @@ export class ProgramProgressionService {
         
         for (const field of integerFields) {
           if (sanitized[field] !== undefined && sanitized[field] !== null) {
-            // If it's already a number, keep it
-            if (typeof sanitized[field] === 'number') {
+            if (typeof sanitized[field] === 'number' && Number.isFinite(sanitized[field] as number)) {
               continue
             }
-            // If it's a string that looks like a number, parse it
-            const strValue = String(sanitized[field])
-            // Handle ranges like "12-15" by taking first number
-            const numValue = parseInt(strValue.split('-')[0], 10)
-            if (!isNaN(numValue)) {
-              sanitized[field] = numValue
+            const coerced = coerceIntegerField(field, sanitized[field])
+            if (coerced !== undefined) {
+              sanitized[field] = coerced
             } else {
-              // If it can't be parsed, remove it to avoid errors
               delete sanitized[field]
             }
           }
@@ -201,10 +215,10 @@ export class ProgramProgressionService {
         for (const field of integerFields) {
           if (rule[field] !== undefined && rule[field] !== null) {
             const value = rule[field]
-            if (typeof value === 'string' && value.includes('-')) {
-              const parsed = parseInt(value.split('-')[0], 10)
-              if (!isNaN(parsed)) {
-                rule[field] = parsed
+            if (typeof value === 'string') {
+              const coerced = coerceIntegerField(field, value)
+              if (coerced !== undefined) {
+                rule[field] = coerced
               } else {
                 delete rule[field]
               }
@@ -1399,8 +1413,12 @@ export class ProgramProgressionService {
         for (const field of integerFields) {
           if (row[field] !== undefined && row[field] !== null) {
             if (typeof row[field] !== 'number') {
-              const parsed = parseInt(String(row[field]).split('-')[0], 10)
-              row[field] = Number.isNaN(parsed) ? undefined : parsed
+              const coerced = coerceIntegerField(field, row[field])
+              if (coerced !== undefined) {
+                row[field] = coerced
+              } else {
+                delete row[field]
+              }
             }
           }
         }

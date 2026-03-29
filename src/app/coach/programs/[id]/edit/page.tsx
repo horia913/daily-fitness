@@ -22,13 +22,8 @@ import WorkoutTemplateService, {
 } from "@/lib/workoutTemplateService";
 import { supabase } from "@/lib/supabase";
 import {
-  BookOpen,
   ArrowLeft,
-  Calendar,
   TrendingUp,
-  Dumbbell,
-  Coffee,
-  Info,
   Target,
   Layers,
 } from "lucide-react";
@@ -36,7 +31,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { useExerciseLibrary } from "@/hooks/useCoachData";
 import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
-import ProgramProgressionService from "@/lib/programProgressionService";
 import ProgramVolumeCalculator from "@/components/coach/ProgramVolumeCalculator";
 import ProgressionSuggestionsModal from "@/components/coach/ProgressionSuggestionsModal";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
@@ -45,6 +39,36 @@ import { TrainingBlockHeader } from "@/components/coach/programs/TrainingBlockHe
 import { TrainingBlockModal } from "@/components/coach/programs/TrainingBlockModal";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
+import { WorkoutBlockService } from "@/lib/workoutBlockService";
+
+/** program_day 1–7 = Mon–Sun (1 = Monday) */
+const PROGRAM_DAY_SHORT_LABELS = [
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+  "Sun",
+] as const;
+
+function programDayLabel(dayNum: number): string {
+  if (dayNum >= 1 && dayNum <= 7)
+    return PROGRAM_DAY_SHORT_LABELS[dayNum - 1];
+  return `Day ${dayNum}`;
+}
+
+/** Match schedule rows to the active training block; legacy rows with null training_block_id count when only one block exists */
+function scheduleRowMatchesActiveBlock(
+  s: { training_block_id?: string | null },
+  activeBlockId: string | null,
+  trainingBlockCount: number,
+): boolean {
+  if (!activeBlockId) return true;
+  if (s.training_block_id === activeBlockId) return true;
+  if (s.training_block_id == null && trainingBlockCount <= 1) return true;
+  return false;
+}
 
 interface Program {
   id: string;
@@ -73,13 +97,14 @@ const getBlockSummary = (block: any): string => {
       const sets = block.total_sets || 3;
       const reps = block.reps_per_set || "10-12";
       const rest = block.rest_seconds || 60;
-      // Get tempo and RIR from first exercise if available
+      // Get tempo and prescribed RPE (`rir` column) from first exercise if available
       const firstExercise = exercises[0];
       const tempo = firstExercise?.tempo;
-      const rir = firstExercise?.rir;
+      const prescribedRpe = firstExercise?.rir;
       let summary = `${sets} sets × ${reps} reps • ${rest}s rest`;
       if (tempo) summary += ` • Tempo ${tempo}`;
-      if (rir !== undefined && rir !== null) summary += ` • RIR ${rir}`;
+      if (prescribedRpe !== undefined && prescribedRpe !== null)
+        summary += ` • RPE ${prescribedRpe}`;
       return summary;
     }
 
@@ -289,7 +314,11 @@ function EditProgramContent() {
           .filter(
             (s) =>
               (s.week_number || 1) === absoluteSelectedWeek &&
-              (!activeBlockId || s.training_block_id === activeBlockId) &&
+              scheduleRowMatchesActiveBlock(
+                s,
+                activeBlockId,
+                trainingBlocks.length,
+              ) &&
               s.template_id &&
               s.template_id !== "rest",
           )
@@ -326,7 +355,13 @@ function EditProgramContent() {
     return () => {
       cancelled = true;
     };
-  }, [programId, schedule, absoluteSelectedWeek, activeBlockId]);
+  }, [
+    programId,
+    schedule,
+    absoluteSelectedWeek,
+    activeBlockId,
+    trainingBlocks.length,
+  ]);
 
   // Background chunk load for volume calculator (avoids one giant query over all templates)
   useEffect(() => {
@@ -528,8 +563,8 @@ function EditProgramContent() {
 
   // ── Training block handlers ──────────────────────────────────────────────
 
-  const refreshBlocks = async () => {
-    if (!programId) return;
+  const refreshBlocks = async (): Promise<TrainingBlock[]> => {
+    if (!programId) return [];
     const blocks = await TrainingBlockService.getTrainingBlocks(programId);
     setTrainingBlocks(blocks);
     // Auto-sync program duration_weeks to sum of block durations
@@ -538,6 +573,7 @@ function EditProgramContent() {
       await WorkoutTemplateService.updateProgram(programId, { duration_weeks: total });
       setForm((prev) => (prev ? { ...prev, duration_weeks: total } : prev));
     }
+    return blocks;
   };
 
   const handleUpdateBlock = async (blockId: string, updates: Partial<TrainingBlock>) => {
@@ -561,16 +597,37 @@ function EditProgramContent() {
     setActiveBlockId(saved.id);
   };
 
-  const handleDeleteBlock = async (blockId: string) => {
-    await refreshBlocks();
-    // Select the first remaining block
+  /** After a block is removed (DB delete already done in modal, or by header handler). */
+  const syncAfterTrainingBlockRemoved = async (blockId: string) => {
+    const blocks = await refreshBlocks();
     setActiveBlockId((prev) => {
-      if (prev === blockId) {
-        const remaining = trainingBlocks.filter((b) => b.id !== blockId);
-        return remaining[0]?.id ?? null;
-      }
-      return prev;
+      if (prev !== blockId) return prev;
+      return blocks[0]?.id ?? null;
     });
+    if (form?.id) {
+      const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
+      setSchedule(sched || []);
+    }
+  };
+
+  /** Header “…” menu: confirm, delete on server, then sync UI. */
+  const handleDeleteBlockFromHeader = async (blockId: string) => {
+    if (
+      !window.confirm(
+        "Delete this training block and all of its scheduled workouts for this program? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    const ok = await TrainingBlockService.deleteTrainingBlock(blockId);
+    if (!ok) {
+      addToast({
+        title: "Could not delete training block.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await syncAfterTrainingBlockRemoved(blockId);
   };
 
   const handleMoveBlock = async (blockId: string, direction: "left" | "right") => {
@@ -598,7 +655,12 @@ function EditProgramContent() {
           (s) =>
             !(
               (s.week_number || 1) === absoluteSelectedWeek &&
-              s.program_day === day
+              s.program_day === day &&
+              scheduleRowMatchesActiveBlock(
+                s,
+                activeBlockId,
+                trainingBlocks.length,
+              )
             ),
         ),
       );
@@ -620,7 +682,21 @@ function EditProgramContent() {
         return;
       }
 
-      let sched = await WorkoutTemplateService.getProgramSchedule(form.id);
+      if (selectedWeek === 1) {
+        const { error: copyError } = await supabase.rpc("copy_week_schedule", {
+          p_program_id: form.id,
+          p_source_week: 1,
+          p_total_weeks: form.duration_weeks,
+        });
+        if (copyError) {
+          addToast({
+            title: `Could not copy week 1 to other weeks: ${copyError.message}`,
+            variant: "destructive",
+          });
+        }
+      }
+
+      const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
       if (process.env.NODE_ENV !== "production") {
         console.log(
           "[EditProgram] Schedule data after save:",
@@ -628,134 +704,6 @@ function EditProgramContent() {
         );
       }
       setSchedule(sched || []);
-
-      if (selectedWeek === 1) {
-        // selectedWeek === 1 means the coach is setting the first (relative) week of the
-        // active block. Auto-fill all other weeks within this block using absolute numbers.
-        const totalWeeks = activeBlock?.duration_weeks ?? form.duration_weeks ?? 1;
-        const autoFillPromises: Promise<any>[] = [];
-        const weeksUpdated: number[] = [];
-        // week1Item rows are stored under the absolute week number for relative week 1
-        const week1Schedule = (sched || []).filter(
-          (s) =>
-            (s.week_number || 1) === absoluteSelectedWeek &&
-            (!activeBlockId || s.training_block_id === activeBlockId),
-        );
-
-        for (let relWeek = 2; relWeek <= totalWeeks; relWeek++) {
-          // Translate relative week → absolute week for storage
-          const absWeek = blockStartWeek + relWeek - 1;
-          for (const week1Item of week1Schedule) {
-            if (week1Item.template_id && week1Item.template_id !== "rest") {
-              autoFillPromises.push(
-                WorkoutTemplateService.setProgramSchedule(
-                  form.id,
-                  week1Item.program_day,
-                  absWeek,
-                  week1Item.template_id,
-                  false,
-                  undefined,
-                  activeBlockId ?? undefined,
-                ),
-              );
-            } else if (
-              week1Item.template_id === "rest" ||
-              !week1Item.template_id
-            ) {
-              autoFillPromises.push(
-                WorkoutTemplateService.removeProgramSchedule(
-                  form.id,
-                  week1Item.program_day,
-                  absWeek,
-                ),
-              );
-            }
-          }
-          if (week1Schedule.length > 0) {
-            weeksUpdated.push(absWeek);
-          }
-        }
-
-        if (autoFillPromises.length > 0) {
-          await Promise.all(autoFillPromises);
-          console.log(
-            `✅ Auto-applied Week 1 schedule to all other weeks (${weeksUpdated.length} week(s)): ${weeksUpdated.join(", ")}`,
-          );
-          sched = await WorkoutTemplateService.getProgramSchedule(form.id);
-          setSchedule(sched || []);
-
-          const allWeeksSchedule = sched || [];
-          const copyPromises: Promise<void>[] = [];
-          for (const week of weeksUpdated) {
-            const weekSchedule = allWeeksSchedule.filter(
-              (s) => (s.week_number || 1) === week,
-            );
-            for (const scheduleItem of weekSchedule) {
-              if (
-                scheduleItem.template_id &&
-                scheduleItem.template_id !== "rest" &&
-                scheduleItem.id
-              ) {
-                copyPromises.push(
-                  (async () => {
-                    try {
-                      await ProgramProgressionService.deleteProgressionRules(
-                        scheduleItem.id,
-                        week,
-                      );
-                      await ProgramProgressionService.copyWorkoutToProgram(
-                        form.id,
-                        scheduleItem.id,
-                        scheduleItem.template_id,
-                        week,
-                      );
-                    } catch (error) {
-                      console.error(
-                        `Error copying workout data for Week ${week}, Day ${scheduleItem.program_day}:`,
-                        error,
-                      );
-                    }
-                  })(),
-                );
-              }
-            }
-          }
-          if (copyPromises.length > 0) {
-            await Promise.all(copyPromises);
-            console.log(
-              `✅ Copied workout data to progression rules for ${copyPromises.length} schedule(s)`,
-            );
-          }
-        }
-      }
-
-      if (v !== "rest" && result?.id) {
-        try {
-          await ProgramProgressionService.deleteProgressionRules(
-            result.id,
-            selectedWeek,
-          );
-          const copySuccess =
-            await ProgramProgressionService.copyWorkoutToProgram(
-              form.id,
-              result.id,
-              v,
-              selectedWeek,
-            );
-          if (!copySuccess) {
-            console.warn(
-              "⚠️ Failed to copy workout data to progression rules after schedule update",
-            );
-          }
-        } catch (error) {
-          console.error(
-            "❌ Error copying workout to progression rules after schedule update:",
-            error,
-          );
-        }
-      }
-
-      // Week-scoped blocks refresh via useEffect when schedule / week updates
     }
   };
 
@@ -778,36 +726,24 @@ function EditProgramContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-          <Button
-            variant="ghost"
-            onClick={() =>
-              (window.location.href = "/coach/programs")
-            }
-            className="fc-btn fc-btn-ghost"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Programs
-          </Button>
-
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-cyan-500 to-cyan-400 shadow-lg shadow-cyan-500/25">
-                <BookOpen className="w-7 h-7 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Program Editor
-                </span>
-                <h1 className="mt-3 text-2xl font-bold text-[color:var(--fc-text-primary)] break-words">
-                  Edit Program
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)] break-words">
-                  {form.name}
-                </p>
-              </div>
-            </div>
+        <div className="max-w-5xl mx-auto space-y-4 relative z-10">
+          <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
+            <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate min-w-0">
+              Edit program
+            </h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="fc-btn fc-btn-ghost h-8 shrink-0 text-xs px-2"
+              onClick={() => (window.location.href = "/coach/programs")}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              Back
+            </Button>
           </div>
+          <p className="text-xs text-[color:var(--fc-text-dim)] truncate -mt-1 mb-1">
+            {form.name}
+          </p>
 
           {/* Training Block Header — goal/duration for single block, timeline for multi */}
           {trainingBlocks.length > 0 && (
@@ -827,79 +763,64 @@ function EditProgramContent() {
                 setEditingBlock(block);
                 setShowBlockModal(true);
               }}
-              onDeleteBlock={handleDeleteBlock}
+              onDeleteBlock={handleDeleteBlockFromHeader}
               onUpdateBlock={handleUpdateBlock}
               onMoveBlock={handleMoveBlock}
             />
           )}
 
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-2">
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("basic")}
-                className={cn(
-                  "flex-1 rounded-xl fc-btn",
-                  activeTab === "basic"
-                    ? "fc-btn-primary"
-                    : "fc-btn-ghost",
-                )}
-              >
-                <BookOpen className="w-4 h-4 mr-2" />
-                <span className="sm:hidden">Info</span>
-                <span className="hidden sm:inline">Basic Info</span>
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("schedule")}
-                className={cn(
-                  "flex-1 rounded-xl fc-btn",
-                  activeTab === "schedule"
-                    ? "fc-btn-primary"
-                    : "fc-btn-ghost",
-                )}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                <span className="sm:hidden">Schedule</span>
-                <span className="hidden sm:inline">Weekly Schedule</span>
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("progression")}
-                className={cn(
-                  "flex-1 rounded-xl fc-btn",
-                  activeTab === "progression"
-                    ? "fc-btn-primary"
-                    : "fc-btn-ghost",
-                )}
-              >
-                <TrendingUp className="w-4 h-4 mr-2" />
-                <span className="sm:hidden">Progression</span>
-                <span className="hidden sm:inline">Progression Rules</span>
-              </Button>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("basic")}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                activeTab === "basic"
+                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
+                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
+              )}
+            >
+              Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("schedule")}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                activeTab === "schedule"
+                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
+                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
+              )}
+            >
+              Schedule
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("progression")}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                activeTab === "progression"
+                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
+                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
+              )}
+            >
+              Progression
+            </button>
           </div>
 
           {/* Tab Content */}
           {activeTab === "basic" && (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-              <div className="space-y-6">
+            <div className="border-t border-black/5 dark:border-white/5 pt-4 mt-1">
+              <div className="space-y-3">
                 {/* Program Name */}
                 <div>
-                  <label
-                    className="text-sm font-semibold block mb-2"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Program Name *
+                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    Program name *
                   </label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="text-base"
+                    className="h-9 text-sm"
                     style={{
                       background: isDark
                         ? "rgba(255,255,255,0.1)"
@@ -915,7 +836,7 @@ function EditProgramContent() {
                 {/* Description */}
                 <div>
                   <label
-                    className="text-sm font-semibold block mb-2"
+                    className="text-sm font-semibold block mb-1"
                     style={{
                       color: isDark
                         ? "rgba(255,255,255,0.9)"
@@ -944,17 +865,10 @@ function EditProgramContent() {
                 </div>
 
                 {/* Difficulty & Duration */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label
-                      className="text-sm font-semibold block mb-2"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.9)"
-                          : "rgba(0,0,0,0.9)",
-                      }}
-                    >
-                      Difficulty Level
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                      Difficulty
                     </label>
                     <Select
                       value={form.difficulty_level}
@@ -963,6 +877,7 @@ function EditProgramContent() {
                       }
                     >
                       <SelectTrigger
+                        className="h-9 text-sm"
                         style={{
                           background: isDark
                             ? "rgba(255,255,255,0.1)"
@@ -986,15 +901,8 @@ function EditProgramContent() {
                     </Select>
                   </div>
                   <div>
-                    <label
-                      className="text-sm font-semibold block mb-2"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.9)"
-                          : "rgba(0,0,0,0.9)",
-                      }}
-                    >
-                      Total Duration (Weeks)
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                      Duration (weeks)
                     </label>
                     {trainingBlocks.length > 1 ? (
                       <div
@@ -1041,17 +949,10 @@ function EditProgramContent() {
 
                 {/* Category */}
                 <div>
-                  <label
-                    className="text-sm font-semibold block mb-2"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Training Category
-                    <span className="text-xs fc-text-dim ml-2">
-                      (optional - for volume calculator)
+                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    Category{" "}
+                    <span className="normal-case text-[color:var(--fc-text-dim)] font-normal">
+                      (optional)
                     </span>
                   </label>
                   <Select
@@ -1074,6 +975,7 @@ function EditProgramContent() {
                     }}
                   >
                     <SelectTrigger
+                      className="h-9 text-sm"
                       style={{
                         background: isDark
                           ? "rgba(255,255,255,0.1)"
@@ -1106,102 +1008,67 @@ function EditProgramContent() {
                 </div>
 
                 {/* Active Toggle */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={form.is_active}
                     onChange={(e) =>
                       setForm({ ...form, is_active: e.target.checked })
                     }
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                   />
-                  <label
-                    className="text-sm font-semibold"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Program is active and visible to clients
+                  <label className="text-sm text-[color:var(--fc-text-primary)]">
+                    Active (visible to clients)
                   </label>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div
-                className="flex items-center justify-end gap-3 mt-8 pt-6"
-                style={{
-                  borderTop: `1px solid ${
-                    isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                  }`,
-                }}
-              >
+              <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-black/5 dark:border-white/5">
                 <Button
                   variant="ghost"
+                  size="sm"
                   onClick={() =>
                     (window.location.href = `/coach/programs/${form.id}`)
                   }
-                  className="rounded-xl"
+                  className="h-9 text-sm"
                 >
                   Cancel
                 </Button>
                 <Button
+                  size="sm"
                   onClick={onSave}
                   disabled={saving || !form.name.trim()}
-                  className="fc-btn fc-btn-primary rounded-xl disabled:opacity-50"
+                  className="h-9 text-sm fc-btn bg-gradient-to-r from-cyan-500 to-cyan-400 text-white shadow-md shadow-cyan-500/20 hover:from-cyan-400 hover:to-cyan-300 disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  {saving ? "Saving..." : "Save"}
                 </Button>
               </div>
             </div>
           )}
 
           {activeTab === "schedule" && (
-            <div className="space-y-6 max-w-6xl">
-              <header>
-                <h2 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
-                  Weekly Schedule
+            <div className="space-y-3 max-w-6xl border-t border-black/5 dark:border-white/5 pt-4 mt-1">
+              <div className="flex min-h-9 max-h-11 items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold fc-text-primary truncate">
+                  Weekly schedule
                 </h2>
-                <p className="fc-text-dim max-w-xl">
-                  Assign workout templates to each day. This schedule will serve
-                  as the foundation for the entire program duration.
-                </p>
-              </header>
-              {/* Info: Week 1 Auto-Apply */}
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 border-l-4 border-l-[color:var(--fc-accent)] flex items-start gap-5">
-                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-aurora)]/20 flex items-center justify-center text-[color:var(--fc-accent)] shrink-0">
-                  <Info className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold fc-text-primary mb-1">
-                    Week {selectedWeek} schedule
-                  </h3>
-                  <p className="fc-text-dim leading-relaxed">
-                    Changes made to this week will apply to this week only. Use
-                    the week selector to edit other weeks.
-                  </p>
-                </div>
               </div>
+              <p className="text-xs text-[color:var(--fc-text-dim)] -mt-2">
+                Week {selectedWeek} · edits apply to this week only.
+              </p>
               {/* Week Selector */}
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-                <div className="flex items-center gap-4 mb-6">
-                  <label
-                    className="text-sm font-semibold"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Select Week:
+              <div className="border-t border-black/5 dark:border-white/5 pt-3 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                    Week
                   </label>
                   <Select
                     value={String(selectedWeek)}
                     onValueChange={(v) => setSelectedWeek(parseInt(v, 10))}
                   >
                     <SelectTrigger
-                      className="w-40"
+                      className="w-40 [&>svg]:text-cyan-400"
                       style={{
                         background: isDark
                           ? "rgba(255,255,255,0.1)"
@@ -1227,13 +1094,17 @@ function EditProgramContent() {
                 </div>
 
                 {/* Day strip */}
-                <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 border-b border-black/5 dark:border-white/5">
                   {[1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
                     const daySchedule = schedule.find(
                       (s) =>
                         (s.week_number || 1) === absoluteSelectedWeek &&
                         s.program_day === dayNum &&
-                        (!activeBlockId || s.training_block_id === activeBlockId),
+                        scheduleRowMatchesActiveBlock(
+                          s,
+                          activeBlockId,
+                          trainingBlocks.length,
+                        ),
                     );
                     const hasWorkout =
                       daySchedule?.template_id &&
@@ -1251,18 +1122,11 @@ function EditProgramContent() {
                         }`}
                       >
                         <span
-                          className={`text-xs font-medium ${
-                            isSelected ? "text-white/80" : "fc-text-subtle"
-                          }`}
-                        >
-                          Day
-                        </span>
-                        <span
-                          className={`text-lg font-bold ${
+                          className={`text-sm font-bold leading-tight ${
                             isSelected ? "text-white" : "fc-text-primary"
                           }`}
                         >
-                          {dayNum}
+                          {programDayLabel(dayNum)}
                         </span>
                         <div
                           className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
@@ -1284,7 +1148,11 @@ function EditProgramContent() {
                     (s) =>
                       (s.week_number || 1) === absoluteSelectedWeek &&
                       s.program_day === selectedDay &&
-                      (!activeBlockId || s.training_block_id === activeBlockId),
+                      scheduleRowMatchesActiveBlock(
+                        s,
+                        activeBlockId,
+                        trainingBlocks.length,
+                      ),
                   );
                   const currentTemplateValue =
                     currentSchedule?.template_id || "rest";
@@ -1293,45 +1161,23 @@ function EditProgramContent() {
                     (t) => t.id === currentTemplateValue,
                   );
                   return (
-                    <div className="fc-surface rounded-2xl p-4 space-y-3 mt-4 border border-[color:var(--fc-surface-card-border)]">
+                    <div className="mt-3 space-y-2 border-t border-black/5 dark:border-white/5 pt-3">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          {hasWorkout ? (
-                            <Dumbbell className="w-5 h-5 text-cyan-400" />
-                          ) : (
-                            <Coffee
-                              className="w-5 h-5"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.3)"
-                                  : "rgba(0,0,0,0.3)",
-                              }}
-                            />
-                          )}
-                          <h4
-                            className="font-semibold"
-                            style={{
-                              color: isDark ? "#fff" : "#1A1A1A",
-                            }}
-                          >
-                            Day {selectedDay}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h4 className="text-sm font-semibold fc-text-primary truncate">
+                            {programDayLabel(selectedDay)}
                           </h4>
+                          {hasWorkout && selectedTemplate && (
+                            <span className="text-xs fc-text-subtle truncate">
+                              {selectedTemplate.name}
+                            </span>
+                          )}
                         </div>
-                        {hasWorkout && selectedTemplate && (
-                          <span className="text-sm fc-text-subtle">
-                            {selectedTemplate.name}
-                          </span>
-                        )}
                       </div>
 
                       <div>
-                        <label
-                          className="text-sm font-medium mb-1.5 block"
-                          style={{
-                            color: isDark ? "#fff" : "#1A1A1A",
-                          }}
-                        >
-                          Workout Template
+                        <label className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1 block">
+                          Template
                         </label>
                         <Select
                           value={currentTemplateValue}
@@ -1340,6 +1186,7 @@ function EditProgramContent() {
                           }
                         >
                           <SelectTrigger
+                            className="h-9 text-sm"
                             style={{
                               background: isDark
                                 ? "rgba(255,255,255,0.1)"
@@ -1366,7 +1213,7 @@ function EditProgramContent() {
                       </div>
 
                       {hasWorkout && selectedTemplate && (
-                        <div className="text-sm fc-text-subtle flex gap-4">
+                        <div className="text-xs fc-text-subtle flex gap-3 border-t border-black/5 dark:border-white/5 pt-2">
                           <span>
                             {selectedTemplate.exercise_count ?? "?"} exercises
                           </span>
@@ -1378,29 +1225,6 @@ function EditProgramContent() {
                     </div>
                   );
                 })()}
-              </div>
-
-              {/* Info Card */}
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
-                <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 flex-shrink-0 mt-0.5 text-cyan-400" />
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.7)",
-                    }}
-                  >
-                    Configure the workout schedule for each week of your
-                    program. When you set workouts for <strong>Week 1</strong>,
-                    they will automatically be applied to all other weeks. You
-                    can then customize individual weeks later if needed. Select
-                    a workout template for each training day, or choose "Rest
-                    Day" for recovery. Changes are saved automatically when you
-                    make a selection.
-                  </p>
-                </div>
               </div>
 
               {/* Program Volume Calculator */}
@@ -1424,58 +1248,53 @@ function EditProgramContent() {
           )}
 
           {activeTab === "progression" && (
-            <div className="space-y-6 max-w-4xl">
-              <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
-                    Progression Rules
-                  </h2>
-                  <p className="fc-text-dim">
-                    Fine-tune intensities and volume for the initial phase.
-                    Changes apply only to this program.
-                  </p>
-                </div>
+            <div className="space-y-3 max-w-4xl border-t border-black/5 dark:border-white/5 pt-4 mt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 min-h-9">
+                <h2 className="text-lg font-semibold fc-text-primary">
+                  Progression rules
+                </h2>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="rounded-lg fc-text-dim hover:fc-text-primary border border-[color:var(--fc-glass-border)]"
+                    className="h-8 text-xs rounded-lg border border-[color:var(--fc-glass-border)]"
                   >
-                    Skip for Now
+                    Skip
                   </Button>
                   {form && form.category && (
                     <Button
                       onClick={() => setShowProgressionSuggestions(true)}
                       variant="outline"
-                      className="rounded-xl"
+                      size="sm"
+                      className="h-8 text-xs rounded-lg"
                     >
-                      <Target className="w-4 h-4 mr-2" />
-                      Get Progression Suggestions
+                      <Target className="w-3.5 h-3.5 mr-1" />
+                      Suggestions
                     </Button>
                   )}
                 </div>
-              </header>
+              </div>
 
               {schedule.filter(
                 (s) =>
                   (s.week_number || 1) === absoluteSelectedWeek &&
-                  (!activeBlockId || s.training_block_id === activeBlockId),
+                  scheduleRowMatchesActiveBlock(
+                    s,
+                    activeBlockId,
+                    trainingBlocks.length,
+                  ),
               ).length === 0 ? (
-                <div className="text-center py-8 fc-text-dim">
-                  <Calendar className="w-16 h-16 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium mb-2">
-                    No Workouts Scheduled for Week {selectedWeek}
-                  </h4>
-                  <p className="text-sm mb-4">
-                    Please assign workout templates to days in the Weekly
-                    Schedule tab first.
+                <div className="py-6 text-center border-t border-black/5 dark:border-white/5">
+                  <p className="text-sm fc-text-dim">
+                    No workouts for week {selectedWeek}. Use the Schedule tab first.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Week Selector */}
-                  <div className="flex items-center gap-4">
-                    <label className="text-sm font-medium">Week:</label>
+                <div className="space-y-3 border-t border-black/5 dark:border-white/5 pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                      Week
+                    </label>
                     <Select
                       value={String(selectedWeek)}
                       onValueChange={(v) => {
@@ -1484,7 +1303,7 @@ function EditProgramContent() {
                         setSelectedScheduleForProgression(null);
                       }}
                     >
-                      <SelectTrigger className="w-32 rounded-xl">
+                      <SelectTrigger className="w-28 h-9 text-sm rounded-lg [&>svg]:text-cyan-400">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-[10000]" position="popper">
@@ -1524,10 +1343,11 @@ function EditProgramContent() {
                             onClick={() => {
                               setSelectedScheduleForProgression(scheduleItem);
                             }}
-                            className="rounded-lg"
+                            size="sm"
+                            className="h-8 text-xs rounded-full px-3"
                           >
-                            Day {scheduleItem.program_day}
-                            {template && ` - ${template.name}`}
+                            {programDayLabel(scheduleItem.program_day)}
+                            {template && ` · ${template.name}`}
                           </Button>
                         );
                       })}
@@ -1543,7 +1363,11 @@ function EditProgramContent() {
                       }
                       weekNumber={absoluteSelectedWeek}
                       isFirstWeekOfBlock={selectedWeek === 1}
-                      trainingBlockId={activeBlockId ?? undefined}
+                      trainingBlockId={
+                        activeBlockId ??
+                        selectedScheduleForProgression.training_block_id ??
+                        undefined
+                      }
                       exercises={availableExercisesList as any}
                       templates={templates}
                       blockSchedules={schedule
@@ -1578,8 +1402,8 @@ function EditProgramContent() {
                       }}
                     />
                   ) : (
-                    <div className="text-center py-8 fc-text-dim">
-                      <p>Select a day above to edit progression rules.</p>
+                    <div className="text-center py-4 text-xs fc-text-dim border-t border-black/5 dark:border-white/5">
+                      Select a day to edit rules.
                     </div>
                   )}
                 </div>
@@ -1608,7 +1432,7 @@ function EditProgramContent() {
               programId={form.id}
               nextBlockOrder={trainingBlocks.length + 1}
               onSave={handleBlockSaved}
-              onDelete={handleDeleteBlock}
+              onDelete={syncAfterTrainingBlockRemoved}
               onClose={() => {
                 setShowBlockModal(false);
                 setEditingBlock(null);

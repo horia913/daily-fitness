@@ -2,10 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { AppCard } from "@/components/ui/AppCard";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Calendar, ChevronRight, Eye } from "lucide-react";
+import { Calendar, ChevronRight } from "lucide-react";
 
 export interface WorkoutLogCardLog {
   id: string;
@@ -41,7 +38,7 @@ function getExerciseNames(log: WorkoutLogCardLog, maxNames = 4): string {
     ...new Set(
       (log.workout_set_logs || [])
         .map((s) => s.exercises?.name)
-        .filter((n): n is string => Boolean(n))
+        .filter((n): n is string => Boolean(n)),
     ),
   ];
   const slice = names.slice(0, maxNames);
@@ -69,65 +66,46 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
   const volumeKg = Math.round(log.totalWeight);
   const detailUrl = `/client/progress/workout-logs/${log.id}`;
   const rating = log.overall_difficulty_rating;
-  const subtitlePills = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {log.programContext && (
-        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-accent)]/15 border border-[color:var(--fc-accent)]/30 text-[color:var(--fc-accent)] font-medium">
-          Day {log.programContext.dayNumber}
-        </span>
-      )}
-      {duration != null && (
-        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)]">
-          {duration} min
-        </span>
-      )}
-      <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)]">
-        {log.totalSets} sets
-      </span>
-      <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)]">
-        {volumeKg.toLocaleString()} kg
-      </span>
-      {rating != null && rating > 0 && (
-        <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-dim)]">
-          {rating}/5
-        </span>
-      )}
-    </div>
-  );
-
   const exercisePreview = getExerciseNames(log);
 
+  const statsLine = [
+    log.programContext ? `Day ${log.programContext.dayNumber}` : null,
+    duration != null ? `${duration} min` : null,
+    `${log.totalSets} sets`,
+    `${volumeKg.toLocaleString()} kg`,
+    rating != null && rating > 0 ? `${rating}/5` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <AppCard
-      variant="client"
-      accentColor="var(--fc-domain-workouts)"
-      eyebrow={`COMPLETED · ${formatDateLabel(completedDate)}`}
-      eyebrowIcon={<Calendar className="w-4 h-4" />}
-      title={workoutName}
-      subtitle={subtitlePills}
+    <button
+      type="button"
       onClick={() => router.push(detailUrl)}
-      actions={
-        <Link
-          href={detailUrl}
-          className="ml-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Button
-            size="sm"
-            className="rounded-xl bg-[color:var(--fc-surface-card)] border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-surface-elevated)] hover:border-[color:var(--fc-glass-border-strong)] fc-press"
-          >
-            <Eye className="w-4 h-4 mr-1.5" />
-            View
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </Link>
-      }
+      className="flex w-full min-h-[52px] items-center gap-3 py-3 pl-3 pr-1 text-left transition-colors hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50 border-l-2 border-l-[color:var(--fc-domain-workouts)] sm:pl-4"
     >
-      {exercisePreview && (
-        <p className="text-sm text-[color:var(--fc-text-dim)] line-clamp-2">
-          {exercisePreview}
+      <Calendar
+        className="h-4 w-4 shrink-0 text-[color:var(--fc-text-dim)]"
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+          {formatDateLabel(completedDate)}
         </p>
-      )}
-    </AppCard>
+        <p className="truncate text-sm font-semibold text-[color:var(--fc-text-primary)]">
+          {workoutName}
+        </p>
+        <p className="mt-0.5 text-xs text-[color:var(--fc-text-dim)]">{statsLine}</p>
+        {exercisePreview ? (
+          <p className="mt-1 line-clamp-1 text-xs text-[color:var(--fc-text-dim)]">
+            {exercisePreview}
+          </p>
+        ) : null}
+      </div>
+      <ChevronRight
+        className="h-5 w-5 shrink-0 text-[color:var(--fc-text-dim)]"
+        aria-hidden
+      />
+    </button>
   );
 }

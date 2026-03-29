@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, Zap, ChevronDown, ChevronUp } from "lucide-react";
-import Link from "next/link";
 import { getCategoryAccent } from "@/lib/workoutCategoryColors";
 import { cn } from "@/lib/utils";
 
@@ -43,44 +41,47 @@ export function ExtraTraining({
 
   return (
     <div className="mb-6">
-      <h3 className="text-sm font-bold fc-text-primary mb-3 flex items-center gap-2">
-        <Zap className="w-4 h-4 text-orange-500 dark:text-orange-400" />
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold fc-text-primary">
+        <Zap className="h-4 w-4 text-orange-500 dark:text-orange-400" />
         Extra Training
       </h3>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col divide-y divide-white/5 border-y border-white/5">
         {visible.map((workout) => {
-          const cat =
-            templateCategories?.get(workout.templateId) ?? "";
+          const cat = templateCategories?.get(workout.templateId) ?? "";
           const accent = getCategoryAccent(cat);
           return (
-            <Link key={workout.id} href={`/client/workouts/${workout.id}/start`}>
-              <ClientGlassCard
+            <button
+              key={workout.id}
+              type="button"
+              className={cn(
+                "flex min-h-[52px] w-full items-center gap-3 border-l-2 bg-transparent px-1 py-3 text-left transition-colors hover:bg-white/[0.02] sm:px-0",
+                accent.border,
+              )}
+              onClick={() => {
+                window.location.href = `/client/workouts/${workout.id}/details`;
+              }}
+            >
+              <div
                 className={cn(
-                  "p-4 hover:opacity-90 transition-all cursor-pointer bg-[color:var(--fc-glass-base)] backdrop-blur-none border-[color:var(--fc-glass-border-strong)] border-l-2",
-                  accent.border,
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                  accent.iconBg,
                 )}
               >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                      accent.iconBg,
-                    )}
-                  >
-                    <Dumbbell className={cn("w-5 h-5", accent.text)} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-bold fc-text-primary mb-0.5 break-words">
-                      {workout.name}
-                    </h4>
-                    <p className="text-xs fc-text-dim">
-                      {workout.exerciseCount > 0 ? `${workout.exerciseCount} exercises` : "Workout"} · ~{workout.estimatedDuration || 45} min
-                    </p>
-                  </div>
-                </div>
-              </ClientGlassCard>
-            </Link>
+                <Dumbbell className={cn("h-5 w-5", accent.text)} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="break-words text-sm font-bold fc-text-primary">
+                  {workout.name}
+                </h4>
+                <p className="text-xs fc-text-dim">
+                  {workout.exerciseCount > 0
+                    ? `${workout.exerciseCount} exercises`
+                    : "Workout"}{" "}
+                  · ~{workout.estimatedDuration || 45} min
+                </p>
+              </div>
+            </button>
           );
         })}
       </div>
@@ -89,10 +90,10 @@ export function ExtraTraining({
         <Button
           type="button"
           variant="outline"
-          className="w-full mt-3 h-11 rounded-xl border-[color:var(--fc-glass-border)] fc-text-primary font-semibold gap-2"
+          className="mt-3 h-11 w-full gap-2 rounded-xl border-[color:var(--fc-glass-border)] font-semibold fc-text-primary"
           onClick={() => setShowAll(true)}
         >
-          <ChevronDown className="w-4 h-4 text-cyan-400" />
+          <ChevronDown className="h-4 w-4 text-cyan-400" />
           Show more ({hiddenCount} more)
         </Button>
       )}
@@ -100,10 +101,10 @@ export function ExtraTraining({
         <Button
           type="button"
           variant="ghost"
-          className="w-full mt-2 h-10 rounded-xl fc-text-dim text-sm gap-1"
+          className="mt-2 h-10 w-full gap-1 rounded-xl text-sm fc-text-dim"
           onClick={() => setShowAll(false)}
         >
-          <ChevronUp className="w-4 h-4" />
+          <ChevronUp className="h-4 w-4" />
           Show less
         </Button>
       )}

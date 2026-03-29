@@ -420,7 +420,7 @@ export default function EnhancedClientWorkouts({
                       60,
                     progressionNotes:
                       exercise.rir !== null && exercise.rir !== undefined
-                        ? `RIR ${exercise.rir}`
+                        ? `RPE ${exercise.rir}`
                         : undefined,
                   };
                 });

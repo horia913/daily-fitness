@@ -535,14 +535,8 @@ export function SupersetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {allowSetEditDelete && setNumbersLogged.length > 0 && (
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--fc-surface-card-border)",
-            background: "var(--fc-surface-sunken)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
+        <div className="border-t border-white/10 pt-3">
+          <div className="mb-2 flex items-center justify-between px-1">
             <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
               Logged sets
             </div>
@@ -560,7 +554,7 @@ export function SupersetExecutor({
               </button>
             )}
           </div>
-          <ul className="space-y-1.5">
+          <ul className="flex flex-col border-y border-white/5">
             {(showAllSets ? setNumbersLogged : setNumbersLogged.slice(-2)).map((setNum) => {
               // Calculate the actual index in the full list for isLatestSet
               const actualIndex = showAllSets 
@@ -582,8 +576,7 @@ export function SupersetExecutor({
               return (
                 <li
                   key={`set-${setNum}`}
-                  className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
-                  style={{ background: "var(--fc-surface-elevated)" }}
+                  className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm fc-text-primary">{label}</span>
@@ -702,12 +695,9 @@ export function SupersetExecutor({
           </Button>
         </div>
       )}
-      <div className="space-y-6">
+      <div className="flex flex-col border-y border-white/5">
         {/* Exercise A */}
-        <div
-          className="p-4 rounded-xl"
-          style={{ background: "var(--fc-surface-sunken)" }}
-        >
+        <div className="border-b border-white/5 py-4">
           <div className="mb-4">
             <h4
               className="font-semibold text-lg"
@@ -793,10 +783,7 @@ export function SupersetExecutor({
         </div>
 
         {/* Exercise B */}
-        <div
-          className="p-4 rounded-xl"
-          style={{ background: "var(--fc-surface-sunken)" }}
-        >
+        <div className="py-4">
           <div className="mb-4">
             <h4
               className="font-semibold text-lg"

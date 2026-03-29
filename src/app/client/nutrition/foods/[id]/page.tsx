@@ -75,7 +75,7 @@ export default function FoodDetailPage() {
   const router = useRouter();
   const { performanceSettings } = useTheme();
 
-  const foodId = params.id as string;
+  const foodId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [food, setFood] = useState<Food | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

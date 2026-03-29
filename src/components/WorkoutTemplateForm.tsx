@@ -27,7 +27,6 @@ import {
   X,
   Clock,
   Target,
-  Dumbbell,
   Plus,
   Save,
   Eye,
@@ -35,7 +34,6 @@ import {
   Calendar,
   Users,
   Zap,
-  CheckCircle,
   Edit,
   Trash2,
   Layers,
@@ -1148,51 +1146,27 @@ export default function WorkoutTemplateForm({
           maxHeight: isPage ? "none" : "min(88vh, calc(100vh - 4rem))",
         }}
       >
-        {/* Header */}
+        {/* Header — modal only; page mode uses parent nav */}
+        {!isPage && (
         <div
-          className={`${isPage ? "mb-6" : "sticky top-0"} ${
-            isPage
-              ? ""
-              : `${theme.card} fc-glass fc-card border-b ${theme.border}`
-          } px-3 py-3 sm:px-6 sm:py-5 ${isPage ? "" : "rounded-t-3xl"}`}
+          className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-3 py-3 sm:px-4 sm:py-3 rounded-t-3xl`}
         >
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-4">
-              <div
-                className={`p-3 rounded-2xl bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-lg`}
-              >
-                <Dumbbell className={`w-6 h-6 text-white`} />
-              </div>
-              <div>
-                <h2 className={`text-xl font-bold ${theme.text}`}>
-                  {template
-                    ? "Edit Workout Template"
-                    : "Create New Workout Template"}
-                </h2>
-                <p className={`text-xs ${theme.textSecondary}`}>
-                  {template
-                    ? "Update template details"
-                    : "Design a new workout template for your clients"}
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between gap-2 min-h-10">
+            <h2 className={`text-lg font-semibold truncate ${theme.text}`}>
+              {template ? "Edit template" : "Create template"}
+            </h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className={`p-2 rounded-xl transition-all duration-200 ${
-                theme.textSecondary
-              } hover:${theme.text} hover:${
-                isDark
-                  ? "bg-[color:var(--fc-surface-sunken)]"
-                  : "bg-[color:var(--fc-surface-sunken)]"
-              }`}
+              className="h-8 w-8 p-0 shrink-0 rounded-lg"
               aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </Button>
           </div>
         </div>
+        )}
 
         <div
           className={`flex-1 ${
@@ -1203,28 +1177,8 @@ export default function WorkoutTemplateForm({
         >
           <form
             onSubmit={handleSubmit}
-            className={`space-y-4 sm:space-y-5 ${isPage ? "" : "pt-3"}`}
+            className={`space-y-3 ${isPage ? "" : "pt-2"}`}
           >
-            {/* Enhanced Schema Status Banner */}
-            <div
-              className={`${theme.card} border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 rounded-xl p-4 mb-6`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-800">
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-green-800 dark:text-green-200">
-                    Enhanced Training Programs
-                  </h3>
-                  <p className="text-sm text-green-600 dark:text-green-300">
-                    Now using improved schema with dedicated exercise types and
-                    progress tracking
-                  </p>
-                </div>
-              </div>
-            </div>
-
             <BasicInfoSection
               formData={formData}
               setFormData={setFormData}
@@ -1250,25 +1204,25 @@ export default function WorkoutTemplateForm({
               {/* Unified Workout Structure - ref so we can scroll here when adding new exercise */}
               <div
                 ref={workoutFlowSectionRef}
-                className="space-y-4"
+                className="space-y-3 border-t border-black/5 dark:border-white/5 mt-4 pt-4"
                 style={{ order: 1 }}
               >
-                <div className="flex flex-col sm:flex-row w-full items-start sm:items-center gap-3 sm:gap-2 sm:justify-between">
-                  <h3 className={`text-xl font-bold ${theme.text}`}>
-                    Workout Flow ({workoutItems.length} {workoutItems.length !== 1 ? "exercises" : "exercise"})
+                <div className="flex flex-wrap w-full items-center gap-2 justify-between">
+                  <h3 className={`text-sm font-semibold ${theme.text}`}>
+                    Exercises ({workoutItems.length})
                   </h3>
                   <Button
                     type="button"
+                    size="sm"
                     onClick={() => setShowAddExercise(true)}
-                    className={`${theme.primary} ${theme.shadow} rounded-xl px-6 py-3 hover:scale-105 transition-all duration-200 w-full sm:w-auto justify-center`}
+                    className={`h-8 text-xs px-3 rounded-lg ${theme.primary} shrink-0`}
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Exercise
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Add exercise
                   </Button>
                 </div>
 
-                {/* When Add Exercise is open, show form first (order 0) then list (order 1) so coach doesn't scroll */}
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
                   {exercises.length > 0 ? (
                     <DragDropContext onDragEnd={handleDragEnd}>
                       <Droppable droppableId="exercises-list">
@@ -1276,7 +1230,7 @@ export default function WorkoutTemplateForm({
                           <div
                             {...provided.droppableProps}
                             ref={provided.innerRef}
-                            className="w-full space-y-3"
+                            className="w-full space-y-2"
                           >
                             {exercises.map((exercise, index) => {
                               // Create unique key combining multiple properties to avoid duplicates
@@ -1306,7 +1260,7 @@ export default function WorkoutTemplateForm({
                                       }
                                     >
                                       <div className="flex items-start gap-2">
-                                        <div className="flex items-center mt-4 text-[color:var(--fc-text-dim)] cursor-grab active:cursor-grabbing flex-shrink-0">
+                                        <div className="flex items-center mt-2 text-[color:var(--fc-text-dim)] cursor-grab active:cursor-grabbing flex-shrink-0">
                                           <GripVertical className="w-4 h-4" />
                                         </div>
                                         <div className="flex-1">
@@ -1319,6 +1273,7 @@ export default function WorkoutTemplateForm({
                                             onEdit={editExercise}
                                             onDelete={removeExercise}
                                             renderMode="form"
+                                            compact
                                             isExpanded={
                                               expandedExerciseId === exercise.id
                                             }

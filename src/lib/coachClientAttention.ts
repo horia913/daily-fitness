@@ -137,6 +137,20 @@ export function attentionBackdropTailwind(level: AttentionLevel): string {
   }
 }
 
+/** Flat list row: left accent + subtle tint (no card / rounded surface). */
+export function attentionListRowClass(level: AttentionLevel): string {
+  switch (level) {
+    case 'urgent':
+      return 'border-l-[3px] border-l-[color:var(--fc-status-error)] bg-red-500/[0.06] dark:bg-red-500/[0.10]';
+    case 'warning':
+      return 'border-l-[3px] border-l-[color:var(--fc-status-warning)] bg-amber-500/[0.06] dark:bg-amber-500/[0.10]';
+    case 'good':
+      return 'border-l-[3px] border-l-[color:var(--fc-status-success)] bg-emerald-500/[0.05] dark:bg-emerald-500/[0.08]';
+    case 'inactive':
+      return 'border-l-[3px] border-l-[color:var(--fc-status-inactive)] bg-neutral-500/[0.05] dark:bg-white/[0.03]';
+  }
+}
+
 /** Frame via box-shadow so nothing can read as a thick left "stripe" (border utilities stack badly on some layouts). */
 const attentionCardFrame: CSSProperties = {
   border: 'none',

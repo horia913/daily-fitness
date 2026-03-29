@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService, {
   ProgramSchedule,
@@ -15,18 +14,10 @@ import WorkoutTemplateService, {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  Calendar,
   Edit,
-  Users,
-  TrendingUp,
-  Clock,
-  Target,
   ArrowLeft,
   Dumbbell,
   Coffee,
-  Share2,
-  MoreHorizontal,
-  Settings2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -274,47 +265,47 @@ function ProgramDetailsContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6 pb-32">
-        <div className="max-w-5xl mx-auto space-y-8 relative z-10">
-          <nav className="flex items-center justify-between">
+        <div className="max-w-5xl mx-auto space-y-4 relative z-10">
+          <nav className="flex min-h-12 items-center justify-between gap-3">
             <Link
               href="/coach/programs"
-              className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors font-medium"
+              className="inline-flex items-center gap-1.5 text-sm font-medium fc-text-dim hover:fc-text-primary transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
-              Back to Programs
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Programs
             </Link>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
-                <Share2 className="w-4 h-4" />
+            <Link href={`/coach/programs/${program.id}/edit`}>
+              <Button size="sm" className="fc-btn fc-btn-primary h-9 font-semibold">
+                <Edit className="w-4 h-4 mr-1.5" />
+                Edit Program
               </Button>
-              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </div>
+            </Link>
           </nav>
 
-          <header className="flex flex-wrap items-start justify-between gap-6">
+          <header className="space-y-2">
             <div className="max-w-2xl">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border"
+                  className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border"
                   style={{
                     background: `${getSemanticColor("critical").primary}15`,
                     color: getSemanticColor("critical").primary,
                     borderColor: `${getSemanticColor("critical").primary}30`,
                   }}
                 >
-                  {program.difficulty_level} {program.target_audience?.replace("_", " ") || ""}
+                  {program.difficulty_level}
                 </span>
-                <span className="fc-text-dim font-mono text-xs">ID: {program.id.slice(0, 8)}</span>
+                <span className="fc-text-dim font-mono text-[10px]">
+                  {program.id.slice(0, 8)}
+                </span>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-3">
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary mt-1 sm:text-2xl">
                 {program.name}
               </h1>
 
               {/* Training block: single = goal badge, multi = timeline */}
               {trainingBlocks.length === 1 && trainingBlocks[0] && (
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-2 mt-2">
                   <span
                     className="px-2.5 py-1 rounded-full text-xs font-semibold"
                     style={{
@@ -339,8 +330,8 @@ function ProgramDetailsContent() {
                   return { startWeek, endWeek };
                 });
                 return (
-                  <div className="mb-4">
-                    <p className="text-xs fc-text-dim mb-2 font-semibold uppercase tracking-wider">
+                  <div className="mb-2 mt-2">
+                    <p className="text-xs fc-text-dim mb-1.5 font-semibold uppercase tracking-wider">
                       Program Timeline ({trainingBlocks.reduce((s, b) => s + b.duration_weeks, 0)} weeks)
                     </p>
                     <div className="flex flex-wrap gap-2 items-center">
@@ -373,141 +364,27 @@ function ProgramDetailsContent() {
               })()}
 
               {program.description && (
-                <p className="text-lg fc-text-dim leading-relaxed">
+                <p className="text-sm fc-text-dim leading-snug line-clamp-3 mt-2">
                   {program.description}
                 </p>
               )}
             </div>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 flex flex-col gap-4 min-w-[220px]">
-              <div className="flex justify-between items-center">
-                <span className="text-sm fc-text-dim">Assigned Clients</span>
-                <span className="fc-badge fc-badge-strong text-xs">0 ACTIVE</span>
-              </div>
-              <Link
-                href={`/coach/programs/${program.id}/edit`}
-                className="text-sm font-semibold fc-text-primary flex items-center gap-1.5 hover:underline"
-              >
-                Manage Access <ArrowLeft className="w-3 h-3 rotate-180" />
-              </Link>
-            </div>
           </header>
 
-          <div className="rounded-2xl border-l-4" style={{ borderLeftColor: getSemanticColor("trust").primary }}>
-          <div
-            className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 flex flex-col md:flex-row items-center justify-between gap-6"
-          >
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${getSemanticColor("trust").primary}20` }}>
-                <TrendingUp className="w-7 h-7" style={{ color: getSemanticColor("trust").primary }} />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold fc-text-primary">Progression</h3>
-                <p className="text-sm fc-text-dim mt-1">Edit rules and weekly schedule in program settings.</p>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--fc-glass-border)]/40 pb-2">
+            <h2 className="text-sm font-semibold fc-text-primary">Progression</h2>
             <Link href={`/coach/programs/${program.id}/edit`}>
-              <Button variant="outline" className="fc-btn fc-btn-ghost rounded-2xl font-bold shrink-0">
-                <Settings2 className="w-4 h-4 mr-2" />
+              <Button size="sm" className="fc-btn fc-btn-primary h-9 shrink-0 font-semibold">
+                <Edit className="w-4 h-4 mr-1.5" />
                 Edit Program
               </Button>
             </Link>
           </div>
-          </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
-              <div
-                className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
-                style={{
-                  background: `${getSemanticColor("trust").primary}20`,
-                }}
-              >
-                <Clock
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("trust").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={program.duration_weeks}
-                size="h2"
-                weight="bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                Total Weeks
-              </div>
-            </div>
-
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
-              <div
-                className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
-                style={{
-                  background: `${getSemanticColor("success").primary}20`,
-                }}
-              >
-                <Users
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("success").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={0}
-                size="h2"
-                weight="bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                Active Clients
-              </div>
-            </div>
-
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
-              <div
-                className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
-                style={{
-                  background: `${getSemanticColor("energy").primary}20`,
-                }}
-              >
-                <TrendingUp
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("energy").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={program.duration_weeks}
-                size="h2"
-                weight="bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                Avg Duration (w)
-              </div>
-            </div>
-
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
-              <div
-                className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
-                style={{
-                  background: `${getSemanticColor("warning").primary}20`,
-                }}
-              >
-                <Target
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("warning").primary }}
-                />
-              </div>
-              <div
-                className="text-sm font-semibold capitalize"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                {program.target_audience.replace("_", " ")}
-              </div>
-              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                Target Audience
-              </div>
-            </div>
-          </div>
+          <p className="text-sm text-gray-400">
+            {totalWeeks} week{totalWeeks !== 1 ? "s" : ""} · 0 clients ·{" "}
+            {program.target_audience.replace(/_/g, " ")}
+          </p>
 
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">Training Schedule</h2>

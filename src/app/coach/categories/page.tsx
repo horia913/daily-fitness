@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { withTimeout } from "@/lib/withTimeout";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -22,9 +23,9 @@ import {
   Layers,
   Star,
 } from "lucide-react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CategoryForm from "@/components/CategoryForm";
+import { CoachExerciseCategoriesPanel } from "@/components/coach/CoachExerciseCategoriesPanel";
 
 interface WorkoutCategory {
   id: string;
@@ -56,8 +57,10 @@ const categoryColors = [
   { name: "Gray", value: "#6B7280" },
 ];
 
-export default function WorkoutCategories() {
+function CategoriesHubContent() {
   const { isDark, performanceSettings } = useTheme();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") === "exercises" ? "exercises" : "workouts";
 
   const [categories, setCategories] = useState<WorkoutCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,68 +234,80 @@ export default function WorkoutCategories() {
     }
   };
 
-  if (loading) {
-    return (
-      <ProtectedRoute requiredRole="coach">
-        <AnimatedBackground>
-          <div className="min-h-screen p-6 max-w-7xl mx-auto">
-            <div className="rounded-2xl p-8 fc-surface animate-pulse">
-              <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
-            </div>
-          </div>
-        </AnimatedBackground>
-      </ProtectedRoute>
-    );
-  }
-
-  const [filterType, setFilterType] = useState<"all" | "workouts" | "exercises" | "programs">("all");
-
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
           <div className="max-w-5xl mx-auto space-y-8">
-            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/coach/training";
+              }}
+              className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4"
+            >
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Back to Training
-            </Link>
+            </button>
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
                 <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
                   Coach <ArrowRight className="w-3 h-3 inline" /> Management
                 </nav>
                 <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">Categories</h1>
-                <p className="text-lg fc-text-dim">Organize your forge with custom tags and classifications.</p>
+                <p className="text-lg fc-text-dim">Workout template tags and exercise library groupings.</p>
               </div>
-              <button
-                onClick={() => setShowCreateForm(true)}
-                className="fc-btn fc-btn-primary px-8 rounded-2xl h-14 font-bold flex items-center justify-center gap-3 shrink-0"
-              >
-                <Plus className="w-6 h-6" />
-                New Category
-              </button>
+              {activeTab === "workouts" && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(true)}
+                  className="fc-btn fc-btn-primary px-8 rounded-2xl h-14 font-bold flex items-center justify-center gap-3 shrink-0"
+                >
+                  <Plus className="w-6 h-6" />
+                  New Category
+                </button>
+              )}
             </header>
 
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)]">
-                {(["all", "workouts", "exercises", "programs"] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFilterType(f)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterType === f ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
-                  >
-                    {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-                  </button>
-                ))}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-fit flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/coach/categories?tab=workouts";
+                  }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "workouts" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
+                >
+                  Workout categories
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/coach/categories?tab=exercises";
+                  }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "exercises" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
+                >
+                  Exercise categories
+                </button>
               </div>
-              <div className="relative w-full md:w-72">
+            </div>
+
+            {activeTab === "exercises" ? (
+              <CoachExerciseCategoriesPanel />
+            ) : loading ? (
+              <div className="rounded-2xl p-8 fc-surface animate-pulse">
+                <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            ) : (
+              <>
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full md:w-72 md:ml-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim pointer-events-none" />
                 <Input
-                  placeholder="Search categories..."
+                  placeholder="Search workout categories..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="fc-input h-12 pl-11 w-full rounded-xl"
@@ -501,9 +516,35 @@ export default function WorkoutCategories() {
                 category={editingCategory}
                 colors={categoryColors}
               />
+              </>
+            )}
           </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>
+  );
+}
+
+function CategoriesHubFallback() {
+  return (
+    <ProtectedRoute requiredRole="coach">
+      <AnimatedBackground>
+        <div className="min-h-screen p-6 max-w-7xl mx-auto">
+          <div className="rounded-2xl p-8 fc-surface animate-pulse">
+            <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
+          </div>
+        </div>
+      </AnimatedBackground>
+    </ProtectedRoute>
+  );
+}
+
+export default function WorkoutCategories() {
+  return (
+    <Suspense fallback={<CategoriesHubFallback />}>
+      <CategoriesHubContent />
+    </Suspense>
   );
 }

@@ -396,10 +396,6 @@ export default function TrainPage() {
     setWeekActivities(updated);
   };
 
-  const activityMinutesThisWeek = weekActivities.reduce(
-    (sum, a) => sum + a.duration_minutes,
-    0,
-  );
   const workoutsCompletedThisWeek =
     programWeek?.hasProgram && !programWeek.isCompleted
       ? programWeek.days.filter((d) => d.isCompleted).length
@@ -419,24 +415,16 @@ export default function TrainPage() {
             </h1>
           </header>
 
-          {!loading && !error && (
-            <TrainStatsRow
-              workoutsCompletedThisWeek={workoutsCompletedThisWeek}
-              activityMinutesThisWeek={activityMinutesThisWeek}
-              workoutStreakDays={workoutStreak}
-            />
-          )}
-
           {error && (
-            <ClientGlassCard className="p-6 text-center mb-6">
-              <p className="text-sm fc-text-dim mb-4">{error}</p>
+            <div className="mb-6 border-b border-white/5 border-l-2 border-l-[color:var(--fc-status-error)] py-4 text-center">
+              <p className="mb-3 text-sm fc-text-dim">{error}</p>
               <button
                 onClick={() => refetch()}
                 className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm"
               >
                 Retry
               </button>
-            </ClientGlassCard>
+            </div>
           )}
 
           {loading ? (
@@ -465,7 +453,7 @@ export default function TrainPage() {
 
                   {/* Coach Feedback Card (dismissible, coach_managed mode) */}
                   {programWeek.coachFeedback && !feedbackDismissed && (
-                    <ClientGlassCard className="p-4 mb-4 border-l-[3px] border-l-[color:var(--fc-domain-workouts)]">
+                    <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-domain-workouts)] py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
                           <MessageSquare className="w-5 h-5 mt-0.5 shrink-0 fc-text-workouts" />
@@ -488,12 +476,12 @@ export default function TrainPage() {
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                    </ClientGlassCard>
+                    </div>
                   )}
 
                   {/* Waiting for Coach Review (coach_managed mode, week complete) */}
                   {programWeek.isWeekCompleteAwaitingReview && (
-                    <ClientGlassCard className="p-5 mb-4 text-center border border-[color:var(--fc-status-warning)]/30">
+                    <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-status-warning)] py-4 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-12 h-12 rounded-full bg-[color:var(--fc-status-warning)]/15 flex items-center justify-center">
                           <Clock className="w-6 h-6 text-[color:var(--fc-status-warning)]" />
@@ -507,7 +495,7 @@ export default function TrainPage() {
                           </p>
                         </div>
                       </div>
-                    </ClientGlassCard>
+                    </div>
                   )}
 
                   {/* Section 3: Week Overview Strip */}
@@ -524,7 +512,11 @@ export default function TrainPage() {
                     selectedRestWeekday={selectedRestWeekday}
                   />
 
-                  {/* Overdue Workouts — right after the strip so it's impossible to miss */}
+                  <TrainStatsRow
+                    workoutsCompletedThisWeek={workoutsCompletedThisWeek}
+                    workoutStreakDays={workoutStreak}
+                  />
+
                   <OverdueWorkouts
                     overdueSlots={programWeek.overdueSlots}
                     onOpenPreview={handleOpenOverduePreview}
@@ -591,13 +583,6 @@ export default function TrainPage() {
                     </div>
                   )}
 
-                  {/* Extra Activities — below the workout detail card */}
-                  {!loading && (
-                    <ActivityWeekSummary
-                      activities={weekActivities}
-                      onQuickAdd={() => setShowActivityModal(true)}
-                    />
-                  )}
                 </>
               ) : (
                 /* No Program State */
@@ -608,11 +593,25 @@ export default function TrainPage() {
                 />
               )}
 
+              {!loading && !error && !programWeek?.hasProgram && (
+                <TrainStatsRow
+                  workoutsCompletedThisWeek={workoutsCompletedThisWeek}
+                  workoutStreakDays={workoutStreak}
+                />
+              )}
+
               {/* Extra Training (coach-assigned extra workouts) */}
               {!loading && (
                 <ExtraTraining
                   workouts={extraWorkouts}
                   templateCategories={templateCategories}
+                />
+              )}
+
+              {!loading && programWeek?.hasProgram && !programWeek.isCompleted && (
+                <ActivityWeekSummary
+                  activities={weekActivities}
+                  onQuickAdd={() => setShowActivityModal(true)}
                 />
               )}
             </>

@@ -8,6 +8,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+/** Coach programs + assignment counts must never be statically cached. */
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient()
@@ -55,7 +58,13 @@ export async function GET(request: NextRequest) {
     }))
 
     const assignmentCountByProgram: Record<string, number> = {}
-    if (!assignmentsError && assignmentsData) {
+    if (assignmentsError) {
+      console.error(
+        '[coach/programs] Error fetching program_assignments (counts will be empty):',
+        assignmentsError.message,
+        assignmentsError
+      )
+    } else if (assignmentsData) {
       assignmentsData.forEach((row: { program_id: string }) => {
         const id = row.program_id
         if (id) assignmentCountByProgram[id] = (assignmentCountByProgram[id] || 0) + 1

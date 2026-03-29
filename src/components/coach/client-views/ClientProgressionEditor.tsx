@@ -429,7 +429,7 @@ export default function ClientProgressionEditor({
                           ['reps', 'Reps'],
                           ['weight_kg', 'Weight (kg)'],
                           ['rest_seconds', 'Rest (s)'],
-                          ['rir', 'RIR'],
+                          ['rir', 'RPE'],
                           ['tempo', 'Tempo'],
                         ] as const
                       ).map(([field, label]) => (

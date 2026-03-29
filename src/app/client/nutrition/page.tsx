@@ -8,7 +8,6 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import { Droplet, BarChart3, ChevronDown, ChevronUp, UtensilsCrossed } from "lucide-react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
   ClientPageShell,
@@ -756,9 +755,26 @@ function NutritionDashboardContent() {
                   )}
                 </button>
               </div>
-              <Link href="/client/progress/nutrition" className="text-sm fc-text-dim hover:fc-text-primary transition-colors shrink-0">
-                History
-              </Link>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/nutrition/foods/create";
+                  }}
+                  className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                >
+                  Add food
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/progress/nutrition";
+                  }}
+                  className="text-sm fc-text-dim hover:fc-text-primary transition-colors min-h-[44px] px-1"
+                >
+                  History
+                </button>
+              </div>
             </div>
             <ClientGlassCard className="p-8">
               <EmptyState
@@ -795,9 +811,26 @@ function NutritionDashboardContent() {
                   )}
                 </button>
               </div>
-              <Link href="/client/progress/nutrition" className="text-sm fc-text-dim hover:fc-text-primary transition-colors shrink-0">
-                History
-              </Link>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/nutrition/foods/create";
+                  }}
+                  className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
+                >
+                  Add food
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/progress/nutrition";
+                  }}
+                  className="text-sm fc-text-dim hover:fc-text-primary transition-colors min-h-[44px] px-1"
+                >
+                  History
+                </button>
+              </div>
             </div>
 
             {/* Plan picker: compact dropdown when client has multiple active plans (Phase N4) */}
@@ -969,7 +1002,7 @@ function NutritionDashboardContent() {
 
             {/* Meal cards — full width, proper padding for mobile */}
             {hasMealsInPlan && (
-              <section className="space-y-4 w-full min-w-0">
+              <section className="flex w-full min-w-0 flex-col divide-y divide-white/5 border-y border-white/5">
                 {meals.map((meal) => {
                   const displayMeal = {
                     id: meal.id,
@@ -991,6 +1024,12 @@ function NutritionDashboardContent() {
                       onMarkComplete={handleMarkComplete}
                       onUndo={() => handleUndo(meal.id)}
                       onAddPhoto={handleAddPhoto}
+                      onOpenMealDetails={() => {
+                        window.location.href = `/client/nutrition/meals/${meal.id}`;
+                      }}
+                      onFoodClick={(foodId) => {
+                        window.location.href = `/client/nutrition/foods/${foodId}`;
+                      }}
                     />
                   );
                 })}
@@ -1126,12 +1165,15 @@ function NutritionDashboardContent() {
                     </span>
                   )}
                 </h3>
-                <Link
-                  href="/client/goals"
-                  className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline"
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/goals";
+                  }}
+                  className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
                 >
                   Manage
-                </Link>
+                </button>
               </div>
               <div className="flex flex-wrap gap-3">
                 {nutritionGoals.slice(0, 3).map((g) => (

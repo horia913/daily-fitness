@@ -492,14 +492,8 @@ export function RestPauseExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {allowSetEditDelete && loggedSetsList.length > 0 && (
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--fc-surface-card-border)",
-            background: "var(--fc-surface-sunken)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
+        <div className="border-t border-white/10 pt-3">
+          <div className="mb-2 flex items-center justify-between px-1">
             <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
               Logged sets
             </div>
@@ -517,7 +511,7 @@ export function RestPauseExecutor({
               </button>
             )}
           </div>
-          <ul className="space-y-1.5">
+          <ul className="flex flex-col border-y border-white/5">
             {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
               // Calculate the actual index in the full list for isLatestSet
               const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
@@ -525,8 +519,7 @@ export function RestPauseExecutor({
               return (
               <li
                 key={setEntry.id}
-                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
-                style={{ background: "var(--fc-surface-elevated)" }}
+                className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm fc-text-primary">

@@ -41,6 +41,7 @@ export function TrainingBlockHeader({
   onAddBlock,
   onEditBlock,
   onDeleteBlock,
+  onUpdateBlock: _onUpdateBlock,
   onMoveBlock,
 }: TrainingBlockHeaderProps) {
   const { isDark, getSemanticColor } = useTheme();
@@ -49,7 +50,6 @@ export function TrainingBlockHeader({
 
   const activeBlock = trainingBlocks.find((b) => b.id === activeBlockId);
 
-  // Compute absolute start/end weeks for every block (cumulative offset)
   const blockWeekRanges = (() => {
     let offset = 0;
     return trainingBlocks.map((block) => {
@@ -63,20 +63,14 @@ export function TrainingBlockHeader({
   const activeBlockIndex = trainingBlocks.findIndex((b) => b.id === activeBlockId);
   const activeBlockRange = activeBlockIndex >= 0 ? blockWeekRanges[activeBlockIndex] : null;
 
-  const surfaceStyle = {
-    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-  };
-
   const labelStyle = {
-    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)",
+    color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)",
   };
 
   const toggleMenu = (id: string) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
 
-  // Close menu on outside click
   React.useEffect(() => {
     if (!openMenuId) return;
     const handleClick = (e: MouseEvent) => {
@@ -91,29 +85,27 @@ export function TrainingBlockHeader({
   if (!activeBlock) return null;
 
   return (
-    <div className="rounded-2xl p-4 sm:p-5" style={surfaceStyle}>
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-3">
-        <h3
-          className="text-sm font-bold uppercase tracking-wider"
+    <div className="space-y-2">
+      <div className="flex min-h-9 items-center justify-between gap-2">
+        <span
+          className="text-xs font-semibold uppercase tracking-wide"
           style={labelStyle}
         >
-          Training Blocks
-        </h3>
+          Training blocks
+        </span>
         <Button
           variant="ghost"
           size="sm"
           onClick={onAddBlock}
-          className="text-xs h-7 px-2 rounded-lg"
+          className="h-8 px-2.5 text-xs font-medium rounded-lg"
           style={{ color: getSemanticColor("trust").primary }}
         >
           <Plus className="w-3 h-3 mr-1" />
-          Add Training Block
+          Add block
         </Button>
       </div>
 
-      {/* Block Timeline Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 items-center">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-0.5 px-0.5 items-center">
         {trainingBlocks.map((block, index) => {
           const isActive = block.id === activeBlockId;
           const goalColor = GOAL_COLORS[block.goal];
@@ -123,55 +115,51 @@ export function TrainingBlockHeader({
 
           return (
             <React.Fragment key={block.id}>
-              {/* Block Pill */}
               <div
                 className="relative flex-shrink-0"
                 ref={isMenuOpen ? menuRef : undefined}
               >
                 <button
                   onClick={() => onSelectBlock(block.id)}
-                  className="relative flex flex-col items-start gap-0.5 px-3 py-2 rounded-xl transition-all min-w-[120px] max-w-[170px]"
+                  className="relative flex flex-col items-start gap-0 px-2.5 py-1.5 rounded-lg transition-all min-w-[108px] max-w-[160px] text-left"
                   style={{
                     background: isActive
-                      ? `${goalColor}22`
+                      ? `${goalColor}18`
                       : isDark
-                      ? "rgba(255,255,255,0.06)"
-                      : "rgba(0,0,0,0.04)",
-                    border: `1.5px solid ${
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(0,0,0,0.03)",
+                    border: `1px solid ${
                       isActive
                         ? goalColor
                         : isDark
-                        ? "rgba(255,255,255,0.12)"
-                        : "rgba(0,0,0,0.1)"
+                          ? "rgba(255,255,255,0.1)"
+                          : "rgba(0,0,0,0.08)"
                     }`,
-                    boxShadow: isActive ? `0 2px 8px ${goalColor}30` : "none",
                   }}
                 >
-                  {/* Block name */}
-                  <div className="flex items-center gap-1.5 w-full pr-4">
+                  <div className="flex items-center gap-1 w-full pr-4">
                     <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                       style={{ background: goalColor }}
                     />
                     <span
-                      className="text-xs font-bold truncate"
+                      className="text-xs font-semibold truncate leading-tight"
                       style={{
                         color: isActive
                           ? goalColor
                           : isDark
-                          ? "rgba(255,255,255,0.8)"
-                          : "rgba(0,0,0,0.8)",
+                            ? "rgba(255,255,255,0.85)"
+                            : "rgba(0,0,0,0.85)",
                       }}
                     >
                       {block.name}
                     </span>
                   </div>
-                  {/* Goal + week range */}
                   <span
-                    className="text-xs pl-3.5 truncate w-full"
+                    className="text-[11px] pl-2.5 truncate w-full leading-tight"
                     style={{
                       color: isDark
-                        ? "rgba(255,255,255,0.45)"
+                        ? "rgba(255,255,255,0.4)"
                         : "rgba(0,0,0,0.45)",
                     }}
                   >
@@ -179,13 +167,12 @@ export function TrainingBlockHeader({
                   </span>
                 </button>
 
-                {/* "..." menu button */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleMenu(block.id);
                   }}
-                  className="absolute top-1 right-1 w-5 h-5 rounded flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
+                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
                   style={{
                     color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
                   }}
@@ -193,10 +180,9 @@ export function TrainingBlockHeader({
                   <MoreHorizontal className="w-3 h-3" />
                 </button>
 
-                {/* Dropdown menu */}
                 {isMenuOpen && (
                   <div
-                    className="absolute top-full right-0 mt-1 w-44 rounded-xl shadow-xl border z-50 py-1"
+                    className="absolute top-full right-0 mt-1 w-44 rounded-lg shadow-xl border z-50 py-1"
                     style={{
                       background: isDark ? "#1f2937" : "#ffffff",
                       borderColor: isDark
@@ -206,17 +192,17 @@ export function TrainingBlockHeader({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
                       style={{ color: isDark ? "#fff" : "#1A1A1A" }}
                       onClick={() => {
                         setOpenMenuId(null);
                         onEditBlock(block);
                       }}
                     >
-                      Edit Block Details
+                      Edit block
                     </button>
                     <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors disabled:opacity-40"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors disabled:opacity-40"
                       style={{ color: isDark ? "#fff" : "#1A1A1A" }}
                       disabled={index === 0}
                       onClick={() => {
@@ -224,10 +210,10 @@ export function TrainingBlockHeader({
                         onMoveBlock(block.id, "left");
                       }}
                     >
-                      Move Left
+                      Move left
                     </button>
                     <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors disabled:opacity-40"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--fc-glass-highlight)] transition-colors disabled:opacity-40"
                       style={{ color: isDark ? "#fff" : "#1A1A1A" }}
                       disabled={index === trainingBlocks.length - 1}
                       onClick={() => {
@@ -235,7 +221,7 @@ export function TrainingBlockHeader({
                         onMoveBlock(block.id, "right");
                       }}
                     >
-                      Move Right
+                      Move right
                     </button>
                     <div
                       className="my-1 h-px"
@@ -246,25 +232,24 @@ export function TrainingBlockHeader({
                       }}
                     />
                     <button
-                      className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-red-500/10"
+                      className="w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-red-500/10"
                       style={{ color: "#ef4444" }}
                       onClick={() => {
                         setOpenMenuId(null);
                         onDeleteBlock(block.id);
                       }}
                     >
-                      Delete Block
+                      Delete block
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Arrow connector between pills */}
               {index < trainingBlocks.length - 1 && (
                 <ChevronRight
-                  className="w-4 h-4 flex-shrink-0"
+                  className="w-3.5 h-3.5 flex-shrink-0"
                   style={{
-                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
+                    color: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)",
                   }}
                 />
               )}
@@ -273,19 +258,18 @@ export function TrainingBlockHeader({
         })}
       </div>
 
-      {/* Active block context label */}
       {activeBlock && activeBlockRange && (
         <p
-          className="text-xs mt-2.5 font-medium"
-          style={{
-            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-          }}
+          className="text-[11px] leading-snug border-t border-black/5 dark:border-white/5 pt-2 mt-1 fc-text-subtle"
         >
-          Editing:{" "}
-          <span style={{ color: GOAL_COLORS[activeBlock.goal] }}>
+          <span className="text-[color:var(--fc-text-dim)]">Editing </span>
+          <span style={{ color: GOAL_COLORS[activeBlock.goal] }} className="font-medium">
             {activeBlock.name}
-          </span>{" "}
-          (Weeks {activeBlockRange.startWeek}–{activeBlockRange.endWeek})
+          </span>
+          <span className="text-[color:var(--fc-text-dim)]">
+            {" "}
+            · Weeks {activeBlockRange.startWeek}–{activeBlockRange.endWeek}
+          </span>
         </p>
       )}
     </div>

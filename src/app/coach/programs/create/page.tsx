@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { supabase } from "@/lib/supabase";
-import { BookOpen, ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useToast } from "@/components/ui/toast-provider";
 
@@ -111,54 +111,35 @@ function CreateProgramContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6 md:p-8 lg:p-12 relative z-10">
+      <div className="min-h-screen p-4 sm:p-6 relative z-10 pb-32">
         <main className="max-w-4xl mx-auto">
-          <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
-            <button
-              type="button"
-              onClick={() => (window.location.href = "/coach/programs")}
-              className="hover:fc-text-primary transition-colors"
-            >
-              Programs
-            </button>
-            <span className="fc-text-subtle">/</span>
-            <span className="fc-text-primary">New Creation</span>
-          </nav>
-          <header className="mb-10">
-            <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
-              Create Training Program
+          <div className="flex min-h-11 max-h-12 items-center justify-between gap-2 mb-4">
+            <h1 className="text-lg font-semibold fc-text-primary">
+              Create program
             </h1>
-            <p className="fc-text-dim">
-              Define the blueprint for your client&apos;s success.
-            </p>
-          </header>
-          <div className="space-y-6">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs px-2 shrink-0"
+              onClick={() => (window.location.href = "/coach/programs")}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              Back
+            </Button>
+          </div>
 
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 md:p-10">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
-                  Program Basics
-                </h2>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Name, description, difficulty, and duration.
-                </p>
-              </div>
+          <div className="border-t border-black/5 dark:border-white/5 pt-4 space-y-3">
               {/* Program Name */}
               <div>
-                <label
-                  className="text-sm font-semibold block mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
-                  Program Name *
+                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  Program name *
                 </label>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., 8-Week Strength Builder"
-                  className="text-base"
+                  className="h-9 text-sm"
                   style={{
                     background: isDark
                       ? "rgba(255,255,255,0.1)"
@@ -173,20 +154,15 @@ function CreateProgramContent() {
 
               {/* Description */}
               <div>
-                <label
-                  className="text-sm font-semibold block mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
+                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
                   Description
                 </label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the program goals, structure, and who it's designed for..."
-                  rows={4}
-                  className="text-base resize-none"
+                  rows={3}
+                  className="text-sm resize-none min-h-[4.5rem]"
                   style={{
                     background: isDark
                       ? "rgba(255,255,255,0.1)"
@@ -200,23 +176,17 @@ function CreateProgramContent() {
               </div>
 
               {/* Difficulty & Duration */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label
-                    className="text-sm font-semibold block mb-2"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Difficulty Level
+                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    Difficulty
                   </label>
                   <Select
                     value={difficulty}
                     onValueChange={(v) => setDifficulty(v as any)}
                   >
                     <SelectTrigger
+                      className="h-9 text-sm"
                       style={{
                         background: isDark
                           ? "rgba(255,255,255,0.1)"
@@ -238,15 +208,8 @@ function CreateProgramContent() {
                   </Select>
                 </div>
                 <div>
-                  <label
-                    className="text-sm font-semibold block mb-2"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    Duration (Weeks)
+                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    Duration (weeks)
                   </label>
                   <Input
                     type="number"
@@ -256,6 +219,7 @@ function CreateProgramContent() {
                     onChange={(e) =>
                       setDurationWeeks(parseInt(e.target.value || "1", 10))
                     }
+                    className="h-9 text-sm"
                     style={{
                       background: isDark
                         ? "rgba(255,255,255,0.1)"
@@ -271,15 +235,10 @@ function CreateProgramContent() {
 
               {/* Category */}
               <div>
-                <label
-                  className="text-sm font-semibold block mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
-                  Training Category
-                    <span className="text-xs fc-text-dim ml-2">
-                    (optional - for volume calculator)
+                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  Category{" "}
+                  <span className="normal-case text-[color:var(--fc-text-dim)] font-normal">
+                    (optional)
                   </span>
                 </label>
                 <Select
@@ -295,6 +254,7 @@ function CreateProgramContent() {
                   }}
                 >
                   <SelectTrigger
+                    className="h-9 text-sm"
                     style={{
                       background: isDark
                         ? "rgba(255,255,255,0.1)"
@@ -322,58 +282,31 @@ function CreateProgramContent() {
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div
-              className="flex items-center justify-end gap-3 mt-8 pt-6"
-              style={{
-                borderTop: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
-              }}
-            >
+            <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-black/5 dark:border-white/5">
               <Button
                 variant="ghost"
+                size="sm"
+                className="h-9 text-sm"
                 onClick={() => (window.location.href = "/coach/programs")}
-                className="rounded-xl"
               >
                 Cancel
               </Button>
               <Button
+                size="sm"
+                className="h-9 text-sm"
                 onClick={onSave}
                 disabled={saving || !name.trim()}
-                className="rounded-xl"
                 style={{
                   background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
+                  boxShadow: `0 2px 8px ${
                     getSemanticColor("success").primary
-                  }30`,
+                  }28`,
                   opacity: saving || !name.trim() ? 0.5 : 1,
                 }}
               >
-                {saving ? "Creating..." : "Create Program"}
+                {saving ? "Creating..." : "Create"}
               </Button>
             </div>
-          </div>
-
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
-            <div className="flex items-start gap-3">
-              <Info
-                className="w-5 h-5 flex-shrink-0 mt-0.5"
-                style={{
-                  color: getSemanticColor("trust").primary,
-                }}
-              />
-              <div>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  After creating the program, you&apos;ll be able to configure the
-                  weekly schedule, assign workout templates to specific days,
-                  and set up progression rules for each week.
-                </p>
-              </div>
-            </div>
-          </div>
           </div>
         </main>
       </div>

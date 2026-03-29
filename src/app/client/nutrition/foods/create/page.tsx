@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -21,10 +20,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
 import { X, Utensils, Save } from "lucide-react";
-import Link from "next/link";
 
 export default function AddCustomFoodPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
@@ -78,7 +75,7 @@ export default function AddCustomFoodPage() {
       if (error) throw error;
 
       addToast({ title: "Saved", description: "Custom food added successfully!", variant: "success" });
-      router.push("/client/nutrition");
+      window.location.href = "/client/nutrition";
     } catch (err: unknown) {
       console.error("Error adding custom food:", err);
       if (err instanceof Error && err.message === "timeout") {
@@ -102,11 +99,16 @@ export default function AddCustomFoodPage() {
                 <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Add Custom Food</h1>
                 <p className="text-sm fc-text-dim mt-0.5">Define your personal nutritional data</p>
               </div>
-              <Link href="/client/nutrition">
-                <button type="button" className="w-10 h-10 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors" aria-label="Close">
-                  <X className="w-6 h-6" />
-                </button>
-              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/nutrition";
+                }}
+                className="w-10 h-10 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </header>
 
             <form id="create-food-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
@@ -252,11 +254,16 @@ export default function AddCustomFoodPage() {
             </form>
 
             <footer className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent pt-12 flex gap-4">
-              <Link href="/client/nutrition" className="flex-1">
-                <Button type="button" variant="outline" className="w-full h-14 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] font-bold fc-text-dim hover:fc-glass-soft">
-                  Cancel
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = "/client/nutrition";
+                }}
+                className="flex-1 h-14 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] font-bold fc-text-dim hover:fc-glass-soft"
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 form="create-food-form"

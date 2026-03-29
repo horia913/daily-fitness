@@ -82,48 +82,30 @@ export function AddExercisePanel({
   return (
               <div style={{ order: 0 }} className="w-full">
                 <Card
-                  className={`${theme?.card ?? ''} fc-glass fc-card border ${theme?.border ?? ''} rounded-2xl`}
+                  className={`${theme?.card ?? ''} fc-glass fc-card border ${theme?.border ?? ''} rounded-lg`}
                 >
-                  <CardHeader className="px-3 py-4 sm:p-6">
+                  <CardHeader className="px-3 py-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`p-2 rounded-xl ${
-                            isDark
-                              ? "bg-[color:var(--fc-surface-sunken)]"
-                              : "bg-green-100"
-                          }`}
-                        >
-                          <Plus
-                            className={`w-5 h-5 ${
-                              isDark ? "text-green-400" : "text-green-600"
-                            }`}
-                          />
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0">
                         <CardTitle
-                          className={`text-lg sm:text-xl font-bold ${theme?.text ?? ''}`}
+                          className={`text-sm font-semibold ${theme?.text ?? ''}`}
                         >
-                          Add Exercise
+                          Add exercise
                         </CardTitle>
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
+                        size="sm"
                         onClick={onClose}
-                        className={`min-w-11 min-h-11 p-3 rounded-xl transition-all duration-200 ${
-                          theme?.textSecondary ?? ''
-                        } hover:${theme?.text ?? ''} hover:${
-                          isDark
-                            ? "bg-[color:var(--fc-surface-sunken)]"
-                            : "bg-[color:var(--fc-surface-sunken)]"
-                        }`}
+                        className="h-8 w-8 p-0 rounded-lg shrink-0"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="px-3 pb-4 pt-0 sm:px-6 sm:pb-6">
-                    <div className="space-y-6">
+                  <CardContent className="px-3 pb-3 pt-0 sm:px-3 sm:pb-4">
+                    <div className="space-y-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <Label
@@ -416,13 +398,13 @@ export function AddExercisePanel({
                               </div>
                               <div>
                                 <Label
-                                  htmlFor="rir"
-                                  className={`text-sm font-medium ${theme?.text ?? ''}`}
+                                  htmlFor="rpe-prescribed"
+                                  className={`text-sm font-medium ${theme?.text ?? ""}`}
                                 >
-                                  RIR
+                                  RPE
                                 </Label>
                                 <Input
-                                  id="rir"
+                                  id="rpe-prescribed"
                                   type="number"
                                   value={
                                     newExercise.rir === ""
@@ -438,9 +420,16 @@ export function AddExercisePanel({
                                       ),
                                     })
                                   }
-                                  min="0"
+                                  min={1}
+                                  max={10}
                                   className="mt-2 rounded-xl"
+                                  placeholder="e.g., 8"
                                 />
+                                <p
+                                  className={`text-xs ${theme?.textSecondary ?? ""} mt-1`}
+                                >
+                                  Prescribed difficulty (1–10).
+                                </p>
                               </div>
                             </div>
 

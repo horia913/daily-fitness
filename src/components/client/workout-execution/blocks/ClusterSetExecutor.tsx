@@ -101,7 +101,10 @@ export function ClusterSetExecutor({
     set_number: number;
   } | null>(null);
   const [currentClusterInSet, setCurrentClusterInSet] = useState(1);
-  const [showIntraClusterRest, setShowIntraClusterRest] = useState(false);
+  /** idle = logging; prompt = cluster done, user starts timer; ticking = countdown running */
+  const [intraClusterRestPhase, setIntraClusterRestPhase] = useState<
+    "idle" | "prompt" | "ticking"
+  >("idle");
   const [intraClusterTimeLeft, setIntraClusterTimeLeft] = useState(intraClusterRest);
 
   const displaySetNumber =
@@ -162,11 +165,14 @@ export function ClusterSetExecutor({
 
   useEffect(() => {
     setCurrentClusterInSet(1);
+    setIntraClusterRestPhase("idle");
   }, [completedSets, currentSetNumber]);
 
   useEffect(() => {
-    if (!showIntraClusterRest || intraClusterRest <= 0) {
-      if (!showIntraClusterRest) setIntraClusterTimeLeft(intraClusterRest);
+    if (intraClusterRestPhase !== "ticking" || intraClusterRest <= 0) {
+      if (intraClusterRestPhase !== "ticking") {
+        setIntraClusterTimeLeft(intraClusterRest);
+      }
       return;
     }
     let restSec = intraClusterRest;
@@ -176,12 +182,13 @@ export function ClusterSetExecutor({
       setIntraClusterTimeLeft(restSec);
       if (restSec <= 0) {
         clearInterval(interval);
-        setShowIntraClusterRest(false);
+        setIntraClusterRestPhase("idle");
         setCurrentClusterInSet((c) => c + 1);
+        setIntraClusterTimeLeft(intraClusterRest);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [showIntraClusterRest, intraClusterRest]);
+  }, [intraClusterRestPhase, intraClusterRest]);
 
   useEffect(() => {
     if (viewingSetIndex >= 1) return;
@@ -356,7 +363,11 @@ export function ClusterSetExecutor({
     const isLastCluster = currentClusterInSet >= clustersPerSet;
 
     if (!isLastCluster) {
-      setShowIntraClusterRest(true);
+      if (intraClusterRest <= 0) {
+        setCurrentClusterInSet((c) => c + 1);
+        return;
+      }
+      setIntraClusterRestPhase("prompt");
       return;
     }
 
@@ -456,14 +467,8 @@ export function ClusterSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {allowSetEditDelete && loggedSetsList.length > 0 && (
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--fc-surface-card-border)",
-            background: "var(--fc-surface-sunken)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
+        <div className="border-t border-white/10 pt-3">
+          <div className="mb-2 flex items-center justify-between px-1">
             <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
               Logged sets
             </div>
@@ -481,7 +486,7 @@ export function ClusterSetExecutor({
               </button>
             )}
           </div>
-          <ul className="space-y-1.5">
+          <ul className="flex flex-col border-y border-white/5">
             {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
               // Calculate the actual index in the full list for isLatestSet
               const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
@@ -489,8 +494,7 @@ export function ClusterSetExecutor({
               return (
               <li
                 key={setEntry.id}
-                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
-                style={{ background: "var(--fc-surface-elevated)" }}
+                className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm fc-text-primary">
@@ -633,18 +637,14 @@ export function ClusterSetExecutor({
         <div className="text-sm font-semibold fc-text-dim mb-4">
           {editDraft
             ? "Edit set"
-            : showIntraClusterRest
+            : intraClusterRestPhase === "ticking"
               ? `Rest ${intraClusterTimeLeft}s — next cluster`
-              : `Set ${displaySetNumber} — Cluster ${currentClusterInSet} of ${clustersPerSet}`}
+              : intraClusterRestPhase === "prompt"
+                ? `Cluster ${currentClusterInSet} done — start rest before cluster ${currentClusterInSet + 1}`
+                : `Set ${displaySetNumber} — Cluster ${currentClusterInSet} of ${clustersPerSet}`}
         </div>
-        {showIntraClusterRest && (
-          <div className="mb-4 rounded-xl p-3 text-center" style={{ background: "var(--fc-surface-elevated)" }}>
-            <p className="text-lg font-bold fc-text-primary">{intraClusterTimeLeft}s</p>
-            <p className="text-xs fc-text-dim">Rest before next cluster</p>
-          </div>
-        )}
         <div className="space-y-4">
-          {!showIntraClusterRest && (
+          {intraClusterRestPhase !== "ticking" && (
           <>
           <div className="space-y-2">
             <LargeInput
@@ -687,6 +687,53 @@ export function ClusterSetExecutor({
           </>
           )}
         </div>
+        {intraClusterRestPhase === "prompt" && (
+          <div
+            className="mb-4 rounded-xl p-4 space-y-3"
+            style={{ background: "var(--fc-surface-elevated)" }}
+          >
+            <p className="text-sm fc-text-dim text-center">
+              Intra-cluster rest: {intraClusterRest}s between mini-sets (same weight for the full set).
+            </p>
+            <Button
+              type="button"
+              variant="fc-primary"
+              className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+              onClick={() => setIntraClusterRestPhase("ticking")}
+            >
+              Start rest timer
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 text-sm font-semibold rounded-xl"
+              onClick={() => {
+                setIntraClusterRestPhase("idle");
+                setCurrentClusterInSet((c) => c + 1);
+              }}
+            >
+              Skip rest — next cluster
+            </Button>
+          </div>
+        )}
+        {intraClusterRestPhase === "ticking" && (
+          <div className="mb-4 rounded-xl p-4 space-y-3" style={{ background: "var(--fc-surface-elevated)" }}>
+            <p className="text-lg font-bold fc-text-primary text-center">{intraClusterTimeLeft}s</p>
+            <p className="text-xs fc-text-dim text-center">Rest before next cluster</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 text-sm font-semibold rounded-xl"
+              onClick={() => {
+                setIntraClusterRestPhase("idle");
+                setCurrentClusterInSet((c) => c + 1);
+                setIntraClusterTimeLeft(intraClusterRest);
+              }}
+            >
+              Skip rest — next cluster
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -728,7 +775,11 @@ export function ClusterSetExecutor({
   ) : (
     <Button
       onClick={handleClusterDone}
-      disabled={isLoggingSet || completedSets >= totalSets || showIntraClusterRest}
+      disabled={
+        isLoggingSet ||
+        completedSets >= totalSets ||
+        intraClusterRestPhase !== "idle"
+      }
       variant="fc-primary"
       className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >

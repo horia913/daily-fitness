@@ -171,6 +171,15 @@ const GOAL_TYPES = [
   },
 ] as const;
 
+/** DB `goal_type` can be any string; use when no GOAL_TYPES entry matches. */
+const UNKNOWN_GOAL_INFO = {
+  label: "Goal",
+  icon: "🎯",
+  unit: "",
+  description: "Track your progress",
+  gradient: "from-slate-500 to-slate-600",
+} as const;
+
 export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
   const { user } = useAuth();
 
@@ -368,8 +377,8 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
     return emojis[quality - 1] || "😐";
   };
 
-  const getGoalInfo = (type: Goal["type"]) => {
-    return GOAL_TYPES.find((g) => g.type === type)!;
+  const getGoalInfo = (type: string) => {
+    return GOAL_TYPES.find((g) => g.type === type) ?? UNKNOWN_GOAL_INFO;
   };
 
   // Calculate habit streaks

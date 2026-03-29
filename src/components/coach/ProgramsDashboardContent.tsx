@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import ProgramCard from "@/components/features/programs/ProgramCard";
@@ -13,16 +12,7 @@ import {
   Plus,
   BookOpen,
   X,
-  ChevronRight,
-  Layers,
-  Dumbbell,
-  Library,
-  FolderTree,
-  Users,
-  Activity,
-  Filter,
 } from "lucide-react";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
@@ -112,7 +102,10 @@ export default function ProgramsDashboardContent() {
 
     try {
       const filter = programFilter === 'all' ? 'all' : 'active';
-      const res = await fetch(`/api/coach/programs?filter=${filter}`, { signal: signal ?? null });
+      const res = await fetch(`/api/coach/programs?filter=${filter}`, {
+        signal: signal ?? null,
+        cache: 'no-store',
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -287,53 +280,29 @@ export default function ProgramsDashboardContent() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                  }}
-                >
-                  <BookOpen className="w-7 h-7 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <nav className="flex items-center gap-2 text-sm fc-text-dim font-mono uppercase tracking-widest mb-2">
-                    <span>Coach</span>
-                    <ChevronRight className="w-3 h-3" />
-                    <span className="fc-text-primary">Programs</span>
-                  </nav>
-                  <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                    Training Programs
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Create, assign, and iterate on structured programs.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <Button
-                  variant="fc-ghost"
-                  onClick={() => {
-                    loadPrograms();
-                  }}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
-                <Link href="/coach/programs/create">
-                  <Button variant="fc-primary">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Program
-                  </Button>
-                </Link>
-              </div>
-            </div>
+      <div className="space-y-3">
+        <div className="flex min-h-12 items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] sm:text-xl">
+            Training Programs
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="fc-ghost"
+              size="sm"
+              className="h-9"
+              onClick={() => loadPrograms()}
+            >
+              <RefreshCw className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+            <Link href="/coach/programs/create">
+              <Button variant="fc-primary" size="sm" className="h-9">
+                <Plus className="w-4 h-4 sm:mr-1.5" />
+                Create Program
+              </Button>
+            </Link>
           </div>
+        </div>
 
           {/* Error Banner */}
           {error && (
@@ -345,141 +314,88 @@ export default function ProgramsDashboardContent() {
             />
           )}
 
-          {/* Stats Summary */}
+          {/* Stats — single line */}
           {programs.length > 0 && !error && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: `${getSemanticColor("trust").primary}20`,
-                    }}
-                  >
-                    <BookOpen
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("trust").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={totalPrograms}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Total Programs
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: `${getSemanticColor("success").primary}20`,
-                    }}
-                  >
-                    <BookOpen
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("success").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={activePrograms}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Active Programs
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: `${getSemanticColor("warning").primary}20`,
-                    }}
-                  >
-                    <BookOpen
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("warning").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={totalAssignments}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Total Assignments
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-gray-400">
+              {totalPrograms} program{totalPrograms !== 1 ? "s" : ""} ·{" "}
+              {activePrograms} active · {totalAssignments} assignment
+              {totalAssignments !== 1 ? "s" : ""}
+            </p>
           )}
 
-          {/* Filter Toggle: Active / All */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[color:var(--fc-text-dim)]" />
-            <div className="flex items-center gap-2 fc-glass fc-card rounded-xl border border-[color:var(--fc-glass-border)] p-1">
-              <button
-                type="button"
-                onClick={() => setProgramFilter('active')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  programFilter === 'active'
-                    ? 'bg-white text-[color:var(--fc-bg-deep)] shadow-sm'
-                    : 'text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]'
-                }`}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setProgramFilter('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  programFilter === 'all'
-                    ? 'bg-white text-[color:var(--fc-bg-deep)] shadow-sm'
-                    : 'text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]'
-                }`}
-              >
-                All
-              </button>
-            </div>
+          {/* Filter pills — no card wrapper */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setProgramFilter("active")}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                programFilter === "active"
+                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
+                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]"
+              }`}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setProgramFilter("all")}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                programFilter === "all"
+                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
+                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]"
+              }`}
+            >
+              All
+            </button>
           </div>
 
-          {/* Programs Grid */}
+          {/* Programs: flat rows below sm, grid from sm */}
           {programs.length > 0 && !error && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {programs.map((program) => (
-                <ProgramCard
-                  key={program.id}
-                  program={program}
-                  onEdit={() => {
-                    window.location.href = `/coach/programs/${program.id}/edit`;
-                  }}
-                  onOpenDetails={() => {
-                    window.location.href = `/coach/programs/${program.id}`;
-                  }}
-                  onDelete={() => {
-                    setProgramToDelete(program);
-                    setConfirmImpact(false);
-                    setShowDeleteModal(true);
-                  }}
-                  onAssign={() => openAssignModal(program.id)}
-                  assignmentCount={assignmentCountByProgram[program.id] || 0}
-                />
-              ))}
-            </div>
+            <>
+              <div className="sm:hidden divide-y divide-[color:var(--fc-glass-border)]/50 border-t border-b border-[color:var(--fc-glass-border)]/50">
+                {programs.map((program) => (
+                  <ProgramCard
+                    key={program.id}
+                    layout="row"
+                    program={program}
+                    onEdit={() => {
+                      window.location.href = `/coach/programs/${program.id}/edit`;
+                    }}
+                    onOpenDetails={() => {
+                      window.location.href = `/coach/programs/${program.id}`;
+                    }}
+                    onDelete={() => {
+                      setProgramToDelete(program);
+                      setConfirmImpact(false);
+                      setShowDeleteModal(true);
+                    }}
+                    onAssign={() => openAssignModal(program.id)}
+                    assignmentCount={assignmentCountByProgram[program.id] || 0}
+                  />
+                ))}
+              </div>
+              <div className="hidden sm:grid sm:grid-cols-2 gap-4">
+                {programs.map((program) => (
+                  <ProgramCard
+                    key={program.id}
+                    program={program}
+                    onEdit={() => {
+                      window.location.href = `/coach/programs/${program.id}/edit`;
+                    }}
+                    onOpenDetails={() => {
+                      window.location.href = `/coach/programs/${program.id}`;
+                    }}
+                    onDelete={() => {
+                      setProgramToDelete(program);
+                      setConfirmImpact(false);
+                      setShowDeleteModal(true);
+                    }}
+                    onAssign={() => openAssignModal(program.id)}
+                    assignmentCount={assignmentCountByProgram[program.id] || 0}
+                  />
+                ))}
+              </div>
+            </>
           )}
 
           {/* Empty State */}

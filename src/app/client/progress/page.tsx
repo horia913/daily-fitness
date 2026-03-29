@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -22,6 +23,7 @@ import {
   Trophy,
   Camera,
   AlertTriangle,
+  Apple,
 } from "lucide-react";
 import Link from "next/link";
 import { getProgressStats, ProgressStats, getMonthlyProgressSummary, getMonthlyNarrativeData, type MonthlyProgressSummary, type MonthlyNarrativeData } from "@/lib/progressStatsService";
@@ -43,11 +45,26 @@ const HUB_NAV_ITEMS: {
   { href: "/client/progress/achievements", title: "Achievements", description: "Badges and milestones", icon: Award, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] text-[color:var(--fc-status-warning)] border border-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)]", getBadge: (s) => (s.achievementsUnlocked > 0 ? `${s.achievementsUnlocked} Earned` : null) },
   { href: "/client/progress/leaderboard", title: "Leaderboard", description: "Rankings and scores", icon: Trophy, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)] text-[color:var(--fc-status-error)] border border-[color-mix(in_srgb,var(--fc-status-error)_20%,transparent)]", getBadge: (s) => (s.bestLeaderboardRank != null ? `#${s.bestLeaderboardRank}` : null) },
   { href: "/client/progress/photos", title: "Photos", description: "Progress photos", icon: Camera, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-habits)_10%,transparent)] text-[color:var(--fc-domain-habits)] border border-[color-mix(in_srgb,var(--fc-domain-habits)_20%,transparent)]", getBadge: () => null },
+  { href: "/client/progress/nutrition", title: "Nutrition", description: "Fuel and macro trends", icon: Apple, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-meals)_10%,transparent)] text-[color:var(--fc-domain-meals)] border border-[color-mix(in_srgb,var(--fc-domain-meals)_20%,transparent)]", getBadge: () => null },
 ];
+
+/** Main hub pills — everything except the “More” group */
+const HUB_PILL_SLUGS_PRIMARY = new Set([
+  "/client/progress/analytics",
+  "/client/progress/workout-logs",
+  "/client/progress/body-metrics",
+  "/client/progress/personal-records",
+  "/client/progress/achievements",
+  "/client/progress/photos",
+]);
+
+const HUB_PILL_ITEMS_PRIMARY = HUB_NAV_ITEMS.filter((i) => HUB_PILL_SLUGS_PRIMARY.has(i.href));
+const HUB_PILL_ITEMS_MORE = HUB_NAV_ITEMS.filter((i) => !HUB_PILL_SLUGS_PRIMARY.has(i.href));
 
 function ProgressHubContent() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
+  const pathname = usePathname() ?? "";
 
   const [stats, setStats] = useState<ProgressStats>({
     weeklyWorkouts: { completed: 0, goal: 0 },
@@ -162,10 +179,10 @@ function ProgressHubContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32">
+      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page px-4 pb-32 sm:px-6">
         {/* This month summary — first thing */}
         {monthlySummary && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5 mb-6">
+          <div className="mb-6 border-b border-white/5 pb-5">
             <h2 className="text-lg font-semibold fc-text-primary mb-2">
               {monthlySummary.isFirstMonth ? "This month so far" : "This month"}
             </h2>
@@ -205,144 +222,181 @@ function ProgressHubContent() {
 
         {/* Monthly "In Review" narrative card */}
         {narrativeParagraph && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5 mb-6">
+          <div className="mb-6 border-b border-white/5 pb-5">
             <h2 className="text-lg font-semibold fc-text-primary mb-2">In Review</h2>
             <p className="text-sm fc-text-primary leading-relaxed">{narrativeParagraph}</p>
           </div>
         )}
 
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                <Layers className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                  Progress Hub
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Insights into your physical progress
-                </p>
-              </div>
+        <header className="mb-6 flex items-center justify-between gap-4 border-b border-white/5 pb-5">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+              <Layers className="h-6 w-6" />
             </div>
-            <Link href="/client/profile" className="w-12 h-12 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] flex items-center justify-center text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] transition-colors shrink-0">
-              <Settings className="w-6 h-6" />
-            </Link>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Progress Hub
+              </h1>
+              <p className="mt-1 text-sm text-[color:var(--fc-text-dim)]">
+                Insights into your physical progress
+              </p>
+            </div>
           </div>
-        </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/client/profile";
+            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] transition-colors hover:text-[color:var(--fc-text-primary)]"
+          >
+            <Settings className="h-6 w-6" />
+          </button>
+        </header>
 
-        {/* Quick Stats Banner — vertical stack on mobile, no horizontal scroll */}
-        <section className="mb-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-nowrap">
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Workouts</span>
-                <Calendar className="w-5 h-5 fc-text-workouts" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold font-mono fc-text-primary">
-                  {loading ? "—" : stats.weeklyWorkouts.completed}
-                  <span className="text-base fc-text-subtle"> / {stats.weeklyWorkouts.goal || 0}</span>
-                </div>
-                <div className="text-xs fc-text-success font-medium mt-1">This week</div>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Volume</span>
-                <Layers className="w-5 h-5 fc-text-error" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold font-mono fc-text-primary">
-                  {loading ? "—" : stats.volumeThisWeek >= 1000
+        <section className="mb-3 mt-3">
+          <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {HUB_PILL_ITEMS_PRIMARY.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = item.href;
+                  }}
+                  className={`min-h-[40px] shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                    active
+                      ? "border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-accent-cyan)]/20 fc-text-primary"
+                      : "border-[color:var(--fc-glass-border)] fc-text-dim hover:fc-text-primary"
+                  }`}
+                >
+                  {item.title}
+                </button>
+              );
+            })}
+            <span className="pl-1 text-[11px] font-medium uppercase tracking-wider fc-text-dim">
+              More
+            </span>
+            {HUB_PILL_ITEMS_MORE.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = item.href;
+                  }}
+                  className={`min-h-[36px] shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                    active
+                      ? "bg-[color:var(--fc-accent-cyan)]/25 fc-text-primary"
+                      : "fc-text-dim hover:fc-text-primary"
+                  }`}
+                >
+                  {item.title}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Quick stats — single compact strip, no per-metric cards */}
+        <section className="mb-8 border-y border-white/5 py-3">
+          <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-1">
+            <span className="fc-text-subtle">
+              <span className="uppercase tracking-wider text-[10px]">This week</span>{" "}
+              <span className="font-mono font-semibold fc-text-primary">
+                {loading ? "—" : stats.weeklyWorkouts.completed}/{stats.weeklyWorkouts.goal || 0}
+              </span>{" "}
+              workouts
+            </span>
+            <span className="hidden h-4 w-px bg-white/10 sm:block" aria-hidden />
+            <span className="fc-text-subtle">
+              <span className="uppercase tracking-wider text-[10px]">Volume</span>{" "}
+              <span className="font-mono font-semibold fc-text-primary">
+                {loading
+                  ? "—"
+                  : stats.volumeThisWeek >= 1000
                     ? `${(stats.volumeThisWeek / 1000).toFixed(1)}t`
                     : `${Math.round(stats.volumeThisWeek).toLocaleString()} kg`}
-                </div>
-                <div className="text-xs fc-text-subtle mt-1">
-                  {loading ? "Total weight lifted" : stats.volumeLastWeek > 0
-                    ? stats.volumeThisWeek > stats.volumeLastWeek
-                      ? `↑ ${Math.round(stats.volumeThisWeek - stats.volumeLastWeek).toLocaleString()} kg vs last week`
-                      : stats.volumeThisWeek < stats.volumeLastWeek
-                        ? `↓ ${Math.round(stats.volumeLastWeek - stats.volumeThisWeek).toLocaleString()} kg vs last week`
-                        : "→ Same as last week"
-                    : "This week"}
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Records</span>
-                <Award className="w-5 h-5 fc-text-warning" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold font-mono fc-text-primary">{loading ? "—" : stats.personalRecords}</div>
-                <div className="text-xs fc-text-subtle mt-1">Personal records</div>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Achievements</span>
-                <Award className="w-5 h-5 fc-text-amber-400" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold font-mono fc-text-primary">{loading ? "—" : stats.achievementsUnlocked}</div>
-                <div className="text-xs fc-text-subtle mt-1">Earned</div>
-              </div>
-            </div>
+              </span>
+              {!loading && stats.volumeLastWeek > 0 && (
+                <span className="ml-1 text-xs fc-text-dim">
+                  {stats.volumeThisWeek > stats.volumeLastWeek
+                    ? `↑${Math.round(stats.volumeThisWeek - stats.volumeLastWeek)}`
+                    : stats.volumeThisWeek < stats.volumeLastWeek
+                      ? `↓${Math.round(stats.volumeLastWeek - stats.volumeThisWeek)}`
+                      : "→"}
+                </span>
+              )}
+            </span>
+            <span className="hidden h-4 w-px bg-white/10 sm:block" aria-hidden />
+            <span className="fc-text-subtle">
+              <span className="uppercase tracking-wider text-[10px]">PRs</span>{" "}
+              <span className="font-mono font-semibold fc-text-primary">
+                {loading ? "—" : stats.personalRecords}
+              </span>
+            </span>
+            <span className="hidden h-4 w-px bg-white/10 sm:block" aria-hidden />
+            <span className="fc-text-subtle">
+              <span className="uppercase tracking-wider text-[10px]">Achievements</span>{" "}
+              <span className="font-mono font-semibold fc-text-primary">
+                {loading ? "—" : stats.achievementsUnlocked}
+              </span>
+            </span>
             {stats.bestLeaderboardRank != null && (
-              <div className="flex-1 min-w-0 fc-surface p-5 flex flex-col justify-between min-h-[120px] rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-medium fc-text-subtle uppercase tracking-widest">Best rank</span>
-                  <Trophy className="w-5 h-5 fc-text-yellow-500" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold font-mono fc-text-primary">#{loading ? "—" : stats.bestLeaderboardRank}</div>
-                  <div className="text-xs fc-text-subtle mt-1">Leaderboard</div>
-                </div>
-              </div>
+              <>
+                <span className="hidden h-4 w-px bg-white/10 sm:block" aria-hidden />
+                <span className="fc-text-subtle">
+                  <span className="uppercase tracking-wider text-[10px]">Best rank</span>{" "}
+                  <span className="font-mono font-semibold fc-text-primary">
+                    #{loading ? "—" : stats.bestLeaderboardRank}
+                  </span>
+                </span>
+              </>
             )}
           </div>
         </section>
 
-        {/* Navigation Grid */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+        {/* Hub links — flat rows */}
+        <section className="mb-10 flex flex-col border-b border-white/5">
           {HUB_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const badge = item.getBadge?.(stats) ?? null;
             return (
-              <Link key={item.href} href={item.href}>
-                <div className="fc-surface p-6 rounded-2xl cursor-pointer fc-hover-rise h-full group border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 ${item.iconClass}`}>
-                    <Icon className="w-8 h-8" />
+              <Link key={item.href} href={item.href} className="block">
+                <div className="flex min-h-[52px] cursor-pointer items-center gap-3 border-b border-white/5 py-3 transition-colors hover:bg-white/[0.02]">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.iconClass}`}
+                  >
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-semibold fc-text-primary mb-1">{item.title}</h3>
-                      <p className="text-sm fc-text-dim mb-4">{item.description}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold fc-text-primary">{item.title}</h3>
+                      {badge && (
+                        <span className="rounded border border-[color:var(--fc-glass-border)] px-2 py-0.5 font-mono text-[10px] fc-text-primary">
+                          {badge}
+                        </span>
+                      )}
                     </div>
-                    <ChevronRight className="w-5 h-5 fc-text-subtle group-hover:fc-text-primary transition-colors flex-shrink-0" />
+                    <p className="line-clamp-1 text-xs fc-text-dim">{item.description}</p>
                   </div>
-                  {badge && (
-                    <div className="fc-glass-soft px-2.5 py-1 rounded-lg border border-[color:var(--fc-glass-border)] inline-block">
-                      <span className="text-xs font-mono fc-text-primary">{badge}</span>
-                    </div>
-                  )}
+                  <ChevronRight className="h-5 w-5 shrink-0 fc-text-subtle" />
                 </div>
               </Link>
             );
           })}
-          <div className="fc-surface p-6 rounded-2xl border border-dashed border-[color:var(--fc-glass-border)] h-full group opacity-80">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-[color:var(--fc-domain-neutral)]/10 fc-text-subtle border border-[color:var(--fc-glass-border)]">
-              <Download className="w-8 h-8" />
+          <div className="flex min-h-[52px] items-center gap-3 py-3 opacity-80">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-domain-neutral)]/10 fc-text-subtle">
+              <Download className="h-5 w-5" />
             </div>
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-xl font-semibold fc-text-dim mb-1">Export</h3>
-                <p className="text-sm fc-text-subtle mb-4">Share your progress with your coach</p>
-              </div>
-              <ChevronRight className="w-5 h-5 fc-text-subtle flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold fc-text-dim">Export</h3>
+              <p className="line-clamp-1 text-xs fc-text-subtle">
+                Share your progress with your coach
+              </p>
             </div>
+            <ChevronRight className="h-5 w-5 shrink-0 fc-text-subtle" />
           </div>
         </section>
 

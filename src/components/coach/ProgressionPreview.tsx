@@ -7,12 +7,21 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ProgramProgressionRule } from "@/lib/programProgressionService";
 import type { ProgressionProfile } from "@/types/trainingBlock";
 import { PROGRESSION_PROFILES } from "@/types/trainingBlock";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   GeneratedWeekRules,
   ProgressionChange,
   GenerationResult,
 } from "@/lib/progressionGenerator";
 import { TIER_3_SKIP } from "@/lib/progressionGenerator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +33,12 @@ interface ProgressionPreviewProps {
   onApply: () => Promise<void>;
   onEditManually: () => void;
   isApplying: boolean;
+
+  // Exercise selection controls
+  progressExercises: Set<string>;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onSetExerciseIncluded: (setEntryId: string, included: boolean) => void;
 }
 
 /** A single rendered item in the changes column: value text + optional delta. */
@@ -34,9 +49,14 @@ interface ChangeItem {
 
 type R = ProgramProgressionRule & Record<string, any>;
 
+/** `rule.rir` is prescribed RPE; display the DB value as-is (no math). */
+function coachRpeDisplay(rirColumn: number | string | null | undefined): string {
+  return formatPrescribedRpeLabel(rirColumn) ?? "";
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SET_TYPE_SHORT: Record<string, string> = {
+export const SET_TYPE_SHORT: Record<string, string> = {
   straight_set: "Straight Set",
   superset: "Superset",
   giant_set: "Giant Set",
@@ -58,18 +78,24 @@ const SET_TYPE_SHORT: Record<string, string> = {
  */
 function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[] {
   const name: string = rule.exercise?.name ?? "Exercise";
+  const setEntryId = rule.set_entry_id as string | undefined;
+  /** Match change rows to this rule (prefer set_entry_id; fallback to name for legacy data). */
+  const matchesRule = (c: ProgressionChange): boolean => {
+    if (setEntryId && c.set_entry_id) return c.set_entry_id === setEntryId;
+    return c.exerciseName === name;
+  };
   const items: ChangeItem[] = [];
 
   /** First non-cycle change for a field, or undefined. */
   const fc = (field: string): ProgressionChange | undefined =>
     allChanges.find(
-      (c) => c.exerciseName === name && c.field === field && !c.isCycleEvent,
+      (c) => matchesRule(c) && c.field === field && !c.isCycleEvent,
     );
 
   const ch = (field: string): boolean => !!fc(field);
 
   const cycleChange = allChanges.find(
-    (c) => c.exerciseName === name && c.isCycleEvent,
+    (c) => matchesRule(c) && c.isCycleEvent,
   );
   const isCycle = !!cycleChange;
   // Weight bumped during cycle iff the description includes "kg" (e.g. "weight 60→61.5kg")
@@ -97,7 +123,10 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       const restChg = fc("rest_seconds") ?? fc("rest_between_pairs");
       if (restChg) {
@@ -129,7 +158,10 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         items.push({ value, delta });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       const rbc = fc("rest_between_pairs");
       if (rbc && rule.rest_between_pairs != null) {
@@ -160,7 +192,10 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         items.push({ value, delta });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       const preRbc = fc("rest_between_pairs");
       if (preRbc && rule.rest_between_pairs != null) {
@@ -185,7 +220,10 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         items.push({ value: `${rule.sets} sets`, delta: fc("sets")!.changeDescription });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       const clRestC = fc("rest_seconds");
       if (clRestC && rule.rest_seconds != null) {
@@ -212,7 +250,10 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         items.push({ value: `RP ${rule.rest_pause_duration}s`, delta: rpDurC.changeDescription });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       break;
     }
@@ -241,11 +282,106 @@ function buildChangeItems(rule: R, allChanges: ProgressionChange[]): ChangeItem[
         });
       }
       if (ch("rir")) {
-        items.push({ value: `RIR ${rule.rir}`, delta: fc("rir")!.changeDescription });
+        items.push({
+          value: coachRpeDisplay(rule.rir),
+          delta: fc("rir")!.changeDescription,
+        });
       }
       break;
     }
 
+    default:
+      break;
+  }
+
+  return items;
+}
+
+function buildBaselineItems(rule: R): ChangeItem[] {
+  const items: ChangeItem[] = [];
+  const setsStr =
+    rule.sets != null ? `${rule.sets}` : null;
+
+  const add = (value: string) => {
+    if (!value) return;
+    items.push({ value });
+  };
+
+  switch (rule.set_type) {
+    case "straight_set":
+    case "giant_set": {
+      const repsStr = rule.reps != null ? `${rule.reps}` : null;
+      const value = setsStr && repsStr ? `${setsStr}×${repsStr}` : null;
+      if (value) add(value);
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      if (rule.rest_seconds != null) add(`Rest ${rule.rest_seconds}s`);
+      break;
+    }
+    case "superset": {
+      const repsA =
+        rule.first_exercise_reps != null ? `${rule.first_exercise_reps}` : null;
+      const repsB =
+        rule.second_exercise_reps != null ? `${rule.second_exercise_reps}` : null;
+      const repsPart =
+        repsA && repsB ? `${repsA} / ${repsB}` : repsA ?? repsB ?? null;
+      const setsPart = setsStr ? `${setsStr} set${rule.sets === 1 ? "" : "s"}` : null;
+      const value =
+        setsPart && repsPart ? `${setsPart} × ${repsPart} reps` : null;
+      if (value) add(value);
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      if (rule.rest_between_pairs != null)
+        add(`Rest ${rule.rest_between_pairs}s`);
+      break;
+    }
+    case "pre_exhaustion": {
+      const iso = rule.isolation_reps != null ? `${rule.isolation_reps}` : null;
+      const cmp = rule.compound_reps != null ? `${rule.compound_reps}` : null;
+      const repsPart = [iso ? `${iso} iso` : null, cmp ? `${cmp} compound` : null]
+        .filter(Boolean)
+        .join(" / ");
+      const setsPart = setsStr ? `${setsStr} set${rule.sets === 1 ? "" : "s"}` : null;
+      const value =
+        setsPart && repsPart ? `${setsPart} × ${repsPart}` : null;
+      if (value) add(value);
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      if (rule.rest_between_pairs != null)
+        add(`Rest ${rule.rest_between_pairs}s`);
+      break;
+    }
+    case "cluster_set": {
+      if (rule.reps_per_cluster != null) {
+        add(`${rule.reps_per_cluster} reps per cluster`);
+      }
+      if (rule.intra_cluster_rest != null) {
+        add(`${rule.intra_cluster_rest}s intra-cluster rest`);
+      }
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.sets != null) add(`${rule.sets} sets`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      if (rule.rest_seconds != null) add(`Rest ${rule.rest_seconds}s`);
+      break;
+    }
+    case "rest_pause": {
+      const repsStr = rule.reps != null ? `${rule.reps}` : null;
+      const value = setsStr && repsStr ? `${setsStr}×${repsStr}` : null;
+      if (value) add(value);
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.rest_pause_duration != null) add(`RP ${rule.rest_pause_duration}s`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      if (rule.rest_seconds != null) add(`Rest ${rule.rest_seconds}s`);
+      break;
+    }
+    case "drop_set": {
+      const repsStr = rule.exercise_reps != null ? `${rule.exercise_reps}` : null;
+      const value = setsStr && repsStr ? `${setsStr}×${repsStr}` : null;
+      if (value) add(value);
+      if (rule.weight_kg != null) add(`${rule.weight_kg}kg`);
+      if (rule.rir != null) add(coachRpeDisplay(rule.rir));
+      break;
+    }
     default:
       break;
   }
@@ -292,6 +428,10 @@ export function ProgressionPreview({
   onApply,
   onEditManually,
   isApplying,
+  progressExercises,
+  onSelectAll,
+  onDeselectAll,
+  onSetExerciseIncluded,
 }: ProgressionPreviewProps) {
   const { isDark } = useTheme();
 
@@ -314,6 +454,10 @@ export function ProgressionPreview({
   );
 
   const { autoProgressed, unchanged, unchangedTypes } = summary;
+  const tier3Count = tier3Exercises.length;
+  const tier3Types = Array.from(
+    new Set(tier3Exercises.map((r) => r.set_type)),
+  );
   const summaryLine = [
     autoProgressed > 0 ? `${autoProgressed} progressed` : null,
     unchanged > 0 ? `${unchanged} unchanged` : null,
@@ -322,71 +466,57 @@ export function ProgressionPreview({
     .join(" · ");
 
   // ── Theme tokens ─────────────────────────────────────────────────────────
-  const containerCls = isDark
-    ? "bg-gray-900/40 border-gray-700/50"
-    : "bg-white/80 border-gray-200";
-  const headerText = isDark ? "text-gray-100" : "text-gray-900";
   const mutedText = isDark ? "text-gray-500" : "text-gray-500";
   const nameText = isDark ? "text-gray-200" : "text-gray-800";
   const valueText = isDark ? "text-gray-200" : "text-gray-700";
-  const rowOdd = isDark ? "bg-gray-800/20" : "bg-gray-100/40";
-  const rowHover = isDark
-    ? "hover:bg-gray-700/30"
-    : "hover:bg-gray-200/50";
-  const weekTabActive = "bg-blue-600 text-white";
+  const weekTabActive =
+    "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40";
   const weekTabInactive = isDark
-    ? "bg-gray-700/50 text-gray-400 hover:bg-gray-600/50"
-    : "bg-gray-200 text-gray-600 hover:bg-gray-300";
+    ? "bg-white/5 text-gray-400 hover:bg-white/10"
+    : "bg-black/[0.04] text-gray-600 hover:bg-black/[0.06]";
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${containerCls}`}>
-
-      {/* ── Collapsible header ───────────────────────────────────────── */}
+    <div className="border-t border-black/5 dark:border-white/5 mt-3 pt-2">
+      {/* Collapsible header — one line + chevron, no card */}
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-start justify-between px-4 py-3 text-left"
+        className="w-full flex items-center justify-between gap-2 py-1.5 text-left min-h-9"
       >
-        <div className="flex flex-col gap-0.5">
-          <span className={`font-semibold text-sm ${headerText}`}>
-            Progression Preview — {PROGRESSION_PROFILES[profile]}
-          </span>
-          {summaryLine && (
-            <span className={`text-xs ${mutedText}`}>{summaryLine}</span>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-[color:var(--fc-text-primary)] truncate">
+          Progression Preview · {PROGRESSION_PROFILES[profile]}
+        </span>
         {expanded ? (
-          <ChevronDown className={`w-4 h-4 mt-0.5 shrink-0 ${mutedText}`} />
+          <ChevronDown className={`w-4 h-4 shrink-0 ${mutedText}`} />
         ) : (
-          <ChevronRight className={`w-4 h-4 mt-0.5 shrink-0 ${mutedText}`} />
+          <ChevronRight className={`w-4 h-4 shrink-0 ${mutedText}`} />
         )}
       </button>
+      {expanded && summaryLine && (
+        <p className={`text-xs ${mutedText} -mt-0.5 mb-2`}>{summaryLine}</p>
+      )}
 
       {expanded && (
-        <div className="pb-4">
-
-          {/* ── Overwrite warning ──────────────────────────────────────── */}
+        <div className="pb-2">
+          {/* Overwrite warning — compact inline alert */}
           {hasExistingWeeks && (
-            <div className="mx-4 mb-3 rounded-lg p-3 text-sm flex items-start gap-2 bg-amber-900/20 border border-amber-700/30 text-amber-400">
-              <span className="shrink-0 mt-0.5">⚠</span>
-              <span>
-                Weeks 2–
-                {weekRules.length
-                  ? weekRules[weekRules.length - 1].weekNumber
-                  : 2}{" "}
-                already have data. Applying will overwrite them.
-              </span>
-            </div>
+            <p className="text-xs text-amber-600 dark:text-amber-400/95 mb-2 pl-2 border-l-2 border-amber-500/70 leading-snug">
+              Weeks 2–
+              {weekRules.length
+                ? weekRules[weekRules.length - 1].weekNumber
+                : 2}{" "}
+              already have data — applying will overwrite.
+            </p>
           )}
 
-          {/* ── Week tabs ─────────────────────────────────────────────── */}
-          <div className="px-4 mb-3 flex flex-wrap gap-1.5">
+          {/* Week pills — no outer card/padding shell */}
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {weekRules.map((gw) => (
               <button
                 key={gw.weekNumber}
                 type="button"
                 onClick={() => setActiveWeek(gw.weekNumber)}
-                className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
+                className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
                   activeWeek === gw.weekNumber
                     ? weekTabActive
                     : weekTabInactive
@@ -397,8 +527,27 @@ export function ProgressionPreview({
             ))}
           </div>
 
-          {/* ── Exercise rows (grouped by set type) ──────────────────── */}
-          <div className="px-1">
+          {tableExercises.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0 mb-2">
+              <button
+                type="button"
+                className="text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)] underline-offset-2 hover:underline"
+                onClick={onSelectAll}
+              >
+                Select all
+              </button>
+              <span className="text-xs text-[color:var(--fc-text-dim)]">·</span>
+              <button
+                type="button"
+                className="text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)] underline-offset-2 hover:underline"
+                onClick={onDeselectAll}
+              >
+                Deselect all
+              </button>
+            </div>
+          )}
+
+          <div>
             {tableExercises.length === 0 ? (
               <p className={`px-3 py-2 text-sm ${mutedText}`}>No exercises.</p>
             ) : (() => {
@@ -412,44 +561,75 @@ export function ProgressionPreview({
                   groups.push({ setType: rule.set_type, exercises: [rule] });
                 }
               }
-              // Pre-compute flat index offset per group for alternating row bg
-              const offsets = groups.map((_, gi) =>
-                groups.slice(0, gi).reduce((s, g) => s + g.exercises.length, 0),
-              );
               const weekChanges = activeWeekData?.changes ?? [];
-              const groupHeaderBg = isDark ? "bg-gray-700/40" : "bg-gray-200/60";
 
               return groups.map((group, gi) => (
                 <div key={gi}>
-                  {/* Group header */}
                   <div
-                    className={`${gi === 0 ? "mt-0" : "mt-4"} mb-1 px-3 py-1.5 rounded ${groupHeaderBg}`}
+                    className={`${gi === 0 ? "pt-0" : "pt-2"} pb-0`}
                   >
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wide block mb-1">
                       {SET_TYPE_SHORT[group.setType] ?? group.setType}
                     </span>
                   </div>
 
-                  {/* Rows within this group */}
                   {group.exercises.map((rule, rowIdx) => {
                     const r = rule as R;
                     const name = rule.exercise?.name ?? "Exercise";
-                    const hasCycle = weekChanges.some(
-                      (c) => c.exerciseName === name && c.isCycleEvent,
-                    );
-                    const items = buildChangeItems(r, weekChanges);
-                    const globalIdx = offsets[gi] + rowIdx;
-                    const rowBg = globalIdx % 2 === 0 ? rowOdd : "";
-
+                    const setEntryId = r.set_entry_id;
+                    const included = setEntryId ? progressExercises.has(setEntryId) : true;
+                    const hasCycle = weekChanges.some((c) => {
+                      if (!c.isCycleEvent) return false;
+                      if (setEntryId && c.set_entry_id)
+                        return c.set_entry_id === setEntryId;
+                      return c.exerciseName === name;
+                    });
+                    const changeItems = buildChangeItems(r, weekChanges);
+                    const items = included
+                      ? changeItems.length > 0
+                        ? changeItems
+                        : buildBaselineItems(r)
+                      : buildBaselineItems(r);
                     return (
                       <div
                         key={rowIdx}
-                        className={`${rowBg} ${rowHover} transition-colors rounded`}
+                        className="border-b border-black/5 dark:border-white/5 last:border-b-0"
                       >
-                        {/* Desktop: 2-column row */}
-                        <div className="hidden md:flex items-center py-2 px-3 gap-2">
-                          {/* Column 1 — Exercise name */}
+                        <div className="hidden md:flex items-center py-2 gap-2 min-w-0">
                           <div className="w-1/2 flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {setEntryId ? (
+                                <>
+                                  <Checkbox
+                                    className="h-3.5 w-3.5"
+                                    checked={included}
+                                    onCheckedChange={(v) =>
+                                      onSetExerciseIncluded(
+                                        setEntryId,
+                                        v === true,
+                                      )
+                                    }
+                                  />
+                                  <Select
+                                    value={included ? "primary" : "maintenance"}
+                                    onValueChange={(val) =>
+                                      onSetExerciseIncluded(
+                                        setEntryId,
+                                        val === "primary",
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 min-h-7 w-[7.25rem] text-xs px-2 py-0 [&>span]:truncate border-[color:var(--fc-glass-border)] bg-transparent">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="primary" className="text-xs">Primary</SelectItem>
+                                      <SelectItem value="maintenance" className="text-xs">Maintenance</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </>
+                              ) : null}
+                            </div>
                             <span
                               className={`w-4 shrink-0 text-sm text-amber-400 ${hasCycle ? "" : "invisible"}`}
                               title={
@@ -460,13 +640,17 @@ export function ProgressionPreview({
                             >
                               ⚡
                             </span>
-                            <span className={`text-sm ${nameText} truncate`}>
+                            <span className={`text-xs sm:text-sm ${nameText} truncate`}>
                               {name}
                             </span>
+                            {!included && (
+                              <span className="text-[11px] text-gray-500 ml-1 shrink-0">
+                                (excluded)
+                              </span>
+                            )}
                           </div>
 
-                          {/* Column 2 — Changes */}
-                          <div className="flex-1 min-w-0 text-sm flex flex-wrap items-center gap-y-0.5">
+                          <div className="flex-1 min-w-0 text-xs flex flex-wrap items-center gap-y-0.5">
                             <ChangesCell
                               items={items}
                               valueClass={valueText}
@@ -475,19 +659,49 @@ export function ProgressionPreview({
                           </div>
                         </div>
 
-                        {/* Mobile: 2-line layout */}
-                        <div className="md:hidden py-2 px-3">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="md:hidden py-2">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                            {setEntryId && (
+                              <>
+                                <Checkbox
+                                  className="h-3.5 w-3.5"
+                                  checked={included}
+                                  onCheckedChange={(v) =>
+                                    onSetExerciseIncluded(
+                                      setEntryId,
+                                      v === true,
+                                    )
+                                  }
+                                />
+                                <Select
+                                  value={included ? "primary" : "maintenance"}
+                                  onValueChange={(val) =>
+                                    onSetExerciseIncluded(
+                                      setEntryId,
+                                      val === "primary",
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-7 min-h-7 w-[6.75rem] text-xs px-2 py-0 border-[color:var(--fc-glass-border)] bg-transparent">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="primary" className="text-xs">Primary</SelectItem>
+                                    <SelectItem value="maintenance" className="text-xs">Maintenance</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
                             <span
-                              className={`shrink-0 text-sm text-amber-400 ${hasCycle ? "" : "invisible"}`}
+                              className={`shrink-0 text-xs text-amber-400 ${hasCycle ? "" : "invisible"}`}
                             >
                               ⚡
                             </span>
-                            <span className={`text-sm ${nameText} truncate`}>
+                            <span className={`text-xs ${nameText} truncate flex-1 min-w-0`}>
                               {name}
                             </span>
                           </div>
-                          <div className="pl-5 mt-0.5 text-sm flex flex-wrap items-center gap-y-0.5">
+                          <div className="mt-1 pl-0 text-xs flex flex-wrap items-center gap-y-0.5">
                             <ChangesCell
                               items={items}
                               valueClass={valueText}
@@ -505,25 +719,22 @@ export function ProgressionPreview({
 
           {/* ── Unchanged (Tier 3) section ────────────────────────────── */}
           {tier3Exercises.length > 0 && (
-            <div className="px-4 mt-4">
+            <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5">
               <button
                 type="button"
                 onClick={() => setUnchangedOpen((o) => !o)}
-                className={`flex items-center gap-1.5 text-sm ${mutedText} hover:opacity-75 transition-opacity`}
+                className={`flex items-center gap-1.5 text-xs ${mutedText} hover:opacity-75 transition-opacity`}
               >
                 <span>{unchangedOpen ? "▾" : "▸"}</span>
                 <span>
-                  {unchanged} unchanged (
-                  {unchangedTypes
-                    .map((t) => SET_TYPE_SHORT[t] ?? t)
-                    .join(", ")}
-                  )
+                  {tier3Count} unchanged (
+                  {tier3Types.map((t) => SET_TYPE_SHORT[t] ?? t).join(", ")})
                 </span>
               </button>
 
               {unchangedOpen && (
-                <div className="mt-2 pl-4">
-                  <p className={`text-sm ${mutedText}`}>
+                <div className="mt-1.5 pl-1">
+                  <p className={`text-xs ${mutedText}`}>
                     {tier3Exercises
                       .map((r) => r.exercise?.name ?? "Exercise")
                       .join(", ")}
@@ -536,20 +747,19 @@ export function ProgressionPreview({
             </div>
           )}
 
-          {/* ── Action buttons ─────────────────────────────────────────── */}
-          <div className="px-4 mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5 flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={() => onApply()}
               disabled={isApplying}
-              className="rounded-xl"
+              className="h-8 text-xs rounded-lg"
             >
               {isApplying ? "Applying…" : "Apply Progression"}
             </Button>
             <button
               type="button"
               onClick={onEditManually}
-              className={`text-sm underline ${mutedText}`}
+              className={`text-xs underline underline-offset-2 ${mutedText} hover:text-[color:var(--fc-text-primary)]`}
             >
               Edit Manually Instead
             </button>

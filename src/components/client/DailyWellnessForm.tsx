@@ -7,7 +7,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
 import {
   DailyWellnessLog,
   getTodayLog,
@@ -501,12 +500,12 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
 
   if (loading) {
     return (
-      <ClientGlassCard className="p-6 space-y-4">
+      <div className="space-y-4 border-y border-white/5 px-4 py-3">
         <Skeleton className="h-8 w-48 rounded-lg" />
         <Skeleton className="h-24 w-full rounded-xl" />
         <Skeleton className="h-24 w-full rounded-xl" />
         <Skeleton className="h-24 w-full rounded-xl" />
-      </ClientGlassCard>
+      </div>
     );
   }
 
@@ -514,7 +513,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
     const log = todayLog;
 
     return (
-      <ClientGlassCard className="p-6 transition-all">
+      <div className="border-y border-white/5 px-4 py-3 transition-all">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-status-success)]/20 flex items-center justify-center border border-[color:var(--fc-status-success)]/40">
             <Check className="w-7 h-7 text-[color:var(--fc-status-success)]" />
@@ -657,13 +656,13 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
           <Pencil className="w-4 h-4" />
           Edit
         </button>
-      </ClientGlassCard>
+      </div>
     );
   }
 
   return (
     <>
-    <ClientGlassCard className="p-6">
+    <div className="border-y border-white/5 px-4 py-3">
       <header className="mb-6">
         <h2 className="text-[22px] font-bold fc-text-primary">Daily Check-in</h2>
         <p className="text-sm fc-text-dim mt-0.5">{todayFormatted}</p>
@@ -1070,7 +1069,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
           )}
         </button>
       </form>
-    </ClientGlassCard>
+    </div>
 
     {newAchievementsQueue.length > 0 && (
       <AchievementUnlockModal

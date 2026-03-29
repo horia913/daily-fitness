@@ -250,27 +250,20 @@ function AchievementsPageContent() {
             </div>
           </div>
 
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-glass-soft)]">
-                <Filter className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                  Filters
-                </h2>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Narrow by status or rarity tier.
-                </p>
-              </div>
+          <div className="my-3">
+            <div className="mb-3 flex items-center gap-2">
+              <Filter className="h-4 w-4 text-[color:var(--fc-text-dim)]" />
+              <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                Filters
+              </h2>
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                   Status
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -324,7 +317,7 @@ function AchievementsPageContent() {
                 <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                   Rarity
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {[
                     "all",
                     "common",
@@ -376,9 +369,13 @@ function AchievementsPageContent() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-col border-y border-white/5">
                 {filteredAchievements.map((achievement) => (
-                  <AchievementCard key={achievement.id} achievement={achievement} />
+                  <AchievementCard
+                    key={achievement.id}
+                    achievement={achievement}
+                    dense
+                  />
                 ))}
               </div>
 

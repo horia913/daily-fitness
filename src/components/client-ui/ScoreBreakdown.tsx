@@ -52,9 +52,9 @@ export function ScoreBreakdown({ scores }: ScoreBreakdownProps) {
           opacity: isExpanded ? 1 : 0,
         }}
       >
-        <div className="space-y-3 pt-2">
+        <div className="divide-y divide-white/5 pt-2">
           {breakdownItems.map((item) => (
-            <div key={item.label} className="space-y-1.5">
+            <div key={item.label} className="space-y-1.5 py-2 first:pt-0 last:pb-0">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium fc-text-primary">
                   {item.label}

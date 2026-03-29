@@ -421,9 +421,13 @@ export class WorkoutTemplateService {
           console.log('[getWorkoutTemplates] count workout_cluster_sets rows=', clusterSets?.length ?? 0)
         }
         if (clusterSets) {
+          const uniquePerTemplate = new Set<string>()
           clusterSets.forEach((row: any) => {
             const templateId = blockToTemplate.get(row.set_entry_id)
-            if (templateId) {
+            if (!templateId || row.exercise_id == null || row.exercise_order == null) return
+            const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
+            if (!uniquePerTemplate.has(key)) {
+              uniquePerTemplate.add(key)
               counts[templateId] = (counts[templateId] || 0) + 1
             }
           })
@@ -620,15 +624,22 @@ export class WorkoutTemplateService {
         )
       }
 
-      // Count from workout_cluster_sets
+      // Count from workout_cluster_sets (unique exercise per block)
       if (blockIdsByType.usesClusterSets.length > 0) {
         countPromises.push(
           this.safeQueryWithTimeout<any[]>(
             supabase
               .from('workout_cluster_sets')
-              .select('id')
+              .select('exercise_id, exercise_order')
               .in('set_entry_id', blockIdsByType.usesClusterSets)
-          ).then(data => (Array.isArray(data) ? data.length : 0))
+          ).then(data => {
+            if (!data || !Array.isArray(data)) return 0
+            const uniqueExercises = new Set<string>()
+            data.forEach((row: any) => {
+              uniqueExercises.add(`${row.exercise_id}:${row.exercise_order}`)
+            })
+            return uniqueExercises.size
+          })
         )
       }
 
@@ -1588,37 +1599,8 @@ export class WorkoutTemplateService {
         row = inserted
       }
 
-      // REQUIREMENT: Copy workout data to program_progression_rules when schedule is set
-      if (templateId && templateId !== "rest" && row?.id) {
-        try {
-          // Delete existing progression rules for this schedule/week first
-          await ProgramProgressionService.deleteProgressionRules(row.id, weekNumber);
-
-          // Copy workout data to progression rules
-          const copySuccess = await ProgramProgressionService.copyWorkoutToProgram(
-            programId,
-            row.id,
-            templateId,
-            weekNumber
-          );
-
-          if (copySuccess) {
-            console.log(
-              `✅ [setProgramSchedule] Copied workout ${templateId} to progression rules for Week ${weekNumber}, Day ${programDay}`
-            );
-          } else {
-            console.warn(
-              `⚠️ [setProgramSchedule] Failed to copy workout ${templateId} to progression rules`
-            );
-          }
-        } catch (copyError) {
-          console.error(
-            `❌ [setProgramSchedule] Error copying workout to progression rules:`,
-            copyError
-          );
-          // Don't throw - schedule was saved successfully, copy can be retried
-        }
-      }
+      // Progression rules are not generated during schedule save (avoids heavy block loads).
+      // Editors fall back to week-1 rules / template defaults when rules are missing.
 
       // Map to ProgramSchedule interface, setting is_optional to false by default
       return {

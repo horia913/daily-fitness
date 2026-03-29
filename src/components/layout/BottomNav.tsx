@@ -27,11 +27,11 @@ const clientNavItems: NavItem[] = [
   { href: "/client/me", icon: User, label: "Me" },
 ];
 
-// Phase 2 — Spec v2.0: exactly 5 pillars. Training = /coach/programs. No scheduling, no Menu in nav.
+// Training opens a hub (programs, templates, exercises); sub-routes stay highlighted on this tab.
 const coachNavItems: NavItem[] = [
   { href: "/coach", icon: Home, label: "Home" },
   { href: "/coach/clients", icon: Users, label: "Clients" },
-  { href: "/coach/programs", icon: Dumbbell, label: "Training" },
+  { href: "/coach/training", icon: Dumbbell, label: "Training" },
   { href: "/coach/nutrition", icon: Apple, label: "Nutrition" },
   { href: "/coach/analytics", icon: BarChart3, label: "Analytics" },
 ];
@@ -67,6 +67,20 @@ function isSegmentActive(pathname: string, item: NavItem): boolean {
            pathname.startsWith("/client/goals") ||
            pathname.startsWith("/client/habits") ||
            pathname.startsWith("/client/challenges");
+  }
+
+  // Coach Training: hub + programs, workout templates, exercises, categories, gym console
+  if (href === "/coach/training") {
+    return (
+      pathname.startsWith("/coach/training") ||
+      pathname.startsWith("/coach/programs") ||
+      pathname.startsWith("/coach/workouts") ||
+      pathname.startsWith("/coach/exercises") ||
+      pathname.startsWith("/coach/exercise-categories") ||
+      pathname.startsWith("/coach/categories") ||
+      pathname.startsWith("/coach/gym-console") ||
+      pathname.startsWith("/coach/challenges")
+    );
   }
   
   // Default: exact match or starts with href + "/"

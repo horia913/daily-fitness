@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 
 interface ExerciseItemProps {
   exercise: any; // Nested exercise data
@@ -121,7 +122,11 @@ export default function ExerciseItem({
       details.push(`${exercise.load_percentage}% load`);
     }
     if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
-    if (exercise.rir) details.push(`RIR: ${exercise.rir}`);
+    if (exercise.rir != null && exercise.rir !== "") {
+      details.push(
+        formatPrescribedRpeLabel(exercise.rir) ?? `RPE ${String(exercise.rir).trim()}`,
+      );
+    }
     if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);
 
     return details.length > 0 ? details.join(" • ") : "No details";
@@ -129,7 +134,7 @@ export default function ExerciseItem({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-3 p-2 sm:p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)]"
+      className="flex flex-wrap items-center gap-2 px-2 py-2 rounded-md fc-glass-soft border border-[color:var(--fc-glass-border)]"
     >
       <span className="fc-pill fc-pill-glass fc-text-workouts text-xs flex-shrink-0">
         {String.fromCharCode(65 + index)} {/* A, B, C, etc. */}

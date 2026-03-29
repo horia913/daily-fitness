@@ -28,6 +28,14 @@ export interface ProgressionSuggestion {
   confidence?: 'high' | 'medium' | 'low';
 }
 
+/** One row from the client’s most recent session that included this exercise */
+export interface LastSessionSetRow {
+  set_number: number;
+  weight_kg: number | null;
+  reps_completed: number | null;
+  rpe: number | null;
+}
+
 export interface ExercisePreviousPerformance {
   lastWorkout: {
     weight: number | null;
@@ -36,6 +44,8 @@ export interface ExercisePreviousPerformance {
     avgRpe: number | null;
     date: string;
     workout_log_id: string;
+    /** Per-set log from that session, ordered by set_number */
+    setDetails: LastSessionSetRow[];
   } | null;
   personalBest: {
     maxWeight: number | null;
@@ -71,21 +81,198 @@ function roundToPlate(weight: number): number {
   return Math.round(weight / 2.5) * 2.5;
 }
 
+type WorkoutLogRow = {
+  id: string;
+  completed_at: string;
+  workout_assignment_id: string;
+};
+
+function buildLastWorkoutFromSetRows(
+  lastSets: Array<{
+    set_number: number;
+    weight_kg: number | null;
+    reps_completed: number | null;
+    rpe: number | null;
+  }>,
+  lastWorkoutLogId: string,
+  completedAt: string
+): ExercisePreviousPerformance['lastWorkout'] {
+  if (lastSets.length === 0) return null;
+
+  const weightsWithValues = lastSets.filter((s) => s.weight_kg !== null);
+  const repsWithValues = lastSets.filter((s) => s.reps_completed !== null);
+  const rpeValues = lastSets
+    .filter((s) => s.rpe !== null)
+    .map((s) => s.rpe as number);
+
+  const avgWeight =
+    weightsWithValues.length > 0
+      ? weightsWithValues.reduce(
+          (sum, s) => sum + (s.weight_kg as number),
+          0
+        ) / weightsWithValues.length
+      : null;
+  const avgReps =
+    repsWithValues.length > 0
+      ? repsWithValues.reduce(
+          (sum, s) => sum + (s.reps_completed as number),
+          0
+        ) / repsWithValues.length
+      : null;
+  const avgRpe =
+    rpeValues.length > 0
+      ? rpeValues.reduce((sum, r) => sum + r, 0) / rpeValues.length
+      : null;
+
+  const setDetails: LastSessionSetRow[] = [...lastSets]
+    .sort((a, b) => a.set_number - b.set_number)
+    .map((s) => ({
+      set_number: s.set_number,
+      weight_kg: s.weight_kg,
+      reps_completed: s.reps_completed,
+      rpe: s.rpe,
+    }));
+
+  return {
+    weight: avgWeight,
+    reps: avgReps ? Math.round(avgReps) : null,
+    sets: lastSets.length,
+    avgRpe: avgRpe !== null ? Math.round(avgRpe * 10) / 10 : null,
+    date: completedAt,
+    workout_log_id: lastWorkoutLogId,
+    setDetails,
+  };
+}
+
+/**
+ * Golden logging: sets are stored in workout_set_logs (POST /api/log-set).
+ * Picks the most recent completed workout_log in logIds that has rows for this exercise.
+ */
+async function lastWorkoutFromWorkoutSetLogs(
+  clientId: string,
+  exerciseId: string,
+  logIds: string[],
+  logDateMap: Map<string, string>
+): Promise<{
+  lastWorkout: ExercisePreviousPerformance['lastWorkout'];
+  maxWeight: number | null;
+  maxReps: number | null;
+}> {
+  if (logIds.length === 0) {
+    return { lastWorkout: null, maxWeight: null, maxReps: null };
+  }
+
+  const { data: rows, error } = await supabase
+    .from('workout_set_logs')
+    .select('workout_log_id, set_number, weight, reps, rpe')
+    .eq('client_id', clientId)
+    .eq('exercise_id', exerciseId)
+    .in('workout_log_id', logIds);
+
+  if (error || !rows?.length) {
+    return { lastWorkout: null, maxWeight: null, maxReps: null };
+  }
+
+  const byLog = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const wid = String(r.workout_log_id);
+    if (!byLog.has(wid)) byLog.set(wid, []);
+    byLog.get(wid)!.push(r);
+  }
+
+  const logsWithSets = logIds.filter((id) => byLog.has(id));
+  logsWithSets.sort((a, b) => {
+    const da = new Date(logDateMap.get(a) || '').getTime();
+    const db = new Date(logDateMap.get(b) || '').getTime();
+    return db - da;
+  });
+
+  const lastLogId = logsWithSets[0];
+  const lastRows = lastLogId ? byLog.get(lastLogId) || [] : [];
+  if (!lastRows.length) {
+    return { lastWorkout: null, maxWeight: null, maxReps: null };
+  }
+
+  const sortedLast = [...lastRows].sort((a, b) => {
+    const sa = a.set_number != null ? Number(a.set_number) : 0;
+    const sb = b.set_number != null ? Number(b.set_number) : 0;
+    return sa - sb;
+  });
+
+  let fallbackNum = 1;
+  const normalized = sortedLast.map((r) => {
+    const sn =
+      r.set_number != null && !Number.isNaN(Number(r.set_number))
+        ? Number(r.set_number)
+        : fallbackNum++;
+    return {
+      set_number: sn,
+      weight_kg: r.weight != null ? Number(r.weight) : null,
+      reps_completed: r.reps != null ? Number(r.reps) : null,
+      rpe: r.rpe != null ? Number(r.rpe) : null,
+    };
+  });
+
+  const lastWorkout = buildLastWorkoutFromSetRows(
+    normalized,
+    lastLogId,
+    logDateMap.get(lastLogId) || ''
+  );
+
+  const allWeights = rows
+    .filter((s) => s.weight != null)
+    .map((s) => Number(s.weight));
+  const allReps = rows
+    .filter((s) => s.reps != null)
+    .map((s) => Number(s.reps));
+  const maxWeight = allWeights.length > 0 ? Math.max(...allWeights) : null;
+  const maxReps = allReps.length > 0 ? Math.max(...allReps) : null;
+
+  return { lastWorkout, maxWeight, maxReps };
+}
+
+/** When global “last session” has no rows, use the latest completed log for this assignment that includes the exercise. */
+async function lastSessionForExerciseOnSameAssignment(
+  clientId: string,
+  exerciseId: string,
+  workoutAssignmentId: string,
+  logs: WorkoutLogRow[]
+): Promise<ExercisePreviousPerformance['lastWorkout']> {
+  const assignmentLogs = logs.filter(
+    (l) => String(l.workout_assignment_id) === String(workoutAssignmentId)
+  );
+  if (assignmentLogs.length === 0) return null;
+
+  const alIds = assignmentLogs.map((l) => l.id);
+  const dateByLogId = new Map(
+    assignmentLogs.map((l) => [l.id, l.completed_at as string])
+  );
+
+  const { lastWorkout } = await lastWorkoutFromWorkoutSetLogs(
+    clientId,
+    exerciseId,
+    alIds,
+    dateByLogId
+  );
+  return lastWorkout;
+}
+
 // ============================================================================
 // NEW: Get previous performance for a single exercise (for PreviousPerformanceCard)
-// Queries workout_exercise_logs → workout_set_details (where rpe lives)
+// Primary: workout_set_logs. Legacy: workout_exercise_logs → workout_set_details
 // ============================================================================
 
 export async function getExercisePreviousPerformance(
   clientId: string,
   exerciseId: string,
-  currentWorkoutLogId?: string
+  currentWorkoutLogId?: string,
+  workoutAssignmentId?: string | null
 ): Promise<ExercisePreviousPerformance> {
   try {
     // Step 1: Get recent completed workout logs for this client (cap at 100)
     let logsQuery = supabase
       .from('workout_logs')
-      .select('id, completed_at')
+      .select('id, completed_at, workout_assignment_id')
       .eq('client_id', clientId)
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false })
@@ -95,109 +282,117 @@ export async function getExercisePreviousPerformance(
       logsQuery = logsQuery.neq('id', currentWorkoutLogId);
     }
 
-    const { data: logs } = await logsQuery;
-    if (!logs || logs.length === 0) {
+    const { data: logsRaw } = await logsQuery;
+    if (!logsRaw || logsRaw.length === 0) {
       return { lastWorkout: null, personalBest: null };
     }
+
+    const logs = logsRaw as WorkoutLogRow[];
 
     const logIds = logs.map((l) => l.id);
     const logDateMap = new Map<string, string>(
       logs.map((l) => [l.id, l.completed_at as string])
     );
 
-    // Step 2: Get workout_exercise_logs for this exercise in those logs
-    const { data: exerciseLogs } = await supabase
-      .from('workout_exercise_logs')
-      .select('id, workout_log_id')
-      .eq('exercise_id', exerciseId)
-      .in('workout_log_id', logIds);
-
-    if (!exerciseLogs || exerciseLogs.length === 0) {
-      return { lastWorkout: null, personalBest: null };
-    }
-
-    // Find the most recent workout log that included this exercise
-    const logIdsWithExercise = [
-      ...new Set(exerciseLogs.map((el) => el.workout_log_id as string)),
-    ];
-    logIdsWithExercise.sort((a, b) => {
-      const dateA = new Date(logDateMap.get(a) || '').getTime();
-      const dateB = new Date(logDateMap.get(b) || '').getTime();
-      return dateB - dateA;
-    });
-
-    const lastWorkoutLogId = logIdsWithExercise[0];
-    const allExerciseLogIds = exerciseLogs.map((el) => el.id as string);
-    const lastExerciseLogIds = exerciseLogs
-      .filter((el) => el.workout_log_id === lastWorkoutLogId)
-      .map((el) => el.id as string);
-
-    // Step 3: Get set details for ALL exercise logs (last workout + personal best)
-    const { data: allSetDetails } = await supabase
-      .from('workout_set_details')
-      .select('workout_exercise_log_id, weight_kg, reps_completed, rpe')
-      .in('workout_exercise_log_id', allExerciseLogIds);
-
-    if (!allSetDetails || allSetDetails.length === 0) {
-      return { lastWorkout: null, personalBest: null };
-    }
-
-    // Aggregate last workout
-    const lastSets = allSetDetails.filter((s) =>
-      lastExerciseLogIds.includes(s.workout_exercise_log_id as string)
+    // Step 2: workout_set_logs — matches POST /api/log-set (primary)
+    const fromSetLogs = await lastWorkoutFromWorkoutSetLogs(
+      clientId,
+      exerciseId,
+      logIds,
+      logDateMap
     );
-
-    const weightsWithValues = lastSets.filter((s) => s.weight_kg !== null);
-    const repsWithValues = lastSets.filter((s) => s.reps_completed !== null);
-    const rpeValues = lastSets
-      .filter((s) => s.rpe !== null)
-      .map((s) => s.rpe as number);
-
-    const avgWeight =
-      weightsWithValues.length > 0
-        ? weightsWithValues.reduce((sum, s) => sum + (s.weight_kg as number), 0) /
-          weightsWithValues.length
-        : null;
-    const avgReps =
-      repsWithValues.length > 0
-        ? repsWithValues.reduce(
-            (sum, s) => sum + (s.reps_completed as number),
-            0
-          ) / repsWithValues.length
-        : null;
-    const avgRpe =
-      rpeValues.length > 0
-        ? rpeValues.reduce((sum, r) => sum + r, 0) / rpeValues.length
+    let lastWorkout = fromSetLogs.lastWorkout;
+    let personalBest: ExercisePreviousPerformance['personalBest'] =
+      fromSetLogs.maxWeight !== null || fromSetLogs.maxReps !== null
+        ? {
+            maxWeight: fromSetLogs.maxWeight,
+            maxReps: fromSetLogs.maxReps,
+            date: '',
+          }
         : null;
 
-    // Personal best across all historical sets
-    const allWeights = allSetDetails
-      .filter((s) => s.weight_kg !== null)
-      .map((s) => s.weight_kg as number);
-    const allReps = allSetDetails
-      .filter((s) => s.reps_completed !== null)
-      .map((s) => s.reps_completed as number);
+    // Step 3: Legacy workout_exercise_logs + workout_set_details
+    if (!lastWorkout) {
+      const { data: exerciseLogs } = await supabase
+        .from('workout_exercise_logs')
+        .select('id, workout_log_id')
+        .eq('exercise_id', exerciseId)
+        .in('workout_log_id', logIds);
 
-    const maxWeight = allWeights.length > 0 ? Math.max(...allWeights) : null;
-    const maxReps = allReps.length > 0 ? Math.max(...allReps) : null;
+      if (exerciseLogs && exerciseLogs.length > 0) {
+        const logIdsWithExercise = [
+          ...new Set(exerciseLogs.map((el) => el.workout_log_id as string)),
+        ];
+        logIdsWithExercise.sort((a, b) => {
+          const dateA = new Date(logDateMap.get(a) || '').getTime();
+          const dateB = new Date(logDateMap.get(b) || '').getTime();
+          return dateB - dateA;
+        });
 
-    return {
-      lastWorkout:
-        lastSets.length > 0
-          ? {
-              weight: avgWeight,
-              reps: avgReps ? Math.round(avgReps) : null,
-              sets: lastSets.length,
-              avgRpe: avgRpe !== null ? Math.round(avgRpe * 10) / 10 : null,
-              date: logDateMap.get(lastWorkoutLogId) || '',
-              workout_log_id: lastWorkoutLogId,
-            }
-          : null,
-      personalBest:
-        maxWeight !== null || maxReps !== null
-          ? { maxWeight, maxReps, date: '' }
-          : null,
-    };
+        const lastWorkoutLogId = logIdsWithExercise[0];
+        const allExerciseLogIds = exerciseLogs.map((el) => el.id as string);
+        const lastExerciseLogIds = exerciseLogs
+          .filter((el) => el.workout_log_id === lastWorkoutLogId)
+          .map((el) => el.id as string);
+
+        const { data: allSetDetails } = await supabase
+          .from('workout_set_details')
+          .select(
+            'workout_exercise_log_id, weight_kg, reps_completed, rpe, set_number'
+          )
+          .in('workout_exercise_log_id', allExerciseLogIds);
+
+        if (allSetDetails && allSetDetails.length > 0) {
+          const lastSets = allSetDetails.filter((s) =>
+            lastExerciseLogIds.includes(s.workout_exercise_log_id as string)
+          );
+
+          const normalized = lastSets.map((s) => ({
+            set_number: s.set_number as number,
+            weight_kg: s.weight_kg as number | null,
+            reps_completed: s.reps_completed as number | null,
+            rpe: s.rpe as number | null,
+          }));
+
+          lastWorkout = buildLastWorkoutFromSetRows(
+            normalized,
+            lastWorkoutLogId,
+            logDateMap.get(lastWorkoutLogId) || ''
+          );
+
+          const allWeights = allSetDetails
+            .filter((s) => s.weight_kg !== null)
+            .map((s) => s.weight_kg as number);
+          const allReps = allSetDetails
+            .filter((s) => s.reps_completed !== null)
+            .map((s) => s.reps_completed as number);
+
+          const maxWeight =
+            allWeights.length > 0 ? Math.max(...allWeights) : null;
+          const maxReps = allReps.length > 0 ? Math.max(...allReps) : null;
+
+          personalBest =
+            maxWeight !== null || maxReps !== null
+              ? { maxWeight, maxReps, date: '' }
+              : personalBest;
+        }
+      }
+    }
+
+    if (
+      !lastWorkout &&
+      workoutAssignmentId &&
+      String(workoutAssignmentId).trim() !== ''
+    ) {
+      lastWorkout = await lastSessionForExerciseOnSameAssignment(
+        clientId,
+        exerciseId,
+        workoutAssignmentId,
+        logs
+      );
+    }
+
+    return { lastWorkout, personalBest };
   } catch (error) {
     console.error('Error fetching exercise previous performance:', error);
     return { lastWorkout: null, personalBest: null };

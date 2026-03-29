@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { ClientGlassCard } from "@/components/client-ui";
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -42,16 +41,16 @@ export function ThisWeekStrip({
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <ClientGlassCard className="p-6">
-      <h3 className="text-lg font-semibold fc-text-primary mb-4">This week</h3>
-      <div className="grid grid-cols-7 gap-1 mb-2">
+    <div className="border-y border-white/5 px-4 py-3">
+      <h3 className="mb-3 text-lg font-semibold fc-text-primary">This week</h3>
+      <div className="mb-2 grid grid-cols-7 gap-1">
         {DAY_LABELS.map((label, i) => (
-          <div key={i} className="text-center text-xs font-medium fc-text-subtle py-1">
+          <div key={i} className="py-1 text-center text-xs font-medium fc-text-subtle">
             {label}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1 mb-4">
+      <div className="mb-3 grid grid-cols-7 gap-1">
         {weekDays.map((dateStr) => {
           const isLogged = loggedDates.has(dateStr);
           const isFuture = dateStr > today;
@@ -73,6 +72,6 @@ export function ThisWeekStrip({
         {avgSleep != null && ` · Avg sleep: ${avgSleep.toFixed(1)}h`}
         {avgStress != null && ` · Avg stress: ${avgStress.toFixed(1)}/5`}
       </p>
-    </ClientGlassCard>
+    </div>
   );
 }

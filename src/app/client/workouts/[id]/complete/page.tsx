@@ -6,7 +6,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import {
   ClientPageShell,
-  ClientGlassCard,
   SectionHeader,
   PrimaryButton,
   SecondaryButton,
@@ -1461,8 +1460,8 @@ export default function WorkoutComplete() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
-            <ClientGlassCard className="p-8 text-center w-full max-w-md">
-              <p className="fc-text-dim mb-4">{loadError}</p>
+            <div className="w-full max-w-md border-b border-white/5 border-l-2 border-l-[color:var(--fc-status-error)] py-6 text-center">
+              <p className="mb-4 fc-text-dim">{loadError}</p>
               <div className="flex flex-wrap justify-center gap-3">
                 <PrimaryButton
                   onClick={() => {
@@ -1497,7 +1496,7 @@ export default function WorkoutComplete() {
                   Back to Workouts
                 </SecondaryButton>
               </div>
-            </ClientGlassCard>
+            </div>
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -1509,7 +1508,7 @@ export default function WorkoutComplete() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
-            <ClientGlassCard className="p-8 text-center w-full max-w-md">
+            <div className="w-full max-w-md border-b border-white/5 py-8 text-center">
               <h3 className="text-xl font-semibold fc-text-primary">
                 Workout not found
               </h3>
@@ -1525,7 +1524,7 @@ export default function WorkoutComplete() {
                   Back to Workouts
                 </SecondaryButton>
               </div>
-            </ClientGlassCard>
+            </div>
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -1603,16 +1602,10 @@ export default function WorkoutComplete() {
 
             {/* Session Highlights Card */}
             {(personalRecords.length > 0 || newAchievementsQueue.length > 0) && (
-              <div
-                className="rounded-2xl p-[2px] overflow-hidden"
-                style={{
-                  background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan), var(--fc-status-warning))",
-                }}
-              >
-                <ClientGlassCard className="p-5 !rounded-[14px]">
-                  <div className="flex items-center gap-3 mb-4">
+              <div className="border-y border-white/5">
+                  <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl"
                       style={{ background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan))" }}
                     >
                       <Star className="h-5 w-5 text-white" />
@@ -1630,14 +1623,13 @@ export default function WorkoutComplete() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="flex flex-col">
                     {personalRecords.slice(0, 3).map((pr: any) => {
                       const exerciseName = pr.exercises?.name || pr.exercise?.name || "Exercise";
                       return (
                         <div
                           key={pr.id}
-                          className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                          style={{ background: "var(--fc-surface-sunken)" }}
+                          className="flex items-center gap-3 border-b border-white/5 px-4 py-3"
                         >
                           <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: "var(--fc-status-warning)" }} />
                           <span className="text-sm font-semibold fc-text-primary truncate">{exerciseName}</span>
@@ -1653,8 +1645,7 @@ export default function WorkoutComplete() {
                     {newAchievementsQueue.map((ach) => (
                       <div
                         key={ach.id}
-                        className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                        style={{ background: "var(--fc-surface-sunken)" }}
+                        className="flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-b-0"
                       >
                         <span className="text-lg flex-shrink-0">{ach.icon}</span>
                         <span className="text-sm font-semibold fc-text-primary truncate">{ach.name}</span>
@@ -1670,14 +1661,13 @@ export default function WorkoutComplete() {
                       </div>
                     ))}
                   </div>
-                </ClientGlassCard>
               </div>
             )}
 
             {personalRecords.length > 0 && (
-              <ClientGlassCard className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
+              <div className="border-y border-white/5">
+                <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
                     <Trophy className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
                   </div>
                   <div>
@@ -1690,7 +1680,7 @@ export default function WorkoutComplete() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col">
                   {personalRecords.slice(0, 5).map((pr: any) => {
                     const exerciseName =
                       pr.exercises?.name || pr.exercise?.name || "Exercise";
@@ -1712,8 +1702,7 @@ export default function WorkoutComplete() {
                     return (
                       <div
                         key={pr.id}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl"
-                        style={{ background: "var(--fc-surface-sunken)" }}
+                        className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3 last:border-b-0"
                       >
                         <div className="min-w-0">
                           <h4 className="text-sm font-semibold fc-text-primary truncate">
@@ -1730,14 +1719,14 @@ export default function WorkoutComplete() {
                     );
                   })}
                 </div>
-              </ClientGlassCard>
+              </div>
             )}
 
             {programProgression &&
               (programProgression.current_week_number != null ||
                 programProgression.current_day_number != null) && (
-              <ClientGlassCard className="p-4">
-                <div className="flex items-center gap-2 mb-1">
+              <div className="border-b border-white/5 px-4 py-3">
+                <div className="mb-1 flex items-center gap-2">
                   <LayoutDashboard className="w-4 h-4" style={{ color: "var(--fc-accent-cyan)" }} />
                   <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">
                     Program
@@ -1752,11 +1741,11 @@ export default function WorkoutComplete() {
                     Week complete! Next week unlocked.
                   </p>
                 )}
-              </ClientGlassCard>
+              </div>
             )}
 
             {nextWorkout && (
-              <ClientGlassCard className="p-4">
+              <div className="border-b border-white/5 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold mb-1">
@@ -1774,7 +1763,7 @@ export default function WorkoutComplete() {
                     </div>
                   )}
                 </div>
-              </ClientGlassCard>
+              </div>
             )}
 
             {blockGroups.length > 0 && (
@@ -1786,7 +1775,7 @@ export default function WorkoutComplete() {
                   }
                 />
 
-                <div className="space-y-2">
+                <div className="flex flex-col border-y border-white/5">
                   {blockGroups.map((block) => {
                     const isExpanded = expandedBlocks.has(block.set_entry_id);
                     const setCount = block.sets.length;
@@ -1801,14 +1790,14 @@ export default function WorkoutComplete() {
                         : "Exercise";
 
                     return (
-                      <ClientGlassCard
+                      <div
                         key={block.set_entry_id}
-                        className="overflow-hidden p-0"
+                        className="overflow-hidden border-b border-white/5 last:border-b-0"
                       >
                         <button
                           type="button"
                           onClick={() => toggleBlock(block.set_entry_id)}
-                          className="w-full p-4 text-left"
+                          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/[0.02]"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-bold fc-text-dim" style={{ background: "var(--fc-surface-sunken)" }}>
@@ -1833,8 +1822,8 @@ export default function WorkoutComplete() {
                           </div>
                         </button>
                         {isExpanded && (
-                          <div className="border-t border-[color:var(--fc-surface-card-border)] px-4 pb-4 pt-3">
-                            <div className="flex flex-col gap-2">
+                          <div className="border-t border-white/5 px-4 pb-3 pt-3">
+                            <div className="flex flex-col">
                               {block.sets.length === 0 ? (
                                 renderTemplateExercises(block, block.exerciseNames)
                               ) : (
@@ -1853,7 +1842,7 @@ export default function WorkoutComplete() {
                                   .map((set) => (
                                     <div
                                       key={set.id}
-                                      className="border-l-2 pl-3" style={{ borderColor: "var(--fc-surface-card-border)" }}
+                                      className="border-b border-white/5 py-2 pl-1 last:border-b-0"
                                     >
                                       {renderSetDisplay(
                                         set,
@@ -1866,7 +1855,7 @@ export default function WorkoutComplete() {
                             </div>
                           </div>
                         )}
-                      </ClientGlassCard>
+                      </div>
                     );
                   })}
                 </div>

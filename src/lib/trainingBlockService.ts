@@ -1,6 +1,7 @@
 'use client'
 
 import { supabase } from './supabase'
+import { ProgramProgressionService } from './programProgressionService'
 import {
   TrainingBlock,
   TrainingBlockGoal,
@@ -109,11 +110,31 @@ export class TrainingBlockService {
 
   /**
    * Delete a training block.
-   * The ON DELETE CASCADE FK ensures all associated program_schedule
-   * and program_progression_rules rows are deleted automatically.
+   * program_schedule has ON DELETE CASCADE from training_blocks, but
+   * program_progression_rules references program_schedule without CASCADE,
+   * so we remove coach progression rules for those slots first.
    */
   static async deleteTrainingBlock(blockId: string): Promise<boolean> {
     try {
+      const { data: scheduleRows, error: scheduleError } = await supabase
+        .from('program_schedule')
+        .select('id')
+        .eq('training_block_id', blockId)
+
+      if (scheduleError) throw scheduleError
+
+      const scheduleIds = (scheduleRows ?? [])
+        .map((r) => r.id)
+        .filter((id): id is string => Boolean(id))
+
+      if (scheduleIds.length > 0) {
+        const cleared =
+          await ProgramProgressionService.deleteProgressionRulesForSchedules(
+            scheduleIds,
+          )
+        if (!cleared) return false
+      }
+
       const { error } = await supabase
         .from('training_blocks')
         .delete()

@@ -217,9 +217,6 @@ export default function TestCelebrationsPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-bold" style={{ color: textPrimary }}>Celebration Test Lab</h1>
             <p className="text-xs" style={{ color: textDim }}>Preview PR & Achievement modals without completing workouts</p>
-            <Link href="/client/preview-ui" className="text-xs font-medium text-cyan-500 hover:text-cyan-400 mt-1 inline-block">
-              Open full UI preview lab (modals + Train accents) →
-            </Link>
           </div>
         </div>
       </div>

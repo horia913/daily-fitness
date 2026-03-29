@@ -148,6 +148,11 @@ export interface ClientSummary {
   athleteScore: number | null;
   hasActiveProgram: boolean;
   hasActiveMealPlan: boolean;
+  /** Coach-managed progression: week complete, awaiting coach review */
+  weekReviewNeeded: boolean;
+  completedWeekNumber: number | null;
+  activeProgramId: string | null;
+  activeProgramAssignmentId: string | null;
 }
 
 /**
@@ -251,7 +256,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', activeClientIds).gte('log_date', weekStartStr).lte('log_date', todayStr),
       db.from('workout_logs').select('client_id, completed_at').in('client_id', allClientIds).not('completed_at', 'is', null).order('completed_at', { ascending: false }),
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', allClientIds).order('log_date', { ascending: false }),
-      db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
+      db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks, progression_mode, coach_unlocked_week').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
       db.from('meal_plan_assignments').select('client_id').in('client_id', activeClientIds).eq('is_active', true),
       db.from('athlete_scores').select('client_id, score').in('client_id', activeClientIds).order('calculated_at', { ascending: false }),
       db.from('workout_assignments').select('id, client_id, scheduled_date, status').in('client_id', activeClientIds).gte('scheduled_date', sevenDaysAgoStr).lte('scheduled_date', todayStr).in('status', ['assigned', 'in_progress']),
@@ -296,11 +301,26 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         lastCheckinMap.set(c.client_id, c.log_date);
       }
     });
-    const activeProgramMap = new Map<string, { id: string; end_date: string | null; program_id: string }>();
+    const activeProgramMap = new Map<
+      string,
+      {
+        id: string;
+        end_date: string | null;
+        program_id: string;
+        progression_mode: string | null;
+        coach_unlocked_week: number | null;
+      }
+    >();
     (activePrograms || []).forEach((p: any) => {
       if (!activeProgramMap.has(p.client_id)) {
         const end_date = computeProgramEndDate(p.start_date, p.duration_weeks);
-        activeProgramMap.set(p.client_id, { id: p.id, end_date, program_id: p.program_id });
+        activeProgramMap.set(p.client_id, {
+          id: p.id,
+          end_date,
+          program_id: p.program_id,
+          progression_mode: p.progression_mode ?? null,
+          coach_unlocked_week: p.coach_unlocked_week ?? null,
+        });
       }
     });
 
@@ -330,6 +350,31 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       }
       completionRowsCompliance = (completionRowsComp ?? []) as typeof completionRowsCompliance;
     }
+
+    const reviewNeededByAssignment = new Map<string, number>();
+    const coachManagedAssignments = (activePrograms || []).filter(
+      (p: any) => p.progression_mode === 'coach_managed',
+    ) as Array<{
+      id: string;
+      client_id: string;
+      program_id: string;
+      coach_unlocked_week: number | null;
+    }>;
+    for (const a of coachManagedAssignments) {
+      const currentWeek = a.coach_unlocked_week ?? 1;
+      const slots = (scheduleByProgram.get(a.program_id) ?? []).filter((s) => s.week_number === currentWeek);
+      const required = slots.filter((s) => !s.is_optional);
+      if (required.length === 0) continue;
+      const completedIds = new Set(
+        completionRowsCompliance
+          .filter((c) => c.program_assignment_id === a.id)
+          .map((c) => c.program_schedule_id),
+      );
+      if (required.every((s) => completedIds.has(s.id))) {
+        reviewNeededByAssignment.set(a.id, currentWeek);
+      }
+    }
+
     const activeMealPlanSet = new Set((activeMealPlans || []).map((m) => m.client_id));
     const athleteScoreMap = new Map<string, number>();
     (athleteScores || []).forEach((s) => {
@@ -681,6 +726,8 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         programCompliance = total > 0 ? Math.round((completedThisWeek / total) * 100) : 0;
       }
 
+      const reviewWeek = program ? reviewNeededByAssignment.get(program.id) : undefined;
+
       clientSummaries.push({
         clientId,
         firstName,
@@ -699,6 +746,10 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         athleteScore: athleteScoreMap.get(clientId) || null,
         hasActiveProgram: !!program,
         hasActiveMealPlan: activeMealPlanSet.has(clientId),
+        weekReviewNeeded: reviewWeek != null,
+        completedWeekNumber: reviewWeek ?? null,
+        activeProgramId: program?.program_id ?? null,
+        activeProgramAssignmentId: program?.id ?? null,
       });
     }
 

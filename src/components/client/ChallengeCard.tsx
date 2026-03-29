@@ -10,6 +10,8 @@ interface ChallengeCardProps {
   onJoin: (challenge: Challenge) => void;
   onView: (challenge: Challenge) => void;
   isParticipating?: boolean;
+  /** Flat list row instead of full card chrome */
+  dense?: boolean;
 }
 
 function getDaysRemaining(endDate: string): number {
@@ -33,6 +35,7 @@ export function ChallengeCard({
   onJoin,
   onView,
   isParticipating = false,
+  dense = false,
 }: ChallengeCardProps) {
   const daysRemaining = getDaysRemaining(challenge.end_date);
   const progress = getChallengeProgress(challenge.start_date, challenge.end_date);
@@ -69,6 +72,52 @@ export function ChallengeCard({
     }
     return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400";
   };
+
+  if (dense) {
+    const denseAccent =
+      challenge.status === "completed"
+        ? "border-l-gray-400 dark:border-l-gray-500"
+        : isParticipating
+          ? "border-l-amber-500"
+          : challenge.status === "active"
+            ? "border-l-green-500"
+            : "border-l-blue-500";
+    return (
+      <div
+        className={`flex min-h-[52px] flex-wrap items-center gap-3 border-b border-white/5 border-l-2 py-3 pl-2 ${denseAccent}`}
+      >
+        <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold fc-text-primary">{challenge.name}</p>
+          <p className="text-xs fc-text-dim">
+            {challenge.status === "active" ? `${daysRemaining}d left` : challenge.status}
+            {isParticipating ? " · Joined" : ""}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="fc-btn fc-btn-ghost h-9 px-3"
+            onClick={() => onView(challenge)}
+          >
+            View
+          </Button>
+          {!isParticipating && challenge.status === "active" && (
+            <Button
+              type="button"
+              size="sm"
+              className="fc-btn fc-btn-primary fc-press h-9 px-3"
+              onClick={() => onJoin(challenge)}
+            >
+              Join
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`p-6 fc-card fc-accent-challenges fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] ${getCardStatusClasses()}`}>

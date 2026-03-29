@@ -1,6 +1,14 @@
 /**
  * Pure progression generation engine.
  *
+ * IMPORTANT — `ProgramProgressionRule.rir` (DB column `rir`):
+ * Stores **prescribed RPE** (1–10), not “reps in reserve”. No column rename; values are RPE.
+ *
+ * Prescribed RPE progression (non-deload profiles):
+ *   newRPE = min(10, week1RPE + floor((weekNumber - 1) / rpeIncreaseFrequency))
+ *   e.g. week1 RPE 7, frequency 2 → W2:7, W3:8, W5:9
+ * Deload (reduction): RPE = max(1, week1RPE - 1)
+ *
  * ─── weekIndex convention ───────────────────────────────────────────────────
  * weekIndex = weekNumber - 2
  *   → weekIndex = 0 for Week 2 (first generated week)
@@ -39,15 +47,16 @@ const VOLUME_RAMP_CONFIG = {
   cluster_rep_floor: 3,
   set_max_addition: 2,
   weight_bump_on_reset: 0.025,
-  rir_decrease_rate: 2,
-  rir_floor: 0,
+  /** RPE steps every N block weeks: +1 RPE per floor((weekNumber-1)/N) */
+  rpe_increase_frequency: 2,
 } as const
 
 const INTENSITY_RAMP_CONFIG = {
   weight_increment_pct: 0.025,
   rep_floor: 2,
   set_floor: 2,
-  rir_floor: 1,
+  /** Steeper RPE ramp than volume (every week of block index). */
+  rpe_increase_frequency: 1,
   rest_increment: 15,
   rest_max: 300,
 } as const
@@ -73,14 +82,12 @@ const REDUCTION_CONFIG = {
   sets_multiplier: 0.5,
   sets_floor: 2,
   weight_multiplier: 0.6,
-  rir_target: 4,
 } as const
 
 const LINEAR_CONFIG = {
   weight_increment_pct: 0.025,
   rep_increment: 1,
-  rir_decrease_rate: 2,
-  rir_floor: 1,
+  rpe_increase_frequency: 2,
 } as const
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -94,6 +101,8 @@ export interface ProgressionGeneratorInput {
 
 export interface ProgressionChange {
   exerciseName: string
+  /** Keyed to the progression rule's set_entry_id so the UI can map changes per exercise row reliably. */
+  set_entry_id?: string
   field: string
   previousValue: number
   newValue: number
@@ -156,6 +165,7 @@ function cloneRuleForWeek(
 
 function addChange(
   changes: ProgressionChange[],
+  setEntryId: string | undefined,
   name: string,
   field: string,
   prev: number,
@@ -165,9 +175,50 @@ function addChange(
 ): void {
   changes.push({
     exerciseName: name, field,
+    set_entry_id: setEntryId,
     previousValue: prev, newValue: next,
     changeDescription: desc, isCycleEvent,
   })
+}
+
+const PRESCRIBED_RPE_CEILING = 10
+
+/** `b.rir` / `r.rir` = prescribed RPE in DB column `rir`. */
+function prescribedRpeForWeek(
+  week1P: number,
+  weekNumber: number,
+  increaseEveryNWeeks: number,
+): number {
+  const steps = Math.floor((weekNumber - 1) / increaseEveryNWeeks)
+  return Math.min(PRESCRIBED_RPE_CEILING, week1P + steps)
+}
+
+function applyPrescribedRpeProgression(
+  r: R,
+  b: R,
+  weekNumber: number,
+  increaseEveryNWeeks: number,
+  changes: ProgressionChange[],
+  setEntryId: string | undefined,
+  name: string,
+): void {
+  const week1P = b.rir as number | null
+  if (week1P == null) return
+  const newP = prescribedRpeForWeek(week1P, weekNumber, increaseEveryNWeeks)
+  const prevP = (r.rir as number | null) ?? week1P
+  if (newP !== prevP) {
+    r.rir = newP
+    const d = newP - prevP
+    addChange(
+      changes,
+      setEntryId,
+      name,
+      'rir',
+      prevP,
+      newP,
+      d > 0 ? `+${d} RPE` : `${d} RPE`,
+    )
+  }
 }
 
 // ─── Profile: Volume Ramp ─────────────────────────────────────────────────────
@@ -187,6 +238,7 @@ function emitCycle(
   changes: ProgressionChange[],
   name: string,
 ): void {
+  const setEntryId = (base.set_entry_id as string | undefined) ?? undefined
   const week1Sets = base.sets as number | null
   let newSets = prevSets
   if (prevSets != null && week1Sets != null) {
@@ -210,7 +262,12 @@ function emitCycle(
       : ''
 
   addChange(
-    changes, name, 'cycle', 0, 0,
+    changes,
+    setEntryId,
+    name,
+    'cycle',
+    0,
+    0,
     `↑ New cycle: ${setsStr}reps reset to ${repFloor}${weightStr}`,
     true,
   )
@@ -226,24 +283,19 @@ function applyVolumeRamp(
   const b = base as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (b.set_entry_id as string | undefined) ?? undefined
   const cfg = VOLUME_RAMP_CONFIG
   const specWeekIndex = weekIndex + 1 // 1-indexed from Week 1
 
-  // RIR: non-cumulative from Week 1 baseline
-  // Formula: max(week1.rir - floor(specWeekIndex / rir_decrease_rate), rir_floor)
-  const week1Rir = b.rir as number | null
-  if (week1Rir != null) {
-    const prevRir = r.rir as number | null
-    const newRir = Math.max(
-      week1Rir - Math.floor(specWeekIndex / cfg.rir_decrease_rate),
-      cfg.rir_floor,
-    )
-    if (prevRir != null && newRir !== prevRir) {
-      r.rir = newRir
-      const d = newRir - prevRir
-      addChange(changes, name, 'rir', prevRir, newRir, d < 0 ? `${d} RIR` : `+${d} RIR`)
-    }
-  }
+  applyPrescribedRpeProgression(
+    r,
+    b,
+    weekNumber,
+    cfg.rpe_increase_frequency,
+    changes,
+    setEntryId,
+    name,
+  )
 
   const prevSets = r.sets as number | null
   const prevWeight = r.weight_kg as number | null
@@ -258,7 +310,7 @@ function applyVolumeRamp(
           emitCycle(r, b, prevSets, prevWeight, cfg.rep_floor, true, changes, name)
         } else {
           r.reps = String(wouldBe)
-          addChange(changes, name, 'reps', prevReps, wouldBe, '+1 rep')
+          addChange(changes, setEntryId, name, 'reps', prevReps, wouldBe, '+1 rep')
         }
       }
       break
@@ -273,7 +325,7 @@ function applyVolumeRamp(
           emitCycle(r, b, prevSets, null, cfg.rep_floor, false, changes, name)
         } else {
           r.reps = String(wouldBe)
-          addChange(changes, name, 'reps', prevReps, wouldBe, '+1 rep')
+          addChange(changes, setEntryId, name, 'reps', prevReps, wouldBe, '+1 rep')
         }
       }
       break
@@ -295,11 +347,11 @@ function applyVolumeRamp(
       } else {
         if (prev1 != null && would1 != null) {
           r.first_exercise_reps = String(would1)
-          addChange(changes, name, 'first_exercise_reps', prev1, would1, '+1 rep (A)')
+          addChange(changes, setEntryId, name, 'first_exercise_reps', prev1, would1, '+1 rep (A)')
         }
         if (prev2 != null && would2 != null) {
           r.second_exercise_reps = String(would2)
-          addChange(changes, name, 'second_exercise_reps', prev2, would2, '+1 rep (B)')
+          addChange(changes, setEntryId, name, 'second_exercise_reps', prev2, would2, '+1 rep (B)')
         }
       }
       break
@@ -320,11 +372,11 @@ function applyVolumeRamp(
       } else {
         if (prevIso != null && wouldIso != null) {
           r.isolation_reps = String(wouldIso)
-          addChange(changes, name, 'isolation_reps', prevIso, wouldIso, '+1 iso rep')
+          addChange(changes, setEntryId, name, 'isolation_reps', prevIso, wouldIso, '+1 iso rep')
         }
         if (prevComp != null && wouldComp != null) {
           r.compound_reps = String(wouldComp)
-          addChange(changes, name, 'compound_reps', prevComp, wouldComp, '+1 comp rep')
+          addChange(changes, setEntryId, name, 'compound_reps', prevComp, wouldComp, '+1 comp rep')
         }
       }
       break
@@ -337,11 +389,11 @@ function applyVolumeRamp(
         const wouldBe = prevClusterReps + 1
         if (wouldBe > cfg.cluster_rep_ceiling) {
           r.reps_per_cluster = cfg.cluster_rep_floor
-          addChange(changes, name, 'reps_per_cluster', prevClusterReps, cfg.cluster_rep_floor,
+          addChange(changes, setEntryId, name, 'reps_per_cluster', prevClusterReps, cfg.cluster_rep_floor,
             `↑ reps reset to ${cfg.cluster_rep_floor}`)
         } else {
           r.reps_per_cluster = wouldBe
-          addChange(changes, name, 'reps_per_cluster', prevClusterReps, wouldBe, '+1 rep/cluster')
+          addChange(changes, setEntryId, name, 'reps_per_cluster', prevClusterReps, wouldBe, '+1 rep/cluster')
         }
       }
       break
@@ -354,10 +406,10 @@ function applyVolumeRamp(
         const wouldBe = prevReps + 1
         if (wouldBe > cfg.rep_ceiling) {
           r.reps = String(cfg.rep_floor)
-          addChange(changes, name, 'reps', prevReps, cfg.rep_floor, `reps reset to ${cfg.rep_floor}`)
+          addChange(changes, setEntryId, name, 'reps', prevReps, cfg.rep_floor, `reps reset to ${cfg.rep_floor}`)
         } else {
           r.reps = String(wouldBe)
-          addChange(changes, name, 'reps', prevReps, wouldBe, '+1 rep')
+          addChange(changes, setEntryId, name, 'reps', prevReps, wouldBe, '+1 rep')
         }
       }
       break
@@ -368,7 +420,7 @@ function applyVolumeRamp(
       const prevReps = parseReps(r.exercise_reps)
       if (prevReps != null) {
         r.exercise_reps = String(prevReps + 1)
-        addChange(changes, name, 'exercise_reps', prevReps, prevReps + 1, '+1 rep')
+        addChange(changes, setEntryId, name, 'exercise_reps', prevReps, prevReps + 1, '+1 rep')
       }
       break
     }
@@ -395,6 +447,7 @@ function applyIntensityRamp(
   const b = base as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (b.set_entry_id as string | undefined) ?? undefined
   const cfg = INTENSITY_RAMP_CONFIG
   const specWeekIndex = weekIndex + 1
 
@@ -411,22 +464,19 @@ function applyIntensityRamp(
     if (newWeight !== prevW) {
       r.weight_kg = newWeight
       const d = newWeight - prevW
-      addChange(changes, name, 'weight_kg', prevW, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
+      addChange(changes, setEntryId, name, 'weight_kg', prevW, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
     }
   }
 
-  // RIR: -1 per week from Week 1 baseline (floor: 1)
-  const week1Rir = b.rir as number | null
-  if (week1Rir != null) {
-    const newRir = Math.max(week1Rir - specWeekIndex, cfg.rir_floor)
-    const prevRir = r.rir as number | null
-    const prevR = prevRir ?? week1Rir
-    if (newRir !== prevR) {
-      r.rir = newRir
-      const d = newRir - prevR
-      addChange(changes, name, 'rir', prevR, newRir, d < 0 ? `${d} RIR` : `+${d} RIR`)
-    }
-  }
+  applyPrescribedRpeProgression(
+    r,
+    b,
+    weekNumber,
+    cfg.rpe_increase_frequency,
+    changes,
+    setEntryId,
+    name,
+  )
 
   // Sets: stable first 60%, -1/week last 40% (from Week 1 baseline)
   const week1Sets = b.sets as number | null
@@ -442,7 +492,7 @@ function applyIntensityRamp(
     if (prevSets != null && newSets !== prevSets) {
       r.sets = newSets
       const d = newSets - prevSets
-      addChange(changes, name, 'sets', prevSets, newSets, d < 0 ? `${d} set` : `+${d} set`)
+      addChange(changes, setEntryId, name, 'sets', prevSets, newSets, d < 0 ? `${d} set` : `+${d} set`)
     }
   }
 
@@ -460,7 +510,7 @@ function applyIntensityRamp(
     const prevReps = parseReps(r[field])
     if (prevReps == null || newReps === prevReps) return
     r[field] = isIntField ? newReps : String(newReps)
-    addChange(changes, name, field, prevReps, newReps, label)
+    addChange(changes, setEntryId, name, field, prevReps, newReps, label)
   }
 
   // Helper: +15s rest per week from Week 1 baseline
@@ -472,7 +522,7 @@ function applyIntensityRamp(
     const prevR = prevRest ?? week1Rest
     if (newRest !== prevR) {
       r[field] = newRest
-      addChange(changes, name, field, prevR, newRest, label)
+      addChange(changes, setEntryId, name, field, prevR, newRest, label)
     }
   }
 
@@ -508,7 +558,7 @@ function applyIntensityRamp(
         const prevIntraRest = r.intra_cluster_rest as number | null
         if (prevIntraRest != null && newIntraRest !== prevIntraRest) {
           r.intra_cluster_rest = newIntraRest
-          addChange(changes, name, 'intra_cluster_rest', prevIntraRest, newIntraRest,
+          addChange(changes, setEntryId, name, 'intra_cluster_rest', prevIntraRest, newIntraRest,
             `+${newIntraRest - prevIntraRest}s intra rest`)
         }
       }
@@ -537,6 +587,7 @@ function applyTaper(
   const b = base as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (b.set_entry_id as string | undefined) ?? undefined
   const cfg = TAPER_CONFIG
   const specWeekIndex = weekIndex + 1
 
@@ -546,7 +597,7 @@ function applyTaper(
     const newSets = Math.max(prevSets - 1, cfg.set_floor)
     if (newSets !== prevSets) {
       r.sets = newSets
-      addChange(changes, name, 'sets', prevSets, newSets, `-1 set`)
+      addChange(changes, setEntryId, name, 'sets', prevSets, newSets, `-1 set`)
     }
   }
 
@@ -559,19 +610,27 @@ function applyTaper(
     if (newWeight !== prevW) {
       r.weight_kg = newWeight
       const d = newWeight - prevW
-      addChange(changes, name, 'weight_kg', prevW, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
+      addChange(changes, setEntryId, name, 'weight_kg', prevW, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
     }
   }
 
-  // RIR: clamp Week 1 value to 1–2 range (constant across all taper weeks)
-  const week1Rir = b.rir as number | null
-  if (week1Rir != null) {
-    const newRir = Math.max(Math.min(week1Rir, 2), 1)
-    const prevRir = r.rir as number | null
-    if (prevRir != null && newRir !== prevRir) {
-      r.rir = newRir
-      const d = newRir - prevRir
-      addChange(changes, name, 'rir', prevRir, newRir, d < 0 ? `${d} RIR` : `+${d} RIR`)
+  // Prescribed RPE (column `rir`): hold Week 1 baseline for every taper week
+  const week1P = b.rir as number | null
+  if (week1P != null) {
+    const newP = week1P
+    const prevP = (r.rir as number | null) ?? week1P
+    if (newP !== prevP) {
+      r.rir = newP
+      const d = newP - prevP
+      addChange(
+        changes,
+        setEntryId,
+        name,
+        'rir',
+        prevP,
+        newP,
+        d > 0 ? `+${d} RPE` : `${d} RPE`,
+      )
     }
   }
 
@@ -584,7 +643,7 @@ function applyTaper(
     const prevR = prevRest ?? week1Rest
     if (newRest !== prevR) {
       r[field] = newRest
-      addChange(changes, name, field, prevR, newRest, `+${newRest - prevR}s rest`)
+      addChange(changes, setEntryId, name, field, prevR, newRest, `+${newRest - prevR}s rest`)
     }
   }
 
@@ -595,7 +654,7 @@ function applyTaper(
     const newReps = Math.max(prevReps - 1, cfg.rep_floor)
     if (newReps !== prevReps) {
       r[field] = String(newReps)
-      addChange(changes, name, field, prevReps, newReps, label)
+      addChange(changes, setEntryId, name, field, prevReps, newReps, label)
     }
   }
 
@@ -646,6 +705,7 @@ function applyDensityIncrease(
   const r = cloneRuleForWeek(prev, weekNumber) as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (base.set_entry_id as string | undefined) ?? undefined
   const cfg = DENSITY_CONFIG
   const specWeekIndex = weekIndex + 1
 
@@ -656,7 +716,7 @@ function applyDensityIncrease(
     const newRest = Math.max(prevRest - amount, floor)
     if (newRest !== prevRest) {
       r[field] = newRest
-      addChange(changes, name, field, prevRest, newRest, label)
+      addChange(changes, setEntryId, name, field, prevRest, newRest, label)
     }
   }
 
@@ -667,7 +727,7 @@ function applyDensityIncrease(
     if (prevReps == null) return
     const newReps = prevReps + 1
     r[field] = String(newReps)
-    addChange(changes, name, field, prevReps, newReps, label)
+    addChange(changes, setEntryId, name, field, prevReps, newReps, label)
   }
 
   switch (prev.set_type) {
@@ -721,13 +781,14 @@ function applyReduction(
   const b = base as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (b.set_entry_id as string | undefined) ?? undefined
   const cfg = REDUCTION_CONFIG
 
   // Sets (from Week 1 * 0.5, floor 2)
   const week1Sets = b.sets as number | null
   if (week1Sets != null && deloadSets !== week1Sets) {
     r.sets = deloadSets
-    addChange(changes, name, 'sets', week1Sets, deloadSets, `${deloadSets} sets (deload)`)
+    addChange(changes, setEntryId, name, 'sets', week1Sets, deloadSets, `${deloadSets} sets (deload)`)
   }
 
   // Weight (from Week 1 * 0.6)
@@ -735,15 +796,18 @@ function applyReduction(
     const week1Weight = b.weight_kg as number | null
     if (week1Weight != null && deloadWeight !== week1Weight) {
       r.weight_kg = deloadWeight
-      addChange(changes, name, 'weight_kg', week1Weight, deloadWeight, `60% weight`)
+      addChange(changes, setEntryId, name, 'weight_kg', week1Weight, deloadWeight, `60% weight`)
     }
   }
 
-  // RIR → 4 (easy deload effort)
-  const week1Rir = b.rir as number | null
-  if (week1Rir != null && cfg.rir_target !== week1Rir) {
-    r.rir = cfg.rir_target
-    addChange(changes, name, 'rir', week1Rir, cfg.rir_target, `RIR ${cfg.rir_target} (deload)`)
+  // Prescribed RPE (column `rir`): deload = easier than Week 1 (−1 RPE, floor 1)
+  const week1P = b.rir as number | null
+  if (week1P != null) {
+    const newP = Math.max(1, week1P - 1)
+    if (newP !== week1P) {
+      r.rir = newP
+      addChange(changes, setEntryId, name, 'rir', week1P, newP, `-1 RPE (deload)`)
+    }
   }
 
   // Reps: unchanged (maintain movement patterns)
@@ -764,24 +828,18 @@ function applyLinear(
   const b = base as R
   const changes: ProgressionChange[] = []
   const name = getExerciseName(base)
+  const setEntryId = (b.set_entry_id as string | undefined) ?? undefined
   const cfg = LINEAR_CONFIG
-  const specWeekIndex = weekIndex + 1
 
-  // RIR: -1 every 2 weeks from Week 1 baseline
-  // Using ceil formula so decrease lands on week 2 (matches expected output)
-  const week1Rir = b.rir as number | null
-  if (week1Rir != null) {
-    const newRir = Math.max(
-      week1Rir - Math.ceil(specWeekIndex / cfg.rir_decrease_rate),
-      cfg.rir_floor,
-    )
-    const prevRir = r.rir as number | null
-    if (prevRir != null && newRir !== prevRir) {
-      r.rir = newRir
-      const d = newRir - prevRir
-      addChange(changes, name, 'rir', prevRir, newRir, d < 0 ? `${d} RIR` : `+${d} RIR`)
-    }
-  }
+  applyPrescribedRpeProgression(
+    r,
+    b,
+    weekNumber,
+    cfg.rpe_increase_frequency,
+    changes,
+    setEntryId,
+    name,
+  )
 
   // weekIndex even (0, 2, 4…) = weight weeks (Week 2, 4, 6…)
   // weekIndex odd  (1, 3, 5…) = reps weeks  (Week 3, 5, 7…)
@@ -795,7 +853,7 @@ function applyLinear(
       if (newWeight !== prevWeight) {
         r.weight_kg = newWeight
         const d = newWeight - prevWeight
-        addChange(changes, name, 'weight_kg', prevWeight, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
+        addChange(changes, setEntryId, name, 'weight_kg', prevWeight, newWeight, d > 0 ? `+${d.toFixed(1)}kg` : `${d.toFixed(1)}kg`)
       }
     }
   } else {
@@ -805,7 +863,7 @@ function applyLinear(
       if (prevReps == null) return
       const newReps = prevReps + cfg.rep_increment
       r[field] = isInt ? newReps : String(newReps)
-      addChange(changes, name, field, prevReps, newReps, label)
+      addChange(changes, setEntryId, name, field, prevReps, newReps, label)
     }
 
     switch (prev.set_type) {
@@ -985,9 +1043,9 @@ if (
   console.log('Test 1 — Volume Ramp, straight_set, 6w:')
   t1.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RIR:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
   })
-  console.log('  Expected: W2:3×11@60,RIR3 | W3:3×12@60,RIR2 | W4:4×8@61.5,RIR2 | W5:4×9@61.5,RIR1 | W6:4×10@61.5,RIR1 (spec shows 0 — formula gives 1)')
+  console.log('  Expected: W2:3×11@60,RPE3 | W3:3×12@60,RPE4 | W4:4×8@61.5,RPE4 | W5:4×9@61.5,RPE5 | W6:4×10@61.5,RPE5')
 
   // Test 2: Intensity Ramp, straight_set, 4 weeks
   const t2 = generateProgression({
@@ -997,9 +1055,9 @@ if (
   console.log('Test 2 — Intensity Ramp, straight_set, 4w:')
   t2.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RIR:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
   })
-  console.log('  Expected: W2:4×5@102.5,RIR2,rest195 | W3:4×4@105,RIR1,rest210 | W4:3×3@107.5,RIR1,rest225')
+  console.log('  Expected: W2:4×5@102.5,RPE4,rest195 | W3:4×4@105,RPE5,rest210 | W4:3×3@107.5,RPE6,rest225')
 
   // Test 3: Volume Ramp, amrap (Tier 3 — all weeks unchanged)
   const t3 = generateProgression({
@@ -1022,9 +1080,9 @@ if (
   console.log('Test 4 — Reduction, straight_set, 2w:')
   t4.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RIR:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
   })
-  console.log('  Expected: W2: sets:2, reps:10, weight:60, RIR:4, rest:120')
+  console.log('  Expected: W2: sets:2, reps:10, weight:60, RPE:1, rest:120')
 
   // Test 5: Density, straight_set, 4 weeks
   const t5 = generateProgression({
@@ -1034,9 +1092,9 @@ if (
   console.log('Test 5 — Density, straight_set, 4w:')
   t5.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RIR:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
   })
-  console.log('  Expected: W2:4×10@60,rest80 | W3:4×11@60,rest70 | W4:4×11@60,rest60')
+  console.log('  Expected: W2:4×10@60,RPE2,rest80 | W3:4×11@60,RPE2,rest70 | W4:4×11@60,RPE2,rest60')
 
   // Test 6: Linear, straight_set, 4 weeks
   const t6 = generateProgression({
@@ -1046,9 +1104,9 @@ if (
   console.log('Test 6 — Linear, straight_set, 4w:')
   t6.weekRules.forEach(w => {
     const r = w.rules[0] as any
-    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RIR:${r.rir}, rest:${r.rest_seconds}`)
+    console.log(`  Week ${w.weekNumber}: sets:${r.sets}, reps:${r.reps}, weight:${r.weight_kg}, RPE:${r.rir}, rest:${r.rest_seconds}`)
   })
-  console.log('  Expected: W2:3×10@41,RIR2 | W3:3×11@41,RIR2 | W4:3×11@42,RIR1')
+  console.log('  Expected: W2:3×10@41,RPE3 | W3:3×11@41,RPE4 | W4:3×11@42,RPE4')
 
   console.log('=== End Test Verification ===\n')
 }

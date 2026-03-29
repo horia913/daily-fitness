@@ -447,3 +447,26 @@
 body.fc-modal-open main {
   overflow: hidden !important;
 }
+
+/* Workout execution: sticky card in <main>; full rounding; small bottom offset so lower corners show */
+.workout-input-area {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 10;
+  margin-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  margin-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0.75rem;
+  background: var(--fc-surface-card);
+  box-sizing: border-box;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+}
+
+/*
+ * Visual density (list surfaces): use on components via Tailwind classes —
+ * Flat row: border-b border-white/5 px-4 py-3 bg-transparent rounded-none shadow-none
+ * Filter row: flex flex-wrap gap-2 my-3 (no fc-surface / rounded-xl wrapper)
+ * Current-user row: bg-cyan-500/5 border-l-2 border-l-cyan-500
+ */

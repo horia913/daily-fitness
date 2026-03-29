@@ -404,9 +404,15 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 text-center">
             <UtensilsCrossed className="w-10 h-10 fc-text-dim mx-auto mb-2" />
             <p className="fc-text-subtle">No nutrition goals set. Set nutrition targets to track compliance.</p>
-            <Link href={`/coach/clients/${clientId}/goals`} className="mt-3 inline-block text-sm font-medium text-[color:var(--fc-accent)]">
+            <button
+              type="button"
+              className="mt-3 text-sm font-medium text-[color:var(--fc-accent)]"
+              onClick={() => {
+                window.location.href = `/coach/clients/${clientId}/progress?section=goals`;
+              }}
+            >
               Set goals
-            </Link>
+            </button>
           </div>
         </section>
       )}
@@ -446,9 +452,15 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
               {goals.completedCount} goal{goals.completedCount !== 1 ? 's' : ''} achieved
             </p>
           )}
-          <Link href={`/coach/clients/${clientId}/goals`} className="text-sm font-medium text-[color:var(--fc-accent)]">
+          <button
+            type="button"
+            className="text-sm font-medium text-[color:var(--fc-accent)]"
+            onClick={() => {
+              window.location.href = `/coach/clients/${clientId}/progress?section=goals`;
+            }}
+          >
             Manage goals
-          </Link>
+          </button>
         </div>
       </section>
 

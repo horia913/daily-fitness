@@ -848,13 +848,13 @@ export default function WorkoutDetailsPage() {
         }
       }
       
-      // OPTIONAL: rir, tempo, notes (only if set)
-      // For SUPERSET: RIR, tempo, notes only for exercise 1 (first exercise, orderIndex === 0)
+      // OPTIONAL: prescribed RPE (`rir` column), tempo, notes (only if set)
+      // For SUPERSET: RPE, tempo, notes only for exercise 1 (first exercise, orderIndex === 0)
       if (blockType === "superset") {
         if (exercise.orderIndex === 0) {
-          // Only show RIR/tempo/notes for first exercise in superset
+          // Only show RPE/tempo/notes for first exercise in superset
           if (exercise.rir !== null && exercise.rir !== undefined) {
-            result.push({ label: "RIR", value: `${exercise.rir}` });
+            result.push({ label: "RPE", value: `${exercise.rir}` });
           }
           if (exercise.tempo) {
             result.push({ label: "Tempo", value: exercise.tempo });
@@ -864,9 +864,9 @@ export default function WorkoutDetailsPage() {
           }
         }
       } else {
-        // For all other block types, show RIR/tempo/notes for all exercises
+        // For all other block types, show RPE/tempo/notes for all exercises
         if (exercise.rir !== null && exercise.rir !== undefined) {
-          result.push({ label: "RIR", value: `${exercise.rir}` });
+          result.push({ label: "RPE", value: `${exercise.rir}` });
         }
         if (exercise.tempo) {
           result.push({ label: "Tempo", value: exercise.tempo });
@@ -1333,10 +1333,7 @@ export default function WorkoutDetailsPage() {
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim mb-6">
               Workout Content
             </h2>
-            <div
-              className="flex flex-col"
-              style={{ gap: "var(--fc-gap-cards)" }}
-            >
+            <div className="flex flex-col border-y border-white/5">
               {blocks.map((block, blockIndex) => {
                 const isExpanded = expandedExercises.has(block.id);
                 const badgeColor = getBlockTypeBadgeColor(block.blockType);
@@ -1345,14 +1342,12 @@ export default function WorkoutDetailsPage() {
                 return (
                   <div
                     key={block.id}
-                    className={`exercise-item ${isExpanded ? "active" : ""}`}
+                    className={`exercise-item border-b border-white/5 last:border-b-0 ${isExpanded ? "active" : ""}`}
                     onClick={() => toggleExercise(block.id)}
                   >
+                    <div className="cursor-pointer overflow-hidden transition-colors hover:bg-white/[0.02]">
                     <div
-                      className="fc-surface rounded-2xl overflow-hidden cursor-pointer border border-[color:var(--fc-surface-card-border)] transition-all"
-                    >
-                    <div
-                      className="flex items-center justify-between p-4"
+                      className="flex items-center justify-between px-4 py-3"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-mono text-sm fc-text-primary" style={{ background: badgeColor.bg, color: badgeColor.text }}>
@@ -1438,7 +1433,7 @@ export default function WorkoutDetailsPage() {
                       <ChevronDown className="rotate-icon w-5 h-5 fc-text-dim" />
                     </div>
                     {isExpanded && (
-                      <div className="px-4 pb-4">
+                      <div className="border-t border-white/5 px-4 pb-3 pt-3">
                         {/* Block Notes */}
                         {block.notes && (
                           <div
@@ -1481,7 +1476,7 @@ export default function WorkoutDetailsPage() {
                         )}
 
                         {/* Exercises in Block */}
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col border-t border-white/5">
                           {block.exercises.map((exercise, exerciseIndex) => {
                             const previousBest = getPreviousBest(exercise.name);
                             const exerciseBadgeColor = getBlockTypeBadgeColor(
@@ -1491,8 +1486,7 @@ export default function WorkoutDetailsPage() {
                             return (
                               <div
                                 key={exercise.id}
-                                className="rounded-xl p-3 flex flex-col gap-3 transition-all duration-200"
-                                style={{ background: "var(--fc-surface-sunken)" }}
+                                className="flex flex-col gap-3 border-b border-white/5 py-3 transition-all duration-200 last:border-b-0"
                               >
                                 <div className="flex items-start gap-3">
                                   <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold font-mono text-xs fc-text-dim flex-shrink-0" style={{ background: "var(--fc-surface-card)" }}>
@@ -1518,13 +1512,13 @@ export default function WorkoutDetailsPage() {
                                   </div>
                                 </div>
 
-                                {/* Exercise Card Fields — hierarchy: primary (Sets/Reps/Rest) > secondary (Weight/Load) > tertiary (RIR/Tempo/Notes) */}
+                                {/* Exercise Card Fields — primary (Sets/Reps/Rest) > secondary (Weight/Load) > tertiary (RPE/Tempo/Notes) */}
                                 {(() => {
                                   const blockType = (block.blockType || "").toLowerCase();
                                   const isTimeBased = ["amrap", "emom", "for_time", "tabata"].includes(blockType);
                                   const primaryLabels = ["Sets", "Reps", "Rest"];
                                   const secondaryLabels = ["Weight", "Load %"];
-                                  const tertiaryLabels = ["RIR", "Tempo", "Notes"];
+                                  const tertiaryLabels = ["RPE", "Tempo", "Notes"];
 
                                   if (isTimeBased) {
                                     const timeParams = getTimeBasedParameters(block, exercise);
@@ -1581,7 +1575,7 @@ export default function WorkoutDetailsPage() {
                                           ))}
                                         </div>
                                       )}
-                                      {/* Tertiary: RIR, Tempo, Notes — small, muted */}
+                                      {/* Tertiary: RPE, Tempo, Notes — small, muted */}
                                       {tertiary.length > 0 && (
                                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs fc-text-dim">
                                           {tertiary.map((field, idx) => (
@@ -1598,7 +1592,7 @@ export default function WorkoutDetailsPage() {
 
                                 {/* Previous Best */}
                                 {previousBest && (
-                                  <div className="px-3 py-2 rounded-lg flex items-center justify-between" style={{ background: "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))" }}>
+                                  <div className="flex items-center justify-between border-l-2 border-l-[color:var(--fc-status-success)] py-2 pl-3">
                                     <div className="flex items-center gap-2">
                                       <History className="w-3 h-3 fc-text-dim" />
                                       <span className="text-xs fc-text-dim">

@@ -4,10 +4,8 @@ import React from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell } from "@/components/client-ui/ClientPageShell";
-import { GlassCard } from "@/components/ui/GlassCard";
 import {
   User,
   Target,
@@ -73,8 +71,6 @@ const NAV_CARDS: NavCard[] = [
 
 export default function MePage() {
   const { user, profile } = useAuth();
-  const { performanceSettings } = useTheme();
-
   const userName = profile?.first_name || user?.email?.split("@")[0] || "there";
   const avatarUrl = profile?.avatar_url;
 
@@ -119,38 +115,33 @@ export default function MePage() {
               </div>
             </div>
 
-            {/* Navigation Cards */}
-            <div className="space-y-3">
+            <nav className="flex flex-col border-y border-white/5" aria-label="Account">
               {NAV_CARDS.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <Link key={card.href} href={card.href}>
-                    <GlassCard
-                      elevation={2}
-                      className="fc-glass fc-card p-4 hover:scale-[1.02] transition-transform cursor-pointer"
-                      pressable
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-[color:var(--fc-glass-highlight)] flex items-center justify-center">
-                          <Icon className="w-6 h-6 fc-text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base font-semibold fc-text-primary mb-0.5">
-                            {card.title}
-                          </h3>
-                          {card.description && (
-                            <p className="text-xs fc-text-dim line-clamp-1">
-                              {card.description}
-                            </p>
-                          )}
-                        </div>
-                        <ChevronRight className="w-5 h-5 fc-text-dim flex-shrink-0" />
-                      </div>
-                    </GlassCard>
+                  <Link
+                    key={`${card.href}-${card.title}`}
+                    href={card.href}
+                    className="flex min-h-[52px] items-center gap-4 border-b border-white/5 py-3 last:border-b-0 transition-colors hover:bg-white/[0.02]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)]">
+                      <Icon className="h-5 w-5 fc-text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-semibold fc-text-primary">
+                        {card.title}
+                      </h3>
+                      {card.description && (
+                        <p className="line-clamp-1 text-xs fc-text-dim">
+                          {card.description}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
                   </Link>
                 );
               })}
-            </div>
+            </nav>
           </ClientPageShell>
         </AnimatedBackground>
       </div>

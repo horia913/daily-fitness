@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService, {
   WorkoutTemplate,
 } from "@/lib/workoutTemplateService";
-import { useExerciseLibrary } from "@/hooks/useCoachData";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -16,26 +15,44 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
   Dumbbell,
-  Clock,
-  Users,
-  Star,
   Edit,
   ArrowLeft,
-  Heart,
-  Zap,
-  Activity,
-  BarChart3,
-  Calendar,
   Copy as CopyIcon,
   Trash2,
-  Share2,
 } from "lucide-react";
 import Link from "next/link";
-import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { WorkoutBlock } from "@/types/workoutBlocks";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/toast-provider";
+
+function flatExerciseRowsFromBlocks(blocks: WorkoutBlock[]) {
+  const rows: { key: string; name: string; setsReps: string }[] = [];
+  blocks.forEach((block, bi) => {
+    const exs = block.exercises || [];
+    if (exs.length === 0) {
+      rows.push({
+        key: `empty-${block.id ?? bi}`,
+        name:
+          (block as { set_name?: string }).set_name ||
+          String(block.set_type || "Block"),
+        setsReps: "—",
+      });
+      return;
+    }
+    exs.forEach((ex: { exercise?: { name?: string }; exercise_id?: string; sets?: number; reps?: string | number }, ei: number) => {
+      const name = ex.exercise?.name || "Exercise";
+      const sets = ex.sets ?? block.total_sets ?? "—";
+      const reps = ex.reps ?? block.reps_per_set ?? "—";
+      rows.push({
+        key: `${block.id}-${ex.exercise_id ?? ei}-${ei}`,
+        name,
+        setsReps: `${sets} × ${reps}`,
+      });
+    });
+  });
+  return rows;
+}
 
 export default function WorkoutTemplateDetailsPage() {
   const params = useParams();
@@ -46,28 +63,11 @@ export default function WorkoutTemplateDetailsPage() {
   const { user, loading: authLoading } = useAuth();
 
   // Load exercises for name lookup
-  const { exercises: availableExercises } = useExerciseLibrary(user?.id || "");
-
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
   const [exerciseCount, setExerciseCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const getCategoryIcon = (categoryName: string) => {
-    switch (categoryName?.toLowerCase()) {
-      case "strength":
-        return Dumbbell;
-      case "cardio":
-        return Heart;
-      case "hiit":
-        return Zap;
-      case "flexibility":
-        return Activity;
-      default:
-        return Dumbbell;
-    }
-  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -154,10 +154,6 @@ export default function WorkoutTemplateDetailsPage() {
       setWorkoutBlocks([]);
     }
   };
-
-  const CategoryIcon = template
-    ? getCategoryIcon(template.category || "")
-    : Dumbbell;
 
   const handleDuplicate = async () => {
     if (!template) return;
@@ -252,50 +248,48 @@ export default function WorkoutTemplateDetailsPage() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 p-4 sm:p-6 pt-10">
-        <div className="max-w-5xl mx-auto space-y-8">
-          <nav className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-                <ArrowLeft className="w-4 h-4 shrink-0" />
-                Back to Programs
-              </Link>
-              <Link
-                href="/coach/workouts/templates"
-                className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors group"
+      <div className="relative z-10 p-4 sm:p-6 pt-4">
+        <div className="max-w-5xl mx-auto space-y-4">
+          <nav className="flex min-h-12 flex-wrap items-center justify-between gap-2">
+            <Link
+              href="/coach/workouts/templates"
+              className="inline-flex items-center gap-1.5 text-sm font-medium fc-text-dim hover:fc-text-primary"
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Templates
+            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="fc-ghost"
+                size="sm"
+                className="h-9"
+                onClick={handleDuplicate}
               >
-                <span className="p-2 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] group-hover:bg-white/10 transition-colors">
-                  <ArrowLeft className="w-5 h-5" />
-                </span>
-                <span className="font-medium">Back to Templates</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="fc-ghost" onClick={handleDuplicate}>
-                <CopyIcon className="w-4 h-4 mr-2" />
-                <span>Duplicate</span>
+                <CopyIcon className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">Duplicate</span>
               </Button>
               <Button
                 variant="outline"
-                className="fc-btn border-red-500/30 text-red-500 hover:bg-red-500/10"
+                size="sm"
+                className="h-9 fc-btn border-red-500/30 text-red-500 hover:bg-red-500/10"
                 onClick={handleDelete}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                <span>Delete</span>
+                <Trash2 className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">Delete</span>
               </Button>
               <Link href={`/coach/workouts/templates/${template.id}/edit`}>
-                <Button className="fc-btn fc-btn-primary">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Template
+                <Button size="sm" className="fc-btn fc-btn-primary h-9 font-semibold">
+                  <Edit className="w-4 h-4 sm:mr-1" />
+                  Edit
                 </Button>
               </Link>
             </div>
           </nav>
 
-          <header className="space-y-4">
-            <div className="flex flex-wrap gap-2">
+          <header className="space-y-2">
+            <div className="flex flex-wrap gap-1.5">
               <span
-                className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold uppercase tracking-wider border"
+                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                 style={{
                   background: `${getSemanticColor("trust").primary}20`,
                   color: getSemanticColor("trust").primary,
@@ -305,7 +299,7 @@ export default function WorkoutTemplateDetailsPage() {
                 {template.category || "General"}
               </span>
               <span
-                className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold capitalize border"
+                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize"
                 style={{
                   background: `${getDifficultyColor(template.difficulty_level)}20`,
                   color: getDifficultyColor(template.difficulty_level),
@@ -315,398 +309,48 @@ export default function WorkoutTemplateDetailsPage() {
                 {template.difficulty_level}
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
+            <h1 className="text-xl font-bold tracking-tight fc-text-primary sm:text-2xl">
               {template.name}
             </h1>
             {template.description && (
-              <p className="text-lg fc-text-dim max-w-2xl leading-relaxed">
+              <p className="max-w-2xl text-sm leading-snug fc-text-dim line-clamp-3">
                 {template.description}
               </p>
             )}
           </header>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Duration */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                >
-                  <Clock
-                    className="w-6 h-6"
-                    style={{ color: getSemanticColor("trust").primary }}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    <AnimatedNumber
-                      value={template.estimated_duration}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <span className="text-sm text-[color:var(--fc-text-dim)]">
-                      min
-                    </span>
-                  </div>
-                  <p className="text-xs text-[color:var(--fc-text-dim)]">
-                    Duration
-                  </p>
-                </div>
-              </div>
-            </div>
+          <p className="text-sm text-gray-400">
+            {template.estimated_duration ?? 0} min · {exerciseCount} exercise
+            {exerciseCount !== 1 ? "s" : ""} · {template.usage_count ?? 0}{" "}
+            assignment{(template.usage_count ?? 0) !== 1 ? "s" : ""}
+            {template.rating != null
+              ? ` · ${Number(template.rating).toFixed(1)}/5`
+              : ""}
+          </p>
 
-            {/* Exercises */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                >
-                  <Dumbbell
-                    className="w-6 h-6"
-                    style={{ color: getSemanticColor("energy").primary }}
-                  />
-                </div>
-                <div>
-                  <AnimatedNumber
-                    value={exerciseCount}
-                    className="text-2xl font-bold"
-                    color="var(--fc-text-primary)"
-                  />
-                  <p className="text-xs text-[color:var(--fc-text-dim)]">
-                    Exercises
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Usage Count */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                >
-                  <Users
-                    className="w-6 h-6"
-                    style={{ color: getSemanticColor("success").primary }}
-                  />
-                </div>
-                <div>
-                  <AnimatedNumber
-                    value={template.usage_count || 0}
-                    className="text-2xl font-bold"
-                    color="var(--fc-text-primary)"
-                  />
-                  <p className="text-xs text-[color:var(--fc-text-dim)]">
-                    Assignments
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Rating */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                >
-                  <Star
-                    className="w-6 h-6"
-                    style={{ color: getSemanticColor("warning").primary }}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    {template.rating ? (
-                      <AnimatedNumber
-                        value={template.rating}
-                        decimals={1}
-                        className="text-2xl font-bold"
-                        color="var(--fc-text-primary)"
-                      />
-                    ) : (
-                      <span className="text-2xl font-bold" style={{ color: "var(--fc-text-primary)" }}>--</span>
-                    )}
-                    <span className="text-sm text-[color:var(--fc-text-dim)]">
-                      / 5
-                    </span>
-                  </div>
-                  <p className="text-xs text-[color:var(--fc-text-dim)]">
-                    Rating
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Workout Flow */}
           <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold tracking-tight fc-text-primary flex items-center gap-3">
-                <Activity className="w-6 h-6 fc-text-dim" />
-                Workout Flow
-              </h2>
-              <span className="text-sm fc-text-dim font-mono">
-                {exerciseCount} {exerciseCount !== 1 ? "exercises" : "exercise"}
+            <div className="flex items-center justify-between border-b border-[color:var(--fc-glass-border)]/40 pb-2">
+              <h2 className="text-sm font-semibold fc-text-primary">Exercises</h2>
+              <span className="font-mono text-xs text-gray-400">
+                {exerciseCount}
               </span>
             </div>
 
             {workoutBlocks.length > 0 ? (
-              <div className="space-y-3">
-                {workoutBlocks.map((block, index) => {
-                  // Get first exercise and its special table data
-                  const firstExercise = block.exercises?.[0];
-                  const firstExerciseId = firstExercise?.exercise_id;
-                  const firstExerciseOrder = firstExercise?.exercise_order || 1;
-                  
-                  // Get time protocol for this block/exercise (for time-based blocks)
-                  const timeProtocol = block.time_protocols?.find(
-                    (tp: any) => tp.exercise_id === firstExerciseId && tp.exercise_order === firstExerciseOrder
-                  ) || block.time_protocols?.[0];
-                  
-                  // Get special table data from first exercise
-                  const dropSet = firstExercise?.drop_sets?.[0];
-                  const clusterSet = firstExercise?.cluster_sets?.[0];
-                  const restPauseSet = firstExercise?.rest_pause_sets?.[0];
-                  
-                  // Convert block to exercise format (same as edit page)
-                  const exercise: any = {
-                    id: block.id || `block-${index}-${Date.now()}`,
-                    exercise_type: block.set_type,
-                    set_type: block.set_type,
-                    exercise_id: firstExerciseId,
-                    order_index: index + 1,
-                    sets: block.total_sets?.toString() || "",
-                    reps: block.reps_per_set || "",
-                    rest_seconds: block.rest_seconds?.toString() || "",
-                    notes: block.set_notes || "",
-                    set_name: block.set_name,
-                    // Read from workout_time_protocols (block_parameters removed)
-                    rounds: timeProtocol?.rounds
-                      ? String(timeProtocol.rounds)
-                      : undefined,
-                    work_seconds: timeProtocol?.work_seconds
-                      ? String(timeProtocol.work_seconds)
-                      : undefined,
-                    rest_after: timeProtocol?.rest_seconds
-                      ? String(timeProtocol.rest_seconds)
-                      : undefined,
-                    amrap_duration: timeProtocol?.total_duration_minutes
-                      ? String(timeProtocol.total_duration_minutes)
-                      : undefined,
-                    emom_duration: timeProtocol?.total_duration_minutes
-                      ? String(timeProtocol.total_duration_minutes)
-                      : undefined,
-                    emom_reps: timeProtocol?.reps_per_round
-                      ? String(timeProtocol.reps_per_round)
-                      : undefined,
-                    emom_mode: timeProtocol?.emom_mode,
-                    // Read from special tables (block_parameters removed)
-                    drop_percentage: dropSet ? (() => {
-                      const initialWeight = firstExercise?.weight_kg || 0;
-                      const dropWeight = dropSet.weight_kg || 0;
-                      if (initialWeight > 0 && dropWeight > 0) {
-                        return String(Math.round(((initialWeight - dropWeight) / initialWeight) * 100));
-                      }
-                      return undefined;
-                    })() : undefined,
-                    drop_set_reps: dropSet?.reps,
-                    cluster_reps: clusterSet?.reps_per_cluster,
-                    clusters_per_set: clusterSet?.clusters_per_set
-                      ? String(clusterSet.clusters_per_set)
-                      : undefined,
-                    intra_cluster_rest: clusterSet?.intra_cluster_rest
-                      ? String(clusterSet.intra_cluster_rest)
-                      : undefined,
-                    rest_pause_duration: restPauseSet?.rest_pause_duration
-                      ? String(restPauseSet.rest_pause_duration)
-                      : undefined,
-                    max_rest_pauses: restPauseSet?.max_rest_pauses
-                      ? String(restPauseSet.max_rest_pauses)
-                      : undefined,
-                    target_reps: timeProtocol?.target_reps
-                      ? String(timeProtocol.target_reps)
-                      : undefined,
-                    time_cap: timeProtocol?.time_cap_minutes
-                      ? String(timeProtocol.time_cap_minutes)
-                      : undefined,
-                    // Load percentage from first exercise
-                    load_percentage: firstExercise?.load_percentage?.toString() || "",
-                  };
-
-                  // Handle complex block types with nested exercises
-                  const blockType = block.set_type as string;
-                  if (blockType === "tabata") {
-                    // Get time protocols for each exercise (for individual work_seconds, rest_after)
-                    const exerciseProtocols =
-                      block.time_protocols?.filter(
-                        (tp: any) => tp.protocol_type === "tabata"
-                      ) || [];
-
-                    const exercisesArray =
-                      block.exercises?.map((ex, idx) => {
-                        // Find protocol for this specific exercise
-                        const exProtocol = exerciseProtocols.find(
-                          (tp: any) =>
-                            tp.exercise_id === ex.exercise_id &&
-                            tp.exercise_order === (idx + 1)
-                        );
-                        
-                        return {
-                          exercise_id: ex.exercise_id,
-                          sets:
-                            ex.sets?.toString() ||
-                            block.total_sets?.toString() ||
-                            "",
-                          reps: ex.reps || block.reps_per_set || "",
-                          // Use individual exercise rest_seconds, not block rest
-                          rest_seconds: ex.rest_seconds?.toString() || "",
-                          // Get work_seconds from time protocol for this exercise
-                          work_seconds: exProtocol?.work_seconds?.toString() || "",
-                          // Get rest_after from time protocol for this exercise
-                          rest_after: exProtocol?.rest_seconds?.toString() || "",
-                          // Load individual load_percentage for each exercise
-                          load_percentage: ex.load_percentage?.toString() || "",
-                          exercise: ex.exercise,
-                        };
-                      }) || [];
-
-                    // Read from workout_time_protocols (one per exercise)
-                    const tabataProtocol = block.time_protocols?.find(
-                      (tp: any) => tp.protocol_type === 'tabata'
-                    ) || timeProtocol;
-                    
-                    const restAfter = tabataProtocol?.rest_seconds?.toString() ||
-                      block.rest_seconds?.toString() ||
-                      "10";
-                    exercise.rest_after = String(restAfter);
-                    
-                    // Load rest_after_set from time_protocols (block-level field)
-                    const restAfterSet =
-                      tabataProtocol?.rest_after_set?.toString() || "10";
-                    (exercise as any).rest_after_set = String(restAfterSet);
-                    
-                    exercise.rounds = tabataProtocol?.rounds?.toString() ||
-                      block.total_sets?.toString() ||
-                      "8";
-                    exercise.work_seconds = tabataProtocol?.work_seconds?.toString() || "20";
-
-                    // Build tabata_sets from exercises and their time protocols
-                    // Group exercises by set number from time_protocols
-                    const setsMap = new Map<number, any[]>();
-                    exercisesArray.forEach((ex: any, exIdx: number) => {
-                      const exProtocol = exerciseProtocols.find(
-                        (tp: any) =>
-                          tp.exercise_id === ex.exercise_id &&
-                          tp.exercise_order === exIdx + 1
-                      );
-                      const setNumber = exProtocol?.set || 1; // Default to set 1 if not found
-                      if (!setsMap.has(setNumber)) {
-                        setsMap.set(setNumber, []);
-                      }
-                      setsMap.get(setNumber)!.push({
-                        ...ex,
-                        work_seconds:
-                          exProtocol?.work_seconds?.toString() ||
-                          exercise.work_seconds,
-                        rest_after: exProtocol?.rest_seconds?.toString() || restAfter,
-                      });
-                    });
-
-                    // Convert map to array of sets
-                    exercise.tabata_sets = Array.from(setsMap.entries())
-                      .sort(([a], [b]) => a - b)
-                      .map(([setNum, exercises]) => ({
-                        exercises,
-                        rest_between_sets: String(restAfter),
-                      }));
-                  } else if (block.set_type === "giant_set") {
-                    exercise.giant_set_exercises =
-                      block.exercises?.map((ex) => ({
-                        exercise_id: ex.exercise_id,
-                        sets:
-                          ex.sets?.toString() ||
-                          block.total_sets?.toString() ||
-                          "",
-                        reps: ex.reps || block.reps_per_set || "",
-                        // Load individual load_percentage for each exercise
-                        load_percentage: ex.load_percentage?.toString() || "",
-                        exercise: ex.exercise,
-                      })) || [];
-                  } else if (block.set_type === "superset") {
-                    if (block.exercises && block.exercises.length >= 2) {
-                      exercise.superset_exercise_id =
-                        block.exercises[1].exercise_id;
-                      exercise.superset_reps =
-                        block.exercises[1].reps || block.reps_per_set || "";
-                      // Load percentage for first exercise (already loaded at line 487)
-                      // Load percentage for second exercise (individual for each exercise in superset)
-                      (exercise as any).superset_load_percentage =
-                        block.exercises[1].load_percentage?.toString() || "";
-                    }
-                  } else if (block.set_type === "pre_exhaustion") {
-                    if (block.exercises && block.exercises.length >= 2) {
-                      exercise.compound_exercise_id =
-                        block.exercises[1].exercise_id;
-                      exercise.isolation_reps = block.exercises[0].reps || "";
-                      exercise.compound_reps = block.exercises[1].reps || "";
-                      // Load percentage for isolation exercise (first exercise)
-                      exercise.load_percentage =
-                        block.exercises[0].load_percentage?.toString() || "";
-                      // Load percentage for compound exercise (second exercise)
-                      (exercise as any).compound_load_percentage =
-                        block.exercises[1].load_percentage?.toString() || "";
-                    }
-                  }
-
-                  // Add exercise object from block
-                  if (block.exercises && block.exercises.length > 0) {
-                    exercise.exercise = block.exercises[0].exercise;
-                  }
-
-                  // Create unique key
-                  const order = exercise.order_index || index + 1;
-                  const uniqueKey = exercise.id
-                    ? `ex-${exercise.exercise_type || "unknown"}-${
-                        exercise.id
-                      }-${order}`
-                    : `ex-${exercise.exercise_type || "unknown"}-${
-                        exercise.exercise_id || "no-id"
-                      }-${order}-${index}`;
-
-                  const blockBorderColor =
-                    blockType === "straight_set"
-                      ? "var(--fc-accent-indigo, #6366f1)"
-                      : blockType === "superset"
-                        ? "var(--fc-accent-amber, #f59e0b)"
-                        : blockType === "amrap" || blockType === "emom" || blockType === "for_time" || blockType === "tabata"
-                          ? "var(--fc-accent-success, #10b981)"
-                          : "var(--fc-glass-border)";
-                  return (
-                    <div key={uniqueKey} className="rounded-2xl border-l-4" style={{ borderLeftColor: blockBorderColor }}>
-                      <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
-                        <ExerciseBlockCard
-                          exercise={exercise}
-                          index={index}
-                          availableExercises={availableExercises}
-                          renderMode="view"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="divide-y divide-[color:var(--fc-glass-border)]/40 border-b border-[color:var(--fc-glass-border)]/40">
+                {flatExerciseRowsFromBlocks(workoutBlocks).map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium fc-text-primary">
+                      {row.name}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-gray-400">
+                      {row.setsReps}
+                    </span>
+                  </div>
+                ))}
               </div>
             ) : (
               <EmptyState

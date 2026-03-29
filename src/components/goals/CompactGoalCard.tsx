@@ -24,7 +24,7 @@ export function CompactGoalCard({ goal }: CompactGoalCardProps) {
   const unit = goal.target_unit ?? "";
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[color:var(--fc-glass-border)] p-3 bg-[color:var(--fc-glass-highlight)]/50">
+    <div className="flex min-h-[52px] flex-col gap-2 border-b border-white/5 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold fc-text-primary truncate flex-1 min-w-0">
           {goal.title}

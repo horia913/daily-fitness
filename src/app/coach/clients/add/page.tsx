@@ -3,8 +3,6 @@
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { GlassCard } from '@/components/ui/GlassCard'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
@@ -12,17 +10,12 @@ import { FloatingInput } from '@/components/ui/floating-input'
 import { ProgressIndicator } from '@/components/ui/progress-indicator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { 
-  UserPlus, 
-  Mail,
   Copy,
   Check,
-  Send,
   Clock,
-  Users,
   ArrowLeft,
   ArrowRight,
   Sparkles,
-  CheckCircle2,
   AlertCircle
 } from 'lucide-react'
 import { useState } from 'react'
@@ -261,7 +254,7 @@ export default function AddClient() {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             <FloatingInput
               label="Client Email Address"
               type="email"
@@ -272,15 +265,15 @@ export default function AddClient() {
               placeholder="client@example.com"
               helperText="We'll generate a signup link with this email pre-filled"
             />
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--fc-text-primary)]">
-                Invite Link Expiry
+            <div className="space-y-1">
+              <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                Invite expiry
               </label>
               <Select 
                 value={formData.inviteExpiryDays.toString()} 
                 onValueChange={(value) => handleInputChange('inviteExpiryDays', value)}
               >
-                <SelectTrigger className="h-12 border-2 border-[color:var(--fc-glass-border)] focus:border-[color:var(--fc-accent-primary)]">
+                <SelectTrigger className="h-9 text-sm border border-[color:var(--fc-glass-border)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,145 +293,81 @@ export default function AddClient() {
       
       case 2:
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {!generatedInviteLink ? (
-              <div className="text-center py-8">
-                <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-full w-fit mx-auto mb-6">
-                  <UserPlus className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
-                  Ready to Generate Invite Link
-                </h3>
-                <p className="text-[color:var(--fc-text-dim)] mb-6">
-                  We'll create a personalized signup link for your client
-                </p>
-                
-                {/* Summary Card */}
-                <div className={`${theme.card} ${theme.shadow} rounded-xl p-6 mb-6 text-left`}>
-                  <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-4">Invite Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-[color:var(--fc-text-dim)]">Email:</span>
-                      <span className="font-medium text-[color:var(--fc-text-primary)]">{formData.email}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[color:var(--fc-text-dim)]">Expires in:</span>
-                      <span className="font-medium text-[color:var(--fc-text-primary)]">{formData.inviteExpiryDays} days</span>
-                    </div>
+              <div className="space-y-3">
+                <div className="text-xs text-[color:var(--fc-text-dim)] border border-[color:var(--fc-glass-border)] rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span className="text-[color:var(--fc-text-dim)]">Email</span>
+                    <span className="font-medium text-[color:var(--fc-text-primary)] truncate">{formData.email}</span>
+                  </div>
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span className="text-[color:var(--fc-text-dim)]">Expires</span>
+                    <span className="font-medium text-[color:var(--fc-text-primary)]">{formData.inviteExpiryDays} days</span>
                   </div>
                 </div>
-
                 <Button 
                   onClick={generateInviteLink}
                   disabled={loading}
-                  className={`${theme.primary} ${theme.shadow} px-8 py-3 text-lg`}
+                  size="sm"
+                  className={`${theme.primary} w-full h-9 text-sm`}
                 >
                   {loading ? (
                     <>
-                      <Clock className="w-5 h-5 mr-2 animate-spin" />
-                      Generating Invite Link...
+                      <Clock className="w-4 h-4 mr-2 animate-spin" />
+                      Generating…
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Generate Invite Link
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate invite link
                     </>
                   )}
                 </Button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {/* Success State */}
-                <div className="text-center">
-                  <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-fit mx-auto mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
-                    Invite Link Generated! 🎉
-                  </h3>
-                  <p className="text-[color:var(--fc-text-dim)]">
-                    Your client can now sign up using the link below
-                  </p>
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">
+                  Invite ready
+                </p>
+                <div className="fc-surface text-[color:var(--fc-text-primary)] p-3 rounded-lg break-all border border-[color:var(--fc-surface-card-border)]">
+                  <p className="text-xs font-mono select-all leading-relaxed">{generatedInviteLink}</p>
                 </div>
-
-                {/* Invite Link Display */}
-                <div className={`${theme.card} ${theme.shadow} rounded-xl p-6 border-2 border-purple-200 dark:border-purple-800`}>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-3">📋 Signup Link</p>
-                    <div className="fc-surface text-[color:var(--fc-text-primary)] p-4 rounded-lg mb-4 break-all border border-[color:var(--fc-surface-card-border)]">
-                      <p className="text-sm font-mono select-all">{generatedInviteLink}</p>
-                    </div>
-                    
-                    <Button 
-                      onClick={copyInviteLink}
-                      className={`${theme.primary} ${theme.shadow} mb-2 px-6 py-3 text-base font-semibold`}
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-5 h-5 mr-2" />
-                          Copied to Clipboard! ✓
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-5 h-5 mr-2" />
-                          Copy Link
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-[color:var(--fc-text-dim)] mt-2">
-                      Click the button above or select and copy the link manually
-                    </p>
-                  </div>
-                </div>
-
-                {/* Success Message */}
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    <span className="font-medium text-green-800 dark:text-green-200">Success!</span>
-                  </div>
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    An email with the invite link has been sent to {formData.email}
-                  </p>
-                </div>
-
-                {/* Next Steps */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-3">What happens next:</h4>
-                  <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="font-semibold">1.</span>
-                      <span>Client receives email with invite link</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-semibold">2.</span>
-                      <span>Client clicks link and is taken to signup page</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-semibold">3.</span>
-                      <span>Email is pre-filled, client just needs to set password</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-semibold">4.</span>
-                      <span>Client completes signup and joins your coaching program</span>
-                    </li>
-                  </ol>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
+                <Button 
+                  onClick={copyInviteLink}
+                  size="sm"
+                  className={`${theme.primary} w-full h-9 text-sm`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy link
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
+                  Share the link with your client. {formData.email}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-black/5 dark:border-white/5">
                   <Button 
                     onClick={resetForm} 
                     variant="outline" 
-                    className="flex-1"
+                    size="sm"
+                    className="flex-1 h-9 text-sm"
                   >
-                    Generate Another Link
+                    Another link
                   </Button>
                   <Button 
                     onClick={() => router.push('/coach/clients')} 
-                    className={`${theme.primary} flex-1`}
+                    size="sm"
+                    className={`${theme.primary} flex-1 h-9 text-sm`}
                   >
-                    View All Clients
+                    Clients
                   </Button>
                 </div>
               </div>
@@ -455,37 +384,34 @@ export default function AddClient() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-4 pb-32 pt-10 sm:px-6 space-y-8">
-          <header className="flex items-center gap-4 mb-10">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-4 pb-32 pt-4 sm:px-6 space-y-4">
+          <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
+            <h1 className="text-lg font-semibold fc-text-primary truncate">
+              Add client
+            </h1>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={() => router.push('/coach/clients')}
-              className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-white/10 transition-all"
+              className="h-8 text-xs px-2 shrink-0"
             >
-              <ArrowLeft className="w-6 h-6 fc-text-primary" />
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              Back
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Add New Client</h1>
-              <p className="text-sm fc-text-dim font-mono uppercase tracking-wider mt-1">Invite by email</p>
-            </div>
-          </header>
+          </div>
 
-          <GlassCard elevation={2} className="fc-glass fc-card rounded-3xl p-6 sm:p-8">
+          <div className="fc-glass fc-card rounded-xl border border-[color:var(--fc-glass-border)] p-4">
             <ProgressIndicator steps={steps} currentStep={currentStep} />
-            <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
-              <h2 className="text-lg font-semibold fc-text-primary mb-1">{steps[currentStep - 1]?.title}</h2>
-              <p className="text-sm fc-text-dim mb-6">
-                {currentStep === 1 ? "Enter the client's email address" : "Generate and send the invite link"}
-              </p>
-              <div className="space-y-6">
+            <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
+              <h2 className="text-sm font-semibold fc-text-primary">{steps[currentStep - 1]?.title}</h2>
+              <div className="space-y-3 mt-2">
                 {renderStepContent()}
               </div>
             </div>
-          </GlassCard>
+          </div>
 
           {currentStep < 2 && (
-            <div className="sticky bottom-0 left-0 right-0 fc-glass rounded-2xl border border-[color:var(--fc-glass-border)] p-4 flex items-center justify-between gap-4 -mx-4 sm:mx-0 sm:rounded-3xl">
+            <div className="sticky bottom-0 left-0 right-0 fc-glass rounded-xl border border-[color:var(--fc-glass-border)] p-3 flex items-center justify-between gap-3 -mx-4 sm:mx-0">
               <Button variant="ghost" onClick={() => router.push('/coach/clients')} className="fc-btn fc-btn-ghost">
                 Cancel
               </Button>

@@ -62,7 +62,7 @@ export interface WorkoutSetEntryExercise {
   reps?: string
   weight_kg?: number
   load_percentage?: number            // Percentage of 1RM for suggested weight
-  rir?: number                        // Reps in reserve
+  rir?: number                        // Prescribed RPE (1–10); DB column name is legacy
   tempo?: string                      // Tempo notation
   rest_seconds?: number               // Exercise-specific rest
   notes?: string

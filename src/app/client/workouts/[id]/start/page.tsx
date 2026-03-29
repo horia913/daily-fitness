@@ -3964,10 +3964,16 @@ export default function LiveWorkout() {
         "@/lib/clientProgressionService"
       );
 
+      const resolvedWorkoutAssignmentId = await resolveWorkoutAssignmentId(
+        assignment?.id || assignmentId,
+        user.id,
+      );
+
       const result = await getExercisePreviousPerformance(
         user.id,
         exerciseId,
-        workoutLogId || undefined
+        workoutLogId || undefined,
+        resolvedWorkoutAssignmentId,
       );
       console.log('[fetchPreviousPerformance] result.lastWorkout:', result?.lastWorkout);
       console.log('[fetchPreviousPerformance] result.personalBest:', result?.personalBest);
@@ -4027,42 +4033,15 @@ export default function LiveWorkout() {
           />
 
           <ClientPageShell
-            className="max-w-2xl mx-auto flex flex-col gap-5 min-h-screen pb-32"
+            className={
+              useBlockSystem && workoutBlocks.length > 0
+                ? "max-w-2xl mx-auto flex min-h-screen flex-col gap-3 pb-32 pt-[calc(env(safe-area-inset-top,0px)+12px)] sm:gap-4"
+                : "max-w-2xl mx-auto flex min-h-screen flex-col gap-5 pb-32"
+            }
             style={{ gap: "var(--fc-gap-sections)" }}
           >
-              {/* Header: symmetric (X | Current Block | Placeholder) when block system; else legacy */}
-              {useBlockSystem && workoutBlocks.length > 0 ? (
-                <div className="flex items-center justify-between mb-3">
-                  <button
-                    onClick={() => {
-                      if (
-                        typeof window !== "undefined" &&
-                        window.confirm("Exit workout? Progress is saved.")
-                      ) {
-                        router.push("/client/train");
-                      }
-                    }}
-                    className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
-                    aria-label="Exit workout"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <div className="text-center min-w-0 flex-1 px-2">
-                    <span className="text-sm font-semibold fc-text-primary truncate block">
-                      {(() => {
-                        const block = workoutBlocks[currentBlockIndex];
-                        const type =
-                          (block?.block?.set_type as WorkoutBlockType) ||
-                          "straight_set";
-                        const typeName =
-                          WORKOUT_BLOCK_CONFIGS[type]?.name ?? "Straight Set";
-                        return `${typeName} (${currentBlockIndex + 1} of ${workoutBlocks.length})`;
-                      })()}
-                    </span>
-                  </div>
-                  <div className="w-9 h-9 flex-shrink-0" aria-hidden />
-                </div>
-              ) : (
+              {/* Block system: back + title live in BaseBlockExecutorLayout */}
+              {(!useBlockSystem || workoutBlocks.length === 0) && (
                 <div className="flex items-center gap-3 mb-3">
                   <button
                     onClick={() => router.push("/client/train")}
@@ -4095,11 +4074,11 @@ export default function LiveWorkout() {
                   <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                 </div>
               ) : assignment && !contentReady ? (
-                <ClientGlassCard className="p-8 text-center">
-                  <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 fc-text-dim" />
-                  <p className="text-sm font-medium fc-text-primary mb-1">Loading exercises…</p>
+                <div className="border-b border-white/5 py-8 text-center">
+                  <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin fc-text-dim" />
+                  <p className="mb-1 text-sm font-medium fc-text-primary">Loading exercises…</p>
                   <p className="text-xs fc-text-dim">This may take a few seconds.</p>
-                </ClientGlassCard>
+                </div>
               ) : useBlockSystem && workoutBlocks.length > 0 ? (
                 <>
                   {/* Calculate overall progress */}
@@ -4157,12 +4136,13 @@ export default function LiveWorkout() {
                     );
                   })()}
 
-                  {/* Spacer to prevent content from being hidden behind the progress bar */}
-                  <div className="h-16" aria-hidden="true" />
+                  {/* Flow gap below fixed progress bar so first content isn’t tight to the track */}
+                  <div className="h-2 w-full shrink-0" aria-hidden />
 
+                  <div className="w-full">
                   {/* Block Progress Indicator */}
                   {workoutBlocks.length > 1 && (
-                    <div className="mb-3">
+                    <div className="mb-2 mt-1">
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                         {workoutBlocks.map((block, index) => {
                           const isCompleted =
@@ -4265,6 +4245,14 @@ export default function LiveWorkout() {
                         setAchievementModalIndex(0);
                       }
                     }}
+                    onExitWorkout={() => {
+                      if (
+                        typeof window !== "undefined" &&
+                        window.confirm("Exit workout? Progress is saved.")
+                      ) {
+                        router.push("/client/train");
+                      }
+                    }}
                   />
                   {/* Complete Workout Button - Only show on last block when complete */}
                   {isLastBlockComplete &&
@@ -4293,6 +4281,7 @@ export default function LiveWorkout() {
                         </PrimaryButton>
                       </div>
                     )}
+                  </div>
                 </>
               ) : /* Traditional Workout System */
               loading ? (
@@ -5316,7 +5305,7 @@ export default function LiveWorkout() {
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    RIR: {Number(currentExercise.rir)}
+                                    RPE: {Number(currentExercise.rir)}
                                   </span>
                                 </div>
                               )}
@@ -5599,7 +5588,7 @@ export default function LiveWorkout() {
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    RIR: {Number(currentExercise.rir)}
+                                    RPE: {Number(currentExercise.rir)}
                                   </span>
                                 </div>
                               )}
@@ -6128,7 +6117,7 @@ export default function LiveWorkout() {
                                     <span
                                       className={`text-xs font-semibold ${theme.text}`}
                                     >
-                                      RIR: {Number(currentExercise.rir)}
+                                      RPE: {Number(currentExercise.rir)}
                                     </span>
                                   </div>
                                 )}
@@ -6616,7 +6605,7 @@ export default function LiveWorkout() {
                                   currentExercise?.rir === 0) && (
                                   <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-warning)]/20">
                                     <span className="text-sm font-semibold text-[color:var(--fc-status-warning)]">
-                                      RIR: {Number(currentExercise.rir)}
+                                      RPE: {Number(currentExercise.rir)}
                                     </span>
                                   </div>
                                 )}

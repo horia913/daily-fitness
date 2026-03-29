@@ -624,7 +624,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               })}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="flex flex-col border-y border-white/5">
               {filteredAndSortedExercises.map(exercise => {
                 const IconComponent = categoryIcons[exercise.category as keyof typeof categoryIcons] || Dumbbell
                 const primaryMuscle = exercise.muscle_groups?.[0] ?? exercise.category ?? '—'
@@ -632,7 +632,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 return (
                   <Card
                     key={exercise.id}
-                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300"
+                    className="rounded-none border-0 border-b border-white/5 bg-transparent shadow-none transition-colors hover:bg-white/[0.02]"
                   >
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-3 sm:gap-4">

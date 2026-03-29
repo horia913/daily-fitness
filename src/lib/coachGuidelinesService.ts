@@ -49,6 +49,7 @@ export interface VolumeGuideline {
   setsPerMuscleWeekMax: number;
   repsPerSetMin: number;
   repsPerSetMax: number;
+  /** DB columns `rir_min` / `rir_max`: treat as prescribed RPE range (1–10) after data backfill. */
   rirMin: number;
   rirMax: number;
   loadPercentMin: number;

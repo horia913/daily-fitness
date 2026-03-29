@@ -3548,6 +3548,22 @@ function ProgramCreateForm({
                         programId={program.id}
                         programScheduleId={selectedScheduleForProgression.id || `temp-${selectedScheduleForProgression.template_id}-${selectedScheduleForProgression.program_day}`}
                         weekNumber={selectedWeek}
+                        trainingBlockId={
+                          selectedScheduleForProgression.training_block_id ??
+                          undefined
+                        }
+                        blockSchedules={schedule
+                          .filter(
+                            (s) =>
+                              s.program_day ===
+                                selectedScheduleForProgression.program_day &&
+                              s.training_block_id ===
+                                selectedScheduleForProgression.training_block_id,
+                          )
+                          .map((s) => ({
+                            id: s.id,
+                            week_number: s.week_number,
+                          }))}
                         exercises={exercises}
                         templates={templates}
                         onUpdate={() => {

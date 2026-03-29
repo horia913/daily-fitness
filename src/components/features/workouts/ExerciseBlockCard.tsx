@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import ExerciseItem from "./ExerciseItem";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 
 interface ExerciseBlockCardProps {
   exercise: any; // WorkoutTemplateExercise with all its data
@@ -39,6 +40,8 @@ interface ExerciseBlockCardProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   children?: React.ReactNode;
+  /** Tighter padding in template editor */
+  compact?: boolean;
 }
 
 // Block type styles with colors and icons
@@ -122,6 +125,7 @@ export default function ExerciseBlockCard({
   isExpanded = true,
   onToggleExpand,
   children,
+  compact = false,
 }: ExerciseBlockCardProps) {
   const isCollapsible =
     renderMode === "form" && onToggleExpand != null;
@@ -305,7 +309,11 @@ export default function ExerciseBlockCard({
           details.push(`${exercise.load_percentage}% load`);
         if (exercise.rest_seconds)
           details.push(`${exercise.rest_seconds}s rest`);
-        if (exercise.rir) details.push(`RIR: ${exercise.rir}`);
+        if (exercise.rir != null && exercise.rir !== "") {
+          details.push(
+            formatPrescribedRpeLabel(exercise.rir) ?? `RPE ${String(exercise.rir).trim()}`,
+          );
+        }
         if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);
         if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
         if (exercise.duration_seconds)
@@ -480,12 +488,14 @@ export default function ExerciseBlockCard({
       draggable={draggable}
       onDragStart={(e) => draggable && onDragStart?.(e, exercise.id)}
       onDragEnd={draggable ? onDragEnd : undefined}
-      className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-3 sm:p-5 transition-all duration-200 fc-hover-rise w-full ${
-        draggable ? "cursor-move" : ""
-      } ${isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent-cyan)]/30" : ""}`}
+      className={`fc-glass fc-card border border-[color:var(--fc-glass-border)] transition-all duration-200 fc-hover-rise w-full ${
+        compact ? "rounded-lg p-3" : "rounded-2xl p-3 sm:p-5"
+      } ${draggable ? "cursor-move" : ""} ${
+        isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent-cyan)]/30" : ""
+      }`}
     >
       <div
-        className={`flex items-start justify-between gap-3 ${isCollapsible ? "cursor-pointer min-h-11" : ""}`}
+        className={`flex items-start justify-between gap-2 sm:gap-3 ${isCollapsible ? `cursor-pointer ${compact ? "min-h-9" : "min-h-11"}` : ""}`}
         onClick={isCollapsible ? onToggleExpand : undefined}
         role={isCollapsible ? "button" : undefined}
         tabIndex={isCollapsible ? 0 : undefined}
@@ -588,7 +598,7 @@ export default function ExerciseBlockCard({
 
       {/* Nested exercises for complex set entries */}
       {showNestedExercises && (
-        <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] space-y-3">
+        <div className={`${compact ? "mt-2 pt-2 space-y-2" : "mt-4 pt-4 space-y-3"} border-t border-[color:var(--fc-glass-border)]`}>
           {/* Group exercises by sets for tabata */}
           {exerciseType === "tabata" && exercise.tabata_sets
             ? exercise.tabata_sets.map((set: any, setIndex: number) => (
@@ -689,7 +699,7 @@ export default function ExerciseBlockCard({
       )}
 
       {showExpanded && children && (
-        <div className="mt-5 pt-5 border-t border-[color:var(--fc-glass-border)]">
+        <div className={`border-t border-[color:var(--fc-glass-border)] ${compact ? "mt-2 pt-2" : "mt-5 pt-5"}`}>
           {children}
         </div>
       )}

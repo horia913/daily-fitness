@@ -13,19 +13,16 @@ interface WorkoutProgressBarProps {
   setTypeName?: string;
 }
 
+/**
+ * Thin fixed workout progress line only (no overlapping header text).
+ * Block / set context lives in BaseBlockExecutorLayout.
+ */
 export function WorkoutProgressBar({
-  currentBlockIndex,
-  totalBlocks,
-  currentSetNumber,
-  totalSetsInBlock,
   overallProgress,
-  blockName,
-  setTypeName,
 }: WorkoutProgressBarProps) {
   const [isPulsing, setIsPulsing] = useState(false);
   const [prevProgress, setPrevProgress] = useState(overallProgress);
 
-  // Pulse animation when progress changes
   useEffect(() => {
     if (overallProgress !== prevProgress && overallProgress > prevProgress) {
       setIsPulsing(true);
@@ -39,56 +36,35 @@ export function WorkoutProgressBar({
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[9999] transition-all duration-300"
+      className="pointer-events-none fixed left-0 right-0 z-[9999] transition-all duration-300"
       style={{
         paddingTop: "env(safe-area-inset-top, 0)",
-        background: "color-mix(in srgb, var(--fc-app-bg) 95%, transparent)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        borderBottom: "1px solid color-mix(in srgb, var(--fc-surface-card-border) 30%, transparent)",
+        /* One bar only: avoid border + track edge reading as “double lines” */
+        background: "color-mix(in srgb, var(--fc-app-bg) 92%, transparent)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
       }}
     >
-      <div className="px-4 py-2">
-        {/* Text row */}
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-2 text-xs font-medium fc-text-dim">
-            <span>
-              {setTypeName ?? "Set"} ({currentBlockIndex + 1} of {totalBlocks})
-            </span>
-            <span>•</span>
-            <span>
-              Set {currentSetNumber} of {totalSetsInBlock}
-            </span>
-            {blockName && (
-              <>
-                <span>•</span>
-                <span className="fc-text-primary">{blockName}</span>
-              </>
-            )}
-          </div>
-          <div
-            className={`text-xs font-bold font-mono tabular-nums text-cyan-400 transition-transform duration-300 ${
-              isPulsing ? "scale-110" : "scale-100"
-            }`}
-          >
-            {Math.round(clampedProgress)}%
-          </div>
-        </div>
-
-        {/* Progress bar */}
+      <div
+        className={`h-1 overflow-hidden transition-transform duration-300 ${
+          isPulsing ? "opacity-90" : "opacity-100"
+        }`}
+        style={{
+          background:
+            "color-mix(in srgb, var(--fc-surface-card-border) 18%, transparent)",
+        }}
+        role="progressbar"
+        aria-valuenow={Math.round(clampedProgress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Workout progress"
+      >
         <div
-          className="h-1 rounded-full overflow-hidden"
+          className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-cyan-600 to-cyan-400"
           style={{
-            background: "color-mix(in srgb, var(--fc-surface-card-border) 20%, transparent)",
+            width: `${clampedProgress}%`,
           }}
-        >
-          <div
-            className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-cyan-600 to-cyan-400"
-            style={{
-              width: `${clampedProgress}%`,
-            }}
-          />
-        </div>
+        />
       </div>
     </div>
   );

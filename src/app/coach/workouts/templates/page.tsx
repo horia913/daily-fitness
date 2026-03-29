@@ -11,7 +11,6 @@ import WorkoutTemplateService, {
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,10 +27,6 @@ import {
   Grid3X3,
   List,
   Search,
-  Clock,
-  BarChart3,
-  Users,
-  Edit,
   Copy as CopyIcon,
   Trash2,
   X,
@@ -318,19 +313,6 @@ export default function WorkoutTemplatesPage() {
     clients,
   ]);
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "beginner":
-        return getSemanticColor("success").primary;
-      case "intermediate":
-        return getSemanticColor("warning").primary;
-      case "advanced":
-        return getSemanticColor("critical").primary;
-      default:
-        return getSemanticColor("neutral").primary;
-    }
-  };
-
   if (!coachId) {
     return (
       <AnimatedBackground>
@@ -389,29 +371,64 @@ export default function WorkoutTemplatesPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
 
         <div className="relative z-10 min-h-screen pb-32">
-          {/* Back to Programs */}
-          <div className="max-w-6xl mx-auto px-4 pt-4 sm:px-6">
-            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-2">
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Programs
+          <div className="max-w-6xl mx-auto px-4 pt-3 sm:px-6 sm:pt-4">
+            <Link
+              href="/coach/training"
+              className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              Training
             </Link>
+            <div className="flex min-h-12 items-center justify-between gap-3">
+              <h1 className="text-lg font-semibold fc-text-primary sm:text-xl">
+                Workout Templates
+              </h1>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => coachId && refetch()}
+                >
+                  <RefreshCw className="w-4 h-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                <Link href="/coach/workouts/templates/create">
+                  <Button size="sm" className="fc-btn fc-btn-primary h-9">
+                    <Plus className="w-4 h-4 sm:mr-1.5" />
+                    Create Template
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            {templates.length > 0 && (
+              <p className="mt-1 text-sm text-gray-400">
+                {templates.length} template{templates.length !== 1 ? "s" : ""} ·{" "}
+                {Object.values(assignmentCountByTemplate).reduce((a, b) => a + b, 0)}{" "}
+                assignment
+                {Object.values(assignmentCountByTemplate).reduce((a, b) => a + b, 0) !== 1
+                  ? "s"
+                  : ""}{" "}
+                · {filteredAndSortedTemplates.length} showing
+              </p>
+            )}
           </div>
-          {/* Sticky search bar */}
-          <nav className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] backdrop-blur-md px-4 py-4 sm:px-6">
-            <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 items-center">
-              <div className="relative w-full md:flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 fc-text-dim pointer-events-none" />
+
+          <nav className="sticky top-0 z-50 border-b border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg-deep)]/80 backdrop-blur-md px-4 py-2 sm:px-6">
+            <div className="max-w-6xl mx-auto flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <div className="relative w-full sm:flex-1 sm:min-w-0">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 fc-text-dim pointer-events-none" />
                 <Input
                   type="text"
                   placeholder="Search templates..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full h-12 pl-12 pr-4 fc-glass border border-[color:var(--fc-glass-border)] rounded-xl fc-text-primary placeholder:fc-text-dim focus:ring-2 focus:ring-[color:var(--fc-domain-workouts)]/50"
+                  className="h-10 w-full rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] pl-9 pr-3 text-sm fc-text-primary placeholder:fc-text-dim"
                 />
               </div>
-              <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide">
+              <div className="flex flex-wrap items-center gap-2">
                 <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                  <SelectTrigger className="h-12 fc-glass border border-[color:var(--fc-glass-border)] rounded-xl w-[180px]">
+                  <SelectTrigger className="h-10 w-full min-w-[140px] sm:w-[160px] rounded-lg border border-[color:var(--fc-glass-border)] text-sm">
                     <SelectValue placeholder="Difficulty" />
                   </SelectTrigger>
                   <SelectContent>
@@ -421,179 +438,8 @@ export default function WorkoutTemplatesPage() {
                     <SelectItem value="advanced">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-          </nav>
-
-          <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 space-y-6">
-            {/* Header */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: getSemanticColor("trust").gradient,
-                      boxShadow: `0 4px 12px ${
-                        getSemanticColor("trust").primary
-                      }30`,
-                    }}
-                  >
-                    <Dumbbell className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Template Library
-                    </span>
-                    <h1 className="mt-3 text-2xl font-bold fc-text-primary">
-                      Workout Templates
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Create and manage templates for your clients.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      if (coachId) {
-                        refetch();
-                      }
-                    }}
-                    className="fc-btn fc-btn-ghost"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                  </Button>
-                  <Link href="/coach/workouts/templates/create">
-                    <Button className="fc-btn fc-btn-primary">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Template
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "var(--fc-surface-sunken)",
-                    }}
-                  >
-                    <Dumbbell
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("trust").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={templates.length}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Total Templates
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "var(--fc-surface-sunken)",
-                    }}
-                  >
-                    <Users
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("success").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={Object.values(assignmentCountByTemplate).reduce(
-                        (a, b) => a + b,
-                        0
-                      )}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Active Assignments
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "var(--fc-surface-sunken)",
-                    }}
-                  >
-                    <BarChart3
-                      className="w-6 h-6"
-                      style={{ color: getSemanticColor("warning").primary }}
-                    />
-                  </div>
-                  <div>
-                    <AnimatedNumber
-                      value={filteredAndSortedTemplates.length}
-                      className="text-2xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Showing Now
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Filters and Search */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim"
-                  />
-                  <Input
-                    placeholder="Search templates..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select
-                  value={selectedDifficulty}
-                  onValueChange={setSelectedDifficulty}
-                >
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Difficulty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Difficulties</SelectItem>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={selectedDuration}
-                  onValueChange={setSelectedDuration}
-                >
-                  <SelectTrigger className="w-full sm:w-48">
+                <Select value={selectedDuration} onValueChange={setSelectedDuration}>
+                  <SelectTrigger className="h-10 w-full min-w-[140px] sm:w-[160px] rounded-lg border border-[color:var(--fc-glass-border)] text-sm">
                     <SelectValue placeholder="Duration" />
                   </SelectTrigger>
                   <SelectContent>
@@ -603,16 +449,15 @@ export default function WorkoutTemplatesPage() {
                     <SelectItem value="long">Long (&gt; 60 min)</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <Button
                     variant={viewMode === "grid" ? "default" : "outline"}
                     onClick={() => setViewMode("grid")}
                     size="sm"
+                    className="h-9 w-9 p-0"
                     style={
                       viewMode === "grid"
-                        ? {
-                            background: getSemanticColor("trust").gradient,
-                          }
+                        ? { background: getSemanticColor("trust").gradient }
                         : undefined
                     }
                   >
@@ -622,11 +467,10 @@ export default function WorkoutTemplatesPage() {
                     variant={viewMode === "list" ? "default" : "outline"}
                     onClick={() => setViewMode("list")}
                     size="sm"
+                    className="h-9 w-9 p-0"
                     style={
                       viewMode === "list"
-                        ? {
-                            background: getSemanticColor("trust").gradient,
-                          }
+                        ? { background: getSemanticColor("trust").gradient }
                         : undefined
                     }
                   >
@@ -635,6 +479,9 @@ export default function WorkoutTemplatesPage() {
                 </div>
               </div>
             </div>
+          </nav>
+
+          <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 sm:py-4 space-y-3">
 
             {/* Templates List */}
             {filteredAndSortedTemplates.length === 0 ? (
@@ -666,49 +513,90 @@ export default function WorkoutTemplatesPage() {
                 }
               />
             ) : (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                    : "space-y-4"
-                }
-              >
-                {filteredAndSortedTemplates.map((template) => (
-                  <WorkoutTemplateCard
-                    key={template.id}
-                    template={template}
-                    assignmentCount={
-                      assignmentCountByTemplate[template.id] || 0
-                    }
-                    onEdit={() => {
-                      router.push(
-                        `/coach/workouts/templates/${template.id}/edit`
-                      );
-                    }}
-                    onOpenDetails={() => {
-                      router.push(`/coach/workouts/templates/${template.id}`);
-                    }}
-                    onDelete={() => {
-                      if (confirm("Delete this template?")) {
-                        WorkoutTemplateService.deleteWorkoutTemplate(
-                          template.id
-                        ).then(() => {
-                          refetch();
-                        });
+              <>
+                <div className="sm:hidden divide-y divide-[color:var(--fc-glass-border)]/50 border-t border-b border-[color:var(--fc-glass-border)]/50">
+                  {filteredAndSortedTemplates.map((template) => (
+                    <WorkoutTemplateCard
+                      key={template.id}
+                      layout="row"
+                      template={template}
+                      assignmentCount={
+                        assignmentCountByTemplate[template.id] || 0
                       }
-                    }}
-                    onDuplicate={async () => {
-                      const dup =
-                        await WorkoutTemplateService.duplicateWorkoutTemplate(
-                          template.id,
-                          `${template.name} (Copy)`
+                      onEdit={() => {
+                        router.push(
+                          `/coach/workouts/templates/${template.id}/edit`
                         );
-                      if (dup) refetch();
-                    }}
-                    onAssign={() => openAssignModal(template.id)}
-                  />
-                ))}
-              </div>
+                      }}
+                      onOpenDetails={() => {
+                        router.push(`/coach/workouts/templates/${template.id}`);
+                      }}
+                      onDelete={() => {
+                        if (confirm("Delete this template?")) {
+                          WorkoutTemplateService.deleteWorkoutTemplate(
+                            template.id
+                          ).then(() => {
+                            refetch();
+                          });
+                        }
+                      }}
+                      onDuplicate={async () => {
+                        const dup =
+                          await WorkoutTemplateService.duplicateWorkoutTemplate(
+                            template.id,
+                            `${template.name} (Copy)`
+                          );
+                        if (dup) refetch();
+                      }}
+                      onAssign={() => openAssignModal(template.id)}
+                    />
+                  ))}
+                </div>
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                      : "hidden sm:flex sm:flex-col sm:divide-y sm:divide-[color:var(--fc-glass-border)]/50 sm:border-t sm:border-b sm:border-[color:var(--fc-glass-border)]/50"
+                  }
+                >
+                  {filteredAndSortedTemplates.map((template) => (
+                    <WorkoutTemplateCard
+                      key={template.id}
+                      layout={viewMode === "list" ? "row" : "card"}
+                      template={template}
+                      assignmentCount={
+                        assignmentCountByTemplate[template.id] || 0
+                      }
+                      onEdit={() => {
+                        router.push(
+                          `/coach/workouts/templates/${template.id}/edit`
+                        );
+                      }}
+                      onOpenDetails={() => {
+                        router.push(`/coach/workouts/templates/${template.id}`);
+                      }}
+                      onDelete={() => {
+                        if (confirm("Delete this template?")) {
+                          WorkoutTemplateService.deleteWorkoutTemplate(
+                            template.id
+                          ).then(() => {
+                            refetch();
+                          });
+                        }
+                      }}
+                      onDuplicate={async () => {
+                        const dup =
+                          await WorkoutTemplateService.duplicateWorkoutTemplate(
+                            template.id,
+                            `${template.name} (Copy)`
+                          );
+                        if (dup) refetch();
+                      }}
+                      onAssign={() => openAssignModal(template.id)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

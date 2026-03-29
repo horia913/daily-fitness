@@ -433,13 +433,12 @@ export default function ClientDashboard() {
             )}
           </section>
 
-          {/* Section 4: Today's Quick Actions */}
-          <section className="mb-6">
-            <ClientGlassCard className="p-4">
+          {/* Section 4: Today — flat row */}
+          <section className="mb-6 border-b border-white/5 pb-4">
               {todaysWorkout?.hasWorkout ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold fc-text-primary mb-1">
+                <div className="flex min-h-[48px] items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold fc-text-primary">
                       Today: {todaysWorkout.name || "Workout"}
                       {todaysWorkout.type === "program" &&
                         todaysWorkout.weekNumber &&
@@ -451,22 +450,21 @@ export default function ClientDashboard() {
                     </p>
                   </div>
                   <Link href="/client/train">
-                    <button className="flex items-center gap-1.5 text-sm font-semibold fc-text-primary hover:opacity-80 transition-opacity">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold fc-text-primary hover:opacity-80">
                       Go to Training
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
                   </Link>
                 </div>
               ) : (
-                <div className="text-center py-3">
-                  <Coffee className="w-6 h-6 mx-auto mb-2 fc-text-dim" />
+                <div className="py-2 text-center">
+                  <Coffee className="mx-auto mb-1 h-5 w-5 fc-text-dim" />
                   <p className="text-sm font-semibold fc-text-primary">Rest Day</p>
-                  <p className="text-xs fc-text-dim mt-1">
+                  <p className="mt-0.5 text-xs fc-text-dim">
                     Recovery is when the magic happens. Stay hydrated.
                   </p>
                 </div>
               )}
-            </ClientGlassCard>
           </section>
 
           {/* Section 5: Daily Check-in Card */}

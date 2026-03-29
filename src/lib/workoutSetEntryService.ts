@@ -22,18 +22,43 @@ export class WorkoutSetEntryService {
   >()
   private static readonly CACHE_TTL_MS = 30 * 1000
 
-  private static getCachedBlocks(templateId: string): WorkoutSetEntry[] | null {
-    const cached = this.blocksCache.get(templateId)
+  /** Lite vs full payloads differ (special tables skipped in lite); never share one cache entry. */
+  private static blocksCacheKey(templateId: string, lite: boolean): string {
+    return `${templateId}:${lite ? 'lite' : 'full'}`
+  }
+
+  private static getCachedBlocks(
+    templateId: string,
+    lite: boolean
+  ): WorkoutSetEntry[] | null {
+    const key = this.blocksCacheKey(templateId, lite)
+    const cached = this.blocksCache.get(key)
     if (!cached) return null
     if (Date.now() - cached.fetchedAt > this.CACHE_TTL_MS) {
-      this.blocksCache.delete(templateId)
+      this.blocksCache.delete(key)
       return null
     }
     return cached.data
   }
 
-  private static setCachedBlocks(templateId: string, data: WorkoutSetEntry[]) {
-    this.blocksCache.set(templateId, { data, fetchedAt: Date.now() })
+  private static setCachedBlocks(
+    templateId: string,
+    lite: boolean,
+    data: WorkoutSetEntry[]
+  ) {
+    this.blocksCache.set(this.blocksCacheKey(templateId, lite), {
+      data,
+      fetchedAt: Date.now(),
+    })
+  }
+
+  /** Drop cached blocks so schedule/template edits refetch instead of reusing stale lite payloads */
+  static clearBlocksCacheForTemplates(templateIds: string[]) {
+    const ids = [...new Set(templateIds.filter(Boolean))]
+    for (const id of ids) {
+      this.blocksCache.delete(this.blocksCacheKey(id, true))
+      this.blocksCache.delete(this.blocksCacheKey(id, false))
+    }
   }
 
   /** Chunk array to avoid Supabase/Postgres statement timeouts on large .in() lists */
@@ -143,12 +168,17 @@ export class WorkoutSetEntryService {
       const chunks = this.chunk(blockIds, this.QUERY_CHUNK_SIZE)
       const label = `[buildBlocks] queryTableInChunks ${tableName} ${buildRunId}`
       if (process.env.NODE_ENV !== 'production') console.time(label)
-      const allData: any[] = []
-      for (const chunkIds of chunks) {
-        const result = await safeQuery(
-          () => supabase.from(tableName).select(select).in('set_entry_id', chunkIds),
-          tableName
+      const chunkResults = await Promise.all(
+        chunks.map((chunkIds) =>
+          safeQuery(
+            () =>
+              supabase.from(tableName).select(select).in('set_entry_id', chunkIds),
+            tableName
+          )
         )
+      )
+      const allData: any[] = []
+      for (const result of chunkResults) {
         if (result.data?.length) allData.push(...result.data)
         if (result.error && result.error.code !== '57014') {
           if (process.env.NODE_ENV !== 'production') console.timeEnd(label)
@@ -465,7 +495,8 @@ export class WorkoutSetEntryService {
   static async getWorkoutBlocks(templateId: string, options?: { lite?: boolean }): Promise<WorkoutSetEntry[]> {
     const getBlocksRunId = this.nextRunId()
     try {
-      const cached = this.getCachedBlocks(templateId)
+      const lite = options?.lite === true
+      const cached = this.getCachedBlocks(templateId, lite)
       if (cached) return cached
       if (process.env.NODE_ENV !== 'production') console.time(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
       const { ensureAuthenticated } = await import('./supabase')
@@ -484,7 +515,7 @@ export class WorkoutSetEntryService {
       }
 
       const enriched = await this.buildBlocksForTemplates(blocks, options)
-      this.setCachedBlocks(templateId, enriched)
+      this.setCachedBlocks(templateId, lite, enriched)
       if (process.env.NODE_ENV !== 'production') {
         console.timeEnd(`[WorkoutSetEntryService] getWorkoutBlocks ${getBlocksRunId}`)
         console.log('[WorkoutSetEntryService] getWorkoutBlocks set entries:', blocks.length, 'enriched:', enriched?.length ?? 0)
@@ -502,9 +533,10 @@ export class WorkoutSetEntryService {
     const uniqueIds = Array.from(new Set(templateIds.filter(Boolean)))
     if (uniqueIds.length === 0) return result
 
+    const lite = options?.lite === true
     const uncachedTemplateIds: string[] = []
     uniqueIds.forEach((templateId) => {
-      const cached = this.getCachedBlocks(templateId)
+      const cached = this.getCachedBlocks(templateId, lite)
       if (cached) {
         result.set(templateId, cached)
       } else {
@@ -555,7 +587,7 @@ export class WorkoutSetEntryService {
         const templateBlocks = (blocksByTemplate.get(templateId) || []).sort(
           (a, b) => (a.set_order ?? 0) - (b.set_order ?? 0)
         )
-        this.setCachedBlocks(templateId, templateBlocks)
+        this.setCachedBlocks(templateId, lite, templateBlocks)
         result.set(templateId, templateBlocks)
       })
 
@@ -596,6 +628,7 @@ export class WorkoutSetEntryService {
       if (exerciseData.weight_kg !== undefined && exerciseData.weight_kg !== null) {
         insertData.weight_kg = exerciseData.weight_kg
       }
+      // Column `rir` stores prescribed RPE (1–10), not reps in reserve.
       if (exerciseData.rir !== undefined && exerciseData.rir !== null) {
         insertData.rir = exerciseData.rir
       }

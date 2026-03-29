@@ -424,7 +424,7 @@ export default function WorkoutBlockBuilder({
                                 <span>Tempo: {exercise.tempo}</span>
                               )}
                               {exercise.rir != null && (
-                                <span>RIR: {exercise.rir}</span>
+                                <span>RPE: {exercise.rir}</span>
                               )}
                               {exercise.rest_seconds != null && (
                                 <span>Rest: {exercise.rest_seconds}s</span>

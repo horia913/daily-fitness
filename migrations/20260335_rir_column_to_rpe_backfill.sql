@@ -1,0 +1,8 @@
+-- Historical note only — do NOT run against databases that already store RPE in `rir`.
+--
+-- A one-time migration used to flip legacy RIR values to RPE with:
+--   UPDATE ... SET rir = 10 - rir WHERE rir IS NOT NULL;
+-- Running that after data is already RPE will corrupt values (e.g. 8 → 2).
+--
+-- Removed executable statements intentionally. Apply any backfill only with an explicit,
+-- environment-specific plan.

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { ClientGlassCard } from "@/components/client-ui";
 import { Activity, Clock, TrendingUp, Plus, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import {
@@ -63,10 +62,9 @@ export function ActivityWeekSummary({
           </p>
         </button>
       ) : (
-        <ClientGlassCard className="p-3">
-          {/* Summary header */}
+        <div className="flex flex-col border-y border-white/5">
           {activities.length > 0 && (
-            <div className="flex items-center gap-4 mb-2 pb-2 border-b border-[color:var(--fc-glass-border)]">
+            <div className="flex items-center gap-4 border-b border-white/5 py-2">
               <span className="text-xs fc-text-dim flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 <span className="text-cyan-400 font-bold tabular-nums">{activities.length}</span>
@@ -80,8 +78,7 @@ export function ActivityWeekSummary({
             </div>
           )}
 
-          {/* Activity list */}
-          <div className="space-y-1.5">
+          <div>
             {displayed.map((a) => {
               const meta =
                 ACTIVITY_META[a.activity_type] ?? ACTIVITY_META.custom;
@@ -92,7 +89,7 @@ export function ActivityWeekSummary({
               return (
                 <div
                   key={a.id}
-                  className="flex items-center gap-2.5 py-1"
+                  className="flex min-h-[44px] items-center gap-2.5 border-b border-white/5 py-2 last:border-b-0"
                 >
                   <span className="text-base shrink-0">{meta.icon}</span>
                   <span className="text-sm font-medium fc-text-primary flex-1 truncate">
@@ -110,13 +107,13 @@ export function ActivityWeekSummary({
           {hasMore && (
             <Link
               href="/client/activity"
-              className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-[color:var(--fc-glass-border)] text-xs font-medium text-cyan-500 hover:text-cyan-400 transition-colors"
+              className="mt-0 flex items-center justify-center gap-1 border-t border-white/5 py-2 text-xs font-medium text-cyan-500 transition-colors hover:text-cyan-400"
             >
               View all {activities.length} activities
               <ChevronRight className="w-3 h-3" />
             </Link>
           )}
-        </ClientGlassCard>
+        </div>
       )}
     </div>
   );

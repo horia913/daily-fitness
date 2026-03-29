@@ -140,7 +140,7 @@ function StepIndicator({ current, step }: { current: Step; step: number }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
           done
             ? "bg-[color:var(--fc-status-success)] text-white"
             : active
@@ -600,89 +600,77 @@ export default function GeneratorPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-w-0 overflow-x-hidden px-4 sm:px-6 py-6 pb-32 max-w-5xl mx-auto space-y-6">
+        <div className="relative z-10 min-w-0 overflow-x-hidden px-4 sm:px-6 py-4 pb-32 max-w-5xl mx-auto space-y-4">
 
-          {/* Back link */}
-          <Link
-            href="/coach/nutrition"
-            className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Nutrition
-          </Link>
+          <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
+            <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">
+              Meal plan generator
+            </h1>
+            <Link
+              href="/coach/nutrition"
+              className="shrink-0 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)] inline-flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back
+            </Link>
+          </div>
 
-          {/* Page header */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
-                <Sparkles className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">Meal Plan Generator</h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Auto-generate a full-day meal plan with multiple options per meal
-                </p>
-              </div>
-            </div>
-
-            {/* Step indicators */}
-            <div className="flex items-center gap-3 mt-6">
-              {stepLabels.map((label, i) => (
-                <React.Fragment key={label}>
-                  <div className="flex items-center gap-2">
-                    <StepIndicator current={step} step={i + 1} />
-                    <span className={`text-sm font-medium ${step === i + 1 ? "text-[color:var(--fc-text-primary)]" : "text-[color:var(--fc-text-dim)]"}`}>
-                      {label}
-                    </span>
-                  </div>
-                  {i < stepLabels.length - 1 && (
-                    <div className="flex-1 h-px bg-[color:var(--fc-glass-border)]" />
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-          </GlassCard>
+          <div className="flex flex-wrap items-center gap-2 border-t border-black/5 dark:border-white/5 pt-3">
+            {stepLabels.map((label, i) => (
+              <React.Fragment key={label}>
+                <div className="flex items-center gap-1.5">
+                  <StepIndicator current={step} step={i + 1} />
+                  <span className={`text-xs font-medium ${step === i + 1 ? "text-[color:var(--fc-text-primary)]" : "text-[color:var(--fc-text-dim)]"}`}>
+                    {label}
+                  </span>
+                </div>
+                {i < stepLabels.length - 1 && (
+                  <div className="hidden sm:block flex-1 min-w-[1rem] h-px bg-[color:var(--fc-glass-border)]" />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
 
           {/* ================================================================
               STEP 1: TARGETS
           ================================================================ */}
           {step === 1 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-6">
-              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Step 1 — Targets</h2>
+            <GlassCard elevation={2} className="fc-glass fc-card p-4 space-y-3">
+              <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Targets</h2>
 
               {/* Plan name */}
-              <div className="space-y-1.5">
-                <Label className="text-[color:var(--fc-text-primary)]">Plan Name</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Plan name</Label>
                 <Input
                   value={planName}
                   onChange={(e) => setPlanName(e.target.value)}
                   placeholder="e.g. John's 2000 kcal Bulk Plan"
-                  className="fc-surface border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
+                  className="h-9 text-sm fc-surface border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
                 />
               </div>
 
               {/* Daily calories */}
-              <div className="space-y-1.5">
-                <Label className="text-[color:var(--fc-text-primary)]">Daily Calories (kcal) *</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Daily calories (kcal) *</Label>
                 <Input
                   type="number"
                   min={800}
                   max={6000}
                   value={targetKcal}
                   onChange={(e) => setTargetKcal(Number(e.target.value))}
-                  className="fc-surface border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] w-48"
+                  className="h-9 text-sm fc-surface border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] w-44"
                 />
               </div>
 
               {/* Macro mode toggle */}
-              <div className="space-y-3">
-                <Label className="text-[color:var(--fc-text-primary)]">Macros</Label>
-                <div className="flex gap-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Macros</Label>
+                <div className="flex flex-wrap gap-2">
                   {(["auto", "manual"] as const).map((mode) => (
                     <button
                       key={mode}
                       onClick={() => setMacroMode(mode)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${
                         macroMode === mode
                           ? "bg-[color:var(--fc-accent)] text-white"
                           : "fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)]"
@@ -740,37 +728,38 @@ export default function GeneratorPage() {
               </div>
 
               {/* Meals per day + options */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[color:var(--fc-text-primary)]">Meals Per Day</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Meals / day</Label>
                   <select
                     value={mealCount}
                     onChange={(e) => setMealCount(Number(e.target.value))}
-                    className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                    className="w-full h-9 fc-surface border border-[color:var(--fc-glass-border)] rounded-lg px-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
                   >
                     {[3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} meals</option>)}
                   </select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[color:var(--fc-text-primary)]">Options Per Meal</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Options / meal</Label>
                   <select
                     value={optionsPerMeal}
                     onChange={(e) => setOptionsPerMeal(Number(e.target.value))}
-                    className="w-full fc-surface border border-[color:var(--fc-glass-border)] rounded-xl px-3 py-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
+                    className="w-full h-9 fc-surface border border-[color:var(--fc-glass-border)] rounded-lg px-2 text-sm text-[color:var(--fc-text-primary)] bg-transparent"
                   >
                     {[1, 2, 3].map((n) => <option key={n} value={n}>{n} option{n > 1 ? "s" : ""}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/5">
                 <Button
+                  size="sm"
                   onClick={() => setStep(2)}
                   disabled={!targetKcal || targetKcal < 800}
-                  className="fc-btn fc-btn-primary"
+                  className="fc-btn fc-btn-primary h-9 text-sm"
                 >
                   Next
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                 </Button>
               </div>
             </GlassCard>
@@ -780,13 +769,13 @@ export default function GeneratorPage() {
               STEP 2: FOOD RULES
           ================================================================ */}
           {step === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Dietary restrictions */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-4">
+              <GlassCard elevation={2} className="fc-glass fc-card p-4 space-y-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Step 2 — Food Rules</h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    Choose dietary restrictions and search the food database to exclude or require specific foods.
+                  <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Food rules</h2>
+                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
+                    Restrictions and food search.
                   </p>
                 </div>
 

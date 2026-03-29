@@ -16,13 +16,13 @@ export default function CoachProgramsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen pb-32">
-          <div className="max-w-7xl mx-auto p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 sm:py-4">
             <Link
               href="/coach"
-              className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4"
+              className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
             >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Dashboard
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              Dashboard
             </Link>
             <ProgramsDashboardContent />
           </div>

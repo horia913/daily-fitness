@@ -195,11 +195,8 @@ export default function ClientDetailPage() {
       style={{ gap: "var(--fc-gap-sections)" }}
     >
       {displayClient.subscription.expiringSoon && (
-        <GlassCard
-          elevation={2}
-          className="fc-glass fc-card p-4 sm:p-5 border border-amber-500/40 bg-amber-500/10"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="border-b border-white/5 border-l-2 border-l-amber-500/80 bg-amber-500/10 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="font-semibold fc-text-primary text-sm sm:text-base">
                 Subscription ending soon
@@ -227,14 +224,13 @@ export default function ClientDetailPage() {
               </Link>
             </Button>
           </div>
-        </GlassCard>
+        </div>
       )}
 
       {att.reasons.length > 0 && (
-        <GlassCard
-          elevation={2}
-          className="fc-card p-4 sm:p-5 border border-[color:var(--fc-glass-border)]"
-          surfaceStyle={attentionCardSurfaceStyle(att.level)}
+        <div
+          className="border-b border-white/5 px-4 py-3"
+          style={attentionCardSurfaceStyle(att.level)}
         >
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-[color:var(--fc-status-warning)]" />
@@ -249,7 +245,7 @@ export default function ClientDetailPage() {
               </ul>
             </div>
           </div>
-        </GlassCard>
+        </div>
       )}
 
       <GlassCard
@@ -413,9 +409,9 @@ export default function ClientDetailPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <GlassCard elevation={2} className="fc-glass fc-card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60 mb-3">
+      <div className="grid grid-cols-1 gap-0 border-y border-white/5 md:grid-cols-2 md:divide-x md:divide-white/5">
+        <div className="border-b border-white/5 px-4 py-3 md:border-b-0">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
             This week
           </h3>
           <div className="space-y-2 text-sm">
@@ -448,10 +444,10 @@ export default function ClientDetailPage() {
               </p>
             )}
           </div>
-        </GlassCard>
+        </div>
 
-        <GlassCard elevation={2} className="fc-glass fc-card p-5 border-l-2 border-l-cyan-500">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60 mb-3">
+        <div className="border-b border-white/5 border-l-0 px-4 py-3 md:border-b-0 md:border-l md:border-l-cyan-500/50">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
             Program
           </h3>
           {displayClient.program ? (
@@ -504,10 +500,10 @@ export default function ClientDetailPage() {
               No active program. Assign from Training.
             </p>
           )}
-        </GlassCard>
+        </div>
 
-        <GlassCard elevation={2} className="fc-glass fc-card p-5 md:col-span-2 border-l-2 border-l-emerald-500">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60 mb-3">
+        <div className="col-span-1 border-b border-white/5 px-4 py-3 md:col-span-2 md:border-l-2 md:border-l-emerald-500/60">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
             Nutrition
           </h3>
           {displayClient.nutrition ? (
@@ -535,28 +531,28 @@ export default function ClientDetailPage() {
           ) : (
             <p className="text-sm fc-text-dim">No active meal plan assignment.</p>
           )}
-        </GlassCard>
+        </div>
       </div>
 
       {displayClient.recentActivity.length > 0 && (
-        <GlassCard elevation={2} className="fc-glass fc-card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60 mb-3">
+        <div className="border-y border-white/5">
+          <h3 className="border-b border-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
             Recent activity
           </h3>
-          <ul className="space-y-2 text-sm">
+          <ul className="text-sm">
             {displayClient.recentActivity.map((a, i) => (
               <li
                 key={`${a.at}-${i}`}
-                className={`flex justify-between gap-2 fc-text-primary pl-3 border-l-2 rounded-l-sm ${
+                className={`flex justify-between gap-2 border-b border-white/5 px-4 py-3 last:border-b-0 fc-text-primary ${
                   a.kind === "workout"
-                    ? "border-l-purple-500"
+                    ? "border-l-2 border-l-purple-500 pl-3"
                     : a.kind === "checkin"
-                      ? "border-l-emerald-500"
-                      : "border-l-amber-500"
+                      ? "border-l-2 border-l-emerald-500 pl-3"
+                      : "border-l-2 border-l-amber-500 pl-3"
                 }`}
               >
                 <span>{a.label}</span>
-                <span className="text-xs fc-text-dim whitespace-nowrap">
+                <span className="whitespace-nowrap text-xs fc-text-dim">
                   {new Date(a.at).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
@@ -565,7 +561,7 @@ export default function ClientDetailPage() {
               </li>
             ))}
           </ul>
-        </GlassCard>
+        </div>
       )}
 
       {showAssignWorkoutModal && (

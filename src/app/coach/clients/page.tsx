@@ -16,8 +16,10 @@ import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import {
   computeClientAttention,
   attentionCardSurfaceStyle,
+  attentionListRowClass,
   attentionPriority,
 } from "@/lib/coachClientAttention";
+import { cn } from "@/lib/utils";
 import { dbToUiScale } from "@/lib/wellnessService";
 import { withTimeout } from "@/lib/withTimeout";
 interface Client {
@@ -421,11 +423,11 @@ function ClientManagementContent() {
                       borderColor="var(--fc-surface-card-border)"
                       surfaceStyle={attentionCardSurfaceStyle(attention.level)}
                     >
-                      <div className="p-6">
+                      <div className="p-4 sm:p-6">
                         <div className="flex items-start mb-3">
-                          <div className="flex items-center gap-4 min-w-0">
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                             <div
-                              className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0"
+                              className="hidden sm:flex w-16 h-16 rounded-full items-center justify-center text-2xl font-bold flex-shrink-0"
                               style={{
                                 background: getSemanticColor("trust").gradient,
                                 color: "#fff",
@@ -433,11 +435,11 @@ function ClientManagementContent() {
                             >
                               {client.name.charAt(0)}
                             </div>
-                            <div className="min-w-0">
-                              <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)] truncate">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-base sm:text-lg font-bold text-[color:var(--fc-text-primary)] truncate">
                                 {client.name}
                               </h3>
-                              <p className="text-sm text-[color:var(--fc-text-dim)] truncate">
+                              <p className="text-sm text-[color:var(--fc-text-dim)] truncate hidden sm:block">
                                 {client.email}
                               </p>
                             </div>
@@ -614,8 +616,7 @@ function ClientManagementContent() {
             </div>
           ) : (
             // List View — each row links to Client Hub
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
-              <div className="space-y-2">
+            <div className="flex flex-col border-y border-white/5">
                 {filteredClients.map((client) => {
                   const relative = formatRelativeTime(client.metrics.lastActive);
                   const checkinRel = formatRelativeTime(client.metrics.lastCheckinDate);
@@ -634,8 +635,11 @@ function ClientManagementContent() {
                     <Link
                       key={client.id}
                       href={`/coach/clients/${client.id}`}
-                      className={`flex items-center gap-4 p-4 rounded-xl transition-all hover:scale-[1.01] cursor-pointer w-full border-0 outline-none backdrop-blur-md focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)] ${isInactiveOrPending ? "opacity-90" : ""}`}
-                      style={attentionCardSurfaceStyle(attention.level)}
+                      className={cn(
+                        "flex w-full cursor-pointer items-center gap-4 border-b border-white/5 py-3 outline-none transition-colors hover:bg-white/[0.02] focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--fc-bg-deep)]",
+                        attentionListRowClass(attention.level),
+                        isInactiveOrPending && "opacity-90",
+                      )}
                     >
                       {/* Avatar */}
                       <div
@@ -753,8 +757,7 @@ function ClientManagementContent() {
                     </Link>
                   );
                 })}
-              </div>
-            </GlassCard>
+            </div>
           )}
         </main>
       </div>

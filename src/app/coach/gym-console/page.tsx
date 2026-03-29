@@ -830,11 +830,11 @@ function GymConsoleContent() {
         <div className="px-4 py-3 border-b border-[color:var(--fc-glass-border)] fc-glass">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
             <Link
-              href="/coach/programs"
+              href="/coach/training"
               className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Programs
+              Back to Training
             </Link>
             <Link href="/coach">
               <Button variant="ghost" size="icon" className="shrink-0 fc-btn fc-btn-ghost">

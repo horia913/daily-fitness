@@ -134,17 +134,19 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
   /* Compact row for completed-goals list */
   if (compact && isCompleted) {
     return (
-      <div className="flex items-center justify-between p-4 border border-[color:var(--fc-glass-border)] rounded-xl fc-glass-soft">
-        <div className="flex items-center gap-4">
-          <CheckCircle className="w-5 h-5 fc-text-success flex-shrink-0" />
-          <div>
+      <div className="flex min-h-[52px] items-center justify-between border-b border-white/5 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <CheckCircle className="h-5 w-5 shrink-0 fc-text-success" />
+          <div className="min-w-0">
             <div className="font-semibold fc-text-primary">{goal.title}</div>
-            <div className="text-xs fc-text-subtle font-mono">
+            <div className="font-mono text-xs fc-text-subtle">
               Final: {goal.current_value ?? goal.target_value ?? "—"} {goal.target_unit ?? ""} • Completed {goal.target_date ? new Date(goal.target_date).toLocaleDateString() : "—"}
             </div>
           </div>
         </div>
-        <span className="fc-pill fc-pill-glass text-xs fc-text-success border border-[color:var(--fc-status-success)]/30">Completed</span>
+        <span className="fc-pill fc-pill-glass shrink-0 border border-[color:var(--fc-status-success)]/30 text-xs fc-text-success">
+          Completed
+        </span>
       </div>
     );
   }
@@ -154,7 +156,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
   const pillarTint = getPillarTintClass(goal.pillar);
   return (
     <div
-      className={`fc-card rounded-2xl border border-[color:var(--fc-glass-border)] border-l-[3px] p-6 transition-all duration-200 fc-hover-rise flex flex-col justify-between hover:border-[color:var(--fc-glass-border-strong)] hover:shadow-[var(--fc-shadow-card)] ${pillarTint}`}
+      className={`flex flex-col justify-between border-b border-white/5 border-l-[3px] bg-transparent py-4 ${pillarTint}`}
       style={{ borderLeftColor: accentColor }}
     >
       <div>
@@ -189,7 +191,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
 
       {/* Manual update + actions: compact row */}
       {(!isAutoTracked || onEdit || onDelete) && !isCompleted && !isCancelled && (
-        <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-4">
           {!isAutoTracked && onUpdate && (
             <>
               <Input

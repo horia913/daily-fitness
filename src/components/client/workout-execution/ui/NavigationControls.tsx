@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface NavigationControlsProps {
   currentBlock: number;
@@ -26,24 +25,20 @@ export function NavigationControls({
   }
 
   return (
-    <div
-      className="flex items-center justify-between p-3 rounded-xl"
-      style={{ background: "var(--fc-surface-sunken)" }}
-    >
-      <div className="text-xs font-semibold fc-text-dim font-mono">
-        Block {currentBlock}/{totalBlocks}
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 py-2">
+      <div className="text-xs font-medium tabular-nums fc-text-dim">
+        Exercise {currentBlock} of {totalBlocks}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {onPrevious && (
           <Button
             variant="outline"
             size="sm"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            className="flex items-center gap-1 h-8 px-3 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
+            className="h-8 px-2.5 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            Prev
+            ← Prev Exercise
           </Button>
         )}
         {onNext && (
@@ -52,10 +47,9 @@ export function NavigationControls({
             size="sm"
             onClick={onNext}
             disabled={!canGoNext}
-            className="flex items-center gap-1 h-8 px-3 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
+            className="h-8 px-2.5 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
           >
-            Next
-            <ChevronRight className="w-3.5 h-3.5" />
+            Next Exercise →
           </Button>
         )}
       </div>

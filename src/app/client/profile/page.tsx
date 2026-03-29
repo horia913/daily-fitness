@@ -56,13 +56,11 @@ import {
   CreditCard
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton } from '@/components/client-ui'
 
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
-  const router = useRouter()
   const { addToast } = useToast()
   const { performanceSettings } = useTheme()
   // Check if we're viewing as another user (for coach view)
@@ -394,7 +392,7 @@ export default function ClientProfilePage() {
   const handleSignOut = async () => {
     try {
       await signOut()
-      router.push('/auth/login')
+      window.location.href = '/'
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -579,14 +577,14 @@ export default function ClientProfilePage() {
             <SectionHeader title="Profile Hub" />
             <ClientGlassCard className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => router.push("/client/progress/achievements")}>
+              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => { window.location.href = "/client/progress/achievements" }}>
                 <Award className="w-5 h-5 fc-text-warning" />
                 <div className="text-left">
                   <span className="font-semibold">Achievements</span>
                   <p className="text-xs fc-text-dim font-normal">All achievements across Training, Nutrition, Lifestyle</p>
                 </div>
               </Button>
-              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => router.push("/client/goals/history")}>
+              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => { window.location.href = "/client/goals/history" }}>
                 <Target className="w-5 h-5 fc-text-success" />
                 <div className="text-left">
                   <span className="font-semibold">Goal History</span>

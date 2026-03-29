@@ -28,7 +28,6 @@ import {
   Link,
   X,
 } from "lucide-react";
-
 interface ExerciseDetailFormProps {
   exercise: any;
   onChange: (updatedExercise: any) => void;
@@ -439,17 +438,27 @@ export default function ExerciseDetailForm({
               </div>
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
-                  RIR
+                  RPE
                 </Label>
                 <Input
                   type="number"
-                  value={exercise.rir === "" ? "" : exercise.rir || ""}
-                  onChange={(e) =>
-                    updateExercise({ rir: handleNumberChange(e.target.value, 0) })
+                  value={
+                    exercise.rir === "" ? "" : exercise.rir ?? ""
                   }
-                  min="0"
+                  onChange={(e) =>
+                    updateExercise({
+                      rir: handleNumberChange(e.target.value, 0),
+                    })
+                  }
+                  min={1}
+                  max={10}
                   className="mt-2 rounded-xl"
+                  placeholder="e.g., 8"
                 />
+                <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                  Prescribed difficulty (1–10). Same value is stored for the
+                  client&apos;s workout.
+                </p>
               </div>
             </div>
 

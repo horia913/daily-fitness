@@ -268,7 +268,7 @@ export default function VolumeDetailsModal({
                       Reps: {standardGuideline.repsPerSetMin}-{standardGuideline.repsPerSetMax} per set
                     </p>
                     <p>
-                      RIR: {standardGuideline.rirMin}-{standardGuideline.rirMax}
+                      RPE: {standardGuideline.rirMin}-{standardGuideline.rirMax}
                     </p>
                   </div>
                 </div>

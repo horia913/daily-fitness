@@ -229,3 +229,10 @@
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
+
+/* Nested workout execution cards — slight separation on small screens */
+@media (max-width: 639px) {
+  .fc-card-container .fc-card-container {
+    margin-top: 0.5rem;
+  }
+}

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
 import { dbToUiScale } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
@@ -147,10 +146,10 @@ export function WellnessTrendsCard({
 
   if (!hasEnoughData) {
     return (
-      <ClientGlassCard className="p-5">
-        <h3 className="text-base font-semibold fc-text-primary mb-2">Wellness Trends</h3>
+      <div className="border-y border-white/5 px-4 py-3">
+        <h3 className="mb-2 text-base font-semibold fc-text-primary">Wellness Trends</h3>
         <p className="text-sm fc-text-dim">Not enough data yet — keep checking in!</p>
-      </ClientGlassCard>
+      </div>
     );
   }
 
@@ -164,8 +163,8 @@ export function WellnessTrendsCard({
 
   if (mode === "week_only") {
     return (
-      <ClientGlassCard className="p-5">
-        <h3 className="text-base font-semibold fc-text-primary mb-3">Wellness Trends</h3>
+      <div className="border-y border-white/5 px-4 py-3">
+        <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[240px] border-collapse text-sm">
             <thead>
@@ -198,7 +197,7 @@ export function WellnessTrendsCard({
             </tbody>
           </table>
         </div>
-      </ClientGlassCard>
+      </div>
     );
   }
 
@@ -214,8 +213,8 @@ export function WellnessTrendsCard({
       ];
 
   return (
-    <ClientGlassCard className="p-5">
-      <h3 className="text-base font-semibold fc-text-primary mb-3">Wellness Trends</h3>
+    <div className="border-y border-white/5 px-4 py-3">
+      <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[320px] border-collapse text-sm">
           <thead>
@@ -252,6 +251,6 @@ export function WellnessTrendsCard({
           </tbody>
         </table>
       </div>
-    </ClientGlassCard>
+    </div>
   );
 }

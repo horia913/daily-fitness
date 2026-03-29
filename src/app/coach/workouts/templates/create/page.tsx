@@ -10,7 +10,6 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 
 export default function CreateWorkoutTemplatePage() {
   const router = useRouter();
@@ -38,31 +37,25 @@ export default function CreateWorkoutTemplatePage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 min-h-screen pb-32">
-          <div className="px-4 sm:px-6 pt-4">
-            <Link href="/coach/workouts/templates" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Templates
-            </Link>
-          </div>
-          <header className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] px-4 sm:px-6 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                className="fc-btn fc-btn-ghost h-10 w-10 rounded-xl"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight fc-text-primary">
-                  Create Template
-                </h1>
-                <p className="text-sm fc-text-dim">Builder Mode</p>
+          <div className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] px-4 sm:px-6">
+            <div className="max-w-7xl mx-auto flex min-h-11 max-h-12 items-center justify-between gap-2 py-2">
+              <h1 className="text-lg font-semibold fc-text-primary truncate">
+                Create template
+              </h1>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClose}
+                  className="h-8 text-xs px-2"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                  Back
+                </Button>
               </div>
             </div>
-          </header>
-          <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+          </div>
+          <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-3">
             <WorkoutTemplateForm
               isOpen={true}
               onClose={handleClose}

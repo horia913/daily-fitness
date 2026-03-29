@@ -204,10 +204,10 @@ export default function CoachMenu() {
                   View All Clients
                 </Button>
               </Link>
-              <Link href="/coach/programs">
+              <Link href="/coach/training">
                 <Button className="fc-btn fc-btn-secondary">
                   <Dumbbell className="w-4 h-4 mr-2" />
-                  Programs
+                  Training
                 </Button>
               </Link>
               <Link href="/coach/workouts/templates">

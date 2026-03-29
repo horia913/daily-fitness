@@ -6,8 +6,6 @@ import {
   CheckCircle,
   MoreVertical,
   Pencil,
-  ChevronLeft,
-  ChevronRight,
   Calculator,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
@@ -28,6 +26,7 @@ import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { InlineRPERow } from "../ui/InlineRPERow";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -64,6 +63,7 @@ export function StraightSetExecutor({
   onSetLogUpsert,
   onSetEditSaved,
   loggedSets,
+  onWorkoutBack,
 }: StraightSetExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -403,11 +403,13 @@ export function StraightSetExecutor({
     });
   }
 
-  // Add RIR if available
+  // Prescribed difficulty: DB column `rir` holds RPE (1–10)
   if (currentExercise?.rir !== null && currentExercise?.rir !== undefined) {
     blockDetails.push({
-      label: "RIR",
-      value: currentExercise.rir,
+      label: "RPE",
+      value:
+        formatPrescribedRpeLabel(currentExercise.rir) ??
+        String(currentExercise.rir).trim(),
     });
   }
 
@@ -578,121 +580,129 @@ export function StraightSetExecutor({
     }
   };
 
-  // Logging inputs - show only current set
-  const loggingInputs = (
-    <div className="space-y-4">
-      {allowSetEditDelete && loggedSetsList.length > 0 && (
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--fc-surface-card-border)",
-            background: "var(--fc-surface-sunken)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
-              Logged sets
-            </div>
-            {loggedSetsList.length > 2 && (
-              <button
-                type="button"
-                onClick={() => setShowAllSets(!showAllSets)}
-                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
-              >
-                {showAllSets ? (
-                  <>Show less ▲</>
-                ) : (
-                  <>Show all {loggedSetsList.length} sets ▼</>
-                )}
-              </button>
-            )}
+  const aboveStickyContent =
+    allowSetEditDelete && loggedSetsList.length > 0 ? (
+      <div className="border-t border-white/10 pt-2">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+            Logged sets
           </div>
-          <ul className="space-y-1.5">
-            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
-              // Calculate the actual index in the full list for isLatestSet
-              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+          {loggedSetsList.length > 2 && (
+            <button
+              type="button"
+              onClick={() => setShowAllSets(!showAllSets)}
+              className="text-xs font-medium fc-text-dim transition-colors hover:fc-text-primary"
+            >
+              {showAllSets ? (
+                <>Show less ▲</>
+              ) : (
+                <>Show all {loggedSetsList.length} sets ▼</>
+              )}
+            </button>
+          )}
+        </div>
+        <ul className="flex flex-col border-y border-white/5">
+          {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map(
+            (setEntry, index) => {
+              const actualIndex = showAllSets
+                ? index
+                : loggedSetsList.length - 2 + index;
               const isLatestSet = actualIndex === loggedSetsList.length - 1;
               const isNewlyLogged = newlyLoggedSetIds.has(setEntry.id);
               return (
-              <li
-                key={setEntry.id}
-                className={`flex flex-col gap-1.5 py-1.5 px-2 rounded-lg transition-all duration-300 ${
-                  isNewlyLogged ? "animate-slideInRight" : ""
-                }`}
-                style={{ background: "var(--fc-surface-elevated)" }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm fc-text-primary flex items-center gap-2 min-w-0">
-                    <CheckCircle className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden />
-                    <span>
-                      Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                      {setEntry.reps_completed ?? "—"} reps
+                <li
+                  key={setEntry.id}
+                  className={`flex flex-col gap-1.5 border-b border-white/5 px-1 py-3 last:border-b-0 transition-all duration-300 ${
+                    isNewlyLogged ? "animate-slideInRight" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm fc-text-primary">
+                      <CheckCircle
+                        className="h-4 w-4 shrink-0 text-cyan-400"
+                        aria-hidden
+                      />
+                      <span>
+                        Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"}{" "}
+                        kg × {setEntry.reps_completed ?? "—"} reps
+                      </span>
                     </span>
-                  </span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === setEntry.id ? null : setEntry.id,
-                        )
-                      }
-                      className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                    {menuOpenSetId === setEntry.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setMenuOpenSetId(null)}
-                          aria-hidden
-                        />
-                        <div
-                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
-                          style={{
-                            background: "var(--fc-surface-elevated)",
-                            border: "1px solid var(--fc-surface-card-border)",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleEditSet(setEntry)}
-                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                    <div className="relative flex items-center">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenuOpenSetId(
+                            menuOpenSetId === setEntry.id ? null : setEntry.id,
+                          )
+                        }
+                        className="rounded-lg p-1.5 fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
+                        aria-label="Options"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                      {menuOpenSetId === setEntry.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setMenuOpenSetId(null)}
+                            aria-hidden
+                          />
+                          <div
+                            className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg py-1 shadow-lg"
+                            style={{
+                              background: "var(--fc-surface-elevated)",
+                              border: "1px solid var(--fc-surface-card-border)",
+                            }}
                           >
-                            <Pencil className="w-3.5 h-3.5" /> Edit
-                          </button>
-                        </div>
-                      </>
-                    )}
+                            <button
+                              type="button"
+                              onClick={() => handleEditSet(setEntry)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:opacity-80"
+                            >
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <InlineRPERow
-                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
-                  currentRPE={setEntry.rpe ?? null}
-                  onRPESelect={async (rpe) => {
-                    // Update RPE optimistically
-                    const updatedEntry: LoggedSet = {
-                      ...setEntry,
-                      rpe,
-                    };
-                    onSetLogUpsert?.(block.block.id, updatedEntry, {
-                      replaceId: setEntry.id,
-                    });
+                  <InlineRPERow
+                    setLogId={
+                      setEntry.id.startsWith("temp-") ? null : setEntry.id
+                    }
+                    currentRPE={setEntry.rpe ?? null}
+                    onRPESelect={async (rpe) => {
+                      const updatedEntry: LoggedSet = {
+                        ...setEntry,
+                        rpe,
+                      };
+                      onSetLogUpsert?.(block.block.id, updatedEntry, {
+                        replaceId: setEntry.id,
+                      });
 
-                    // If set is synced (has real ID), update via API
-                    if (!setEntry.id.startsWith("temp-")) {
-                      try {
-                        const res = await fetch(`/api/sets/${setEntry.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ rpe }),
-                          credentials: "include",
-                        });
-                        if (!res.ok) {
-                          console.error("Failed to update RPE:", await res.text());
-                          // Revert optimistic update on error
+                      if (!setEntry.id.startsWith("temp-")) {
+                        try {
+                          const res = await fetch(`/api/sets/${setEntry.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rpe }),
+                            credentials: "include",
+                          });
+                          if (!res.ok) {
+                            console.error(
+                              "Failed to update RPE:",
+                              await res.text(),
+                            );
+                            const revertedEntry: LoggedSet = {
+                              ...setEntry,
+                              rpe: setEntry.rpe ?? undefined,
+                            };
+                            onSetLogUpsert?.(block.block.id, revertedEntry, {
+                              replaceId: setEntry.id,
+                            });
+                          }
+                        } catch (err) {
+                          console.error("Error updating RPE:", err);
                           const revertedEntry: LoggedSet = {
                             ...setEntry,
                             rpe: setEntry.rpe ?? undefined,
@@ -701,74 +711,65 @@ export function StraightSetExecutor({
                             replaceId: setEntry.id,
                           });
                         }
-                      } catch (err) {
-                        console.error("Error updating RPE:", err);
-                        // Revert optimistic update on error
-                        const revertedEntry: LoggedSet = {
-                          ...setEntry,
-                          rpe: setEntry.rpe ?? undefined,
-                        };
-                        onSetLogUpsert?.(block.block.id, revertedEntry, {
-                          replaceId: setEntry.id,
-                        });
                       }
-                    }
-                    // If set is still optimistic (temp ID), the RPE will be included
-                    // in the next sync via the orchestrator's pending entry
-                  }}
-                  isLatestSet={isLatestSet}
-                />
-              </li>
+                    }}
+                    isLatestSet={isLatestSet}
+                  />
+                </li>
               );
-            })}
-          </ul>
-        </div>
-      )}
-      <div
-        className="p-4 space-y-4 rounded-xl"
-        style={{ background: "var(--fc-surface-sunken)" }}
-      >
-        <div className="flex items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setViewingSetIndex((i) => Math.max(0, i - 1));
-            }}
-            disabled={viewingSetIndex === 0}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 transition-transform"
-            aria-label="Previous set"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="text-xs font-semibold fc-text-dim uppercase tracking-wider min-w-[6rem] text-center">
-            Set {displaySetNumber} of {totalSets}
+            },
+          )}
+        </ul>
+      </div>
+    ) : null;
+
+  const loggingInputs = (
+    <div className="space-y-3">
+      <div className="flex h-8 items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setViewingSetIndex((i) => Math.max(0, i - 1));
+          }}
+          disabled={viewingSetIndex === 0}
+          className="flex min-h-8 min-w-8 items-center justify-center rounded-md fc-text-primary transition-transform hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+          aria-label="Previous set"
+        >
+          <span className="text-sm" aria-hidden>
+            ←
           </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setViewingSetIndex((i) => Math.min(loggedSetsList.length, i + 1));
-            }}
-            disabled={viewingSetIndex >= loggedSetsList.length}
-            title={
-              loggedSetsList.length === 0
-                ? "Log at least one set to review previous sets"
-                : undefined
-            }
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg fc-text-primary disabled:opacity-40 disabled:pointer-events-none hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 transition-transform"
-            aria-label={
-              loggedSetsList.length === 0
-                ? "Next set (log a set first to review)"
-                : "Next set"
-            }
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+        </button>
+        <span className="min-w-[7.5rem] text-center text-[11px] font-semibold uppercase tracking-wide fc-text-dim">
+          Set {displaySetNumber} of {totalSets}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setViewingSetIndex((i) => Math.min(loggedSetsList.length, i + 1));
+          }}
+          disabled={viewingSetIndex >= loggedSetsList.length}
+          title={
+            loggedSetsList.length === 0
+              ? "Log at least one set to review previous sets"
+              : undefined
+          }
+          className="flex min-h-8 min-w-8 items-center justify-center rounded-md fc-text-primary transition-transform hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+          aria-label={
+            loggedSetsList.length === 0
+              ? "Next set (log a set first to review)"
+              : "Next set"
+          }
+        >
+          <span className="text-sm" aria-hidden>
+            →
+          </span>
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <div className="relative">
               <LargeInput
@@ -829,7 +830,6 @@ export function StraightSetExecutor({
             stepAmount={1}
           />
         </div>
-      </div>
     </div>
   );
 
@@ -942,6 +942,8 @@ export function StraightSetExecutor({
           if (w != null) { setWeight(String(w)); setIsWeightPristine(false); }
           if (r != null) setReps(String(r));
         }}
+        onWorkoutBack={onWorkoutBack}
+        aboveStickyContent={aboveStickyContent}
       />
       {/* Edit mode is inline (same form + Save edits / Cancel); no dialog so list stays visible. */}
       {/* RPE Modal moved to parent LiveWorkoutBlockExecutor (Golden Logging Flow) */}

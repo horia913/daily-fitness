@@ -600,14 +600,8 @@ export function GiantSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {allowSetEditDelete && roundNumbersLogged.length > 0 && (
-        <div
-          className="rounded-xl border p-3"
-          style={{
-            borderColor: "var(--fc-surface-card-border)",
-            background: "var(--fc-surface-sunken)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
+        <div className="border-t border-white/10 pt-3">
+          <div className="mb-2 flex items-center justify-between px-1">
             <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
               Logged rounds
             </div>
@@ -625,7 +619,7 @@ export function GiantSetExecutor({
               </button>
             )}
           </div>
-          <ul className="space-y-1.5">
+          <ul className="flex flex-col border-y border-white/5">
             {(showAllSets ? roundNumbersLogged : roundNumbersLogged.slice(-2)).map((roundNum) => {
               // Calculate the actual index in the full list for isLatestSet
               const actualIndex = showAllSets 
@@ -650,8 +644,7 @@ export function GiantSetExecutor({
               return (
                 <li
                   key={`round-${roundNum}`}
-                  className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
-                  style={{ background: "var(--fc-surface-elevated)" }}
+                  className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm fc-text-primary">
@@ -772,11 +765,11 @@ export function GiantSetExecutor({
           </Button>
         </div>
       )}
+      <div className="flex flex-col border-y border-white/5">
       {exercises.map((exercise, idx) => (
         <div
           key={exercise.id || idx}
-          className="p-4 rounded-xl"
-          style={{ background: "var(--fc-surface-sunken)" }}
+          className={`border-b border-white/5 py-4 ${idx === exercises.length - 1 ? "last:border-b-0" : ""}`}
         >
           <div className="mb-4">
             <h4 className="font-semibold fc-text-primary text-lg">
@@ -910,6 +903,7 @@ export function GiantSetExecutor({
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 

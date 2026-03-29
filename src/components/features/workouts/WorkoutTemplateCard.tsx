@@ -16,6 +16,7 @@ interface WorkoutTemplateCardProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onAssign?: () => void;
+  layout?: "card" | "row";
 }
 
 function getPrimaryCategory(template: WorkoutTemplate): string {
@@ -59,6 +60,7 @@ export default function WorkoutTemplateCard({
   onDelete,
   onDuplicate,
   onAssign,
+  layout = "card",
 }: WorkoutTemplateCardProps) {
   const primaryCategory = getPrimaryCategory(template);
   const accent = getCategoryAccent(primaryCategory);
@@ -79,6 +81,90 @@ export default function WorkoutTemplateCard({
     </div>
   );
   const bodyPreview = getExercisePreview(template);
+
+  if (layout === "row") {
+    return (
+      <div className="flex items-center gap-2 py-2.5 px-1 border-b border-[color:var(--fc-glass-border)]/40">
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left"
+          onClick={onOpenDetails}
+        >
+          <span className="font-medium text-[color:var(--fc-text-primary)] truncate block">
+            {template.name}
+          </span>
+          <span className="text-sm text-gray-400">
+            {exerciseCount} exercise{exerciseCount !== 1 ? "s" : ""} ·{" "}
+            {primaryCategory}
+          </span>
+        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg fc-btn fc-btn-ghost fc-press"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails();
+            }}
+            aria-label="View template"
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+          {onAssign && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-lg fc-btn fc-btn-ghost fc-press fc-text-workouts"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAssign();
+              }}
+              aria-label="Assign template"
+            >
+              <UserPlus className="w-4 h-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg fc-btn fc-btn-ghost fc-press"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            aria-label="Edit template"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg fc-btn fc-btn-ghost fc-press"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            aria-label="Duplicate template"
+          >
+            <Copy className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg fc-btn fc-btn-ghost fc-press text-[color:var(--fc-status-error)] hover:bg-[color:var(--fc-status-error)]/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            aria-label="Delete template"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AppCard

@@ -27,24 +27,26 @@ export function ActionButtons({
     <>
       {/* Action Buttons */}
       <div
-        className={`flex-shrink-0 ${theme?.card ?? ''} border-t ${theme?.border ?? ''} px-6 py-4 rounded-b-3xl`}
+        className={`flex-shrink-0 border-t border-black/5 dark:border-white/5 px-3 py-3 sm:px-4 rounded-b-3xl ${theme?.card ?? ''}`}
       >
-        <div className="w-full flex flex-col sm:flex-row justify-end gap-3">
+        <div className="w-full flex flex-col sm:flex-row justify-end gap-2">
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={onCancel}
-            className="rounded-xl w-full sm:w-auto"
+            className="h-9 text-sm rounded-lg w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             type="submit"
+            size="sm"
             disabled={loading}
             onClick={() => onSubmit()}
-            className={`${theme?.primary ?? ''} flex items-center gap-2 rounded-xl w-full sm:w-auto justify-center`}
+            className={`${theme?.primary ?? ''} flex items-center gap-2 h-9 text-sm rounded-lg w-full sm:w-auto justify-center`}
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-3.5 h-3.5" />
             {loading
               ? 'Saving...'
               : template

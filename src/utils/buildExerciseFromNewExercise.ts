@@ -35,6 +35,7 @@ export interface NewExerciseInput {
   sets?: string | number;
   reps?: string | number;
   rest_seconds?: string | number;
+  /** Prescribed RPE (1–10); persisted in DB column `rir`. */
   rir?: string | number;
   tempo?: string;
   notes?: string;
@@ -95,6 +96,7 @@ export interface BuiltExercise {
   sets: string;
   reps: string;
   rest_seconds: string;
+  /** Prescribed RPE (1–10); DB column name is `rir`. */
   rir: string;
   tempo: string;
   notes: string;

@@ -202,12 +202,12 @@ export function DashboardLayout({
             </Card>
           </Link>
 
-          <Link href="/coach/programs">
+          <Link href="/coach/training">
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4 text-center">
                 <Target className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                <h3 className="font-semibold text-purple-800">Workouts</h3>
-                <p className="text-sm text-purple-600">Create programs</p>
+                <h3 className="font-semibold text-purple-800">Training</h3>
+                <p className="text-sm text-purple-600">Programs, templates & exercises</p>
               </CardContent>
             </Card>
           </Link>
