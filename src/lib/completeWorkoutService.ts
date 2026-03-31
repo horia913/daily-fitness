@@ -32,6 +32,10 @@ import {
   updateProgressCache,
   assertWeekUnlocked,
 } from './programStateService'
+import {
+  clampedWallClockSessionMinutes,
+  durationMinutesFromSetCompletedAts,
+} from './workoutLogDuration'
 
 // ============================================================================
 // INTERFACES
@@ -148,9 +152,17 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   if (durationMinutes !== undefined && durationMinutes !== null) {
     totalDurationMinutes = Math.round(durationMinutes)
   } else {
-    const startedAt = workoutLog.started_at ? new Date(workoutLog.started_at) : new Date()
-    const durationMs = completedAt.getTime() - startedAt.getTime()
-    totalDurationMinutes = Math.round(durationMs / 1000 / 60)
+    const fromSets = durationMinutesFromSetCompletedAts(
+      (setLogs ?? []).map((s) => s.completed_at)
+    )
+    if (fromSets != null) {
+      totalDurationMinutes = fromSets
+    } else {
+      totalDurationMinutes = clampedWallClockSessionMinutes(
+        workoutLog.started_at,
+        completedAt
+      )
+    }
   }
 
   const { data: updatedLog, error: updateError } = await supabaseAdmin

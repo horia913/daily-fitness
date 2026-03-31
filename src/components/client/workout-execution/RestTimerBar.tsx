@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { Timer, SkipForward } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { Timer } from "lucide-react";
+import { useDeadlineCountdown } from "@/hooks/useDeadlineCountdown";
 
 export interface RestTimerBarLastSet {
   weight: number;
@@ -33,10 +34,8 @@ export function RestTimerBar({
   lastSet,
   nextSet,
 }: RestTimerBarProps) {
-  const [remainingSeconds, setRemainingSeconds] = useState(durationSeconds);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onCompleteRef = useRef(onComplete);
   const expandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,63 +43,39 @@ export function RestTimerBar({
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
-  // Reset and start timer when isActive or durationSeconds changes
+  const handleDeadlineReached = useCallback(() => {
+    if (durationSeconds === 0) {
+      onCompleteRef.current();
+      return;
+    }
+    setIsCompleted(true);
+    setTimeout(() => {
+      onCompleteRef.current();
+    }, 2000);
+  }, [durationSeconds]);
+
+  const remainingSeconds = useDeadlineCountdown({
+    active: isActive,
+    durationSeconds,
+    onDeadlineReached: handleDeadlineReached,
+  });
+
   useEffect(() => {
     if (!isActive) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
       if (expandTimeoutRef.current) {
         clearTimeout(expandTimeoutRef.current);
         expandTimeoutRef.current = null;
       }
-      setRemainingSeconds(durationSeconds);
       setIsExpanded(false);
       setIsCompleted(false);
-      return;
     }
+  }, [isActive]);
 
-    setRemainingSeconds(durationSeconds);
-    setIsExpanded(false);
-    setIsCompleted(false);
-
-    if (durationSeconds === 0) {
-      setTimeout(() => onCompleteRef.current(), 0);
-      return;
+  useEffect(() => {
+    if (isActive) {
+      setIsExpanded(false);
+      setIsCompleted(false);
     }
-
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    timerRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          setIsCompleted(true);
-          // Show "REST COMPLETE" for 2 seconds, then auto-dismiss
-          setTimeout(() => {
-            onCompleteRef.current();
-          }, 2000);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (expandTimeoutRef.current) {
-        clearTimeout(expandTimeoutRef.current);
-        expandTimeoutRef.current = null;
-      }
-    };
   }, [isActive, durationSeconds]);
 
   const handleBarClick = () => {
@@ -124,10 +99,6 @@ export function RestTimerBar({
   };
 
   const handleSkip = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
     if (expandTimeoutRef.current) {
       clearTimeout(expandTimeoutRef.current);
       expandTimeoutRef.current = null;

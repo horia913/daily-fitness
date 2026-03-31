@@ -59,7 +59,7 @@ export default function ClientAccountSection({ clientId }: Props) {
     label: string
     value: React.ReactNode
   }) => (
-    <div className="flex items-center gap-3 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+    <div className="flex items-center gap-3 px-2 py-2 border-b border-[color:var(--fc-glass-border)] last:border-b-0">
       <div className="fc-icon-tile fc-icon-workouts">
         <Shield className="w-5 h-5" />
       </div>
@@ -79,8 +79,8 @@ export default function ClientAccountSection({ clientId }: Props) {
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-      <div className="p-6 pb-4">
+    <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+      <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">
             <Shield className="w-6 h-6" />
@@ -88,14 +88,14 @@ export default function ClientAccountSection({ clientId }: Props) {
           <h3 className="text-lg font-semibold fc-text-primary">Account information</h3>
         </div>
       </div>
-      <div className="space-y-3 p-6 pt-0">
+      <div className="px-2 py-1">
         <InfoRow
           label="Role"
           value={role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Client'}
         />
         <InfoRow label="Coaching relationship" value={statusLabel} />
         {createdAt && (
-          <div className="flex items-center gap-3 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+          <div className="flex items-center gap-3 px-2 py-2 border-b border-[color:var(--fc-glass-border)] last:border-b-0">
             <div className="fc-icon-tile fc-icon-workouts">
               <Clock className="w-5 h-5" />
             </div>

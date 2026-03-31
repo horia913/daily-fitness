@@ -176,7 +176,7 @@ export default function ClientProfileView({ clientId }: ClientProfileViewProps) 
     label: string
     value: React.ReactNode
   }) => (
-    <div className="flex items-center gap-3 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+    <div className="flex items-center gap-3 px-2 py-2 border-b border-[color:var(--fc-glass-border)] last:border-b-0">
       <div className="fc-icon-tile fc-icon-workouts">
         <Icon className="w-5 h-5" />
       </div>
@@ -205,8 +205,8 @@ export default function ClientProfileView({ clientId }: ClientProfileViewProps) 
         </Button>
       </div>
 
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-6 pb-4">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <Camera className="w-6 h-6" />
@@ -214,7 +214,7 @@ export default function ClientProfileView({ clientId }: ClientProfileViewProps) 
             <h3 className="text-lg font-semibold fc-text-primary">Photo</h3>
           </div>
         </div>
-        <div className="p-6 pt-0">
+        <div className="px-3 py-2">
           <div className="flex items-center gap-6">
             {profile.avatar_url ? (
               <img
@@ -238,8 +238,8 @@ export default function ClientProfileView({ clientId }: ClientProfileViewProps) 
         </div>
       </div>
 
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-6 pb-4">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <User className="w-6 h-6" />
@@ -247,7 +247,7 @@ export default function ClientProfileView({ clientId }: ClientProfileViewProps) 
             <h3 className="text-lg font-semibold fc-text-primary">Details</h3>
           </div>
         </div>
-        <div className="space-y-3 p-6 pt-0">
+        <div className="px-2 py-1">
           <InfoRow
             icon={User}
             label="Name"

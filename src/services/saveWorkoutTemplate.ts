@@ -2,6 +2,45 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import type { WorkoutBlock } from "@/types/workoutBlocks";
 
+const SET_TYPES_REQUIRING_WSEE = new Set([
+  "straight_set",
+  "superset",
+  "giant_set",
+  "pre_exhaustion",
+]);
+
+/**
+ * Warn if any set entry that should have workout_set_entry_exercises has none after save.
+ */
+async function warnIfAnySetEntryMissingExercises(
+  supabase: SupabaseClient,
+  templateId: string,
+): Promise<void> {
+  const { data: entries, error } = await supabase
+    .from("workout_set_entries")
+    .select("id, set_type")
+    .eq("template_id", templateId);
+
+  if (error || !entries?.length) return;
+
+  for (const entry of entries) {
+    if (!SET_TYPES_REQUIRING_WSEE.has(entry.set_type)) continue;
+
+    const { count, error: countErr } = await supabase
+      .from("workout_set_entry_exercises")
+      .select("id", { count: "exact", head: true })
+      .eq("set_entry_id", entry.id);
+
+    if (countErr) continue;
+    if (count === 0) {
+      console.warn(
+        "[saveWorkoutTemplate] Set entry has 0 workout_set_entry_exercises after save (bug).",
+        { set_entry_id: entry.id, set_type: entry.set_type, template_id: templateId },
+      );
+    }
+  }
+}
+
 export interface SaveWorkoutTemplateFormData {
   name: string;
   description: string;
@@ -127,11 +166,11 @@ export async function saveWorkoutTemplate(
             // UPDATE existing block (preserves block ID for referential integrity)
             console.log(`🔄 Updating existing block: ${exercise.id}`);
 
-            // Delete special table data first (will be recreated below)
-            // Pass block type for optimized deletion (only deletes from relevant table)
-            await WorkoutBlockService.deleteBlockSpecialData(
+            // Clear ALL child rows for this set entry in one transaction (RPC),
+            // then reinsert from form. Type-specific delete missed rows on type
+            // changes; timeout-based delete could leave stale workout_set_entry_exercises.
+            await WorkoutBlockService.deleteAllRelatedDataForSetEntryStrict(
               exercise.id,
-              exerciseType,
             );
 
             // Collect exercise IDs for block name generation
@@ -312,6 +351,9 @@ export async function saveWorkoutTemplate(
                 // Time-based blocks don't use workout_set_entry_exercises, only workout_time_protocols
                 // Set mainExerciseId directly for time protocol creation
                 mainExerciseId = exercise.exercise_id;
+              } else if (exerciseType === "pre_exhaustion") {
+                // Isolation + compound are inserted in the pre_exhaustion section below
+                // (do not add isolation here — that duplicated the A exercise)
               } else {
                 // For all other block types, add exercise to workout_set_entry_exercises
                 const addedExercise =
@@ -904,6 +946,8 @@ export async function saveWorkoutTemplate(
       } else {
         console.log("🔍 No exercises to save");
       }
+
+      await warnIfAnySetEntryMissingExercises(supabase, savedTemplateId);
     }
     return { success: true, templateId: savedTemplateId };
   } catch (err) {

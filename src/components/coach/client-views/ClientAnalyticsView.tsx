@@ -215,8 +215,8 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {/* SECTION 2: Workout Analytics */}
       <section>
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Workout Analytics</h2>
-        <div className="space-y-4">
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="space-y-3">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-3">Workout adherence (this week)</h3>
             {workout.scheduledThisWeek > 0 ? (
               <>
@@ -237,7 +237,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
               <p className="text-sm fc-text-subtle">No workouts scheduled this week.</p>
             )}
           </div>
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-3">Volume trend (last 12 weeks)</h3>
             {workout.weeklyVolume.length > 0 ? (
               <div className="flex items-end gap-1 h-32">
@@ -269,7 +269,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {/* SECTION 3: Body Composition */}
       <section>
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Body Composition</h2>
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 space-y-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 space-y-3">
           {body.measurements.length > 0 ? (
             <>
               <div>
@@ -361,7 +361,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {/* SECTION 4: Wellness & Recovery */}
       <section>
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Wellness & Recovery</h2>
-        <div className="space-y-4">
+        <div className="space-y-3">
           <WellnessTrendsCard
             logRange={wellness.logs as DailyWellnessLog[]}
             weekStart={weekStart}
@@ -369,7 +369,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
             lastWeekStart={lastWeekStart}
             lastWeekDays={lastWeekDays}
           />
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-2">Check-in consistency (last 3 months)</h3>
             <p className="text-sm fc-text-subtle">
               Total check-ins: {wellness.logs.filter((l) => l.sleep_hours != null && l.stress_level != null && l.soreness_level != null).length} |
@@ -383,7 +383,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {nutrition.hasGoalsOrPlan && (
         <section>
           <h2 className="text-lg font-semibold fc-text-primary mb-4">Nutrition</h2>
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-2">Nutrition adherence</h3>
             {nutrition.adherencePct != null ? (
               <>
@@ -401,7 +401,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
 
       {!nutrition.hasGoalsOrPlan && (
         <section>
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 text-center">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-3 text-center">
             <UtensilsCrossed className="w-10 h-10 fc-text-dim mx-auto mb-2" />
             <p className="fc-text-subtle">No nutrition goals set. Set nutrition targets to track compliance.</p>
             <button
@@ -420,7 +420,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {/* SECTION 6: Goal Progress */}
       <section>
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Goal Progress</h2>
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 space-y-4">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 space-y-2">
           {goals.active.length > 0 ? (
             <>
               {goals.active.map((g) => (
@@ -468,14 +468,14 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       {habits.hasHabits && (
         <section>
           <h2 className="text-lg font-semibold fc-text-primary mb-4">Habit Tracking</h2>
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-3">Completion rate (last 30 days)</h3>
             <ul className="space-y-3">
               {habits.assignments.map((a) => {
                 const comp = habits.completionByHabit[a.id]
                 const pct = comp && comp.total > 0 ? Math.round((comp.completed / comp.total) * 100) : 0
                 return (
-                  <li key={a.id} className="flex justify-between items-center">
+                  <li key={a.id} className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] py-2 last:border-b-0">
                     <span className="text-sm fc-text-primary">{a.name ?? 'Habit'}</span>
                     <span className="text-sm fc-text-subtle">
                       {comp?.completed ?? 0} / {comp?.total ?? 30} ({pct}%) · Streak: {comp?.streak ?? 0}

@@ -14,6 +14,18 @@ import {
 } from '@/lib/clientDashboardService';
 import { getClientMetrics, type ClientMetrics } from '@/lib/coachDashboardService';
 import { computeClientAttention, type ClientRosterStatus } from '@/lib/coachClientAttention';
+import {
+  buildTodayWorkoutSummary,
+  buildNextScheduledWorkout,
+  buildLatestCheckIn,
+  buildWeekWorkoutDots,
+} from '@/lib/coachClientSummaryServer';
+import {
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+  zonedDayInclusiveUtcBounds,
+  mondayYmdOfZonedWeekContaining,
+} from '@/lib/clientZonedCalendar';
 
 async function assertCoachHasClient(
   coachId: string,
@@ -46,19 +58,32 @@ export async function GET(
 
     const { status: clientDbStatus } = await assertCoachHasClient(coachId, clientId, supabaseAdmin);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    const todayStart = `${todayStr}T00:00:00.000Z`;
-    const todayEnd = `${todayStr}T23:59:59.999Z`;
-    const weekStart = new Date(today);
-    const dow = weekStart.getUTCDay();
-    const monOffset = dow === 0 ? -6 : 1 - dow;
-    weekStart.setUTCDate(weekStart.getUTCDate() + monOffset);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const profileResult = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, first_name, last_name, avatar_url, created_at, timezone')
+      .eq('id', clientId)
+      .single();
+
+    if (profileResult.error || !profileResult.data) {
+      return NextResponse.json(
+        { error: profileResult.error?.message ?? 'Failed to load client profile' },
+        { status: 500 }
+      );
+    }
+
+    const profile = profileResult.data;
+    const clientTz = normalizeClientTimezone(
+      (profile as { timezone?: string | null }).timezone
+    );
+    const now = new Date();
+    const todayStr = zonedCalendarDateString(now, clientTz);
+    const { startIso: todayStart, endIso: todayEnd } = zonedDayInclusiveUtcBounds(
+      todayStr,
+      clientTz
+    );
+    const weekStartStr = mondayYmdOfZonedWeekContaining(now, clientTz);
 
     const [
-      profileResult,
       streak,
       weeklyProgress,
       metricsMap,
@@ -69,18 +94,14 @@ export async function GET(
       mealsTodayRes,
       checkinsWeekRes,
       recentWellnessRes,
+      trainedTodayCountRes,
     ] = await Promise.all([
-      supabaseAdmin
-        .from('profiles')
-        .select('id, email, first_name, last_name, avatar_url, created_at')
-        .eq('id', clientId)
-        .single(),
       calculateStreakWithClient(supabaseAdmin, clientId),
       calculateWeeklyProgressWithClient(supabaseAdmin, clientId),
       getClientMetrics([clientId], supabaseAdmin),
       supabaseAdmin
         .from('program_assignments')
-        .select('id, program_id, name, duration_weeks')
+        .select('id, program_id, name, duration_weeks, progression_mode, coach_unlocked_week')
         .eq('client_id', clientId)
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
@@ -128,16 +149,16 @@ export async function GET(
         .eq('client_id', clientId)
         .order('log_date', { ascending: false })
         .limit(8),
+      supabaseAdmin
+        .from('workout_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', todayStart)
+        .lte('completed_at', todayEnd),
     ]);
 
-    if (profileResult.error || !profileResult.data) {
-      return NextResponse.json(
-        { error: profileResult.error?.message ?? 'Failed to load client profile' },
-        { status: 500 }
-      );
-    }
-
-    const profile = profileResult.data;
+    const trainedTodayZoned = (trainedTodayCountRes.count ?? 0) > 0;
     const compliance =
       weeklyProgress.goal > 0
         ? Math.round((weeklyProgress.current / weeklyProgress.goal) * 100)
@@ -178,7 +199,28 @@ export async function GET(
       subscriptionEndDate: null,
       subscriptionExpiringSoon: false,
     };
-    const metrics = metricsMap.get(clientId) ?? defaultMetrics;
+    const baseMetrics = metricsMap.get(clientId) ?? defaultMetrics;
+    const checkedInTodayZoned = (recentWellnessRes.data ?? []).some((w) => {
+      const r = w as {
+        log_date: string;
+        sleep_hours: number | null;
+        sleep_quality: number | null;
+        stress_level: number | null;
+        soreness_level: number | null;
+      };
+      return (
+        r.log_date === todayStr &&
+        r.sleep_hours != null &&
+        r.sleep_quality != null &&
+        r.stress_level != null &&
+        r.soreness_level != null
+      );
+    });
+    const metrics: ClientMetrics = {
+      ...baseMetrics,
+      trainedToday: trainedTodayZoned,
+      checkedInToday: checkedInTodayZoned,
+    };
     const attention = computeClientAttention(rosterStatus, metrics);
 
     const pa = programAssignRes.data as {
@@ -186,6 +228,8 @@ export async function GET(
       program_id: string;
       name: string | null;
       duration_weeks: number | null;
+      progression_mode?: string | null;
+      coach_unlocked_week?: number | null;
     } | null;
 
     let programCard: {
@@ -194,6 +238,12 @@ export async function GET(
       name: string;
       currentWeek: number | null;
       durationWeeks: number | null;
+      progressionMode: string | null;
+      coachUnlockedWeek: number | null;
+      weekReviewNeeded: boolean;
+      reviewWeekNumber: number | null;
+      behindOnWeeklyWorkouts: boolean;
+      programProgressPercent: number | null;
     } | null = null;
 
     if (pa) {
@@ -206,14 +256,48 @@ export async function GET(
           .maybeSingle(),
       ]);
       const nm = (pa.name && pa.name.trim()) || wp?.name || 'Program';
+      const cw = pp?.current_week_number ?? metrics.programCurrentWeek;
+      const dw = pa.duration_weeks ?? metrics.programDurationWeeks;
+      let programProgressPercent: number | null = null;
+      if (
+        cw != null &&
+        dw != null &&
+        dw > 0
+      ) {
+        programProgressPercent = Math.min(100, Math.round((cw / dw) * 100));
+      }
+      const goal = weeklyProgress.goal;
+      const cur = weeklyProgress.current;
       programCard = {
         assignmentId: pa.id,
         programId: pa.program_id,
         name: nm,
-        currentWeek: pp?.current_week_number ?? metrics.programCurrentWeek,
-        durationWeeks: pa.duration_weeks ?? metrics.programDurationWeeks,
+        currentWeek: cw,
+        durationWeeks: dw,
+        progressionMode: pa.progression_mode ?? null,
+        coachUnlockedWeek: pa.coach_unlocked_week ?? null,
+        weekReviewNeeded: metrics.weekReviewNeeded === true,
+        reviewWeekNumber: metrics.completedWeekNumber ?? null,
+        behindOnWeeklyWorkouts: goal > 0 && cur < goal,
+        programProgressPercent,
       };
     }
+
+    const [
+      todayWorkout,
+      nextScheduledWorkout,
+      latestCheckIn,
+      weekWorkoutDots,
+    ] = await Promise.all([
+      trainedTodayZoned
+        ? buildTodayWorkoutSummary(supabaseAdmin, clientId, todayStart, todayEnd)
+        : Promise.resolve(null),
+      !trainedTodayZoned && pa
+        ? buildNextScheduledWorkout(supabaseAdmin, clientId, pa.id, pa.program_id)
+        : Promise.resolve(null),
+      buildLatestCheckIn(supabaseAdmin, clientId),
+      buildWeekWorkoutDots(supabaseAdmin, clientId, clientTz),
+    ]);
 
     let nutritionCard: {
       assignmentId: string;
@@ -319,6 +403,12 @@ export async function GET(
         level: attention.level,
         reasons: attention.reasons,
       },
+      trainedToday: trainedTodayZoned,
+      phone: null,
+      todayWorkout,
+      nextScheduledWorkout,
+      latestCheckIn,
+      weekWorkoutDots,
       metricsSummary: {
         mealCompliance7dPct: metrics.mealCompliance7dPct,
         lastCheckinDate: metrics.lastCheckinDate,

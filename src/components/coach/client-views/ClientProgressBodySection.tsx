@@ -134,7 +134,7 @@ export default function ClientProgressBodySection({
         )}
       </div>
 
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
         <h3 className="text-lg font-semibold fc-text-primary mb-4 flex items-center gap-2">
           <Scale className="w-5 h-5 fc-text-subtle" />
           Latest check-in
@@ -232,7 +232,7 @@ export default function ClientProgressBodySection({
           </p>
         )}
         {anchor?.notes && (
-          <div className="mt-4 fc-glass-soft rounded-xl p-3 border border-[color:var(--fc-glass-border)]">
+          <div className="mt-3 border-t border-[color:var(--fc-glass-border)] px-2 py-2">
             <p className="text-xs font-medium fc-text-subtle mb-1">Client notes</p>
             <p className="text-sm fc-text-primary">{anchor.notes}</p>
           </div>
@@ -242,7 +242,7 @@ export default function ClientProgressBodySection({
       {firstMeasurement &&
         anchor &&
         (anchor.id !== firstMeasurement.id || anchor.measured_date !== firstMeasurement.measured_date) && (
-          <div className="mb-6 p-4 rounded-xl bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30">
+          <div className="mb-4 rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-semibold fc-text-primary mb-3">Since they started</h3>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[280px] text-sm">

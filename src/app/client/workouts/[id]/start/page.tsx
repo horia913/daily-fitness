@@ -77,6 +77,7 @@ import { BARBELL_OPTIONS } from "./constants";
 import { isValidUuid, calculatePlateLoading } from "./utils";
 import { PreviousPerformanceCard } from "./components/PreviousPerformanceCard";
 import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
+import { collectExerciseIdsDeep } from "@/lib/collectExerciseIdsDeep";
 export default function LiveWorkout() {
   const params = useParams();
   const router = useRouter();
@@ -1724,6 +1725,8 @@ export default function LiveWorkout() {
       const isProgramAssignment =
         (resolvedAssignment as any).is_program_assignment === true;
       let workoutBlocks: any[] = [];
+      /** Raw RPC payload (template path only); used to collect exercise_ids from nested tables. */
+      let rpcRawBlocks: unknown = null;
 
       if (isProgramAssignment) {
         // Load blocks from client_program_progression_rules
@@ -1785,6 +1788,7 @@ export default function LiveWorkout() {
           console.error("[start] get_workout_blocks RPC error:", rpcError);
           throw new Error(rpcError.message || "Failed to load workout blocks");
         }
+        rpcRawBlocks = rpcBlocks ?? null;
         workoutBlocks = mapWorkoutBlocksRpcToSetEntries(rpcBlocks ?? []);
 
         if (!workoutBlocks || workoutBlocks.length === 0) {
@@ -1824,16 +1828,22 @@ export default function LiveWorkout() {
           rest_pause_sets: ex.rest_pause_sets ?? [],
         })) as any[],
       }));
-      const allClientExercises = clientBlocks.flatMap(
-        (block) => (block.exercises ?? []) as any[],
-      );
-
+      // Universal: every set-type path (RPC nested tables, mapped exercises, progression overrides)
       const exerciseIds = Array.from(
         new Set(
-          allClientExercises
-            .map((exercise) => exercise.exercise_id)
-            .filter((id): id is string => Boolean(id)),
+          [
+            ...collectExerciseIdsDeep(workoutBlocks),
+            ...(rpcRawBlocks != null ? collectExerciseIdsDeep(rpcRawBlocks) : []),
+          ].filter((id): id is string => Boolean(id)),
         ),
+      );
+
+      console.log(
+        "[loadAssignment] exercise ids by block (set_type + exercise_ids)",
+        workoutBlocks.map((block) => ({
+          set_type: block.set_type,
+          exercise_ids: collectExerciseIdsDeep(block),
+        })),
       );
 
       const exerciseMeta = new Map<

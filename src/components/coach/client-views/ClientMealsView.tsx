@@ -952,9 +952,9 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   const modeBadge = nutritionMode ? getModeBadge(nutritionMode) : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Mode Badge & Unified Compliance Score */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6">
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] px-3 py-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
@@ -1183,7 +1183,7 @@ function MealPlanModeView({
     <>
       {/* Today's Plan (Phase N5) — prominent block */}
       {todayPlanSummary && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 mb-4">
           <h3 className="text-lg font-semibold fc-text-primary mb-2">
             Today&apos;s Plan: {todayPlanSummary.planName}
             {todayPlanSummary.targetCalories != null && ` — ${todayPlanSummary.targetCalories} kcal`}
@@ -1206,7 +1206,7 @@ function MealPlanModeView({
 
       {/* This Week — 7-day compliance grid (Phase N5) */}
       {weeklyCompliance && weeklyCompliance.days.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 mb-4">
           <h4 className="text-sm font-semibold fc-text-primary mb-3">This Week</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -1245,7 +1245,7 @@ function MealPlanModeView({
 
       {/* Plan selection history (Phase N4) */}
       {selectionHistory.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <h4 className="text-sm font-semibold fc-text-primary mb-3">Plan chosen per day</h4>
           <ul className="space-y-1 text-sm">
             {selectionHistory.slice(0, 7).map(({ date, label }) => (
@@ -1260,8 +1260,8 @@ function MealPlanModeView({
 
       {/* Compliance Dashboard */}
       {compliance && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-          <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts">
                 <CheckCircle className="w-5 h-5" />
@@ -1276,7 +1276,7 @@ function MealPlanModeView({
               </div>
             </div>
           </div>
-          <div className="p-4 sm:p-6">
+          <div className="px-3 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
                 <p className="text-3xl font-bold text-cyan-400 tabular-nums">{compliance.loggedMeals}</p>
@@ -1298,7 +1298,7 @@ function MealPlanModeView({
               {compliance.todayMeals.map(meal => (
                 <div
                   key={meal.id}
-                  className={`fc-glass-soft rounded-xl border-l-2 border-l-emerald-500 p-3 flex items-center gap-3 border-y border-r ${
+                  className={`border-b border-[color:var(--fc-glass-border)] px-2 py-2 flex items-center gap-2 last:border-b-0 ${
                     meal.logged
                       ? 'border-[color:var(--fc-status-success)]'
                       : 'border-[color:var(--fc-glass-border)]'
@@ -1427,8 +1427,8 @@ function GoalBasedModeView({ adherence }: { adherence: MacroAdherence | null }) 
   return (
     <>
       {/* Macro Adherence Dashboard */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <Target className="w-5 h-5" />
@@ -1735,7 +1735,7 @@ function HybridModeView({
             </div>
           </div>
         </div>
-        <div className="p-4 sm:p-6">
+        <div className="px-3 py-2">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
               <p className="text-3xl font-bold fc-text-primary">{mealPlanCompliance.loggedMeals}</p>
@@ -1756,7 +1756,7 @@ function HybridModeView({
             {mealPlanCompliance.todayMeals.map(meal => (
               <div
                 key={meal.id}
-                className={`fc-glass-soft rounded-xl border p-3 flex items-center gap-3 ${
+                className={`border-b border-[color:var(--fc-glass-border)] px-2 py-2 flex items-center gap-2 last:border-b-0 ${
                   meal.logged ? 'border-[color:var(--fc-status-success)]' : 'border-[color:var(--fc-glass-border)]'
                 }`}
               >
@@ -1798,8 +1798,8 @@ function HybridModeView({
       </div>
 
       {/* Macro Adherence Section */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <Target className="w-5 h-5" />
@@ -1814,7 +1814,7 @@ function HybridModeView({
             </div>
           </div>
         </div>
-        <div className="p-4 sm:p-6 space-y-6">
+        <div className="px-3 py-2 space-y-3">
           {/* Breakdown */}
           <div>
             <h4 className="text-sm font-semibold fc-text-primary mb-3">Today&apos;s Breakdown</h4>
@@ -1908,7 +1908,7 @@ function HybridModeView({
                 {macroAdherence.todayEntries.map(entry => (
                   <div
                     key={entry.id}
-                    className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-3"
+                    className="border-b border-[color:var(--fc-glass-border)] px-2 py-2 last:border-b-0"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -1977,8 +1977,8 @@ function MealPlansList({
 }) {
   const activePlans = mealPlans.filter((p) => p.is_active !== false)
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-      <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)] flex flex-wrap items-center justify-between gap-3">
+    <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+      <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">
             <Apple className="w-4 h-4" />
@@ -2000,7 +2000,7 @@ function MealPlansList({
           Assign Another Plan
         </Button>
       </div>
-      <div className="p-4 sm:p-6 space-y-4">
+      <div className="px-2 py-1">
         {activePlans.length === 0 ? (
           <EmptyState
             variant="compact"
@@ -2012,7 +2012,7 @@ function MealPlansList({
           activePlans.map((plan) => (
             <div
               key={plan.id}
-              className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5"
+              className="border-b border-[color:var(--fc-glass-border)] px-2 py-3 last:border-b-0"
             >
               <div className="flex items-start gap-4">
                 <div className="fc-icon-tile fc-icon-workouts">

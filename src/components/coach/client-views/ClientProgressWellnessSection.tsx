@@ -137,7 +137,7 @@ export default function ClientProgressWellnessSection({
     <div className="space-y-6">
       <ClientAdherenceView clientId={clientId} />
 
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
         <h3 className="text-lg font-semibold fc-text-primary mb-3">This week (wellness logs)</h3>
         {thisWeekWellnessSummary ? (
           <>
@@ -184,7 +184,7 @@ export default function ClientProgressWellnessSection({
       />
 
       {wellnessByWeek.some((w) => w.sleep.length > 0 || w.stress.length > 0) && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Wellness trend (4 weeks)</h3>
           <div className="space-y-3 text-sm">
             <div>
@@ -228,7 +228,7 @@ export default function ClientProgressWellnessSection({
       )}
 
       {measurements.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <button
             type="button"
             onClick={() => setShowHistory(!showHistory)}
@@ -246,7 +246,7 @@ export default function ClientProgressWellnessSection({
               {measurements.map((m) => (
                 <div
                   key={m.id}
-                  className="fc-glass-soft rounded-xl p-3 flex justify-between items-center"
+                  className="border-b border-[color:var(--fc-glass-border)] px-2 py-2 flex justify-between items-center last:border-b-0"
                 >
                   <span className="text-sm fc-text-primary">
                     {new Date(m.measured_date + "T12:00:00").toLocaleDateString("en-US", {

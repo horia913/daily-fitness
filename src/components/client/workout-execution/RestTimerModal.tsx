@@ -6,6 +6,8 @@ import { SkipForward, Plus, Trophy, Layers } from "lucide-react";
 import { preventBackgroundScroll, restoreBackgroundScroll } from "@/lib/mobile-compatibility";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 
+const TICK_MS = 250;
+
 export interface RestTimerLastSet {
   weight: number;
   reps: number;
@@ -44,7 +46,8 @@ export function RestTimerModal({
 }: RestTimerModalProps) {
   const [timeLeft, setTimeLeft] = useState(restSeconds);
   const [totalRestSeconds, setTotalRestSeconds] = useState(restSeconds);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deadlineRef = useRef<number | null>(null);
+  const reachedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
@@ -53,45 +56,58 @@ export function RestTimerModal({
 
   useEffect(() => {
     if (!isOpen) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      deadlineRef.current = null;
+      reachedRef.current = false;
       setTimeLeft(restSeconds);
       setTotalRestSeconds(restSeconds);
       return;
     }
 
-    setTimeLeft(restSeconds);
-    setTotalRestSeconds(restSeconds);
+    reachedRef.current = false;
+    const total = restSeconds;
+    deadlineRef.current = Date.now() + total * 1000;
+    setTimeLeft(total);
+    setTotalRestSeconds(total);
 
-    if (restSeconds === 0) {
-      setTimeout(() => onCompleteRef.current(), 0);
+    if (total === 0) {
+      queueMicrotask(() => onCompleteRef.current());
       return;
     }
 
-    if (timerRef.current) clearInterval(timerRef.current);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          setTimeout(() => onCompleteRef.current(), 0);
-          return 0;
+    const clearTick = () => {
+      if (intervalId != null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const tick = () => {
+      const end = deadlineRef.current;
+      if (end == null) return;
+      const rem = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      setTimeLeft(rem);
+      if (rem <= 0) {
+        clearTick();
+        if (!reachedRef.current) {
+          reachedRef.current = true;
+          onCompleteRef.current();
         }
-        return next;
-      });
-    }, 1000);
+      }
+    };
+
+    intervalId = setInterval(tick, TICK_MS);
+    tick();
+
+    const sync = () => tick();
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("focus", sync);
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      clearTick();
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("focus", sync);
     };
   }, [isOpen, restSeconds]);
 
@@ -108,8 +124,15 @@ export function RestTimerModal({
   }, [isOpen]);
 
   const handleAdd30 = () => {
-    setTimeLeft((prev) => prev + 30);
+    if (deadlineRef.current != null) {
+      deadlineRef.current += 30_000;
+    }
     setTotalRestSeconds((prev) => prev + 30);
+    setTimeLeft(() => {
+      const end = deadlineRef.current;
+      if (end == null) return 0;
+      return Math.max(0, Math.ceil((end - Date.now()) / 1000));
+    });
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(10);
     }

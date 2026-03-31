@@ -904,6 +904,21 @@ export class WorkoutSetEntryService {
     }
   }
 
+  /**
+   * Clears all child rows for one set entry in a single DB transaction (RPC).
+   * Use before re-inserting exercises / special sets on template save — avoids
+   * duplicate rows when the old timeout-based delete failed silently.
+   */
+  static async deleteAllRelatedDataForSetEntryStrict(setEntryId: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_workout_set_entry_children', {
+      p_set_entry_id: setEntryId,
+    })
+    if (error) {
+      console.error('delete_workout_set_entry_children RPC failed:', error)
+      throw error
+    }
+  }
+
   // Delete all special table data for a set entry (helper for updates)
   static async deleteBlockSpecialData(setEntryId: string, setType?: string): Promise<void> {
     const safeDelete = async (table: string) => {

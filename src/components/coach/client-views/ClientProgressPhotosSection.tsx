@@ -58,7 +58,7 @@ export default function ClientProgressPhotosSection({ clientId }: ClientProgress
   return (
     <div className="space-y-6">
       {comparisonPhotos && (comparisonPhotos.before.length > 0 || comparisonPhotos.after.length > 0) && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Progress photos</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -114,13 +114,13 @@ export default function ClientProgressPhotosSection({ clientId }: ClientProgress
       )}
 
       {photoTimeline.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Photo timeline</h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {photoTimeline.map((entry) => (
               <div
                 key={entry.date}
-                className="fc-glass-soft rounded-xl p-3 flex justify-between items-center text-sm"
+                className="border-b border-[color:var(--fc-glass-border)] px-2 py-2 flex justify-between items-center text-sm last:border-b-0"
               >
                 <span className="fc-text-primary">
                   {new Date(entry.date + "T12:00:00").toLocaleDateString("en-US", {
@@ -140,7 +140,7 @@ export default function ClientProgressPhotosSection({ clientId }: ClientProgress
       )}
 
       {!comparisonPhotos && photoTimeline.length === 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
           <p className="text-sm fc-text-subtle">
             No progress photos yet. Photos are uploaded by the client from their check-in flow.
           </p>

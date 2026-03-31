@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { GlassCard } from "@/components/ui/GlassCard";
 import ClientProfileView from "@/components/coach/client-views/ClientProfileView";
 import CoachClientSubscriptionSection from "@/components/coach/client-views/CoachClientSubscriptionSection";
 import ClientHabitsView from "@/components/coach/client-views/ClientHabitsView";
@@ -51,7 +50,7 @@ export default function ClientProfilePage() {
 
   return (
     <div className="space-y-6">
-      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-3 sm:px-4 sm:py-4">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -85,7 +84,7 @@ export default function ClientProfilePage() {
             ))}
           </div>
         </div>
-      </GlassCard>
+      </div>
 
       <div ref={personalRef} className="scroll-mt-4 space-y-6">
         <ClientProfileView clientId={clientId} />

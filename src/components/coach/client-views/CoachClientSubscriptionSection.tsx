@@ -472,7 +472,7 @@ export default function CoachClientSubscriptionSection({
       <GlassCard
         elevation={2}
         className={cn(
-          'fc-glass fc-card p-5 sm:p-6 border border-[color:var(--fc-glass-border)] border-l-2',
+          'p-3 sm:p-4 border border-[color:var(--fc-glass-border)] border-l-2 rounded-xl',
           !active
             ? ''
             : active && daysRemainingFromEnd(active.end_date) <= 14
@@ -481,7 +481,7 @@ export default function CoachClientSubscriptionSection({
         )}
       >
         {!active ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <EmptyState
               icon={CreditCard}
               title="No active subscription"
@@ -504,25 +504,25 @@ export default function CoachClientSubscriptionSection({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-2 text-[color:var(--fc-text-success)]">
               <CheckCircle2 className="w-5 h-5 shrink-0" />
               <span className="font-semibold">Active</span>
             </div>
-            <div className="space-y-1 text-sm">
-              <p className="fc-text-primary">
+            <div className="text-sm rounded-lg border border-[color:var(--fc-glass-border)]">
+              <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
                 <span className="text-[color:var(--fc-text-dim)]">Plan: </span>
                 <span className="font-medium">
                   {planLabelFromMonths(active.plan_duration_months ?? 1)}
                 </span>
               </p>
-              <p className="fc-text-dim">
+              <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
                 Status:{' '}
                 <span className="fc-text-primary font-medium">
                   {String(active.subscription_status || 'active').replace(/_/g, ' ')}
                 </span>
               </p>
-              <p className="fc-text-dim">
+              <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
                 Started:{' '}
                 {new Date(active.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
                   month: 'short',
@@ -530,7 +530,7 @@ export default function CoachClientSubscriptionSection({
                   year: 'numeric',
                 })}
               </p>
-              <p className="fc-text-primary">
+              <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
                 Expires:{' '}
                 {new Date(active.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
                   month: 'short',
@@ -544,12 +544,12 @@ export default function CoachClientSubscriptionSection({
                 })()}
               </p>
               {active.amount_paid != null && String(active.amount_paid).trim() !== '' && (
-                <p className="fc-text-dim">
+                <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
                   Amount: {Number(active.amount_paid).toLocaleString()}
                 </p>
               )}
               {active.subscription_notes && (
-                <p className="fc-text-dim text-xs mt-2 whitespace-pre-wrap">
+                <p className="fc-text-dim text-xs px-2 py-2 whitespace-pre-wrap">
                   {active.subscription_notes}
                 </p>
               )}

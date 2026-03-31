@@ -19,7 +19,8 @@ const MS_PER_DAY = 86400000
  * Return UTC ISO string for midnight on the given date in the given IANA timezone.
  * Uses Intl only; no server timezone. tz defaults to 'UTC' if invalid.
  */
-function midnightInTimezone(dateStr: string, ianaTimezone: string): string {
+/** UTC instant for 00:00:00 on `dateStr` (YYYY-MM-DD) in `ianaTimezone`. */
+export function midnightInTimezone(dateStr: string, ianaTimezone: string): string {
   if (!dateStr || !ianaTimezone) {
     const fallback = (dateStr || new Date().toISOString().slice(0, 10)) + 'T00:00:00.000Z'
     const d = new Date(fallback)

@@ -191,8 +191,8 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
   return (
     <div className="space-y-6">
       {/* Overview */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts">
@@ -215,7 +215,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
             </Button>
           </div>
         </div>
-        <div className="p-4 sm:p-6">
+        <div className="px-3 py-2">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
               <p className="text-3xl font-bold fc-text-primary">{activeGoals.length}</p>
@@ -236,8 +236,8 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
       </div>
 
       {/* Goals List */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <Target className="w-4 h-4" />
@@ -253,7 +253,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
             </span>
           </div>
         </div>
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="px-2 py-1">
           {displayGoals.map((goal) => {
             const targetVal = goal.target_value != null ? Number(goal.target_value) : null
             const currentVal = goal.current_value != null ? Number(goal.current_value) : null
@@ -268,7 +268,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
             return (
               <div
                 key={goal.id}
-                className="fc-glass rounded-2xl border border-[color:var(--fc-glass-border)] p-5"
+                className="border-b border-[color:var(--fc-glass-border)] px-2 py-3 last:border-b-0"
               >
                 <div className="flex items-start gap-4">
                   <div className="fc-icon-tile fc-icon-workouts">

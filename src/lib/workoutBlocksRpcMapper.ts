@@ -22,9 +22,41 @@ type RpcBlock = {
   drop_sets?: RpcDropSet[];
   cluster_sets?: RpcClusterSet[];
   rest_pause_sets?: RpcRestPauseSet[];
-  pyramid_sets?: unknown[];
-  ladder_sets?: unknown[];
+  pyramid_sets?: RpcPyramidRow[];
+  ladder_sets?: RpcLadderRow[];
   time_protocols?: RpcTimeProtocol[];
+  hr_sets?: RpcHRRow[];
+};
+
+type RpcPyramidRow = {
+  id: string;
+  set_entry_id?: string;
+  exercise_id: string;
+  exercise_order?: number;
+  pyramid_order?: number;
+  weight_kg?: number | null;
+  load_percentage?: number | null;
+  reps?: string | null;
+  rest_seconds?: number | null;
+};
+
+type RpcLadderRow = {
+  id: string;
+  set_entry_id?: string;
+  exercise_id: string;
+  exercise_order?: number;
+  ladder_order?: number;
+  weight_kg?: number | null;
+  load_percentage?: number | null;
+  reps?: number | null;
+  rest_seconds?: number | null;
+};
+
+type RpcHRRow = {
+  id: string;
+  set_entry_id?: string;
+  exercise_id: string;
+  exercise_order?: number;
 };
 
 type RpcExercise = {
@@ -130,7 +162,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
     const usesDropSets = setType === "drop_set";
     const usesClusterSets = setType === "cluster_set";
     const usesRestPause = setType === "rest_pause";
-    const usesTimeProtocols = ["amrap", "emom", "for_time", "tabata"].includes(setType);
+    const usesTimeProtocols = ["amrap", "emom", "for_time", "tabata", "circuit"].includes(setType);
 
     const block: WorkoutSetEntry = {
       id: b.id,
@@ -230,6 +262,53 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
         weight_kg: rp.weight_kg,
         load_percentage: rp.load_percentage,
         rest_pause_sets: [rp],
+      })) as any;
+    } else if (setType === "pyramid_set" && Array.isArray(b.pyramid_sets) && b.pyramid_sets.length > 0) {
+      const psList = [...b.pyramid_sets].sort(
+        (a, b) => (a.pyramid_order ?? 0) - (b.pyramid_order ?? 0),
+      );
+      block.exercises = psList.map((ps) => ({
+        id: ps.id,
+        set_entry_id: b.id,
+        exercise_id: ps.exercise_id,
+        exercise_order: ps.exercise_order ?? 1,
+        exercise: null,
+        sets: b.total_sets,
+        reps: b.reps_per_set,
+        rest_seconds: b.rest_seconds,
+        weight_kg: ps.weight_kg,
+        load_percentage: ps.load_percentage,
+      })) as any;
+    } else if (
+      (setType === "ladder_set" || setType === "ladder") &&
+      Array.isArray(b.ladder_sets) &&
+      b.ladder_sets.length > 0
+    ) {
+      const lsList = [...b.ladder_sets].sort(
+        (a, b) => (a.ladder_order ?? 0) - (b.ladder_order ?? 0),
+      );
+      block.exercises = lsList.map((ls) => ({
+        id: ls.id,
+        set_entry_id: b.id,
+        exercise_id: ls.exercise_id,
+        exercise_order: ls.exercise_order ?? 1,
+        exercise: null,
+        sets: b.total_sets,
+        reps: ls.reps != null ? String(ls.reps) : b.reps_per_set,
+        rest_seconds: ls.rest_seconds ?? b.rest_seconds,
+        weight_kg: ls.weight_kg,
+        load_percentage: ls.load_percentage,
+      })) as any;
+    } else if (setType === "hr_sets" && Array.isArray(b.hr_sets) && b.hr_sets.length > 0) {
+      const hrList = [...b.hr_sets].sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
+      block.exercises = hrList.map((hr) => ({
+        id: hr.id,
+        set_entry_id: b.id,
+        exercise_id: hr.exercise_id,
+        exercise_order: hr.exercise_order ?? 1,
+        exercise: null,
+        sets: b.total_sets,
+        hr_sets: [hr],
       })) as any;
     } else if (usesTimeProtocols && Array.isArray(b.time_protocols) && b.time_protocols.length > 0) {
       const byKey = new Map<string, RpcTimeProtocol[]>();

@@ -27,6 +27,14 @@ import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { useCoachClient } from '@/contexts/CoachClientContext'
 import { cn } from '@/lib/utils'
 import { getCategoryAccent } from '@/lib/workoutCategoryColors'
+import type { AdherenceTier } from '@/lib/coachWorkoutAdherence'
+
+function sessionAdherenceTierClass(tier: AdherenceTier | null | undefined) {
+  if (tier === 'green') return 'text-emerald-400'
+  if (tier === 'amber') return 'text-amber-400'
+  if (tier === 'red') return 'text-red-400'
+  return 'text-gray-500'
+}
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
 // workout_set_entry_exercises -> protocol tables (workout_time_protocols,
@@ -299,6 +307,12 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   const [activeProgramSummary, setActiveProgramSummary] =
     useState<ActiveProgramSummary | null>(null)
   const [recentLogs, setRecentLogs] = useState<RecentWorkoutLogRow[]>([])
+  const [sessionAdherence, setSessionAdherence] = useState<
+    Record<
+      string,
+      { adherencePercent: number | null; tier: AdherenceTier | null }
+    >
+  >({})
   const [assignWorkoutOpen, setAssignWorkoutOpen] = useState(false)
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [customizeOpen, setCustomizeOpen] = useState(false)
@@ -714,6 +728,37 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     loadTrainingData()
   }, [loadTrainingData])
 
+  useEffect(() => {
+    if (recentLogs.length === 0) {
+      setSessionAdherence({})
+      return
+    }
+    const ids = recentLogs.map((l) => l.id).filter(Boolean)
+    if (ids.length === 0) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/coach/clients/${clientId}/workout-logs/adherence-batch?logIds=${encodeURIComponent(ids.join(','))}`
+        )
+        if (!res.ok) return
+        const json = (await res.json()) as {
+          byLogId?: Record<
+            string,
+            { adherencePercent: number | null; tier: AdherenceTier | null }
+          >
+        }
+        if (cancelled) return
+        setSessionAdherence(json.byLogId ?? {})
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [recentLogs, clientId])
+
   const scheduleStrip = useMemo(
     () =>
       buildScheduleStripCells(activeProgramSummary?.weekScheduleSlots ?? []),
@@ -949,7 +994,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
   return (
     <>
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
         <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">
           Training
@@ -958,7 +1003,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       {activeProgramSummary && programHubHref ? (
         <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] border-l-2 border-l-cyan-500 shadow-lg shadow-cyan-500/10 overflow-hidden">
-          <div className="p-6 sm:p-8 space-y-6 bg-gradient-to-br from-cyan-500/5 to-transparent">
+          <div className="p-4 sm:p-5 space-y-4 bg-gradient-to-br from-cyan-500/5 to-transparent">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0 space-y-2">
                 <span className="fc-pill fc-pill-glass fc-text-workouts text-[10px] font-bold uppercase tracking-wider">
@@ -1124,8 +1169,8 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         </div>
       )}
 
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)] flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)] flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold fc-text-primary">
               Recent sessions
@@ -1142,7 +1187,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="flex flex-col border-t border-white/5 p-4 sm:p-6">
+        <div className="flex flex-col border-t border-white/5 px-2 py-1">
           {recentLogs.length === 0 ? (
             <EmptyState
               variant="compact"
@@ -1153,6 +1198,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           ) : (
             recentLogs.map((log) => {
               const accent = getCategoryAccent(log.templateCategory || '')
+              const ad = sessionAdherence[log.id]
               return (
                 <Link
                   key={log.id}
@@ -1192,15 +1238,27 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                           · {formatWeight(log.total_weight_lifted)} volume
                         </p>
                       </div>
-                      <span
-                        className={cn(
-                          'text-xs font-medium shrink-0 inline-flex items-center gap-0.5',
-                          accent.text
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {ad?.adherencePercent != null && (
+                          <span
+                            className={cn(
+                              'text-xs font-semibold tabular-nums',
+                              sessionAdherenceTierClass(ad.tier)
+                            )}
+                          >
+                            {Math.round(ad.adherencePercent)}% on target
+                          </span>
                         )}
-                      >
-                        Open log
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </span>
+                        <span
+                          className={cn(
+                            'text-xs font-medium inline-flex items-center gap-0.5',
+                            accent.text
+                          )}
+                        >
+                          Open log
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -1212,8 +1270,8 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       {/* Programs Section */}
       {otherPrograms.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-          <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts">
                 <Target className="w-4 h-4" />
@@ -1231,18 +1289,18 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
               </span>
             </div>
           </div>
-          <div className="p-4 sm:p-6 space-y-4">
+          <div className="px-2 py-1">
             {otherPrograms.map((program) => {
               const programStatus = getProgramStatusMeta(program.status)
               return (
                 <div
                   key={program.id}
                   onClick={() => handleProgramClick(program)}
-                  className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer ${
+                  className={`border-b border-[color:var(--fc-glass-border)] px-2 py-3 transition-colors w-full cursor-pointer last:border-b-0 ${
                     program.status === 'active' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
                     {/* Row 1: Icon, Title, Button */}
                     <div className="flex items-center gap-4 w-full">
                       {/* Icon */}
@@ -1317,8 +1375,8 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       {/* Standalone workout assignments */}
       {workouts.length > 0 && (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
+        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
               <Dumbbell className="w-4 h-4" />
@@ -1339,7 +1397,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             </span>
           </div>
         </div>
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="px-2 py-1">
             {workouts.map((workout) => {
               const workoutStatus = getWorkoutStatusMeta(workout.status)
               return (
@@ -1347,11 +1405,11 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                   key={workout.id} 
                   data-workout-id={workout.id}
                   onClick={() => handleWorkoutClick(workout)}
-                  className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer ${
+                  className={`border-b border-[color:var(--fc-glass-border)] px-2 py-3 transition-colors w-full cursor-pointer last:border-b-0 ${
                     workout.status === 'in_progress' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
                     {/* Row 1: Icon, Title, Button */}
                     <div className="flex items-center gap-4 w-full">
                       {/* Icon */}

@@ -351,7 +351,7 @@ export function ClientFmsAssessmentsPanel({
 
           {/* Assessments List */}
           {assessments.length > 0 ? (
-            <div className="space-y-4">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
               {assessments.map((assessment) => {
                 const totalScore = assessment.total_score || 0;
                 const maxScore = FMS_TESTS.length * 3;
@@ -361,9 +361,9 @@ export function ClientFmsAssessmentsPanel({
                   <GlassCard
                     key={assessment.id}
                     elevation={2}
-                    className="fc-glass fc-card rounded-2xl"
+                    className="rounded-none border-b border-[color:var(--fc-glass-border)] last:border-b-0"
                   >
-                    <CardHeader className="p-6">
+                    <CardHeader className="px-3 py-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Calendar className="w-5 h-5 text-orange-500" />
@@ -398,7 +398,7 @@ export function ClientFmsAssessmentsPanel({
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-6 pt-0">
+                    <CardContent className="px-3 py-2">
                       {/* Total Score */}
                       <div className="mb-6 p-4 rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800">
                         <div className="flex items-center justify-between">
