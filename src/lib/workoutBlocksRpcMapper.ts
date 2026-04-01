@@ -206,30 +206,49 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
           return String(letterA).localeCompare(String(letterB));
         });
       }
-    } else if (usesDropSets && Array.isArray(b.drop_sets) && b.drop_sets.length > 0) {
-      const byKey = new Map<string, RpcDropSet[]>();
-      for (const ds of b.drop_sets) {
-        const key = exerciseKey(ds.exercise_id, ds.exercise_order);
-        if (!byKey.has(key)) byKey.set(key, []);
-        byKey.get(key)!.push(ds);
+    } else if (usesDropSets) {
+      // Prefer RPC `exercises` when present (same shape as straight_set branch),
+      // then attach drop set rows to each exercise. Fallback to grouping drop_sets.
+      if (Array.isArray(b.exercises) && b.exercises.length > 0) {
+        block.exercises = b.exercises.map((ex) => {
+          const drop = filterByExercise(b.drop_sets ?? [], ex.exercise_id, ex.exercise_order).sort(
+            (a, b) => (a.drop_order ?? 0) - (b.drop_order ?? 0)
+          );
+          return {
+            ...ex,
+            sets: ex.sets ?? b.total_sets,
+            reps: ex.reps ?? b.reps_per_set,
+            weight_kg: ex.weight_kg ?? drop[0]?.weight_kg,
+            load_percentage: ex.load_percentage ?? drop[0]?.load_percentage,
+            drop_sets: drop,
+            exercise: ex.exercise ?? null,
+          } as any;
+        });
+      } else if (Array.isArray(b.drop_sets) && b.drop_sets.length > 0) {
+        const byKey = new Map<string, RpcDropSet[]>();
+        for (const ds of b.drop_sets) {
+          const key = exerciseKey(ds.exercise_id, ds.exercise_order);
+          if (!byKey.has(key)) byKey.set(key, []);
+          byKey.get(key)!.push(ds);
+        }
+        block.exercises = Array.from(byKey.entries()).map(([, dsList]) => {
+          const first = dsList[0];
+          const sorted = [...dsList].sort((a, b) => (a.drop_order ?? 0) - (b.drop_order ?? 0));
+          return {
+            id: first.id,
+            set_entry_id: b.id,
+            exercise_id: first.exercise_id,
+            exercise_order: first.exercise_order,
+            exercise: null,
+            sets: b.total_sets,
+            reps: b.reps_per_set,
+            weight_kg: first.weight_kg,
+            load_percentage: first.load_percentage,
+            drop_sets: sorted,
+          } as any;
+        });
       }
-      block.exercises = Array.from(byKey.entries()).map(([, dsList]) => {
-        const first = dsList[0];
-        const sorted = [...dsList].sort((a, b) => (a.drop_order ?? 0) - (b.drop_order ?? 0));
-        return {
-          id: first.id,
-          set_entry_id: b.id,
-          exercise_id: first.exercise_id,
-          exercise_order: first.exercise_order,
-          exercise: null,
-          sets: b.total_sets,
-          reps: b.reps_per_set,
-          weight_kg: first.weight_kg,
-          load_percentage: first.load_percentage,
-          drop_sets: sorted,
-        } as any;
-      });
-      block.exercises.sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
+      block.exercises?.sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
     } else if (usesClusterSets && Array.isArray(b.cluster_sets) && b.cluster_sets.length > 0) {
       const csList = [...b.cluster_sets].sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
       block.exercises = csList.map((cs) => ({

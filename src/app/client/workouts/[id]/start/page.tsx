@@ -1839,6 +1839,21 @@ export default function LiveWorkout() {
       );
 
       console.log(
+        "[DEBUG] collectExerciseIdsDeep exists:",
+        typeof collectExerciseIdsDeep,
+      );
+      console.log(
+        "[DEBUG] rpcRawBlocks:",
+        JSON.stringify(rpcRawBlocks).substring(0, 1000),
+      );
+      console.log("[DEBUG] exerciseIds before batch query:", exerciseIds);
+      console.log("[DEBUG] workoutBlocks count:", workoutBlocks.length);
+      console.log(
+        "[DEBUG] first block sample:",
+        JSON.stringify(workoutBlocks[0]).substring(0, 500),
+      );
+
+      console.log(
         "[loadAssignment] exercise ids by block (set_type + exercise_ids)",
         workoutBlocks.map((block) => ({
           set_type: block.set_type,
@@ -1879,6 +1894,14 @@ export default function LiveWorkout() {
           });
         }
       }
+      console.log("[DEBUG] exerciseMeta size:", exerciseMeta.size);
+      console.log(
+        "[DEBUG] exerciseMeta entries:",
+        Array.from(exerciseMeta.entries()).map(([k, v]) => ({
+          id: k,
+          name: v.name,
+        })),
+      );
 
       const now = new Date().toISOString();
 
@@ -1917,6 +1940,11 @@ export default function LiveWorkout() {
               const metaDetails = exercise.exercise_id
                 ? exerciseMeta.get(exercise.exercise_id)
                 : undefined;
+              console.log("[DEBUG] building exercise:", {
+                exercise_id: exercise.exercise_id,
+                metaFound: !!exerciseMeta.get(exercise.exercise_id),
+                metaName: exerciseMeta.get(exercise.exercise_id)?.name,
+              });
 
               return {
                 id: exercise.id,
