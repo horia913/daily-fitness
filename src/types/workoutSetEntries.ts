@@ -16,6 +16,8 @@ export type SetType =
   | 'tabata'            // 20s work / 10s rest protocol
   | 'for_time'          // Complete as fast as possible
   | 'hr_sets'           // Heart rate zone training for aerobic endurance
+  | 'speed_work'        // Sprint intervals with full recovery
+  | 'endurance'         // Distance or time-based continuous work
 
 export interface WorkoutSetEntry {
   id: string
@@ -45,6 +47,8 @@ export interface WorkoutSetEntry {
   rest_pause_sets?: WorkoutRestPauseSet[]
   time_protocols?: WorkoutTimeProtocol[]  // One per exercise for time-based set entries
   hr_sets?: WorkoutHRSet[]                // One per exercise for HR-based set entries
+  speed_sets?: WorkoutSpeedSet[]          // workout_speed_sets (RPC key: speed_sets)
+  endurance_sets?: WorkoutEnduranceSet[]  // workout_endurance_sets (RPC key: endurance_sets)
 
   created_at: string
   updated_at: string
@@ -74,6 +78,8 @@ export interface WorkoutSetEntryExercise {
   rest_pause_sets?: WorkoutRestPauseSet[]
   time_protocols?: WorkoutTimeProtocol[]  // For time-based set entries (amrap, emom, for_time, tabata)
   hr_sets?: WorkoutHRSet[]                // For HR-based set entries (hr_sets)
+  speed_sets?: WorkoutSpeedSet[]
+  endurance_sets?: WorkoutEnduranceSet[]
 
   created_at: string
   updated_at: string
@@ -123,19 +129,6 @@ export interface WorkoutClusterSet {
   created_at: string
 }
 
-// Pyramid Set Configuration
-export interface WorkoutPyramidSet {
-  id: string
-  set_entry_id: string                 // Links to workout set entry
-  exercise_id: string                   // Links to exercise from library
-  exercise_order: number                // Order of exercise within set entry
-  pyramid_order: number                 // Order in the pyramid
-  weight_kg?: number
-  reps?: string
-  rest_seconds?: number
-  created_at: string
-}
-
 // Rest-Pause Configuration
 export interface WorkoutRestPauseSet {
   id: string
@@ -149,7 +142,7 @@ export interface WorkoutRestPauseSet {
   created_at: string
 }
 
-// Time Protocol Configuration (AMRAP, EMOM, Tabata, For Time, Circuit)
+// Time Protocol Configuration (AMRAP, EMOM, Tabata, For Time)
 export interface WorkoutTimeProtocol {
   id: string
   set_entry_id: string                 // Links to workout set entry
@@ -159,28 +152,15 @@ export interface WorkoutTimeProtocol {
   total_duration_minutes?: number       // For AMRAP, EMOM
   work_seconds?: number                 // For Tabata, EMOM work periods
   rest_seconds?: number                 // For Tabata, EMOM rest periods (rest after exercise)
-  rest_after_set?: number               // For Circuit/Tabata: rest after completing all exercises in the set
+  rest_after_set?: number               // For Tabata: rest after completing all exercises in the set
   rounds?: number                       // For Tabata (usually 8)
   target_reps?: number                  // For AMRAP, For Time
   time_cap_minutes?: number             // For For Time
   reps_per_round?: number               // For EMOM (reps per minute/round)
   emom_mode?: string                    // For EMOM (target_reps or target_time)
-  set?: number                          // Set number (for Tabata/Circuit only)
+  set?: number                          // Set number (for Tabata only)
   weight_kg?: number | null             // Weight for time-based set entries (amrap, emom, for_time)
   load_percentage?: number | null       // Load percentage for time-based set entries (amrap, emom, for_time, NOT tabata)
-  created_at: string
-}
-
-// Ladder Configuration
-export interface WorkoutLadderSet {
-  id: string
-  set_entry_id: string                 // Links to workout set entry
-  exercise_id: string                   // Links to exercise from library
-  exercise_order: number                // Order of exercise within set entry
-  ladder_order: number                  // Order in the ladder
-  weight_kg?: number
-  reps?: number
-  rest_seconds?: number
   created_at: string
 }
 
@@ -205,6 +185,39 @@ export interface WorkoutHRSet {
   updated_at?: string
 }
 
+/** workout_speed_sets — must match database columns */
+export interface WorkoutSpeedSet {
+  id: string
+  set_entry_id: string
+  exercise_id: string
+  exercise_order: number
+  intervals: number
+  distance_meters: number
+  load_pct_bw?: number | null
+  target_speed_pct?: number | null
+  target_hr_pct?: number | null
+  rest_seconds: number
+  notes?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+/** workout_endurance_sets — must match database columns */
+export interface WorkoutEnduranceSet {
+  id: string
+  set_entry_id: string
+  exercise_id: string
+  exercise_order: number
+  target_distance_meters: number
+  target_time_seconds?: number | null
+  target_pace_seconds_per_km?: number | null
+  hr_zone?: number | null
+  target_hr_pct?: number | null
+  notes?: string | null
+  created_at: string
+  updated_at?: string
+}
+
 // UI Helper Types
 export interface SetTypeConfig {
   type: SetType
@@ -217,9 +230,7 @@ export interface SetTypeConfig {
   supportsHRSets: boolean
   supportsDropSets: boolean
   supportsClusterSets: boolean
-  supportsPyramidSets: boolean
   supportsRestPause: boolean
-  supportsLadder: boolean
 }
 
 // Live Workout Execution Types
@@ -258,6 +269,11 @@ export interface LoggedSet {
   rest_seconds?: number
   notes?: string
   completed_at: Date
+  /** Logged performance — speed / endurance / HR-capable blocks */
+  actual_time_seconds?: number
+  actual_distance_meters?: number
+  actual_hr_avg?: number
+  actual_speed_kmh?: number
 }
 
 // Set Type Configurations
@@ -273,9 +289,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   superset: {
     type: 'superset',
@@ -288,9 +302,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: true,
     supportsClusterSets: true,
-    supportsPyramidSets: true,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   giant_set: {
     type: 'giant_set',
@@ -303,9 +315,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   drop_set: {
     type: 'drop_set',
@@ -318,9 +328,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: true,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   cluster_set: {
     type: 'cluster_set',
@@ -333,9 +341,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: true,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   rest_pause: {
     type: 'rest_pause',
@@ -348,9 +354,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: true,
-    supportsLadder: false
+    supportsRestPause: true
   },
   pre_exhaustion: {
     type: 'pre_exhaustion',
@@ -363,9 +367,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   amrap: {
     type: 'amrap',
@@ -378,9 +380,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   emom: {
     type: 'emom',
@@ -393,9 +393,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   tabata: {
     type: 'tabata',
@@ -408,9 +406,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   for_time: {
     type: 'for_time',
@@ -423,9 +419,7 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
   },
   hr_sets: {
     type: 'hr_sets',
@@ -438,8 +432,32 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     supportsHRSets: true,
     supportsDropSets: false,
     supportsClusterSets: false,
-    supportsPyramidSets: false,
-    supportsRestPause: false,
-    supportsLadder: false
+    supportsRestPause: false
+  },
+  speed_work: {
+    type: 'speed_work',
+    name: 'Speed Work',
+    description: 'Sprint intervals with full recovery',
+    icon: '⚡',
+    color: 'amber',
+    requiresMultipleExercises: false,
+    supportsTimeProtocols: false,
+    supportsHRSets: false,
+    supportsDropSets: false,
+    supportsClusterSets: false,
+    supportsRestPause: false
+  },
+  endurance: {
+    type: 'endurance',
+    name: 'Endurance',
+    description: 'Distance or time-based continuous work',
+    icon: '🏃',
+    color: 'emerald',
+    requiresMultipleExercises: false,
+    supportsTimeProtocols: false,
+    supportsHRSets: false,
+    supportsDropSets: false,
+    supportsClusterSets: false,
+    supportsRestPause: false
   },
 }

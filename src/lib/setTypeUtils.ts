@@ -16,10 +16,36 @@ const SET_TYPE_MAP: Record<string, string> = {
   for_time: 'for_time',
   fortime: 'for_time',
   tabata: 'tabata',
-  circuit: 'circuit',
-  pyramid_set: 'pyramid_set',
-  ladder: 'ladder',
   hr_sets: 'hr_sets',
+  speedwork: 'speed_work',
+  speed_work: 'speed_work',
+  endurance: 'endurance',
+};
+
+/** Human-readable labels for UI (coach + client) */
+export const SET_TYPE_DISPLAY: Record<string, string> = {
+  straight_set: 'Straight Set',
+  superset: 'Superset',
+  giant_set: 'Giant Set',
+  drop_set: 'Drop Set',
+  cluster_set: 'Cluster Set',
+  rest_pause: 'Rest-Pause',
+  pre_exhaustion: 'Pre-Exhaustion',
+  amrap: 'AMRAP',
+  emom: 'EMOM',
+  tabata: 'Tabata',
+  for_time: 'For Time',
+  hr_sets: 'HR Sets',
+  speed_work: 'Speed Work',
+  endurance: 'Endurance',
+};
+
+/**
+ * Short icon hints for set types (emoji). Specialized UIs may use Lucide instead.
+ */
+export const SET_TYPE_ICON: Record<string, string> = {
+  speed_work: '⚡',
+  endurance: '🏃',
 };
 
 /**
@@ -28,4 +54,10 @@ const SET_TYPE_MAP: Record<string, string> = {
 export function normalizeSetType(type: string | null | undefined): string {
   if (type == null || type === '') return type ?? '';
   return SET_TYPE_MAP[type] ?? type;
+}
+
+export function getSetTypeDisplayLabel(type: string | null | undefined): string {
+  if (type == null || type === '') return '';
+  const c = normalizeSetType(type);
+  return SET_TYPE_DISPLAY[c] ?? SET_TYPE_DISPLAY[type] ?? type;
 }

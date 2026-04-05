@@ -46,6 +46,8 @@ import { EmomExecutor } from "./workout-execution/blocks/EmomExecutor";
 import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
 import { HRSetExecutor } from "./workout-execution/blocks/HRSetExecutor";
+import { SpeedWorkExecutor } from "./workout-execution/blocks/SpeedWorkExecutor";
+import { EnduranceExecutor } from "./workout-execution/blocks/EnduranceExecutor";
 
 interface LiveWorkoutBlockExecutorProps {
   block: LiveWorkoutBlock;
@@ -128,6 +130,8 @@ interface LiveWorkoutBlockExecutorProps {
   ) => void;
   /** Exit workout (confirm + navigate). Passed to block layout header back control. */
   onExitWorkout?: () => void;
+  /** Client body weight (kg) for speed work % BW display */
+  clientBodyWeightKg?: number | null;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -157,6 +161,7 @@ export default function LiveWorkoutBlockExecutor({
   onPRDetected,
   onAchievementsUnlocked,
   onExitWorkout,
+  clientBodyWeightKg = null,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
   const { user: authUser } = useAuth();
@@ -1035,6 +1040,7 @@ export default function LiveWorkoutBlockExecutor({
     onSetEditSaved: onSetEditSaved ?? (() => {}),
     loggedSets: loggedSets ?? [],
     onWorkoutBack: onExitWorkout,
+    clientBodyWeightKg,
   };
 
   // Route to appropriate component based on block type
@@ -1066,6 +1072,10 @@ export default function LiveWorkoutBlockExecutor({
         return <ForTimeExecutor {...commonProps} />;
       case "hr_sets":
         return <HRSetExecutor {...commonProps} />;
+      case "speed_work":
+        return <SpeedWorkExecutor {...commonProps} />;
+      case "endurance":
+        return <EnduranceExecutor {...commonProps} />;
       default:
         return <StraightSetExecutor {...commonProps} />;
     }

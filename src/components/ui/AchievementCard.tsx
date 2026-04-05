@@ -3,7 +3,8 @@
 import React from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GlassCard } from "./GlassCard";
-import { Lock, Trophy } from "lucide-react";
+import { Lock } from "lucide-react";
+import { AchievementIconDisplay } from "./achievementIconDisplay";
 import { rarityColors } from "@/lib/colors";
 
 export type AchievementRarity =
@@ -118,17 +119,17 @@ function AchievementDenseRow({
       }}
     >
       {earned ? (
-        achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
-          <span className="text-xl">{achievement.icon}</span>
-        ) : (
-          <Trophy className="h-5 w-5" style={{ color: rarity.color }} />
-        )
+        <AchievementIconDisplay
+          icon={achievement.icon}
+          className="text-xl [&_svg]:h-5 [&_svg]:w-5"
+          style={{ color: rarity.color }}
+        />
       ) : inProgress ? (
-        achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
-          <span className="text-xl opacity-60">{achievement.icon}</span>
-        ) : (
-          <Trophy className="h-5 w-5 opacity-60" style={{ color: rarity.color }} />
-        )
+        <AchievementIconDisplay
+          icon={achievement.icon}
+          className="text-xl opacity-60 [&_svg]:h-5 [&_svg]:w-5"
+          style={{ color: rarity.color }}
+        />
       ) : (
         <Lock
           className="h-5 w-5"
@@ -284,11 +285,11 @@ export function AchievementCard({
                 boxShadow: `0 4px 12px ${rarity.glow}40`,
               }}
             >
-              {achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
-                <span className="text-3xl">{achievement.icon}</span>
-              ) : (
-                <Trophy className="w-7 h-7" style={{ color: rarity.color }} />
-              )}
+              <AchievementIconDisplay
+                icon={achievement.icon}
+                className="text-3xl [&_svg]:h-7 [&_svg]:w-7"
+                style={{ color: rarity.color }}
+              />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -397,11 +398,11 @@ export function AchievementCard({
               border: `1px dashed ${rarity.color}40`,
             }}
           >
-            {achievement.icon && !/^[🏆🏅🎖️⭐]/.test(achievement.icon) ? (
-              <span className="text-3xl opacity-60">{achievement.icon}</span>
-            ) : (
-              <Trophy className="w-7 h-7 opacity-60" style={{ color: rarity.color }} />
-            )}
+            <AchievementIconDisplay
+              icon={achievement.icon}
+              className="text-3xl opacity-60 [&_svg]:h-7 [&_svg]:w-7"
+              style={{ color: rarity.color }}
+            />
           </div>
 
           <div className="flex-1">

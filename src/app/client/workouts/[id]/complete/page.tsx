@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -27,6 +27,10 @@ import { PersonalRecordsService } from "@/lib/progressTrackingService";
 import { fetchApi } from "@/lib/apiClient";
 import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/ui/toast-provider";
+import {
+  formatPaceMinSecPerKm,
+  formatDurationFromSeconds,
+} from "@/lib/enduranceFormUtils";
 
 interface WorkoutAssignment {
   id: string;
@@ -94,6 +98,11 @@ interface WorkoutSetLog {
   preexhaust_compound_weight?: number | null;
   preexhaust_compound_reps?: number | null;
 
+  actual_time_seconds?: number | null;
+  actual_distance_meters?: number | null;
+  actual_hr_avg?: number | null;
+  actual_speed_kmh?: number | null;
+
   exercises?: {
     id: string;
     name: string;
@@ -117,7 +126,7 @@ interface BlockGroup {
   templateBlock?: any; // Store full template block data for blocks with no sets
 }
 
-export default function WorkoutComplete() {
+function WorkoutCompleteContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -599,6 +608,10 @@ export default function WorkoutComplete() {
           preexhaust_compound_exercise_id,
           preexhaust_compound_weight,
           preexhaust_compound_reps,
+          actual_time_seconds,
+          actual_distance_meters,
+          actual_hr_avg,
+          actual_speed_kmh,
           exercises (
             id,
             name
@@ -1214,6 +1227,66 @@ export default function WorkoutComplete() {
           </div>
         );
 
+      case "speed_work": {
+        const speedName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
+        const t = set.actual_time_seconds;
+        const timeStr =
+          t != null && Number.isFinite(t)
+            ? `${(Math.round(Number(t) * 10) / 10).toFixed(1)}s`
+            : "—";
+        const hr = set.actual_hr_avg;
+        const hrPart =
+          hr != null && Number.isFinite(Number(hr))
+            ? ` · ${Math.round(Number(hr))} bpm`
+            : "";
+        const intervalNum = set.set_number || 1;
+        return (
+          <div className="text-sm">
+            <span className="font-semibold">
+              • {speedName} — Interval {intervalNum}: {timeStr}
+              {hrPart}
+            </span>
+          </div>
+        );
+      }
+
+      case "endurance": {
+        const endName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
+        const distM = set.actual_distance_meters;
+        const timeSec = set.actual_time_seconds;
+        const parts: string[] = [];
+        if (distM != null && Number.isFinite(Number(distM)) && Number(distM) > 0) {
+          parts.push(`${(Number(distM) / 1000).toFixed(1)} km`);
+        }
+        if (timeSec != null && Number.isFinite(Number(timeSec)) && Number(timeSec) > 0) {
+          parts.push(formatDurationFromSeconds(Math.floor(Number(timeSec))));
+        }
+        const km = distM != null ? Number(distM) / 1000 : 0;
+        const ts = timeSec != null ? Number(timeSec) : 0;
+        if (km > 0 && ts > 0) {
+          const secPerKm = ts / km;
+          if (Number.isFinite(secPerKm) && secPerKm > 0) {
+            parts.push(formatPaceMinSecPerKm(secPerKm));
+          }
+        }
+        const hrE = set.actual_hr_avg;
+        if (hrE != null && Number.isFinite(Number(hrE))) {
+          parts.push(`${Math.round(Number(hrE))} bpm`);
+        }
+        const summary = parts.length > 0 ? parts.join(" · ") : "—";
+        return (
+          <div className="text-sm">
+            <span className="font-semibold">
+              • {endName} — {summary}
+            </span>
+          </div>
+        );
+      }
+
       default:
         return (
           <div className="text-sm">
@@ -1557,6 +1630,135 @@ export default function WorkoutComplete() {
 
   const totalExercises = blockGroups.reduce((s, g) => s + g.exerciseNames.size, 0);
 
+  const allLoggedSets = blockGroups.flatMap((g) => g.sets);
+  const isCardioSet = (s: WorkoutSetLog) =>
+    s.set_type === "speed_work" || s.set_type === "endurance";
+  const cardioLoggedSets = allLoggedSets.filter(isCardioSet);
+  const strengthLoggedSets = allLoggedSets.filter((s) => !isCardioSet(s));
+
+  type StatsStripMode = "cardio_only" | "strength_only" | "mixed";
+  let statsStripMode: StatsStripMode = "strength_only";
+  if (allLoggedSets.length > 0) {
+    const hasCardio = cardioLoggedSets.length > 0;
+    const hasStrength = strengthLoggedSets.length > 0;
+    if (hasCardio && hasStrength) statsStripMode = "mixed";
+    else if (hasCardio) statsStripMode = "cardio_only";
+    else statsStripMode = "strength_only";
+  }
+
+  const intervalCount = cardioLoggedSets.filter((s) => s.set_type === "speed_work").length;
+  const cardioTotalDistanceM = cardioLoggedSets.reduce((sum, s) => {
+    const d = s.actual_distance_meters;
+    const n = d == null ? NaN : Number(d);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+  const cardioTotalTimeSec = cardioLoggedSets.reduce((sum, s) => {
+    const t = s.actual_time_seconds;
+    const n = t == null ? NaN : Number(t);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+  const cardioDistKm = cardioTotalDistanceM / 1000;
+  const cardioAvgPaceSecPerKm =
+    cardioDistKm > 0 && cardioTotalTimeSec > 0
+      ? cardioTotalTimeSec / cardioDistKm
+      : null;
+
+  const formatDistanceKm = (meters: number): string => {
+    if (!Number.isFinite(meters) || meters <= 0) return "—";
+    return `${(meters / 1000).toFixed(1)} km`;
+  };
+
+  const sessionTotalSeconds = Math.max(
+    0,
+    Math.round(Number(workoutStats.duration || 0) * 60)
+  );
+  const mixedSessionTimeDisplay =
+    sessionTotalSeconds > 0
+      ? formatDurationFromSeconds(sessionTotalSeconds)
+      : "—";
+
+  const statItem = (
+    value: React.ReactNode,
+    label: string,
+    colorVar: string,
+    key: string
+  ) => (
+    <div key={key} className="fc-stats-strip-item">
+      <span className="fc-stats-strip-value" style={{ color: colorVar }}>
+        {value}
+      </span>
+      <span className="fc-stats-strip-label">{label}</span>
+    </div>
+  );
+
+  let statsStripItems: React.ReactNode[];
+  if (statsStripMode === "cardio_only") {
+    statsStripItems = [
+      statItem(intervalCount > 0 ? intervalCount : "—", "Intervals", "var(--fc-accent-cyan)", "intervals"),
+      statItem(
+        cardioTotalDistanceM > 0 ? formatDistanceKm(cardioTotalDistanceM) : "—",
+        "Distance",
+        "var(--fc-status-success)",
+        "dist"
+      ),
+      statItem(
+        cardioTotalTimeSec > 0
+          ? formatDurationFromSeconds(Math.floor(cardioTotalTimeSec))
+          : "—",
+        "Total time",
+        "var(--fc-status-warning)",
+        "time"
+      ),
+      statItem(
+        cardioAvgPaceSecPerKm != null
+          ? formatPaceMinSecPerKm(cardioAvgPaceSecPerKm)
+          : "—",
+        "Avg pace",
+        "var(--fc-accent-purple)",
+        "pace"
+      ),
+    ];
+  } else if (statsStripMode === "mixed") {
+    statsStripItems = [
+      statItem(totalExercises > 0 ? totalExercises : "—", "Exercises", "var(--fc-accent-cyan)", "ex"),
+      statItem(
+        workoutStats.totalSets > 0 ? workoutStats.totalSets : "—",
+        "Sets",
+        "var(--fc-status-success)",
+        "sets"
+      ),
+      statItem(mixedSessionTimeDisplay, "Total time", "var(--fc-status-warning)", "time"),
+      statItem(
+        workoutStats.totalWeight > 0 ? formatVolume(workoutStats.totalWeight) : "—",
+        "kg lifted",
+        "var(--fc-status-error)",
+        "kg"
+      ),
+    ];
+  } else {
+    statsStripItems = [
+      statItem(personalRecords.length > 0 ? personalRecords.length : "—", "PRs", "var(--fc-status-error)", "prs"),
+      statItem(
+        workoutStats.totalWeight > 0 ? formatVolume(workoutStats.totalWeight) : "—",
+        "kg lifted",
+        "var(--fc-accent-cyan)",
+        "kg"
+      ),
+      statItem(
+        workoutStats.totalSets > 0 ? workoutStats.totalSets : "—",
+        "Sets",
+        "var(--fc-status-success)",
+        "sets"
+      ),
+      statItem(
+        workoutStats.totalReps > 0 ? workoutStats.totalReps : "—",
+        "Reps",
+        "var(--fc-status-warning)",
+        "reps"
+      ),
+    ];
+  }
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -1580,24 +1782,7 @@ export default function WorkoutComplete() {
 
             {/* Stats Strip */}
             <section>
-              <div className="fc-stats-strip">
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-error)" }}>{personalRecords.length}</span>
-                  <span className="fc-stats-strip-label">PRs</span>
-                </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-accent-cyan)" }}>{formatVolume(workoutStats.totalWeight)}</span>
-                  <span className="fc-stats-strip-label">kg lifted</span>
-                </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-success)" }}>{workoutStats.totalSets}</span>
-                  <span className="fc-stats-strip-label">Sets</span>
-                </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-warning)" }}>{workoutStats.totalReps}</span>
-                  <span className="fc-stats-strip-label">Reps</span>
-                </div>
-              </div>
+              <div className="fc-stats-strip">{statsStripItems}</div>
             </section>
 
             {/* Session Highlights Card */}
@@ -1896,5 +2081,26 @@ export default function WorkoutComplete() {
           )}
       </AnimatedBackground>
     </ProtectedRoute>
+  );
+}
+
+export default function WorkoutComplete() {
+  return (
+    <Suspense
+      fallback={
+        <ProtectedRoute>
+          <AnimatedBackground>
+            <ClientPageShell>
+              <div className="animate-pulse space-y-4 p-4">
+                <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </ClientPageShell>
+          </AnimatedBackground>
+        </ProtectedRoute>
+      }
+    >
+      <WorkoutCompleteContent />
+    </Suspense>
   );
 }

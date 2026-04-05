@@ -1258,3 +1258,326 @@
 .dark .fc-activity-bar--inactive {
   background: rgba(255, 255, 255, 0.06);
 }
+
+/* --- Athlete score ring (CSS-only motion; GPU-friendly) --- */
+.as-ring-root {
+  position: relative;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.as-ring-gpu {
+  transform: translateZ(0);
+  will-change: transform, stroke-dashoffset, filter, opacity;
+}
+
+.as-ring-fill-transition {
+  transition: stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes as-ring-slip-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.45));
+  }
+  50% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 14px rgba(217, 119, 6, 0.55));
+  }
+}
+
+.as-ring-tier-slipping .as-ring-progress-arc {
+  animation: as-ring-slip-pulse 4s ease-in-out infinite;
+}
+
+.as-ring-tier-showing .as-ring-halo {
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.28) 0%, rgba(34, 211, 238, 0.08) 45%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Showing Up: dashed energy flowing around track (full ring, under progress) */
+@keyframes as-ring-showing-flow-spin {
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-showing .as-ring-showing-flow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-showing-flow-spin 20s linear infinite;
+}
+
+@keyframes as-ring-locked-glow {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.as-ring-tier-locked .as-ring-halo {
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(251, 146, 60, 0.24) 0%, rgba(234, 88, 12, 0.1) 48%, transparent 72%);
+  pointer-events: none;
+  z-index: 0;
+  transform-origin: center;
+  animation: as-ring-locked-glow 4s ease-in-out infinite;
+}
+
+/* Locked In: subtle warm flicker on main progress arc */
+@keyframes as-ring-locked-flicker {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.35)) drop-shadow(0 0 12px rgba(234, 88, 12, 0.22));
+  }
+  33% {
+    filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.42)) drop-shadow(0 0 14px rgba(249, 115, 22, 0.28));
+  }
+  66% {
+    filter: drop-shadow(0 0 5px rgba(248, 113, 113, 0.38)) drop-shadow(0 0 11px rgba(234, 88, 12, 0.2));
+  }
+}
+
+/* Filter on <circle>, not <g> — avoids rectangular filter bbox (glowing “square”) */
+.as-ring-tier-locked .as-ring-locked-flicker-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: filter;
+  animation: as-ring-locked-flicker 4s ease-in-out infinite;
+}
+
+/* Locked In: traveling hotspot (screen blend over progress) */
+@keyframes as-ring-locked-hotspot-spin {
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-locked .as-ring-locked-hotspot {
+  transform-box: fill-box;
+  transform-origin: center;
+  mix-blend-mode: screen;
+  animation: as-ring-locked-hotspot-spin 8s linear infinite;
+}
+
+/* Outer thin ring, opposite spin */
+@keyframes as-ring-locked-outer-spin {
+  to {
+    transform: rotate(-360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-locked .as-ring-locked-outer-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-locked-outer-spin 12s linear infinite;
+}
+
+@keyframes as-ring-locked-ember-pulse {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+}
+
+.as-ring-tier-locked .as-ring-locked-ember {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-locked-ember-pulse 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.9));
+}
+
+/* Beast Mode: radial wash — opacity only (no transform) to avoid compositor glitches */
+@keyframes as-ring-beast-aura-pulse {
+  0%,
+  100% {
+    opacity: 0.48;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-aura {
+  pointer-events: none;
+  animation: as-ring-beast-aura-pulse 3s ease-in-out infinite;
+}
+
+/* Wider SVG strokes only — WebKit turns CSS filter:drop-shadow on SVG into a square tile */
+@keyframes as-ring-beast-echo-flicker {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  25% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  75% {
+    opacity: 0.88;
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-fire-echo {
+  pointer-events: none;
+  animation: as-ring-beast-echo-flicker 2.4s ease-in-out infinite;
+}
+
+/* When Lottie/canvas motion plays, keep SVG/CSS as subtle base (fallback if motion dies) */
+.as-ring-tier-beast.as-ring-beast--with-motion-bg .as-ring-beast-fire-echo {
+  animation: none;
+  opacity: 0.42;
+}
+
+.as-ring-tier-beast.as-ring-beast--with-motion-bg .as-ring-beast-aura {
+  animation: none;
+  opacity: 0.4;
+}
+
+@keyframes as-ring-beast-inner-spin {
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-inner-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-beast-inner-spin 15s linear infinite;
+}
+
+@keyframes as-ring-beast-heat-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.34;
+  }
+  50% {
+    transform: scale(1.035);
+    opacity: 0.54;
+  }
+}
+
+@keyframes as-ring-beast-heat-pulse-outer {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.26;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.46;
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-heat-pulse--inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-beast-heat-pulse 3s ease-in-out infinite;
+}
+
+.as-ring-tier-beast .as-ring-beast-heat-pulse--outer {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-beast-heat-pulse-outer 3s ease-in-out infinite;
+}
+
+@keyframes as-ring-beast-energy-flow {
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-energy {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.48;
+  animation: as-ring-beast-energy-flow 3s linear infinite;
+}
+
+@keyframes as-ring-beast-outer-spin {
+  to {
+    transform: rotate(-360deg) translateZ(0);
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-outer-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-beast-outer-spin 10s linear infinite;
+}
+
+@keyframes as-ring-beast-tip-pulse {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-tip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: as-ring-beast-tip-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes as-ring-beast-text-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 10px rgba(56, 189, 248, 0.52),
+      0 0 22px rgba(34, 211, 238, 0.38),
+      0 0 36px rgba(190, 242, 100, 0.28);
+  }
+  50% {
+    text-shadow:
+      0 0 14px rgba(255, 255, 255, 0.5),
+      0 0 28px rgba(14, 165, 233, 0.4),
+      0 0 44px rgba(163, 230, 53, 0.22);
+  }
+}
+
+.as-ring-tier-beast .as-ring-beast-score {
+  text-shadow:
+    0 0 10px rgba(125, 211, 252, 0.48),
+    0 0 24px rgba(6, 182, 212, 0.34),
+    0 0 34px rgba(190, 242, 100, 0.22);
+  animation: as-ring-beast-text-glow 2s ease-in-out infinite;
+}
+
+.as-ring-center-pop {
+  transition: opacity 0.35s ease-out 0.1s, transform 0.35s ease-out 0.1s;
+}
+
+.as-ring-center-pop--hidden {
+  opacity: 0;
+  transform: scale(0.92) translateZ(0);
+}
+
+.as-ring-center-pop--visible {
+  opacity: 1;
+  transform: scale(1) translateZ(0);
+}

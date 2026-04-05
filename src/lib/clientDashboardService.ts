@@ -14,229 +14,171 @@ export interface DashboardStats {
   };
 }
 
-/**
- * Calculate client's current workout streak (consecutive days with completed workouts)
- */
-export async function calculateStreak(clientId: string): Promise<number> {
-  try {
-    // Get all completed workout logs, ordered by completion date descending
-    const { data: logs, error } = await supabase
-      .from('workout_logs')
-      .select('completed_at')
-      .eq('client_id', clientId)
-      .not('completed_at', 'is', null)
-      .order('completed_at', { ascending: false });
+/** Matches get_client_dashboard Option C: active program + program-linked sessions only. */
+interface ActiveProgramCtx {
+  paId: string;
+  programId: string;
+  ppWeek: number;
+}
 
-    if (error || !logs || logs.length === 0) {
-      return 0;
-    }
+async function getActiveProgramCtx(
+  sb: SupabaseClient,
+  clientId: string
+): Promise<ActiveProgramCtx | null> {
+  const { data: pa, error: paErr } = await sb
+    .from('program_assignments')
+    .select('id, program_id')
+    .eq('client_id', clientId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-    // Extract unique dates (YYYY-MM-DD)
-    const uniqueDates = Array.from(
-      new Set(
-        logs.map(log => new Date(log.completed_at!).toISOString().split('T')[0])
-      )
-    ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  if (paErr || !pa?.id || !pa.program_id) return null;
 
-    if (uniqueDates.length === 0) return 0;
+  const { data: pp } = await sb
+    .from('program_progress')
+    .select('current_week_number')
+    .eq('program_assignment_id', pa.id)
+    .maybeSingle();
 
-    // Check if streak is current (most recent date should be today or yesterday)
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
-    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
-      return 0; // Streak broken
-    }
+  return {
+    paId: pa.id,
+    programId: pa.program_id,
+    ppWeek: pp?.current_week_number ?? 1,
+  };
+}
 
-    // Count consecutive days
-    let streak = 1;
-    let expectedDate = new Date(uniqueDates[0]);
-    
-    for (let i = 1; i < uniqueDates.length; i++) {
-      expectedDate.setDate(expectedDate.getDate() - 1);
-      const expectedDateStr = expectedDate.toISOString().split('T')[0];
-      
-      if (uniqueDates[i] === expectedDateStr) {
-        streak++;
-      } else {
-        break; // Streak broken
-      }
-    }
+function resolveIndexedWeekNumber(
+  distinctWeekNumbers: number[],
+  currentWeekNumberFromProgress: number
+): number | null {
+  if (!distinctWeekNumbers.length) return null;
+  const idx = Math.max(0, currentWeekNumberFromProgress - 1);
+  if (idx >= distinctWeekNumbers.length) return null;
+  return distinctWeekNumbers[idx] ?? null;
+}
 
-    return streak;
-  } catch (error) {
-    console.error('Error calculating streak:', error);
-    return 0;
+function streakFromUtcDayStrings(datesDesc: string[]): number {
+  const uniqueDates = Array.from(new Set(datesDesc)).sort(
+    (a, b) => new Date(b).getTime() - new Date(a).getTime()
+  );
+  if (uniqueDates.length === 0) return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) return 0;
+
+  let streak = 1;
+  const expectedDate = new Date(uniqueDates[0] + 'T12:00:00.000Z');
+  for (let i = 1; i < uniqueDates.length; i++) {
+    expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+    const expectedStr = expectedDate.toISOString().split('T')[0];
+    if (uniqueDates[i] === expectedStr) streak++;
+    else break;
   }
+  return streak;
 }
 
 /**
- * Server-side: same as calculateStreak but uses the provided Supabase client (e.g. server client in API routes).
+ * Single fetch: program schedule rows + completed program sessions (2 queries max).
+ * Aligns with public.get_client_dashboard Option C.
  */
+export async function fetchProgramWorkoutCounters(
+  sb: SupabaseClient,
+  clientId: string
+): Promise<DashboardStats> {
+  try {
+    const ctx = await getActiveProgramCtx(sb, clientId);
+    if (!ctx) {
+      return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
+    }
+
+    const { data: schedRows, error: schedErr } = await sb
+      .from('program_schedule')
+      .select('id, week_number')
+      .eq('program_id', ctx.programId);
+
+    if (schedErr) {
+      console.error('fetchProgramWorkoutCounters program_schedule:', schedErr);
+      return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
+    }
+
+    const distinctWeeks = [...new Set((schedRows ?? []).map((r) => r.week_number))].sort(
+      (a, b) => a - b
+    );
+    const resolvedWeek = resolveIndexedWeekNumber(distinctWeeks, ctx.ppWeek);
+    if (resolvedWeek == null) {
+      return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
+    }
+
+    const slotIds = (schedRows ?? [])
+      .filter((r) => r.week_number === resolvedWeek)
+      .map((r) => r.id)
+      .filter(Boolean);
+    const goal = slotIds.length;
+    const slotSet = new Set(slotIds);
+
+    const { data: sessions, error: sessErr } = await sb
+      .from('workout_sessions')
+      .select('completed_at, program_schedule_id')
+      .eq('client_id', clientId)
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null)
+      .eq('program_assignment_id', ctx.paId)
+      .not('program_schedule_id', 'is', null);
+
+    if (sessErr) {
+      console.error('fetchProgramWorkoutCounters workout_sessions:', sessErr);
+      return { streak: 0, weeklyProgress: { current: 0, goal: goal } };
+    }
+
+    const sessionList = sessions ?? [];
+    const current = sessionList.filter(
+      (s) => s.program_schedule_id && slotSet.has(s.program_schedule_id)
+    ).length;
+
+    const dayStrings = sessionList.map((s) =>
+      new Date(s.completed_at!).toISOString().split('T')[0]
+    );
+    const streak = streakFromUtcDayStrings(dayStrings);
+
+    return {
+      streak,
+      weeklyProgress: { current, goal },
+    };
+  } catch (e) {
+    console.error('fetchProgramWorkoutCounters:', e);
+    return { streak: 0, weeklyProgress: { current: 0, goal: 0 } };
+  }
+}
+
+export async function calculateStreak(clientId: string): Promise<number> {
+  const { streak } = await fetchProgramWorkoutCounters(supabase, clientId);
+  return streak;
+}
+
 export async function calculateStreakWithClient(
   sb: SupabaseClient,
   clientId: string
 ): Promise<number> {
-  try {
-    const { data: logs, error } = await sb
-      .from('workout_logs')
-      .select('completed_at')
-      .eq('client_id', clientId)
-      .not('completed_at', 'is', null)
-      .order('completed_at', { ascending: false });
-
-    if (error || !logs || logs.length === 0) return 0;
-
-    const uniqueDates = Array.from(
-      new Set(logs.map((log) => new Date(log.completed_at!).toISOString().split('T')[0]))
-    ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-    if (uniqueDates.length === 0) return 0;
-
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) return 0;
-
-    let streak = 1;
-    let expectedDate = new Date(uniqueDates[0]);
-    for (let i = 1; i < uniqueDates.length; i++) {
-      expectedDate.setDate(expectedDate.getDate() - 1);
-      const expectedDateStr = expectedDate.toISOString().split('T')[0];
-      if (uniqueDates[i] === expectedDateStr) streak++;
-      else break;
-    }
-    return streak;
-  } catch (error) {
-    console.error('Error calculating streak (server):', error);
-    return 0;
-  }
+  const { streak } = await fetchProgramWorkoutCounters(sb, clientId);
+  return streak;
 }
 
-/**
- * Calculate weekly workout progress (current week's completed vs assigned)
- * Now supports both program-based workouts and legacy workout_assignments
- */
-export async function calculateWeeklyProgress(clientId: string): Promise<{ current: number; goal: number }> {
-  try {
-    // Get start and end of current week (Monday to Sunday)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-    
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    // Count completed workouts this week from workout_logs
-    const { data: completedLogs, error: logError } = await supabase
-      .from('workout_logs')
-      .select('id, completed_at')
-      .eq('client_id', clientId)
-      .not('completed_at', 'is', null)
-      .gte('completed_at', monday.toISOString())
-      .lte('completed_at', sunday.toISOString());
-
-    if (logError) {
-      console.error('Error fetching completed logs:', logError);
-    }
-
-    const current = completedLogs?.length || 0;
-
-    // Use canonical programStateService for program-based weekly goal
-    const { getProgramState } = await import('./programStateService');
-    const programState = await getProgramState(supabase, clientId);
-
-    if (programState.assignment && programState.slots.length > 0) {
-      // Count slots in the current week
-      const currentWeekSlots = programState.slots.filter(
-        s => s.week_number === programState.currentWeekNumber
-      ).length;
-      return { current, goal: currentWeekSlots };
-    }
-
-    // FALLBACK: Legacy workout_assignments with scheduled_date
-    const mondayStr = monday.toISOString().split('T')[0];
-    const sundayStr = sunday.toISOString().split('T')[0];
-
-    const { data: assignments, error: assignError } = await supabase
-      .from('workout_assignments')
-      .select('id')
-      .eq('client_id', clientId)
-      .gte('scheduled_date', mondayStr)
-      .lte('scheduled_date', sundayStr);
-
-    if (assignError) {
-      console.error('Error fetching assignments:', assignError);
-    }
-
-    const goal = assignments?.length || 0;
-
-    return { current, goal };
-  } catch (error) {
-    console.error('Error calculating weekly progress:', error);
-    return { current: 0, goal: 0 };
-  }
+export async function calculateWeeklyProgress(
+  clientId: string
+): Promise<{ current: number; goal: number }> {
+  const { weeklyProgress } = await fetchProgramWorkoutCounters(supabase, clientId);
+  return weeklyProgress;
 }
 
-/**
- * Server-side: same as calculateWeeklyProgress but uses the provided Supabase client (e.g. server client in API routes).
- */
 export async function calculateWeeklyProgressWithClient(
   sb: SupabaseClient,
   clientId: string
 ): Promise<{ current: number; goal: number }> {
-  try {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    const { data: completedLogs, error: logError } = await sb
-      .from('workout_logs')
-      .select('id, completed_at')
-      .eq('client_id', clientId)
-      .not('completed_at', 'is', null)
-      .gte('completed_at', monday.toISOString())
-      .lte('completed_at', sunday.toISOString());
-
-    if (logError) console.error('Error fetching completed logs:', logError);
-    const current = completedLogs?.length || 0;
-
-    const { getProgramState } = await import('./programStateService');
-    const programState = await getProgramState(sb, clientId);
-
-    if (programState.assignment && programState.slots.length > 0) {
-      const currentWeekSlots = programState.slots.filter(
-        (s) => s.week_number === programState.currentWeekNumber
-      ).length;
-      return { current, goal: currentWeekSlots };
-    }
-
-    const mondayStr = monday.toISOString().split('T')[0];
-    const sundayStr = sunday.toISOString().split('T')[0];
-    const { data: assignments, error: assignError } = await sb
-      .from('workout_assignments')
-      .select('id')
-      .eq('client_id', clientId)
-      .gte('scheduled_date', mondayStr)
-      .lte('scheduled_date', sundayStr);
-
-    if (assignError) console.error('Error fetching assignments:', assignError);
-    const goal = assignments?.length || 0;
-    return { current, goal };
-  } catch (error) {
-    console.error('Error calculating weekly progress (server):', error);
-    return { current: 0, goal: 0 };
-  }
+  const { weeklyProgress } = await fetchProgramWorkoutCounters(sb, clientId);
+  return weeklyProgress;
 }
 
 /**
@@ -307,15 +249,7 @@ export async function getClientType(clientId: string): Promise<'online' | 'in_gy
  * Get all dashboard stats at once
  */
 export async function getDashboardStats(clientId: string): Promise<DashboardStats> {
-  const [streak, weeklyProgress] = await Promise.all([
-    calculateStreak(clientId),
-    calculateWeeklyProgress(clientId),
-  ]);
-
-  return {
-    streak,
-    weeklyProgress,
-  };
+  return fetchProgramWorkoutCounters(supabase, clientId);
 }
 
 /**

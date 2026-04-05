@@ -150,6 +150,8 @@ export async function POST(req: NextRequest) {
       'fortime',
       'for_time',
       'hr_sets',
+      'speed_work',
+      'endurance',
     ] as const
 
     type BlockType = (typeof validBlockTypes)[number] | 'hr_sets'
@@ -661,6 +663,71 @@ export async function POST(req: NextRequest) {
           break
         }
 
+        case 'hr_sets': {
+          if (body.exercise_id) {
+            insertData.exercise_id = body.exercise_id
+          }
+          insertData.set_number = body.set_number ?? 1
+          insertData.hr_zone = parseIntNumber(body.hr_zone)
+          insertData.hr_percentage = parseNumber(body.hr_percentage)
+          insertData.hr_distance_meters = parseNumber(body.hr_distance_meters)
+          insertData.hr_interval_round = parseIntNumber(body.hr_interval_round)
+          insertData.hr_work_duration_seconds = parseIntNumber(body.hr_work_duration_seconds)
+          insertData.hr_rest_duration_seconds = parseIntNumber(body.hr_rest_duration_seconds)
+          insertData.hr_average_percentage = parseNumber(body.hr_average_percentage)
+          insertData.hr_duration_seconds = parseIntNumber(body.hr_duration_seconds)
+          primaryExerciseId = typeof body.exercise_id === 'string' ? body.exercise_id : null
+          break
+        }
+
+        case 'speed_work': {
+          const exerciseId = body.exercise_id as string | undefined
+          const timeSec = parseIntNumber(body.actual_time_seconds)
+          if (!exerciseId || timeSec === null || timeSec <= 0) {
+            return NextResponse.json(
+              {
+                error: 'Missing required fields for speed_work: exercise_id, actual_time_seconds',
+                details: { exercise_id: exerciseId || 'missing', actual_time_seconds: timeSec },
+              },
+              { status: 400 }
+            )
+          }
+          insertData.exercise_id = exerciseId
+          insertData.set_number = body.set_number ?? 1
+          insertData.actual_time_seconds = timeSec
+          insertData.actual_distance_meters = parseNumber(body.actual_distance_meters)
+          insertData.actual_hr_avg = parseNumber(body.actual_hr_avg)
+          insertData.actual_speed_kmh = parseNumber(body.actual_speed_kmh)
+          primaryExerciseId = exerciseId
+          break
+        }
+
+        case 'endurance': {
+          const exerciseId = body.exercise_id as string | undefined
+          const distM = parseNumber(body.actual_distance_meters)
+          const timeSec = parseIntNumber(body.actual_time_seconds)
+          if (!exerciseId || distM === null || distM <= 0 || timeSec === null || timeSec <= 0) {
+            return NextResponse.json(
+              {
+                error: 'Missing required fields for endurance: exercise_id, actual_distance_meters, actual_time_seconds',
+                details: {
+                  exercise_id: exerciseId || 'missing',
+                  actual_distance_meters: distM,
+                  actual_time_seconds: timeSec,
+                },
+              },
+              { status: 400 }
+            )
+          }
+          insertData.exercise_id = exerciseId
+          insertData.set_number = body.set_number ?? 1
+          insertData.actual_distance_meters = distM
+          insertData.actual_time_seconds = timeSec
+          insertData.actual_hr_avg = parseNumber(body.actual_hr_avg)
+          insertData.actual_speed_kmh = parseNumber(body.actual_speed_kmh)
+          primaryExerciseId = exerciseId
+          break
+        }
 
         default: {
           return NextResponse.json(
@@ -825,6 +892,8 @@ export async function POST(req: NextRequest) {
       }
       case 'tabata':
       case 'hr_sets':
+      case 'speed_work':
+      case 'endurance':
         break
       default:
         break

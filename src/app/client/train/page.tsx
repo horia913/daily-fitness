@@ -17,7 +17,6 @@ import { ProgramCompletedCard } from "@/components/client/train/ProgramCompleted
 import { WeekStrip } from "@/components/client/train/WeekStrip";
 import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
-import { TrainStatsRow } from "@/components/client/train/TrainStatsRow";
 import { ActivityWeekSummary } from "@/components/client/activity/ActivityWeekSummary";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
 import {
@@ -121,8 +120,6 @@ interface TrainPageData {
   programWeek: ProgramWeekState | null;
   extraWorkouts: ExtraWorkout[];
   exerciseCounts: Map<string, number>;
-  /** Consecutive workout days streak (same metric as dashboard `get_client_dashboard`). */
-  workoutStreak: number;
   templateCategories: Map<string, string>;
 }
 
@@ -162,24 +159,20 @@ export default function TrainPage() {
         programWeek: null,
         extraWorkouts: [],
         exerciseCounts: new Map(),
-        workoutStreak: 0,
         templateCategories: new Map(),
       };
     }
     const todayWeekday = getTodayWeekday();
-    const [{ data: rpcData, error: rpcError }, dashRes] = await Promise.all([
-      supabase.rpc("get_train_page_data", {
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "get_train_page_data",
+      {
         p_client_id: user.id,
         p_today_weekday: todayWeekday,
-      }),
-      supabase.rpc("get_client_dashboard"),
-    ]);
+      },
+    );
     if (rpcError) {
       throw new Error(rpcError.message || "Failed to load train page data");
     }
-    const workoutStreak = dashRes.error
-      ? 0
-      : Number((dashRes.data as Record<string, unknown> | null)?.streak) || 0;
 
     const data = (rpcData ?? null) as TrainPageRpcResponse | null;
     const programWeek = data
@@ -219,7 +212,6 @@ export default function TrainPage() {
       programWeek,
       extraWorkouts,
       exerciseCounts,
-      workoutStreak,
       templateCategories,
     };
   }, [user?.id]);
@@ -236,7 +228,6 @@ export default function TrainPage() {
   const extraWorkouts: ExtraWorkout[] = programData?.extraWorkouts ?? [];
   const exerciseCounts =
     programData?.exerciseCounts ?? new Map<string, number>();
-  const workoutStreak = programData?.workoutStreak ?? 0;
   const templateCategories =
     programData?.templateCategories ?? new Map<string, string>();
 
@@ -396,11 +387,6 @@ export default function TrainPage() {
     setWeekActivities(updated);
   };
 
-  const workoutsCompletedThisWeek =
-    programWeek?.hasProgram && !programWeek.isCompleted
-      ? programWeek.days.filter((d) => d.isCompleted).length
-      : 0;
-
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -512,11 +498,6 @@ export default function TrainPage() {
                     selectedRestWeekday={selectedRestWeekday}
                   />
 
-                  <TrainStatsRow
-                    workoutsCompletedThisWeek={workoutsCompletedThisWeek}
-                    workoutStreakDays={workoutStreak}
-                  />
-
                   <OverdueWorkouts
                     overdueSlots={programWeek.overdueSlots}
                     onOpenPreview={handleOpenOverduePreview}
@@ -532,6 +513,7 @@ export default function TrainPage() {
                     <div className="mb-6" data-workout-preview>
                       {selectedOverdueSlot ? (
                         <WorkoutDayPreview
+                          key={selectedOverdueSlot.scheduleId}
                           day={null}
                           status="missed"
                           templateId={selectedOverdueSlot.templateId}
@@ -547,9 +529,14 @@ export default function TrainPage() {
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
                           blocks={prefetchedBlocks.get(selectedOverdueSlot.templateId) ?? undefined}
+                          exerciseCount={
+                            exerciseCounts.get(selectedOverdueSlot.templateId) ??
+                            undefined
+                          }
                         />
                       ) : selectedRestWeekday !== null ? (
                         <WorkoutDayPreview
+                          key={`rest-${selectedRestWeekday}`}
                           day={null}
                           status="rest"
                           templateId={null}
@@ -565,6 +552,7 @@ export default function TrainPage() {
                         />
                       ) : selectedDay ? (
                         <WorkoutDayPreview
+                          key={selectedDay.scheduleId}
                           day={selectedDay}
                           status={getDayStatus(selectedDay, todayWeekday)}
                           templateId={selectedDay.templateId}
@@ -578,6 +566,10 @@ export default function TrainPage() {
                           startingScheduleId={startingScheduleId}
                           clientId={user?.id}
                           blocks={prefetchedBlocks.get(selectedDay.templateId) ?? undefined}
+                          exerciseCount={
+                            exerciseCounts.get(selectedDay.templateId) ??
+                            undefined
+                          }
                         />
                       ) : null}
                     </div>
@@ -590,13 +582,6 @@ export default function TrainPage() {
                   icon={<Dumbbell className="w-6 h-6" />}
                   title="No program assigned yet"
                   description="Your coach will assign your training program. In the meantime, check below for any assigned workouts."
-                />
-              )}
-
-              {!loading && !error && !programWeek?.hasProgram && (
-                <TrainStatsRow
-                  workoutsCompletedThisWeek={workoutsCompletedThisWeek}
-                  workoutStreakDays={workoutStreak}
                 />
               )}
 

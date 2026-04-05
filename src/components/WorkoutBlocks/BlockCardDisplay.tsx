@@ -3,7 +3,7 @@ import { BlockVariantProps, WorkoutBlockDisplay } from "./types";
 import { StraightSetsDisplay } from "./StraightSetsDisplay";
 import { SupersetsDisplay } from "./SupersetsDisplay";
 import { DropsetsDisplay } from "./DropsetsDisplay";
-import { CircuitsDisplay } from "./CircuitsDisplay";
+import { TabataSetsDisplay } from "./TabataSetsDisplay";
 import { DensityTrainingDisplay } from "./DensityTrainingDisplay";
 
 type BlockVariantComponent = (props: BlockVariantProps) => React.ReactElement;
@@ -13,7 +13,7 @@ const DISPLAY_COMPONENTS: Record<string, BlockVariantComponent> = {
   straight_sets: StraightSetsDisplay,
   superset: SupersetsDisplay,
   drop_set: DropsetsDisplay,
-  tabata: CircuitsDisplay,
+  tabata: TabataSetsDisplay,
   density: DensityTrainingDisplay,
   density_training: DensityTrainingDisplay,
   amrap: DensityTrainingDisplay,

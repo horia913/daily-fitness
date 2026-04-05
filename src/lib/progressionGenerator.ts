@@ -19,7 +19,8 @@
  *
  * Set-type tiers:
  *   Tier 1 (full):    straight_set
- *   Tier 2 (partial): superset, giant_set, pre_exhaustion, cluster_set, rest_pause, drop_set
+ *   Tier 2 (partial): superset, giant_set, pre_exhaustion, cluster_set, rest_pause, drop_set,
+ *                     speed_work, endurance (progress via speed_endurance_config + sets/rest_seconds)
  *   Tier 3 (skip):    amrap, emom, for_time, tabata
  *     → Tier 3 exercises are copied from Week 1 unchanged to all subsequent weeks.
  *
@@ -894,6 +895,245 @@ function applyLinear(
   return { rule: r as ProgramProgressionRule, changes }
 }
 
+// ─── Speed work & endurance (Tier 2, not Tier 3) ─────────────────────────────
+
+/**
+ * Weekly progression for speed_work and endurance using `speed_endurance_config` jsonb
+ * (intervals → intensity → distance → rest → load for speed; distance / pace / time for endurance).
+ */
+function applySpeedEnduranceProgression(
+  prev: ProgramProgressionRule,
+  base: ProgramProgressionRule,
+  weekNumber: number,
+  weekIndex: number,
+  profile: ProgressionProfile,
+): { rule: ProgramProgressionRule; changes: ProgressionChange[] } {
+  const r = cloneRuleForWeek(prev, weekNumber) as R
+  const changes: ProgressionChange[] = []
+  const name = getExerciseName(base)
+  const setEntryId = (base.set_entry_id as string | undefined) ?? undefined
+  const cfg: Record<string, any> = {
+    ...(typeof r.speed_endurance_config === 'object' && r.speed_endurance_config
+      ? { ...(r.speed_endurance_config as Record<string, any>) }
+      : {}),
+  }
+
+  if (r.set_type === 'speed_work') {
+    const maxI = cfg.max_intervals ?? 20
+    const incI = cfg.increment_intervals ?? 1
+    const prevSets = (r.sets as number | null) ?? cfg.intervals ?? 1
+
+    if (profile === 'reduction') {
+      const floor = cfg.min_intervals ?? 1
+      const next = Math.max(floor, Math.ceil(prevSets * REDUCTION_CONFIG.sets_multiplier))
+      if (next !== prevSets) {
+        r.sets = next
+        cfg.intervals = next
+        addChange(changes, setEntryId, name, 'sets', prevSets, next, 'fewer intervals (deload)')
+      }
+      r.speed_endurance_config = cfg
+      return { rule: r as ProgramProgressionRule, changes }
+    }
+
+    if (profile === 'taper') {
+      const floor = cfg.min_intervals ?? 1
+      const next = Math.max(floor, prevSets - 1)
+      if (next !== prevSets) {
+        r.sets = next
+        cfg.intervals = next
+        addChange(changes, setEntryId, name, 'sets', prevSets, next, '-1 interval (taper)')
+      }
+      r.speed_endurance_config = cfg
+      return { rule: r as ProgramProgressionRule, changes }
+    }
+
+    if (profile === 'density_increase' && prevSets >= maxI) {
+      const curRest = (r.rest_seconds as number | null) ?? cfg.rest_seconds
+      if (curRest != null) {
+        const dec = cfg.decrement_rest_seconds ?? 10
+        const minR = cfg.min_rest_seconds ?? 60
+        const nextR = Math.max(minR, curRest - dec)
+        if (nextR !== curRest) {
+          r.rest_seconds = nextR
+          cfg.rest_seconds = nextR
+          addChange(
+            changes,
+            setEntryId,
+            name,
+            'rest_seconds',
+            curRest,
+            nextR,
+            `-${curRest - nextR}s rest`,
+          )
+        }
+        r.speed_endurance_config = cfg
+        return { rule: r as ProgramProgressionRule, changes }
+      }
+    }
+
+    if (prevSets < maxI) {
+      const next = Math.min(maxI, prevSets + incI)
+      r.sets = next
+      cfg.intervals = next
+      addChange(changes, setEntryId, name, 'sets', prevSets, next, '+1 interval')
+    } else if (
+      (cfg.target_speed_pct != null && typeof cfg.target_speed_pct === 'number') ||
+      (cfg.max_speed_percent != null && typeof cfg.max_speed_percent === 'number')
+    ) {
+      const inc = cfg.increment_speed_percent ?? 2
+      const prevS = (cfg.target_speed_pct ?? cfg.max_speed_percent) as number
+      const nextS = Math.min(100, prevS + inc)
+      if (nextS !== prevS) {
+        cfg.target_speed_pct = nextS
+        delete cfg.max_speed_percent
+        addChange(changes, setEntryId, name, 'target_speed_pct', prevS, nextS, `+${inc}% target speed`)
+      }
+    } else if (
+      (cfg.target_hr_pct != null && typeof cfg.target_hr_pct === 'number') ||
+      (cfg.max_hr_percent != null && typeof cfg.max_hr_percent === 'number')
+    ) {
+      const inc = cfg.increment_speed_percent ?? 2
+      const prevH = (cfg.target_hr_pct ?? cfg.max_hr_percent) as number
+      const nextH = Math.min(100, prevH + inc)
+      if (nextH !== prevH) {
+        cfg.target_hr_pct = nextH
+        delete cfg.max_hr_percent
+        addChange(changes, setEntryId, name, 'target_hr_pct', prevH, nextH, `+${inc}% target HR`)
+      }
+    } else if (cfg.distance_meters != null && typeof cfg.distance_meters === 'number') {
+      const inc = cfg.increment_distance_meters ?? 5
+      const prevD = cfg.distance_meters
+      cfg.distance_meters = prevD + inc
+      addChange(changes, setEntryId, name, 'distance_meters', prevD, cfg.distance_meters, `+${inc}m`)
+    } else {
+      const curRest = (r.rest_seconds as number | null) ?? cfg.rest_seconds
+      if (curRest != null) {
+        const dec = cfg.decrement_rest_seconds ?? 10
+        const minR = cfg.min_rest_seconds ?? 60
+        const nextR = Math.max(minR, curRest - dec)
+        if (nextR !== curRest) {
+          r.rest_seconds = nextR
+          cfg.rest_seconds = nextR
+          addChange(
+            changes,
+            setEntryId,
+            name,
+            'rest_seconds',
+            curRest,
+            nextR,
+            `-${curRest - nextR}s rest`,
+          )
+        }
+      } else if (
+        (cfg.load_pct_bw != null && typeof cfg.load_pct_bw === 'number') ||
+        (cfg.load_percent_bw != null && typeof cfg.load_percent_bw === 'number')
+      ) {
+        const inc = cfg.increment_load_bw ?? 2
+        const maxL = cfg.max_load_bw ?? 40
+        const prevL = (cfg.load_pct_bw ?? cfg.load_percent_bw) as number
+        cfg.load_pct_bw = Math.min(maxL, prevL + inc)
+        delete cfg.load_percent_bw
+        addChange(changes, setEntryId, name, 'load_pct_bw', prevL, cfg.load_pct_bw, `+${inc}% BW`)
+      }
+    }
+  } else if (r.set_type === 'endurance') {
+    if (profile === 'reduction') {
+      const dist = cfg.target_distance_meters
+      if (dist != null && typeof dist === 'number') {
+        const prevD = dist
+        cfg.target_distance_meters = Math.max(100, Math.round(prevD * REDUCTION_CONFIG.weight_multiplier))
+        addChange(
+          changes,
+          setEntryId,
+          name,
+          'target_distance_meters',
+          prevD,
+          cfg.target_distance_meters,
+          'shorter distance (deload)',
+        )
+      }
+      r.speed_endurance_config = cfg
+      return { rule: r as ProgramProgressionRule, changes }
+    }
+
+    if (profile === 'taper') {
+      const dist = cfg.target_distance_meters
+      if (dist != null && typeof dist === 'number' && dist > 200) {
+        const prevD = dist
+        cfg.target_distance_meters = Math.round(prevD * 0.92)
+        addChange(
+          changes,
+          setEntryId,
+          name,
+          'target_distance_meters',
+          prevD,
+          cfg.target_distance_meters,
+          'shorter distance (taper)',
+        )
+      }
+      r.speed_endurance_config = cfg
+      return { rule: r as ProgramProgressionRule, changes }
+    }
+
+    const dist = cfg.target_distance_meters
+    if (
+      dist != null &&
+      typeof dist === 'number' &&
+      dist > 0 &&
+      (profile === 'volume_ramp' ||
+        profile === 'linear' ||
+        profile === 'intensity_ramp' ||
+        profile === 'density_increase')
+    ) {
+      const pct = (cfg.increment_distance_percent ?? 10) / 100
+      const prevD = dist
+      cfg.target_distance_meters = Math.round(prevD * (1 + pct))
+      addChange(
+        changes,
+        setEntryId,
+        name,
+        'target_distance_meters',
+        prevD,
+        cfg.target_distance_meters,
+        `+${Math.round(pct * 100)}% distance`,
+      )
+    } else if (
+      cfg.target_pace_seconds_per_km != null &&
+      typeof cfg.target_pace_seconds_per_km === 'number' &&
+      (profile === 'intensity_ramp' || profile === 'density_increase')
+    ) {
+      const dec = cfg.decrement_pace_seconds_per_week ?? 5
+      const prevP = cfg.target_pace_seconds_per_km
+      cfg.target_pace_seconds_per_km = Math.max(120, prevP - dec)
+      addChange(
+        changes,
+        setEntryId,
+        name,
+        'target_pace_seconds_per_km',
+        prevP,
+        cfg.target_pace_seconds_per_km,
+        'faster target pace',
+      )
+    } else if (cfg.target_time_seconds != null && typeof cfg.target_time_seconds === 'number') {
+      const incT = cfg.increment_time_seconds_per_week ?? 30
+      const prevT = cfg.target_time_seconds
+      cfg.target_time_seconds = prevT + incT
+      addChange(
+        changes,
+        setEntryId,
+        name,
+        'target_time_seconds',
+        prevT,
+        cfg.target_time_seconds,
+        `+${incT}s target time`,
+      )
+    }
+  }
+
+  r.speed_endurance_config = cfg
+  return { rule: r as ProgramProgressionRule, changes }
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -972,35 +1212,45 @@ export function generateProgression(input: ProgressionGeneratorInput): Generatio
 
       let out: { rule: ProgramProgressionRule; changes: ProgressionChange[] }
 
-      switch (profile) {
-        case 'volume_ramp':
-          out = applyVolumeRamp(prevRule, baseRule, weekNumber, weekIndex)
-          break
-        case 'intensity_ramp':
-          out = applyIntensityRamp(prevRule, baseRule, weekNumber, weekIndex, durationWeeks)
-          break
-        case 'taper':
-          out = applyTaper(prevRule, baseRule, weekNumber, weekIndex)
-          break
-        case 'density_increase':
-          out = applyDensityIncrease(prevRule, baseRule, weekNumber, weekIndex)
-          break
-        case 'reduction': {
-          const dv = deloadValues![i]
-          // Null-safe fallback: if week1 sets was null, pass 2 (function will skip if week1Sets null)
-          out = applyReduction(
-            baseRule,
-            weekNumber,
-            dv.sets ?? (baseRule.sets ?? 2),
-            dv.weight,
-          )
-          break
+      if (baseRule.set_type === 'speed_work' || baseRule.set_type === 'endurance') {
+        out = applySpeedEnduranceProgression(
+          prevRule,
+          baseRule,
+          weekNumber,
+          weekIndex,
+          profile,
+        )
+      } else {
+        switch (profile) {
+          case 'volume_ramp':
+            out = applyVolumeRamp(prevRule, baseRule, weekNumber, weekIndex)
+            break
+          case 'intensity_ramp':
+            out = applyIntensityRamp(prevRule, baseRule, weekNumber, weekIndex, durationWeeks)
+            break
+          case 'taper':
+            out = applyTaper(prevRule, baseRule, weekNumber, weekIndex)
+            break
+          case 'density_increase':
+            out = applyDensityIncrease(prevRule, baseRule, weekNumber, weekIndex)
+            break
+          case 'reduction': {
+            const dv = deloadValues![i]
+            // Null-safe fallback: if week1 sets was null, pass 2 (function will skip if week1Sets null)
+            out = applyReduction(
+              baseRule,
+              weekNumber,
+              dv.sets ?? (baseRule.sets ?? 2),
+              dv.weight,
+            )
+            break
+          }
+          case 'linear':
+            out = applyLinear(prevRule, baseRule, weekNumber, weekIndex)
+            break
+          default:
+            out = { rule: cloneRuleForWeek(prevRule, weekNumber), changes: [] }
         }
-        case 'linear':
-          out = applyLinear(prevRule, baseRule, weekNumber, weekIndex)
-          break
-        default:
-          out = { rule: cloneRuleForWeek(prevRule, weekNumber), changes: [] }
       }
 
       out.rule.week_number = weekNumber

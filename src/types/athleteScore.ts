@@ -24,9 +24,9 @@ export interface AthleteScoreTier {
 }
 
 export const ATHLETE_TIERS: AthleteScoreTier[] = [
-  { key: 'beast_mode', label: 'Beast Mode', minScore: 90, maxScore: 100, color: '#FF6B00', colorEnd: '#FFD700', emoji: '🏆' },
-  { key: 'locked_in', label: 'Locked In', minScore: 75, maxScore: 89, color: '#FF8C00', colorEnd: '#FFA500', emoji: '🔥' },
-  { key: 'showing_up', label: 'Showing Up', minScore: 55, maxScore: 74, color: '#0EA5E9', colorEnd: '#38BDF8', emoji: '⚡' },
-  { key: 'slipping', label: 'Slipping', minScore: 35, maxScore: 54, color: '#6B7280', colorEnd: '#9CA3AF', emoji: '⚠️' },
+  { key: 'beast_mode', label: 'Beast Mode', minScore: 90, maxScore: 100, color: '#0369A1', colorEnd: '#BEF264', emoji: '🏆' },
+  { key: 'locked_in', label: 'Locked In', minScore: 75, maxScore: 89, color: '#EA580C', colorEnd: '#EF4444', emoji: '🔥' },
+  { key: 'showing_up', label: 'Showing Up', minScore: 55, maxScore: 74, color: '#06B6D4', colorEnd: '#0EA5E9', emoji: '⚡' },
+  { key: 'slipping', label: 'Slipping', minScore: 35, maxScore: 54, color: '#F59E0B', colorEnd: '#D97706', emoji: '⚠️' },
   { key: 'benched', label: 'Benched', minScore: 0, maxScore: 34, color: '#374151', colorEnd: '#4B5563', emoji: '💤' },
 ];

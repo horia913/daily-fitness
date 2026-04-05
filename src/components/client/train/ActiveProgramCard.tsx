@@ -93,11 +93,8 @@ export function ActiveProgramCard({
 
   const handleStart = () => {
     if (!nextWorkout || isRestDay) return;
-    if (onSelectDay) {
-      onSelectDay(nextWorkout);
-    } else {
-      onStartWorkout(nextWorkout.scheduleId);
-    }
+    onSelectDay?.(nextWorkout);
+    onStartWorkout(nextWorkout.scheduleId);
   };
 
   const gradId = "active-program-ring-grad";

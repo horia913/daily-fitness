@@ -113,7 +113,7 @@ const DAYS: (DayData | null)[] = [
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const EXTRA_WORKOUTS = [
-  { id: "ex1", name: "Quick HIIT Circuit", exerciseCount: 5, estimatedDuration: 20 },
+  { id: "ex1", name: "Quick HIIT Intervals", exerciseCount: 5, estimatedDuration: 20 },
   { id: "ex2", name: "Mobility Flow", exerciseCount: 8, estimatedDuration: 15 },
 ];
 

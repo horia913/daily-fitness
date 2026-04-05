@@ -8,10 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth';
 import { handleApiError } from '@/lib/apiErrorHandler';
-import {
-  calculateStreakWithClient,
-  calculateWeeklyProgressWithClient,
-} from '@/lib/clientDashboardService';
+import { fetchProgramWorkoutCounters } from '@/lib/clientDashboardService';
 import { getClientMetrics, type ClientMetrics } from '@/lib/coachDashboardService';
 import { computeClientAttention, type ClientRosterStatus } from '@/lib/coachClientAttention';
 import {
@@ -84,8 +81,7 @@ export async function GET(
     const weekStartStr = mondayYmdOfZonedWeekContaining(now, clientTz);
 
     const [
-      streak,
-      weeklyProgress,
+      workoutCounters,
       metricsMap,
       programAssignRes,
       mealAssignRes,
@@ -96,8 +92,7 @@ export async function GET(
       recentWellnessRes,
       trainedTodayCountRes,
     ] = await Promise.all([
-      calculateStreakWithClient(supabaseAdmin, clientId),
-      calculateWeeklyProgressWithClient(supabaseAdmin, clientId),
+      fetchProgramWorkoutCounters(supabaseAdmin, clientId),
       getClientMetrics([clientId], supabaseAdmin),
       supabaseAdmin
         .from('program_assignments')
@@ -157,6 +152,9 @@ export async function GET(
         .gte('completed_at', todayStart)
         .lte('completed_at', todayEnd),
     ]);
+
+    const streak = workoutCounters.streak;
+    const weeklyProgress = workoutCounters.weeklyProgress;
 
     const trainedTodayZoned = (trainedTodayCountRes.count ?? 0) > 0;
     const compliance =

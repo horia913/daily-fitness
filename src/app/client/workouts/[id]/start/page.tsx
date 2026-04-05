@@ -787,16 +787,15 @@ export default function LiveWorkout() {
         blockCompletions = prefetched.blockCompletions;
         startedAt = prefetched.startedAt ?? null;
       } else {
-        const [setLogsResult, blockCompletionsResult, workoutLogResult] =
+        const SET_LOGS_RESUME_SELECT =
+          "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh";
+
+        const [setLogsRpcResult, blockCompletionsResult, workoutLogResult] =
           await Promise.all([
-            supabase
-              .from("workout_set_logs")
-              .select(
-                "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps",
-              )
-              .eq("workout_log_id", workoutLogId)
-              .eq("client_id", userId)
-              .order("completed_at", { ascending: true }),
+            supabase.rpc("get_workout_set_logs_for_resume", {
+              p_client_id: userId,
+              p_workout_log_id: workoutLogId,
+            }),
             supabase
               .from("workout_set_entry_completions")
               .select("workout_set_entry_id")
@@ -807,12 +806,34 @@ export default function LiveWorkout() {
               .eq("id", workoutLogId)
               .single(),
           ]);
-        const err = setLogsResult.error;
-        if (err) {
-          console.error("Error fetching set logs for progress restoration:", err);
-          return null;
+
+        if (
+          !setLogsRpcResult.error &&
+          Array.isArray(setLogsRpcResult.data)
+        ) {
+          setLogs = setLogsRpcResult.data;
+        } else {
+          if (setLogsRpcResult.error) {
+            console.warn(
+              "get_workout_set_logs_for_resume failed (run migration 20260408 if missing); falling back to REST:",
+              setLogsRpcResult.error.message,
+            );
+          }
+          const rest = await supabase
+            .from("workout_set_logs")
+            .select(SET_LOGS_RESUME_SELECT)
+            .eq("workout_log_id", workoutLogId)
+            .eq("client_id", userId)
+            .order("completed_at", { ascending: true });
+          if (rest.error) {
+            console.error(
+              "Error fetching set logs for progress restoration:",
+              rest.error,
+            );
+            return null;
+          }
+          setLogs = rest.data ?? [];
         }
-        setLogs = setLogsResult.data ?? [];
         blockCompletions = blockCompletionsResult.data ?? [];
         startedAt = workoutLogResult.data?.started_at ?? null;
         if (blockCompletionsResult.error) {
@@ -873,6 +894,7 @@ export default function LiveWorkout() {
           "emom",
           "tabata",
           "for_time",
+          "endurance",
         ].includes(setLog.set_type || "");
 
         if (isSingleLogBlock) {
@@ -995,6 +1017,20 @@ export default function LiveWorkout() {
                 weight_kg: weightKg,
                 reps_completed: repsVal,
                 rpe: s.rpe ?? undefined,
+                actual_time_seconds:
+                  s.actual_time_seconds != null
+                    ? Number(s.actual_time_seconds)
+                    : undefined,
+                actual_distance_meters:
+                  s.actual_distance_meters != null
+                    ? Number(s.actual_distance_meters)
+                    : undefined,
+                actual_hr_avg:
+                  s.actual_hr_avg != null ? Number(s.actual_hr_avg) : undefined,
+                actual_speed_kmh:
+                  s.actual_speed_kmh != null
+                    ? Number(s.actual_speed_kmh)
+                    : undefined,
                 completed_at: s.completed_at
                   ? new Date(s.completed_at)
                   : new Date(),
@@ -1064,7 +1100,9 @@ export default function LiveWorkout() {
                 : blockData.total_sets || 1;
             const normalizedCompletedSets =
               blockType &&
-              ["amrap", "emom", "tabata", "for_time"].includes(blockType)
+              ["amrap", "emom", "tabata", "for_time", "endurance"].includes(
+                blockType,
+              )
                 ? completedSetsForExercise
                 : Math.min(completedSetsForExercise, totalSetsForExercise);
 
@@ -1072,7 +1110,9 @@ export default function LiveWorkout() {
             // For multi-set blocks, check if sets match total
             const isExerciseComplete =
               blockType &&
-              ["amrap", "emom", "tabata", "for_time"].includes(blockType)
+              ["amrap", "emom", "tabata", "for_time", "endurance"].includes(
+                blockType,
+              )
                 ? completedSetsForExercise >= 1
                 : normalizedCompletedSets >= totalSetsForExercise;
 
@@ -1808,6 +1848,8 @@ export default function LiveWorkout() {
         rest_seconds: block.rest_seconds ?? null,
         duration_seconds: block.duration_seconds ?? null,
         time_protocols: (block as any).time_protocols ?? [], // Block-level time protocols
+        speed_sets: (block as any).speed_sets ?? [],
+        endurance_sets: (block as any).endurance_sets ?? [],
         exercises: (block.exercises ?? []).map((ex: any) => ({
           id: ex.id,
           exercise_id: ex.exercise_id,
@@ -1826,6 +1868,8 @@ export default function LiveWorkout() {
           drop_sets: ex.drop_sets ?? [],
           cluster_sets: ex.cluster_sets ?? [],
           rest_pause_sets: ex.rest_pause_sets ?? [],
+          speed_sets: ex.speed_sets ?? [],
+          endurance_sets: ex.endurance_sets ?? [],
         })) as any[],
       }));
       // Universal: every set-type path (RPC nested tables, mapped exercises, progression overrides)
@@ -1836,21 +1880,6 @@ export default function LiveWorkout() {
             ...(rpcRawBlocks != null ? collectExerciseIdsDeep(rpcRawBlocks) : []),
           ].filter((id): id is string => Boolean(id)),
         ),
-      );
-
-      console.log(
-        "[DEBUG] collectExerciseIdsDeep exists:",
-        typeof collectExerciseIdsDeep,
-      );
-      console.log(
-        "[DEBUG] rpcRawBlocks:",
-        JSON.stringify(rpcRawBlocks).substring(0, 1000),
-      );
-      console.log("[DEBUG] exerciseIds before batch query:", exerciseIds);
-      console.log("[DEBUG] workoutBlocks count:", workoutBlocks.length);
-      console.log(
-        "[DEBUG] first block sample:",
-        JSON.stringify(workoutBlocks[0]).substring(0, 500),
       );
 
       console.log(
@@ -1894,15 +1923,6 @@ export default function LiveWorkout() {
           });
         }
       }
-      console.log("[DEBUG] exerciseMeta size:", exerciseMeta.size);
-      console.log(
-        "[DEBUG] exerciseMeta entries:",
-        Array.from(exerciseMeta.entries()).map(([k, v]) => ({
-          id: k,
-          name: v.name,
-        })),
-      );
-
       const now = new Date().toISOString();
 
       const safeParse = (value: unknown) => {
@@ -1940,12 +1960,6 @@ export default function LiveWorkout() {
               const metaDetails = exercise.exercise_id
                 ? exerciseMeta.get(exercise.exercise_id)
                 : undefined;
-              console.log("[DEBUG] building exercise:", {
-                exercise_id: exercise.exercise_id,
-                metaFound: !!exerciseMeta.get(exercise.exercise_id),
-                metaName: exerciseMeta.get(exercise.exercise_id)?.name,
-              });
-
               return {
                 id: exercise.id,
                 set_entry_id: block.id,
@@ -1988,6 +2002,8 @@ export default function LiveWorkout() {
                 drop_sets: exercise.drop_sets ?? [],
                 cluster_sets: exercise.cluster_sets ?? [],
                 rest_pause_sets: exercise.rest_pause_sets ?? [],
+                speed_sets: (exercise as any).speed_sets ?? [],
+                endurance_sets: (exercise as any).endurance_sets ?? [],
                 created_at: now,
                 updated_at: now,
               };
@@ -2019,6 +2035,10 @@ export default function LiveWorkout() {
             ),
             rest_pause_sets: blockExercises.flatMap(
               (ex: any) => ex.rest_pause_sets || [],
+            ),
+            speed_sets: blockExercises.flatMap((ex: any) => ex.speed_sets || []),
+            endurance_sets: blockExercises.flatMap(
+              (ex: any) => ex.endurance_sets || [],
             ),
             time_protocol: block.time_protocols?.[0] ?? undefined, // First time protocol for backwards compatibility
             time_protocols: block.time_protocols ?? [], // Full array for tabata/amrap/emom/for_time
@@ -2070,15 +2090,6 @@ export default function LiveWorkout() {
           if (Array.isArray(m.giant_set_exercises)) {
             for (const gi of m.giant_set_exercises) {
               if (gi?.exercise_id) idSet.add(gi.exercise_id);
-            }
-          }
-          if (Array.isArray(m.circuit_sets)) {
-            for (const cs of m.circuit_sets) {
-              if (Array.isArray(cs.exercises)) {
-                for (const cse of cs.exercises) {
-                  if (cse?.exercise_id) idSet.add(cse.exercise_id);
-                }
-              }
             }
           }
           if (Array.isArray(m.tabata_sets)) {
@@ -3733,17 +3744,17 @@ export default function LiveWorkout() {
     return () => interval && clearInterval(interval);
   }, [emomRepActive, emomRepTimeLeft]);
 
-  // Tabata/Circuit autoplay: alternate work/rest for N rounds
+  // Tabata autoplay: alternate work/rest for N rounds
   // State machine: Move to next state when time reaches zero
   useEffect(() => {
     if (intervalPhaseLeft !== 0 || !intervalActive || !showTimerModal) return;
     if (currentType !== "tabata") return;
 
-    // Time reached zero - transition to next state (tabata_sets; fallback to circuit_sets for legacy data)
-    const circuitSets = currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets;
-    if (!circuitSets || !Array.isArray(circuitSets)) return;
+    // Time reached zero - transition to next state (tabata_sets)
+    const intervalSets = currentExercise?.meta?.tabata_sets;
+    if (!intervalSets || !Array.isArray(intervalSets)) return;
 
-    const currentSet = (circuitSets as unknown[])[timerSetIndex] as {
+    const currentSet = (intervalSets as unknown[])[timerSetIndex] as {
       exercises?: Array<{ rest_after?: number; work_seconds?: number }>;
       rest_between_sets?: number;
     } | undefined;
@@ -3767,8 +3778,8 @@ export default function LiveWorkout() {
         hasMoreExercises:
           timerExerciseIndex + 1 < (currentSet?.exercises?.length || 0),
         timerSetIndex,
-        totalSets: circuitSets.length,
-        hasMoreSets: timerSetIndex + 1 < circuitSets.length,
+        totalSets: intervalSets.length,
+        hasMoreSets: timerSetIndex + 1 < intervalSets.length,
       });
 
       if (timerExerciseIndex + 1 < (currentSet?.exercises?.length || 0)) {
@@ -3782,7 +3793,7 @@ export default function LiveWorkout() {
         setIntervalPhaseLeft(workTime);
       } else {
         // Completed all exercises in current set
-        const isLastSetInRound = timerSetIndex === circuitSets.length - 1;
+        const isLastSetInRound = timerSetIndex === intervalSets.length - 1;
         const nextRound = intervalRound + 1;
         const isLastRound = nextRound >= intervalTotalRounds;
 
@@ -3809,13 +3820,13 @@ export default function LiveWorkout() {
       }
     } else if (intervalPhase === "rest_after_set") {
       // Rest after set finished
-      const isLastSetInRound = timerSetIndex === circuitSets.length - 1;
+      const isLastSetInRound = timerSetIndex === intervalSets.length - 1;
 
       if (isLastSetInRound) {
         // Last set of round completed - start next round
         const nextRound = intervalRound + 1;
         console.log("🔄 Starting next round after rest:", nextRound + 1);
-        const firstSet = circuitSets[0];
+        const firstSet = intervalSets[0];
         const firstExercise = firstSet?.exercises?.[0];
         const workTime = firstExercise?.work_seconds || 20;
         setIntervalRound(nextRound);
@@ -3826,7 +3837,7 @@ export default function LiveWorkout() {
       } else {
         // Move to first exercise of next set
         const nextSetIndex = timerSetIndex + 1;
-        const nextSet = circuitSets[nextSetIndex];
+        const nextSet = intervalSets[nextSetIndex];
         const firstExercise = nextSet?.exercises?.[0];
         const workTime = firstExercise?.work_seconds || 20;
         console.log("➡️ Moving to next set after rest:", nextSetIndex + 1);
@@ -3842,7 +3853,7 @@ export default function LiveWorkout() {
     showTimerModal,
     currentType,
     currentExercise?.meta?.tabata_sets,
-    (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets),
+    currentExercise?.meta?.tabata_sets,
     timerSetIndex,
     timerExerciseIndex,
     intervalPhase,
@@ -4291,6 +4302,7 @@ export default function LiveWorkout() {
                         router.push("/client/train");
                       }
                     }}
+                    clientBodyWeightKg={clientBodyWeightKg}
                   />
                   {/* Complete Workout Button - Only show on last block when complete */}
                   {isLastBlockComplete &&
@@ -4909,7 +4921,7 @@ export default function LiveWorkout() {
                                           ? currentExercise?.meta
                                               ?.tabata_sets ||
                                             currentExercise?.tabata_sets
-                                          : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                                          : currentExercise?.meta?.tabata_sets;
                                       return Array.isArray(sets)
                                         ? sets.length
                                         : 0;
@@ -4924,7 +4936,7 @@ export default function LiveWorkout() {
                                   currentType === "tabata"
                                     ? currentExercise?.meta?.tabata_sets ||
                                       currentExercise?.tabata_sets
-                                    : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                                    : currentExercise?.meta?.tabata_sets;
                                 return (
                                   Array.isArray(sets) &&
                                   sets.length > 0 && (
@@ -5063,7 +5075,7 @@ export default function LiveWorkout() {
                                                                 </>
                                                               ) : (
                                                                 <>
-                                                                  {/* For Circuit, use individual exercise settings */}
+                                                                  {/* Use individual exercise settings */}
                                                                   {exercise.work_seconds && (
                                                                     <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
                                                                       <span
@@ -5157,7 +5169,7 @@ export default function LiveWorkout() {
                                   currentType === "tabata"
                                     ? currentExercise?.meta?.tabata_sets ??
                                       currentExercise?.tabata_sets
-                                    : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                                    : currentExercise?.meta?.tabata_sets;
                                 const sets = Array.isArray(rawSets)
                                   ? (rawSets as Array<{ exercises?: Array<{ work_seconds?: number }> }>)
                                   : undefined;
@@ -6918,14 +6930,14 @@ export default function LiveWorkout() {
                     <span className="text-white font-semibold text-lg">
                       {(() => {
                         const raw =
-                          (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets) ?? [];
-                        const circuitSets = Array.isArray(raw)
+                          currentExercise?.meta?.tabata_sets ?? [];
+                        const intervalSets = Array.isArray(raw)
                           ? raw
                           : [];
 
                         // Calculate segments per round
                         let segmentsPerRound = 0;
-                        circuitSets.forEach((set: any) => {
+                        intervalSets.forEach((set: any) => {
                           const exercisesInSet = set?.exercises?.length || 0;
                           // Each exercise has: work + rest
                           segmentsPerRound += exercisesInSet * 2;
@@ -6934,7 +6946,7 @@ export default function LiveWorkout() {
                           // For counting purposes, we'll add it for all sets and subtract later if needed
                         });
                         // Add rest_after_set for each set
-                        segmentsPerRound += circuitSets.length;
+                        segmentsPerRound += intervalSets.length;
 
                         const totalSegments =
                           segmentsPerRound * intervalTotalRounds - 1; // -1 because last set of last round has no rest_after_set
@@ -6945,12 +6957,12 @@ export default function LiveWorkout() {
                         // Add segments from completed sets in current round
                         for (let s = 0; s < timerSetIndex; s++) {
                           const exercisesInSet =
-                            circuitSets[s]?.exercises?.length || 0;
+                            intervalSets[s]?.exercises?.length || 0;
                           currentSegment += exercisesInSet * 2 + 1; // work + rest per exercise + rest_after_set
                         }
 
                         // Add segments from current set
-                        const currentSet = circuitSets[timerSetIndex];
+                        const currentSet = intervalSets[timerSetIndex];
                         const exercisesBeforeCurrent = timerExerciseIndex;
                         currentSegment += exercisesBeforeCurrent * 2; // work + rest for each completed exercise
 
@@ -6975,7 +6987,7 @@ export default function LiveWorkout() {
                 <div className="text-center flex-1 flex flex-col justify-center items-center">
                   {/* Current Exercise Info */}
                   {((() => {
-                    const sets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                    const sets = currentExercise?.meta?.tabata_sets;
                     if (!Array.isArray(sets)) return null;
                     const set = (sets as unknown[])[timerSetIndex] as
                       | { exercises?: unknown[] }
@@ -7050,8 +7062,8 @@ export default function LiveWorkout() {
                   </div>
 
                   {/* Next Exercise Preview */}
-                  {(currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets) &&
-                    (((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                  {currentExercise?.meta?.tabata_sets &&
+                    (((currentExercise.meta.tabata_sets) as unknown[])[
                       timerSetIndex
                     ] as { exercises?: Array<{ exercise_id?: string }> } | undefined)
                       ?.exercises && (
@@ -7063,13 +7075,13 @@ export default function LiveWorkout() {
                           <div className="text-lg font-semibold text-white">
                             {timerExerciseIndex + 1 <
                             (
-                              ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                              ((currentExercise.meta.tabata_sets) as unknown[])[
                                 timerSetIndex
                               ] as { exercises: Array<{ exercise_id?: string }> }
                             ).exercises.length
                               ? exerciseLookup[
                                   (
-                                    ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                                    ((currentExercise.meta.tabata_sets) as unknown[])[
                                       timerSetIndex
                                     ] as {
                                       exercises: Array<{ exercise_id?: string }>;
@@ -7078,7 +7090,7 @@ export default function LiveWorkout() {
                                     ?.exercise_id ?? ""
                                 ]?.name || "Next Exercise"
                               : timerSetIndex + 1 <
-                                  ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[]).length
+                                  ((currentExercise.meta.tabata_sets) as unknown[]).length
                                 ? "Next Set"
                                 : "Break"}
                           </div>
@@ -7092,14 +7104,14 @@ export default function LiveWorkout() {
                   {/* Previous Button */}
                   <Button
                     onClick={() => {
-                      const circuitSets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                      const intervalSets = currentExercise?.meta?.tabata_sets;
 
                       if (intervalPhase === "work") {
                         // Work -> Previous Rest (or Previous Rest After Set)
                         if (timerExerciseIndex > 0) {
                           // Go to rest of previous exercise in same set
                           setTimerExerciseIndex((prev) => prev - 1);
-                          const currentSet = circuitSets?.[timerSetIndex];
+                          const currentSet = intervalSets?.[timerSetIndex];
                           const prevExercise =
                             currentSet?.exercises?.[timerExerciseIndex - 1];
                           const restTime = prevExercise?.rest_after || 10;
@@ -7108,7 +7120,7 @@ export default function LiveWorkout() {
                         } else if (timerSetIndex > 0) {
                           // First exercise in set - go to rest_after_set of previous set
                           setTimerSetIndex((prev) => prev - 1);
-                          const prevSet = circuitSets?.[timerSetIndex - 1];
+                          const prevSet = intervalSets?.[timerSetIndex - 1];
                           const restAfterSetTime =
                             Number(prevSet?.rest_between_sets) || 30;
                           setIntervalPhase("rest_after_set");
@@ -7116,8 +7128,8 @@ export default function LiveWorkout() {
                         } else if (intervalRound > 0) {
                           // First exercise of first set - go to rest_after_set of last set of previous round
                           setIntervalRound((prev) => prev - 1);
-                          const lastSetIndex = circuitSets.length - 1;
-                          const lastSet = circuitSets?.[lastSetIndex];
+                          const lastSetIndex = intervalSets.length - 1;
+                          const lastSet = intervalSets?.[lastSetIndex];
                           const restAfterSetTime =
                             Number(lastSet?.rest_between_sets) || 30;
                           setTimerSetIndex(lastSetIndex);
@@ -7127,7 +7139,7 @@ export default function LiveWorkout() {
                         }
                       } else if (intervalPhase === "rest") {
                         // Rest -> Work (same exercise)
-                        const currentSet = circuitSets?.[timerSetIndex];
+                        const currentSet = intervalSets?.[timerSetIndex];
                         const currentExerciseInSet =
                           currentSet?.exercises?.[timerExerciseIndex];
                         const workTime =
@@ -7136,7 +7148,7 @@ export default function LiveWorkout() {
                         setIntervalPhaseLeft(workTime);
                       } else if (intervalPhase === "rest_after_set") {
                         // Rest After Set -> Rest (last exercise of current set)
-                        const currentSet = circuitSets?.[timerSetIndex];
+                        const currentSet = intervalSets?.[timerSetIndex];
                         const lastExerciseIndex =
                           (currentSet?.exercises?.length || 1) - 1;
                         const lastExercise =
@@ -7180,11 +7192,11 @@ export default function LiveWorkout() {
                   {/* Next Button */}
                   <Button
                     onClick={() => {
-                      const circuitSets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                      const intervalSets = currentExercise?.meta?.tabata_sets;
 
                       if (intervalPhase === "work") {
                         // Work -> Rest (same exercise)
-                        const currentSet = circuitSets?.[timerSetIndex];
+                        const currentSet = intervalSets?.[timerSetIndex];
                         const currentExerciseInSet =
                           currentSet?.exercises?.[timerExerciseIndex];
                         const restTime = currentExerciseInSet?.rest_after || 10;
@@ -7192,7 +7204,7 @@ export default function LiveWorkout() {
                         setIntervalPhaseLeft(restTime);
                       } else if (intervalPhase === "rest") {
                         // Rest -> Next Work (or Rest After Set)
-                        const currentSet = circuitSets?.[timerSetIndex];
+                        const currentSet = intervalSets?.[timerSetIndex];
                         const isLastExerciseInSet =
                           timerExerciseIndex ===
                           (currentSet?.exercises?.length || 1) - 1;
@@ -7208,7 +7220,7 @@ export default function LiveWorkout() {
                         } else {
                           // Last exercise in set - check if we should show rest_after_set
                           const isLastSetInRound =
-                            timerSetIndex === circuitSets.length - 1;
+                            timerSetIndex === intervalSets.length - 1;
                           const nextRound = intervalRound + 1;
                           const isLastRound = nextRound >= intervalTotalRounds;
 
@@ -7227,14 +7239,14 @@ export default function LiveWorkout() {
                       } else if (intervalPhase === "rest_after_set") {
                         // Rest After Set -> Work (first exercise of next set or next round)
                         const isLastSetInRound =
-                          timerSetIndex === circuitSets.length - 1;
+                          timerSetIndex === intervalSets.length - 1;
 
                         if (isLastSetInRound) {
                           // Start next round
                           setIntervalRound((prev) => prev + 1);
                           setTimerSetIndex(0);
                           setTimerExerciseIndex(0);
-                          const firstSet = circuitSets?.[0];
+                          const firstSet = intervalSets?.[0];
                           const firstExercise = firstSet?.exercises?.[0];
                           const workTime = firstExercise?.work_seconds || 20;
                           setIntervalPhase("work");
@@ -7243,7 +7255,7 @@ export default function LiveWorkout() {
                           // Move to next set
                           setTimerSetIndex((prev) => prev + 1);
                           setTimerExerciseIndex(0);
-                          const nextSet = circuitSets?.[timerSetIndex + 1];
+                          const nextSet = intervalSets?.[timerSetIndex + 1];
                           const firstExercise = nextSet?.exercises?.[0];
                           const workTime = firstExercise?.work_seconds || 20;
                           setIntervalPhase("work");

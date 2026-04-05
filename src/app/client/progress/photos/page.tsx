@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -12,11 +12,10 @@ import {
   X,
   Save,
   ChevronRight,
-  ChevronLeft,
-  Maximize2,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { isFromCheckIns, progressBackHref } from "@/lib/clientProgressNav";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   uploadPhoto,
@@ -47,6 +46,8 @@ function formatDate(dateStr: string): string {
 }
 
 function ProgressPhotosPageContent() {
+  const searchParams = useSearchParams();
+  const fromCheckIns = isFromCheckIns(searchParams);
   const { addToast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
@@ -299,10 +300,10 @@ function ProgressPhotosPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+            <div className="py-6 text-center">
+              <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -315,12 +316,10 @@ function ProgressPhotosPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
-              <div className="animate-pulse space-y-6">
-                <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-36 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
           </div>
         </AnimatedBackground>
@@ -334,11 +333,9 @@ function ProgressPhotosPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold fc-text-primary">
-                  Photo Comparison
-                </h1>
+            <div className="mb-4 border-b border-[color:var(--fc-glass-border)] pb-3">
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                <h1 className="text-lg font-semibold fc-text-primary">Photo comparison</h1>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <label className="text-sm fc-text-subtle">Before:</label>
@@ -369,6 +366,7 @@ function ProgressPhotosPageContent() {
                     </select>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       setComparisonMode(false);
                       setComparisonPhotos(null);
@@ -474,51 +472,36 @@ function ProgressPhotosPageContent() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-          {/* Header */}
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link
-                  href="/client/progress"
-                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]"
-                >
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div>
-                  <nav className="flex items-center gap-2 text-sm text-[color:var(--fc-text-dim)] mb-1">
-                    <Link
-                      href="/client/progress"
-                      className="hover:text-[color:var(--fc-text-primary)]"
-                    >
-                      Progress
-                    </Link>
-                    <ChevronRight className="w-3 h-3 shrink-0" />
-                    <span className="text-[color:var(--fc-text-primary)]">
-                      Progress Photos
-                    </span>
-                  </nav>
-                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                    Progress Photos
-                  </h1>
-                </div>
-              </div>
+        <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+          {/* Header — compact */}
+          <div className="mb-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = progressBackHref(fromCheckIns);
+              }}
+              className="fc-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-4 w-4 text-[color:var(--fc-text-primary)]" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Progress Photos</h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">Log and compare over time</p>
             </div>
           </div>
 
           {/* Upload Section */}
-          <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-8">
-            <h2 className="text-xl font-semibold fc-text-primary mb-6">
-              Take Progress Photos
-            </h2>
+          <div className="mb-4 space-y-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+            <h2 className="text-base font-semibold fc-text-primary">Take photos</h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="mb-3 grid grid-cols-3 gap-2 sm:gap-3">
               {photoSlots.map((slot) => (
                 <div key={slot.type}>
-                  <label className="block text-sm font-medium fc-text-primary mb-2 capitalize">
+                  <label className="mb-1 block text-xs font-medium capitalize fc-text-primary">
                     {slot.label}
                   </label>
-                  <div className="relative aspect-[3/4] rounded-xl border-2 border-dashed border-[color:var(--fc-glass-border)] overflow-hidden">
+                  <div className="relative h-28 overflow-hidden rounded-lg border border-dashed border-[color:var(--fc-glass-border)] sm:h-32">
                     {slot.preview ? (
                       <>
                         <img
@@ -548,9 +531,9 @@ function ProgressPhotosPageContent() {
                         </div>
                       </>
                     ) : (
-                      <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer fc-text-subtle hover:fc-text-primary transition-colors">
-                        <Camera className="w-12 h-12 mb-2" />
-                        <span className="text-sm font-medium">Take {slot.label}</span>
+                      <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1 px-1 fc-text-subtle transition-colors hover:fc-text-primary">
+                        <Camera className="h-6 w-6" />
+                        <span className="text-center text-xs font-medium">Add</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -565,38 +548,39 @@ function ProgressPhotosPageContent() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium fc-text-primary mb-2">
-                  Weight (kg) - Optional
+                <label className="mb-1 block text-sm font-medium fc-text-primary">
+                  Weight (kg) — optional
                 </label>
                 <input
                   type="number"
                   step="0.1"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  placeholder="Auto-filled from latest"
-                  className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
+                  placeholder="From latest log"
+                  className="w-full rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 text-sm fc-glass-soft fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium fc-text-primary mb-2">
-                  Notes - Optional
+                <label className="mb-1 block text-sm font-medium fc-text-primary">
+                  Notes — optional
                 </label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes"
-                  className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
+                  className="w-full rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-2 text-sm fc-glass-soft fc-text-primary focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                 />
               </div>
             </div>
 
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving || !photoSlots.some((s) => s.file || s.existingPhoto)}
-              className="w-full fc-btn fc-btn-primary py-4 rounded-xl font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold fc-btn fc-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -614,13 +598,12 @@ function ProgressPhotosPageContent() {
 
           {/* Timeline */}
           {timeline.length > 0 && (
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold fc-text-primary">
-                  Photo Timeline
-                </h2>
+            <div className="space-y-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold fc-text-primary">Timeline</h2>
                 {timeline.length >= 2 && (
                   <button
+                    type="button"
                     onClick={startComparison}
                     className="fc-btn fc-btn-secondary text-sm"
                   >
@@ -629,7 +612,7 @@ function ProgressPhotosPageContent() {
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {timeline.map((entry) => {
                   const photos = selectedDate === entry.date ? selectedPhotos : [];
                   const isExpanded = selectedDate === entry.date;
@@ -637,22 +620,23 @@ function ProgressPhotosPageContent() {
                   return (
                     <div
                       key={entry.date}
-                      className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] overflow-hidden"
+                      className="overflow-hidden rounded-lg border border-[color:var(--fc-glass-border)]/80"
                     >
                       <button
+                        type="button"
                         onClick={() =>
                           isExpanded
                             ? setSelectedDate(null)
                             : loadDatePhotos(entry.date)
                         }
-                        className="w-full p-4 flex items-center justify-between hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                        className="flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]/40"
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           <div className="text-left">
-                            <p className="font-semibold fc-text-primary">
+                            <p className="text-sm font-semibold fc-text-primary">
                               {formatDate(entry.date)}
                             </p>
-                            <p className="text-sm fc-text-subtle">
+                            <p className="text-xs fc-text-subtle">
                               {entry.types.length} photo{entry.types.length !== 1 ? "s" : ""}
                               {entry.weight_kg != null &&
                                 ` · ${entry.weight_kg.toFixed(1)} kg`}
@@ -667,7 +651,7 @@ function ProgressPhotosPageContent() {
                       </button>
 
                       {isExpanded && photos.length > 0 && (
-                        <div className="p-4 pt-0 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-2 border-t border-[color:var(--fc-glass-border)]/60 p-2 pt-2">
                           {(["front", "side", "back"] as PhotoType[]).map((type) => {
                             const photo = photos.find((p) => p.photo_type === type);
                             return (
@@ -734,5 +718,22 @@ function ProgressPhotosPageContent() {
 }
 
 export default function ProgressPhotosPage() {
-  return <ProgressPhotosPageContent />;
+  return (
+    <Suspense
+      fallback={
+        <ProtectedRoute>
+          <AnimatedBackground>
+            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </div>
+          </AnimatedBackground>
+        </ProtectedRoute>
+      }
+    >
+      <ProgressPhotosPageContent />
+    </Suspense>
+  );
 }

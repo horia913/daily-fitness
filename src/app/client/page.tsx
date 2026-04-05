@@ -7,7 +7,7 @@
  * This ensures the page is always functional, even if data fetching hangs or fails.
  */
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -15,9 +15,11 @@ import { ClientPageShell, ClientGlassCard } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { AthleteScoreRing } from "@/components/client-ui/AthleteScoreRing";
-import { ScoreBreakdown } from "@/components/client-ui/ScoreBreakdown";
-import { AthleteScore } from "@/types/athleteScore";
-import Link from "next/link";
+import {
+  ScoreBreakdown,
+  type ScoreBreakdownProps,
+} from "@/components/client-ui/ScoreBreakdown";
+import { ATHLETE_TIERS, AthleteScore } from "@/types/athleteScore";
 import {
   Dumbbell,
   BarChart3,
@@ -32,6 +34,8 @@ import { dbToUiScale, DailyWellnessLog } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import { usePageData } from "@/hooks/usePageData";
 import { supabase } from "@/lib/supabase";
+import { getWorkoutStreakDisplay } from "@/lib/workoutStreakDisplay";
+import { isClientNutritionConfigured } from "@/lib/athleteScoreService";
 
 interface DashboardData {
   avatarUrl: string | null;
@@ -105,7 +109,13 @@ function FeaturedChallengeBanner() {
 
   return (
     <section className="mb-6">
-      <Link href={`/client/challenges/${challenge.id}`}>
+      <button
+        type="button"
+        onClick={() => {
+          window.location.href = `/client/challenges/${challenge.id}`;
+        }}
+        className="w-full text-left"
+      >
         <ClientGlassCard className="p-4 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-500/5 to-transparent hover:opacity-90 transition-opacity">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
@@ -126,7 +136,7 @@ function FeaturedChallengeBanner() {
             <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
           </div>
         </ClientGlassCard>
-      </Link>
+      </button>
     </section>
   );
 }
@@ -182,6 +192,16 @@ async function fetchDashboardPageData(_userId: string): Promise<DashboardPageDat
     throw new Error(error.message || "Failed to load dashboard");
   }
   return mapDashboardRpcResponse((data ?? null) as Record<string, unknown> | null);
+}
+
+/** Tier from API when valid; otherwise infer from score so the ring matches ATHLETE_TIERS bands. */
+function tierForAthleteScoreRow(row: AthleteScore): string {
+  const t = row.tier;
+  if (t && ATHLETE_TIERS.some((x) => x.key === t)) return t;
+  const band = ATHLETE_TIERS.find(
+    (x) => row.score >= x.minScore && row.score <= x.maxScore,
+  );
+  return band?.key ?? "benched";
 }
 
 function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): DashboardPageData {
@@ -287,6 +307,57 @@ export default function ClientDashboard() {
 
   const programProgressData = dashboardData?.programProgress;
 
+  const [nutritionConfigured, setNutritionConfigured] = useState(false);
+  const [breakdownTrends, setBreakdownTrends] = useState<
+    ScoreBreakdownProps["trends"] | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const nut = await isClientNutritionConfigured(user.id, supabase);
+      const { data: rows } = await supabase
+        .from("athlete_scores")
+        .select(
+          "workout_completion_score, checkin_completion_score, nutrition_compliance_score, calculated_at",
+        )
+        .eq("client_id", user.id)
+        .order("calculated_at", { ascending: false })
+        .limit(2);
+      if (cancelled) return;
+      setNutritionConfigured(nut);
+      const r = rows ?? [];
+      if (r.length >= 2) {
+        const a = r[0] as {
+          workout_completion_score?: number | null;
+          checkin_completion_score?: number | null;
+          nutrition_compliance_score?: number | null;
+        };
+        const b = r[1] as {
+          workout_completion_score?: number | null;
+          checkin_completion_score?: number | null;
+          nutrition_compliance_score?: number | null;
+        };
+        setBreakdownTrends({
+          programCompletion:
+            (a.workout_completion_score ?? 0) - (b.workout_completion_score ?? 0),
+          dailyCheckins:
+            (a.checkin_completion_score ?? 0) - (b.checkin_completion_score ?? 0),
+          nutrition: nut
+            ? (a.nutrition_compliance_score ?? 0) -
+              (b.nutrition_compliance_score ?? 0)
+            : undefined,
+        });
+      } else {
+        setBreakdownTrends(undefined);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, athleteScore?.calculated_at]);
+
   const getAvatarUrl = () => {
     if (dashboardData?.avatarUrl) return dashboardData.avatarUrl;
     if (profile?.first_name) {
@@ -298,7 +369,7 @@ export default function ClientDashboard() {
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
+        <ClientPageShell className="max-w-lg px-4 pb-32 pt-6 overflow-x-visible">
           {loading ? (
             <>
               {/* Loading: skeleton layout */}
@@ -310,8 +381,10 @@ export default function ClientDashboard() {
                 <Skeleton variant="circular" className="w-10 h-10 flex-shrink-0" />
               </header>
 
-              <section className="flex flex-col items-center justify-center mb-8 min-h-[30vh] sm:min-h-[50vh]">
-                <AthleteScoreRing score={null} tier={null} animated={false} />
+              <section className="mb-8 flex flex-col items-center py-2 sm:py-4">
+                <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex justify-center">
+                  <AthleteScoreRing score={null} tier={null} animated={false} size={200} />
+                </div>
               </section>
 
               <section className="mb-6">
@@ -339,52 +412,62 @@ export default function ClientDashboard() {
                 {formatDate()}
               </p>
             </div>
-            <Link href="/client/me">
-              <div className="w-10 h-10 rounded-full border border-[var(--fc-glass-border)] overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
-                <img
-                  src={getAvatarUrl()}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/me";
+              }}
+              className="w-10 h-10 rounded-full border border-[var(--fc-glass-border)] overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity p-0 bg-transparent"
+              aria-label="Open profile"
+            >
+              <img
+                src={getAvatarUrl()}
+                alt="Avatar"
+                className="w-full h-full object-cover"
+              />
+            </button>
           </header>
 
-          {/* Section 2: Athlete Score Ring (HERO) */}
-          <section className="flex flex-col items-center justify-center mb-8 min-h-[30vh] sm:min-h-[50vh]">
+          {/* Section 2: Athlete Score Ring (HERO) — same AthleteScoreRing as /client/test-athlete-score; overflow visible for tier glows */}
+          <section className="mb-8 flex flex-col items-center py-2 sm:py-4">
+            <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex flex-col items-center min-w-0">
             {scoreError ? (
-              <div className="flex flex-col items-center justify-center">
-                <AthleteScoreRing score={0} tier="benched" animated={false} />
-                <p className="text-sm fc-text-dim mt-4 text-center">
+              <div className="flex flex-col items-center w-full">
+                <div className="flex justify-center overflow-visible w-full">
+                  <AthleteScoreRing score={0} tier="benched" animated={false} size={200} />
+                </div>
+                <p className="text-sm fc-text-dim mt-4 text-center px-1">
                   {scoreError}
                 </p>
               </div>
             ) : (
               <>
-                <AthleteScoreRing
-                  score={athleteScore?.score ?? null}
-                  tier={athleteScore?.tier ?? null}
-                  animated={true}
-                  accentStroke
-                />
+                <div className="flex justify-center overflow-visible w-full">
+                  <AthleteScoreRing
+                    score={athleteScore?.score ?? null}
+                    tier={
+                      athleteScore != null
+                        ? tierForAthleteScoreRow(athleteScore)
+                        : null
+                    }
+                    animated={true}
+                    size={200}
+                  />
+                </div>
 
-                {/* Score Breakdown */}
                 {athleteScore && (
-                  <div className="mt-6 w-full max-w-sm">
+                  <div className="mt-5 w-full min-w-0">
                     <ScoreBreakdown
-                      scores={{
-                        workout: athleteScore.workout_completion_score,
-                        program: athleteScore.program_adherence_score,
-                        checkin: athleteScore.checkin_completion_score,
-                        goals: athleteScore.goal_progress_score,
-                        nutrition: athleteScore.nutrition_compliance_score,
-                      }}
+                      programCompletion={athleteScore.workout_completion_score}
+                      dailyCheckins={athleteScore.checkin_completion_score}
+                      nutrition={athleteScore.nutrition_compliance_score}
+                      nutritionConfigured={nutritionConfigured}
+                      trends={breakdownTrends}
                     />
                   </div>
                 )}
 
-                {/* Score trend sparkline */}
-                <div className="mt-4 w-full max-w-sm px-2">
+                <div className="mt-4 w-full min-w-0 px-0.5">
                   {scoreHistory.length >= 2 ? (
                     <>
                       <div className="h-10 w-full flex items-end justify-between gap-0.5" aria-hidden>
@@ -431,6 +514,84 @@ export default function ClientDashboard() {
                 </div>
               </>
             )}
+            </div>
+
+            {/* Hero: workout streak + program week X/Y + program progress */}
+            {dashboardData && (() => {
+              const streakDisp =
+                getWorkoutStreakDisplay(streak) ?? {
+                  tierKey: "starting" as const,
+                  label: "Starting",
+                  flames: "🔥",
+                  flameClass: "text-zinc-400 opacity-50 text-sm",
+                  accentClass: "text-zinc-400",
+                  cardBorderClass: "border-l-zinc-500",
+                  cardBgClass: "bg-zinc-500/10 dark:bg-zinc-900/20",
+                  pulseClass: "",
+                };
+              return (
+                <section className="mb-6 w-full max-w-sm mx-auto">
+                  <div className="flex gap-3">
+                    <div
+                      className="flex-1 min-w-0"
+                      role="group"
+                      aria-label={`${streak} day workout streak, ${streakDisp.label}`}
+                    >
+                    <ClientGlassCard
+                      className={`p-3 text-center border-l-4 h-full ${streakDisp.cardBorderClass} ${streakDisp.cardBgClass}`}
+                    >
+                      <div
+                        className={`flex items-center justify-center gap-1 mb-1 ${streakDisp.pulseClass}`}
+                      >
+                        <span className={streakDisp.flameClass} aria-hidden>
+                          {streakDisp.flames}
+                        </span>
+                        <span
+                          className={`text-lg font-bold tabular-nums ${streakDisp.accentClass}`}
+                        >
+                          {streak}
+                        </span>
+                      </div>
+                      <p className="text-[10px] font-semibold fc-text-primary">
+                        {streakDisp.label}
+                      </p>
+                      <p className="text-xs fc-text-dim">day streak</p>
+                    </ClientGlassCard>
+                    </div>
+
+                    <ClientGlassCard className="flex-1 min-w-0 p-3 text-center border-l-4 border-cyan-500/40 bg-cyan-950/20 dark:bg-cyan-950/30">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <Dumbbell className="w-4 h-4 text-cyan-400" />
+                        <span className="text-lg font-bold text-cyan-400 tabular-nums">
+                          {weeklyProgress.current}/{weeklyProgress.goal || 0}
+                        </span>
+                      </div>
+                      <p className="text-xs fc-text-dim">this program week</p>
+                    </ClientGlassCard>
+
+                    {programProgressData && programProgressData.totalSlots > 0 && (
+                      <ClientGlassCard className="flex-1 p-3 text-center min-w-0">
+                        <div className="flex items-center justify-center mb-1">
+                          <div className="relative w-12 h-12">
+                            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                              <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3.5" />
+                              <circle cx="24" cy="24" r="19" fill="none" stroke="#06b6d4" strokeWidth="3.5" strokeLinecap="round"
+                                strokeDasharray={`${Math.min(100, programProgressData.percent) * 1.194} 999`} />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black fc-text-primary">
+                              {programProgressData.percent}%
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs fc-text-dim">
+                          Week {programProgressData.currentWeek}/{programProgressData.totalWeeks}
+                        </p>
+                      </ClientGlassCard>
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
           </section>
 
           {/* Section 4: Today — flat row */}
@@ -449,12 +610,16 @@ export default function ClientDashboard() {
                       {todaysWorkout.type === "program" ? "Program workout" : "Assigned workout"}
                     </p>
                   </div>
-                  <Link href="/client/train">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold fc-text-primary hover:opacity-80">
-                      Go to Training
-                      <ChevronRight className="h-4 w-4" />
-                    </span>
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = "/client/train";
+                    }}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold fc-text-primary hover:opacity-80 bg-transparent border-0 p-0 cursor-pointer"
+                  >
+                    Go to Training
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               ) : (
                 <div className="py-2 text-center">
@@ -482,12 +647,17 @@ export default function ClientDashboard() {
                         : "Start your check-in streak today"}
                     </p>
                   </div>
-                  <Link href="/client/check-ins">
-                    <Button variant="fc-primary" className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2">
-                      Check in
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                  <Button
+                    variant="fc-primary"
+                    className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                    type="button"
+                    onClick={() => {
+                      window.location.href = "/client/check-ins";
+                    }}
+                  >
+                    Check in
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
                 </div>
               </ClientGlassCard>
             </section>
@@ -544,64 +714,18 @@ export default function ClientDashboard() {
                       🔥 {checkinStreak}-day streak
                     </p>
                   )}
-                  <Link href="/client/check-ins">
-                    <button className="text-xs font-medium fc-text-subtle hover:fc-text-primary transition-colors inline-flex items-center gap-1">
-                      <Pencil className="w-3 h-3" />
-                      Edit
-                    </button>
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = "/client/check-ins";
+                    }}
+                    className="text-xs font-medium fc-text-subtle hover:fc-text-primary transition-colors inline-flex items-center gap-1"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit
+                  </button>
                 </div>
               </ClientGlassCard>
-            </section>
-          )}
-
-          {/* Section 6: Streak & Stats Row */}
-          {dashboardData && (
-            <section className="mb-6">
-              <div className="flex gap-3">
-                {/* Streak */}
-                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20">
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <span className="text-base" aria-hidden>🔥</span>
-                    <span className="text-lg font-bold text-amber-400 tabular-nums">
-                      {streak}
-                    </span>
-                  </div>
-                  <p className="text-xs fc-text-dim">day streak</p>
-                </ClientGlassCard>
-
-                {/* Weekly Progress */}
-                <ClientGlassCard className="flex-1 p-3 text-center border-l-4 border-cyan-500/40 bg-cyan-950/20 dark:bg-cyan-950/30">
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <Dumbbell className="w-4 h-4 text-cyan-400" />
-                    <span className="text-lg font-bold text-cyan-400 tabular-nums">
-                      {weeklyProgress.current}/{weeklyProgress.goal || 0}
-                    </span>
-                  </div>
-                  <p className="text-xs fc-text-dim">this week</p>
-                </ClientGlassCard>
-
-                {/* Program Progress */}
-                {programProgressData && programProgressData.totalSlots > 0 && (
-                  <ClientGlassCard className="flex-1 p-3 text-center min-w-0">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="relative w-12 h-12">
-                        <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
-                          <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3.5" />
-                          <circle cx="24" cy="24" r="19" fill="none" stroke="#06b6d4" strokeWidth="3.5" strokeLinecap="round"
-                            strokeDasharray={`${Math.min(100, programProgressData.percent) * 1.194} 999`} />
-                        </svg>
-                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black fc-text-primary">
-                          {programProgressData.percent}%
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs fc-text-dim">
-                      Week {programProgressData.currentWeek}/{programProgressData.totalWeeks}
-                    </p>
-                  </ClientGlassCard>
-                )}
-              </div>
             </section>
           )}
 
@@ -646,13 +770,16 @@ export default function ClientDashboard() {
 
           {/* View full progress link */}
           <section className="mb-6">
-            <Link
-              href="/client/progress"
-              className="inline-flex items-center gap-2 text-sm font-medium fc-text-primary hover:fc-text-subtle transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/progress";
+              }}
+              className="inline-flex items-center gap-2 text-sm font-medium fc-text-primary hover:fc-text-subtle transition-colors bg-transparent border-0 p-0 cursor-pointer"
             >
               View full progress
               <ChevronRight className="w-4 h-4" />
-            </Link>
+            </button>
           </section>
 
             </>

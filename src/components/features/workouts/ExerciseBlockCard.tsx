@@ -23,6 +23,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import ExerciseItem from "./ExerciseItem";
+import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 
@@ -96,6 +97,18 @@ const blockTypeStyles: Record<
   for_time: {
     icon: Zap,
     label: "For Time",
+  },
+  hr_sets: {
+    icon: Activity,
+    label: "HR Sets",
+  },
+  speed_work: {
+    icon: Zap,
+    label: "Speed Work",
+  },
+  endurance: {
+    icon: Activity,
+    label: "Endurance",
   },
 };
 
@@ -285,6 +298,45 @@ export default function ExerciseBlockCard({
               }%`}
           </>
         );
+      case "speed_work": {
+        const intv = (exercise as any).speed_intervals || exercise.sets || "?";
+        const dm = (exercise as any).speed_distance_meters;
+        const rs = (exercise as any).speed_rest_seconds;
+        const mode = (exercise as any).speed_intensity_mode === "hr";
+        const pct = mode
+          ? (exercise as any).speed_max_hr_percent
+          : (exercise as any).speed_max_speed_percent;
+        const bw = (exercise as any).speed_load_percent_bw;
+        const parts = [
+          `${intv} × ${dm != null ? `${dm}m` : "—"}`,
+          pct != null && pct !== ""
+            ? `${pct}% ${mode ? "HR" : "speed"}`
+            : null,
+          rs != null && rs !== "" ? `${rs}s rest` : null,
+          bw != null && bw !== "" ? `${bw}% BW` : null,
+        ].filter(Boolean);
+        return <>{parts.join(" · ")}</>;
+      }
+      case "endurance": {
+        const km = (exercise as any).endurance_distance_km;
+        const pace = (exercise as any).endurance_target_pace_sec_per_km;
+        const z = (exercise as any).endurance_hr_zone;
+        const hp = (exercise as any).endurance_hr_percentage;
+        const paceStr =
+          pace != null && pace !== "" && Number(pace) > 0
+            ? formatPaceMinSecPerKm(Number(pace))
+            : null;
+        const parts = [
+          km != null && km !== "" ? `${Number(km).toFixed(1)} km` : null,
+          paceStr,
+          z != null && z !== ""
+            ? `Zone ${z}`
+            : hp != null && hp !== ""
+              ? `${hp}% HR`
+              : null,
+        ].filter(Boolean);
+        return <>{parts.join(" · ")}</>;
+      }
       case "drop_set":
         return (
           <>
@@ -450,7 +502,6 @@ export default function ExerciseBlockCard({
       case "emom":
       case "emom_reps":
       case "for_time":
-      case "ladder":
         // These types might have nested exercises in block.exercises
         // If main exercise exists, show it as a nested item
         if (exercise.exercise_id) {
@@ -628,7 +679,6 @@ export default function ExerciseBlockCard({
                           "Exercise";
 
                         // For Tabata: work_seconds and rest_seconds are uniform (block-level)
-                        // For Circuit: can differ per exercise
                         let workTime: number | undefined;
                         let restTime: number | undefined;
 
@@ -645,7 +695,6 @@ export default function ExerciseBlockCard({
                             ? parseInt(String(ex.rest_seconds))
                             : 10; // Default 10s rest between exercises in tabata
                         } else {
-                          // Circuit: can differ per exercise
                           workTime = ex.work_seconds
                             ? parseInt(String(ex.work_seconds))
                             : undefined;

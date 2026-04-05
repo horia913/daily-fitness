@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -1457,7 +1457,20 @@ function AnalyticsPageContent() {
 export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
-      <AnalyticsPageContent />
+      <Suspense
+        fallback={
+          <AnimatedBackground>
+            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </div>
+          </AnimatedBackground>
+        }
+      >
+        <AnalyticsPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }

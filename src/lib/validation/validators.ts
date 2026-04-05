@@ -61,7 +61,6 @@ export const WorkoutBlockTypeSchema = z.enum([
   'drop_set',
   'cluster_set',
   'rest_pause',
-  'ladder',
   'pre_exhaustion',
   'amrap',
   'emom',

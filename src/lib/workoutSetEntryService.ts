@@ -1,15 +1,16 @@
 import { supabase } from '@/lib/supabase'
+import { collectExerciseIdsDeep } from '@/lib/collectExerciseIdsDeep'
 import {
   WorkoutSetEntry,
   WorkoutSetEntryExercise,
   SetType,
   WorkoutDropSet,
   WorkoutClusterSet,
-  WorkoutPyramidSet,
   WorkoutRestPauseSet,
   WorkoutTimeProtocol,
   WorkoutHRSet,
-  WorkoutLadderSet,
+  WorkoutSpeedSet,
+  WorkoutEnduranceSet,
   LiveWorkoutSetEntry,
   LiveWorkoutExercise,
   LoggedSet
@@ -94,10 +95,12 @@ export class WorkoutSetEntryService {
     const needsClusterSets = setTypes.has('cluster_set')
     const needsRestPause = setTypes.has('rest_pause')
     const needsHRSets = setTypes.has('hr_sets')
+    const needsSpeedSets = setTypes.has('speed_work')
+    const needsEnduranceSets = setTypes.has('endurance')
 
-    const blockIdsForExercises = blocks
-      .filter((b: any) => ['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(b.set_type))
-      .map((b: any) => b.id)
+    // Load workout_set_entry_exercises for every set entry so lite prefetch still gets exercise_ids
+    // for drop_set, superset, etc. (same pattern as get_workout_blocks / execution loadAssignment).
+    const blockIdsForExercises = allBlockIds
     const blockIdsForTimeProtocols = needsTimeProtocols
       ? blocks.filter((b: any) => ['amrap', 'emom', 'for_time', 'tabata'].includes(b.set_type)).map((b: any) => b.id)
       : []
@@ -112,6 +115,12 @@ export class WorkoutSetEntryService {
       : []
     const blockIdsForHRSets = needsHRSets
       ? blocks.filter((b: any) => b.set_type === 'hr_sets').map((b: any) => b.id)
+      : []
+    const blockIdsForSpeedSets = needsSpeedSets
+      ? blocks.filter((b: any) => b.set_type === 'speed_work').map((b: any) => b.id)
+      : []
+    const blockIdsForEnduranceSets = needsEnduranceSets
+      ? blocks.filter((b: any) => b.set_type === 'endurance').map((b: any) => b.id)
       : []
 
     const safeQuery = async (
@@ -212,16 +221,41 @@ export class WorkoutSetEntryService {
       ? await queryTableInChunks('workout_rest_pause_sets', 'id, set_entry_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage', blockIdsForRestPause)
       : { data: [], error: null }
     const hrSetsRes = !lite && needsHRSets
-      ? await queryTableInChunks('workout_hr_sets', 'id, set_entry_id, exercise_id, exercise_order, target_hr_zone, work_duration_seconds, rest_duration_seconds, target_rounds', blockIdsForHRSets)
+      ? await queryTableInChunks(
+          'workout_hr_sets',
+          'id, set_entry_id, exercise_id, exercise_order, hr_zone, hr_percentage_min, hr_percentage_max, is_intervals, duration_seconds, work_duration_seconds, rest_duration_seconds, target_rounds, distance_meters',
+          blockIdsForHRSets,
+        )
+      : { data: [], error: null }
+    const speedSetsRes = !lite && needsSpeedSets
+      ? await queryTableInChunks(
+          'workout_speed_sets',
+          'id, set_entry_id, exercise_id, exercise_order, intervals, distance_meters, load_pct_bw, target_speed_pct, target_hr_pct, rest_seconds, notes',
+          blockIdsForSpeedSets,
+        )
+      : { data: [], error: null }
+    const enduranceSetsRes = !lite && needsEnduranceSets
+      ? await queryTableInChunks(
+          'workout_endurance_sets',
+          'id, set_entry_id, exercise_id, exercise_order, target_distance_meters, target_time_seconds, target_pace_seconds_per_km, hr_zone, target_hr_pct, notes',
+          blockIdsForEnduranceSets,
+        )
       : { data: [], error: null }
 
     const allExerciseIds = new Set<string>()
-    ;(exercisesRes.data || []).forEach((ex: any) => allExerciseIds.add(ex.exercise_id))
-    ;(dropRes.data || []).forEach((ds: any) => allExerciseIds.add(ds.exercise_id))
-    ;(clusterRes.data || []).forEach((cs: any) => allExerciseIds.add(cs.exercise_id))
-    ;(restPauseRes.data || []).forEach((rp: any) => allExerciseIds.add(rp.exercise_id))
-    ;(timeProtocolsRes.data || []).forEach((tp: any) => allExerciseIds.add(tp.exercise_id))
-    ;(hrSetsRes.data || []).forEach((hr: any) => allExerciseIds.add(hr.exercise_id))
+    for (const id of collectExerciseIdsDeep([
+      blocks,
+      exercisesRes.data,
+      dropRes.data,
+      clusterRes.data,
+      restPauseRes.data,
+      timeProtocolsRes.data,
+      hrSetsRes.data,
+      speedSetsRes.data,
+      enduranceSetsRes.data,
+    ])) {
+      allExerciseIds.add(id)
+    }
 
     const exercisesLabel = process.env.NODE_ENV !== 'production' ? `[buildBlocks] exercises ${buildRunId}` : ''
     if (process.env.NODE_ENV !== 'production') console.time(exercisesLabel)
@@ -301,6 +335,8 @@ export class WorkoutSetEntryService {
       const usesRestPause = setType === 'rest_pause'
       const usesTimeProtocols = ['amrap', 'emom', 'for_time', 'tabata'].includes(setType)
       const usesHRSets = setType === 'hr_sets'
+      const usesSpeedSets = setType === 'speed_work'
+      const usesEnduranceSets = setType === 'endurance'
 
       if (usesBlockExercises) {
         const blockExercises = exercisesByBlock.get(block.id) || []
@@ -325,102 +361,262 @@ export class WorkoutSetEntryService {
         block.exercises = mappedExercises
       } else if (usesDropSets) {
         const dropSets = dropRes.data?.filter((ds: any) => ds.set_entry_id === block.id) || []
-        const exerciseMap = new Map<string, any>()
-        dropSets.forEach((ds: any) => {
-          const key = `${ds.exercise_id}:${ds.exercise_order}`
-          if (!exerciseMap.has(key)) {
-            exerciseMap.set(key, {
-              id: ds.id,
-              set_entry_id: ds.set_entry_id,
-              exercise_id: ds.exercise_id,
-              exercise_order: ds.exercise_order,
-              exercise: exercisesMap.get(ds.exercise_id) || null,
-              sets: block.total_sets,
-              reps: block.reps_per_set,
-              weight_kg: ds.weight_kg,
-              load_percentage: ds.load_percentage,
-              drop_sets: dropSets.filter((d: any) =>
-                d.exercise_id === ds.exercise_id && d.exercise_order === ds.exercise_order
-              ).sort((a: any, b: any) => a.drop_order - b.drop_order)
+        const fromWse = exercisesByBlock.get(block.id) || []
+        if (fromWse.length > 0) {
+          block.exercises = fromWse
+            .map((ex: any) => {
+              const dropForEx = dropSets.filter(
+                (d: any) =>
+                  d.exercise_id === ex.exercise_id && d.exercise_order === ex.exercise_order,
+              ).sort((a: any, b: any) => (a.drop_order ?? 0) - (b.drop_order ?? 0))
+              return {
+                ...ex,
+                exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+                sets: ex.sets ?? block.total_sets,
+                reps: ex.reps ?? block.reps_per_set,
+                weight_kg: ex.weight_kg ?? dropForEx[0]?.weight_kg,
+                load_percentage: ex.load_percentage ?? dropForEx[0]?.load_percentage,
+                drop_sets: dropForEx,
+              }
             })
-          }
-        })
-        block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+        } else if (dropSets.length > 0) {
+          const exerciseMap = new Map<string, any>()
+          dropSets.forEach((ds: any) => {
+            const key = `${ds.exercise_id}:${ds.exercise_order}`
+            if (!exerciseMap.has(key)) {
+              exerciseMap.set(key, {
+                id: ds.id,
+                set_entry_id: ds.set_entry_id,
+                exercise_id: ds.exercise_id,
+                exercise_order: ds.exercise_order,
+                exercise: exercisesMap.get(ds.exercise_id) || null,
+                sets: block.total_sets,
+                reps: block.reps_per_set,
+                weight_kg: ds.weight_kg,
+                load_percentage: ds.load_percentage,
+                drop_sets: dropSets.filter((d: any) =>
+                  d.exercise_id === ds.exercise_id && d.exercise_order === ds.exercise_order
+                ).sort((a: any, b: any) => a.drop_order - b.drop_order)
+              })
+            }
+          })
+          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+        } else {
+          block.exercises = []
+        }
       } else if (usesClusterSets) {
         const clusterSets = clusterRes.data?.filter((cs: any) => cs.set_entry_id === block.id) || []
-        block.exercises = clusterSets.map((cs: any) => ({
-          id: cs.id,
-          set_entry_id: cs.set_entry_id,
-          exercise_id: cs.exercise_id,
-          exercise_order: cs.exercise_order,
-          exercise: exercisesMap.get(cs.exercise_id) || null,
-          sets: block.total_sets,
-          reps_per_cluster: cs.reps_per_cluster,
-          clusters_per_set: cs.clusters_per_set,
-          intra_cluster_rest: cs.intra_cluster_rest,
-          rest_seconds: block.rest_seconds,
-          weight_kg: cs.weight_kg,
-          load_percentage: cs.load_percentage,
-          cluster_sets: [cs]
-        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        const fromWseCluster = exercisesByBlock.get(block.id) || []
+        if (clusterSets.length > 0) {
+          block.exercises = clusterSets.map((cs: any) => ({
+            id: cs.id,
+            set_entry_id: cs.set_entry_id,
+            exercise_id: cs.exercise_id,
+            exercise_order: cs.exercise_order,
+            exercise: exercisesMap.get(cs.exercise_id) || null,
+            sets: block.total_sets,
+            reps_per_cluster: cs.reps_per_cluster,
+            clusters_per_set: cs.clusters_per_set,
+            intra_cluster_rest: cs.intra_cluster_rest,
+            rest_seconds: block.rest_seconds,
+            weight_kg: cs.weight_kg,
+            load_percentage: cs.load_percentage,
+            cluster_sets: [cs]
+          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        } else if (fromWseCluster.length > 0) {
+          block.exercises = fromWseCluster.map((ex: any) => ({
+            ...ex,
+            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+            cluster_sets: [],
+          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+        } else {
+          block.exercises = []
+        }
       } else if (usesRestPause) {
         const restPauseSets = restPauseRes.data?.filter((rp: any) => rp.set_entry_id === block.id) || []
-        block.exercises = restPauseSets.map((rp: any) => ({
-          id: rp.id,
-          set_entry_id: rp.set_entry_id,
-          exercise_id: rp.exercise_id,
-          exercise_order: rp.exercise_order,
-          exercise: exercisesMap.get(rp.exercise_id) || null,
-          sets: block.total_sets,
-          reps: block.reps_per_set,
-          rest_pause_duration: rp.rest_pause_duration,
-          max_rest_pauses: rp.max_rest_pauses,
-          weight_kg: rp.weight_kg,
-          load_percentage: rp.load_percentage,
-          rest_pause_sets: [rp]
-        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        const fromWseRp = exercisesByBlock.get(block.id) || []
+        if (restPauseSets.length > 0) {
+          block.exercises = restPauseSets.map((rp: any) => ({
+            id: rp.id,
+            set_entry_id: rp.set_entry_id,
+            exercise_id: rp.exercise_id,
+            exercise_order: rp.exercise_order,
+            exercise: exercisesMap.get(rp.exercise_id) || null,
+            sets: block.total_sets,
+            reps: block.reps_per_set,
+            rest_pause_duration: rp.rest_pause_duration,
+            max_rest_pauses: rp.max_rest_pauses,
+            weight_kg: rp.weight_kg,
+            load_percentage: rp.load_percentage,
+            rest_pause_sets: [rp]
+          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        } else if (fromWseRp.length > 0) {
+          block.exercises = fromWseRp.map((ex: any) => ({
+            ...ex,
+            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+            rest_pause_sets: [],
+          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+        } else {
+          block.exercises = []
+        }
       } else if (usesTimeProtocols) {
         const timeProtocols = timeProtocolsByBlock.get(block.id) || []
-        const exerciseMap = new Map<string, any>()
-        timeProtocols.forEach((tp: any) => {
-          const key = `${tp.exercise_id}:${tp.exercise_order}`
-          if (!exerciseMap.has(key)) {
-            exerciseMap.set(key, {
-              id: tp.id,
-              set_entry_id: tp.set_entry_id,
-              exercise_id: tp.exercise_id,
-              exercise_order: tp.exercise_order,
-              exercise: exercisesMap.get(tp.exercise_id) || null,
-              sets: block.total_sets,
-              weight_kg: tp.weight_kg,
-              load_percentage: tp.load_percentage,
-              time_protocols: timeProtocols.filter((t: any) =>
-                t.exercise_id === tp.exercise_id && t.exercise_order === tp.exercise_order
-              )
-            })
-          }
-        })
-        block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+        const fromWseTp = exercisesByBlock.get(block.id) || []
+        if (timeProtocols.length > 0) {
+          const exerciseMap = new Map<string, any>()
+          timeProtocols.forEach((tp: any) => {
+            const key = `${tp.exercise_id}:${tp.exercise_order}`
+            if (!exerciseMap.has(key)) {
+              exerciseMap.set(key, {
+                id: tp.id,
+                set_entry_id: tp.set_entry_id,
+                exercise_id: tp.exercise_id,
+                exercise_order: tp.exercise_order,
+                exercise: exercisesMap.get(tp.exercise_id) || null,
+                sets: block.total_sets,
+                weight_kg: tp.weight_kg,
+                load_percentage: tp.load_percentage,
+                time_protocols: timeProtocols.filter((t: any) =>
+                  t.exercise_id === tp.exercise_id && t.exercise_order === tp.exercise_order
+                )
+              })
+            }
+          })
+          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+        } else if (fromWseTp.length > 0) {
+          block.exercises = fromWseTp.map((ex: any) => ({
+            ...ex,
+            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+            time_protocols: [],
+          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+        } else {
+          block.exercises = []
+        }
       } else if (usesHRSets) {
         const hrSets = hrSetsRes.data?.filter((hr: any) => hr.set_entry_id === block.id) || []
-        block.exercises = hrSets.map((hr: any) => ({
-          id: hr.id,
-          set_entry_id: hr.set_entry_id,
-          exercise_id: hr.exercise_id,
-          exercise_order: hr.exercise_order,
-          exercise: exercisesMap.get(hr.exercise_id) || null,
-          hr_zone: hr.hr_zone,
-          hr_percentage_min: hr.hr_percentage_min,
-          hr_percentage_max: hr.hr_percentage_max,
-          hr_is_intervals: hr.is_intervals,
-          hr_duration_minutes: hr.duration_seconds ? Math.round(hr.duration_seconds / 60) : undefined,
-          hr_work_duration_minutes: hr.work_duration_seconds ? Math.round(hr.work_duration_seconds / 60) : undefined,
-          hr_rest_duration_minutes: hr.rest_duration_seconds ? Math.round(hr.rest_duration_seconds / 60) : undefined,
-          hr_target_rounds: hr.target_rounds,
-          hr_distance_meters: hr.distance_meters,
-          hr_sets: [hr]
-        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        block.hr_sets = hrSets.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        const fromWseHr = exercisesByBlock.get(block.id) || []
+        if (hrSets.length > 0) {
+          block.exercises = hrSets.map((hr: any) => ({
+            id: hr.id,
+            set_entry_id: hr.set_entry_id,
+            exercise_id: hr.exercise_id,
+            exercise_order: hr.exercise_order,
+            exercise: exercisesMap.get(hr.exercise_id) || null,
+            hr_zone: hr.hr_zone,
+            hr_percentage_min: hr.hr_percentage_min,
+            hr_percentage_max: hr.hr_percentage_max,
+            hr_is_intervals: hr.is_intervals,
+            hr_duration_minutes: hr.duration_seconds ? Math.round(hr.duration_seconds / 60) : undefined,
+            hr_work_duration_minutes: hr.work_duration_seconds ? Math.round(hr.work_duration_seconds / 60) : undefined,
+            hr_rest_duration_minutes: hr.rest_duration_seconds ? Math.round(hr.rest_duration_seconds / 60) : undefined,
+            hr_target_rounds: hr.target_rounds,
+            hr_distance_meters: hr.distance_meters,
+            hr_sets: [hr]
+          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+          block.hr_sets = hrSets.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        } else if (fromWseHr.length > 0) {
+          block.exercises = fromWseHr.map((ex: any) => ({
+            ...ex,
+            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+            hr_sets: [],
+          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+        } else {
+          block.exercises = []
+        }
+      } else if (usesSpeedSets) {
+        const speedRows = speedSetsRes.data?.filter((r: any) => r.set_entry_id === block.id) || []
+        const fromWseSpeed = exercisesByBlock.get(block.id) || []
+        if (speedRows.length > 0) {
+          if (fromWseSpeed.length > 0) {
+            block.exercises = fromWseSpeed
+              .map((ex: any) => {
+                const match = speedRows.find(
+                  (r: any) =>
+                    r.exercise_id === ex.exercise_id &&
+                    r.exercise_order === ex.exercise_order,
+                )
+                return {
+                  ...ex,
+                  exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+                  sets: ex.sets ?? match?.intervals ?? block.total_sets,
+                  rest_seconds:
+                    ex.rest_seconds ?? match?.rest_seconds ?? block.rest_seconds,
+                  speed_sets: match ? [match] : [],
+                }
+              })
+              .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+          } else {
+            block.exercises = speedRows.map((row: any) => ({
+              id: row.id,
+              set_entry_id: row.set_entry_id,
+              exercise_id: row.exercise_id,
+              exercise_order: row.exercise_order,
+              exercise: exercisesMap.get(row.exercise_id) || null,
+              sets: block.total_sets,
+              rest_seconds: row.rest_seconds ?? block.rest_seconds,
+              speed_sets: [row],
+            })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+          }
+          block.speed_sets = speedRows.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        } else if (fromWseSpeed.length > 0) {
+          block.exercises = fromWseSpeed
+            .map((ex: any) => ({
+              ...ex,
+              exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+              speed_sets: [],
+            }))
+            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+          block.speed_sets = []
+        } else {
+          block.exercises = []
+          block.speed_sets = []
+        }
+      } else if (usesEnduranceSets) {
+        const endRows = enduranceSetsRes.data?.filter((r: any) => r.set_entry_id === block.id) || []
+        const fromWseEndurance = exercisesByBlock.get(block.id) || []
+        if (endRows.length > 0) {
+          if (fromWseEndurance.length > 0) {
+            block.exercises = fromWseEndurance
+              .map((ex: any) => {
+                const match = endRows.find(
+                  (r: any) =>
+                    r.exercise_id === ex.exercise_id &&
+                    r.exercise_order === ex.exercise_order,
+                )
+                return {
+                  ...ex,
+                  exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+                  sets: ex.sets ?? block.total_sets,
+                  endurance_sets: match ? [match] : [],
+                }
+              })
+              .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+          } else {
+            block.exercises = endRows.map((row: any) => ({
+              id: row.id,
+              set_entry_id: row.set_entry_id,
+              exercise_id: row.exercise_id,
+              exercise_order: row.exercise_order,
+              exercise: exercisesMap.get(row.exercise_id) || null,
+              sets: block.total_sets,
+              endurance_sets: [row],
+            })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+          }
+          block.endurance_sets = endRows.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        } else if (fromWseEndurance.length > 0) {
+          block.exercises = fromWseEndurance
+            .map((ex: any) => ({
+              ...ex,
+              exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
+              endurance_sets: [],
+            }))
+            .sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
+          block.endurance_sets = []
+        } else {
+          block.exercises = []
+          block.endurance_sets = []
+        }
       } else {
         block.exercises = []
       }
@@ -479,6 +675,14 @@ export class WorkoutSetEntryService {
     if (!setEntries?.length) return 0
     let n = 0
     for (const b of setEntries) {
+      if (b.set_type === 'speed_work' || b.set_type === 'endurance') {
+        const wsee = b.exercises?.length ?? 0
+        n +=
+          wsee > 0
+            ? wsee
+            : (b.speed_sets?.length ?? 0) + (b.endurance_sets?.length ?? 0)
+        continue
+      }
       n += (b.exercises?.length ?? 0)
       if (b.drop_sets?.length) {
         n += new Set(b.drop_sets.map((d: any) => `${d.exercise_id}:${d.exercise_order}`)).size
@@ -486,7 +690,10 @@ export class WorkoutSetEntryService {
       if (b.time_protocols?.length) {
         n += new Set(b.time_protocols.map((t: any) => `${t.exercise_id}:${t.exercise_order}`)).size
       }
-      n += (b.cluster_sets?.length ?? 0) + (b.rest_pause_sets?.length ?? 0) + (b.hr_sets?.length ?? 0)
+      n +=
+        (b.cluster_sets?.length ?? 0) +
+        (b.rest_pause_sets?.length ?? 0) +
+        (b.hr_sets?.length ?? 0)
     }
     return n
   }
@@ -883,6 +1090,73 @@ export class WorkoutSetEntryService {
     }
   }
 
+  static async createSpeedSet(
+    setEntryId: string,
+    exerciseId: string,
+    exerciseOrder: number,
+    data: Partial<WorkoutSpeedSet>
+  ): Promise<WorkoutSpeedSet | null> {
+    try {
+      const insertData: Record<string, unknown> = {
+        set_entry_id: setEntryId,
+        exercise_id: exerciseId,
+        exercise_order: exerciseOrder,
+        intervals: data.intervals ?? 1,
+        distance_meters: data.distance_meters ?? 0,
+        rest_seconds: data.rest_seconds ?? 120,
+      }
+      if (data.load_pct_bw != null) insertData.load_pct_bw = data.load_pct_bw
+      if (data.target_speed_pct != null) insertData.target_speed_pct = data.target_speed_pct
+      if (data.target_hr_pct != null) insertData.target_hr_pct = data.target_hr_pct
+      if (data.notes != null) insertData.notes = data.notes
+
+      const { data: row, error } = await supabase
+        .from('workout_speed_sets')
+        .insert(insertData)
+        .select()
+        .single()
+
+      if (error) throw error
+      return row as WorkoutSpeedSet
+    } catch (error) {
+      console.error('Error creating speed set:', error)
+      return null
+    }
+  }
+
+  static async createEnduranceSet(
+    setEntryId: string,
+    exerciseId: string,
+    exerciseOrder: number,
+    data: Partial<WorkoutEnduranceSet>
+  ): Promise<WorkoutEnduranceSet | null> {
+    try {
+      const insertData: Record<string, unknown> = {
+        set_entry_id: setEntryId,
+        exercise_id: exerciseId,
+        exercise_order: exerciseOrder,
+        target_distance_meters: data.target_distance_meters ?? 0,
+      }
+      if (data.target_time_seconds != null) insertData.target_time_seconds = data.target_time_seconds
+      if (data.target_pace_seconds_per_km != null) insertData.target_pace_seconds_per_km = data.target_pace_seconds_per_km
+      if (data.hr_zone != null) insertData.hr_zone = data.hr_zone
+      if (data.target_hr_pct != null) insertData.target_hr_pct = data.target_hr_pct
+      if (data.notes != null) insertData.notes = data.notes
+
+      const { data: row, error } = await supabase
+        .from('workout_endurance_sets')
+        .insert(insertData)
+        .select()
+        .single()
+
+      if (error) throw error
+      return row as WorkoutEnduranceSet
+    } catch (error) {
+      console.error('Error creating endurance set:', error)
+      return null
+    }
+  }
+
   // Update workout set entry
   static async updateWorkoutBlock(
     setEntryId: string,
@@ -947,6 +1221,10 @@ export class WorkoutSetEntryService {
         await safeDelete('workout_time_protocols')
       } else if (setType === 'hr_sets') {
         await safeDelete('workout_hr_sets')
+      } else if (setType === 'speed_work') {
+        await safeDelete('workout_speed_sets')
+      } else if (setType === 'endurance') {
+        await safeDelete('workout_endurance_sets')
       }
       return
     }
@@ -958,6 +1236,8 @@ export class WorkoutSetEntryService {
       safeDelete('workout_rest_pause_sets'),
       safeDelete('workout_time_protocols'),
       safeDelete('workout_hr_sets'),
+      safeDelete('workout_speed_sets'),
+      safeDelete('workout_endurance_sets'),
     ])
   }
 
@@ -1013,9 +1293,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       superset: {
         name: 'Superset',
@@ -1026,9 +1304,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: true,
         supportsClusterSets: true,
-        supportsPyramidSets: true,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       giant_set: {
         name: 'Giant Set',
@@ -1039,9 +1315,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       drop_set: {
         name: 'Drop Set',
@@ -1052,9 +1326,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: true,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       cluster_set: {
         name: 'Cluster Set',
@@ -1065,9 +1337,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: false,
         supportsClusterSets: true,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       rest_pause: {
         name: 'Rest-Pause Set',
@@ -1078,9 +1348,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: true,
-        supportsLadder: false
+        supportsRestPause: true
       },
       pre_exhaustion: {
         name: 'Pre-Exhaustion',
@@ -1091,9 +1359,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: false,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       amrap: {
         name: 'AMRAP',
@@ -1104,9 +1370,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: true,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       emom: {
         name: 'EMOM',
@@ -1117,9 +1381,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: true,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       tabata: {
         name: 'Tabata',
@@ -1130,9 +1392,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: true,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
+        supportsRestPause: false
       },
       for_time: {
         name: 'For Time',
@@ -1143,22 +1403,7 @@ export class WorkoutSetEntryService {
         supportsTimeProtocols: true,
         supportsDropSets: false,
         supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: false
-      },
-      ladder: {
-        name: 'Ladder',
-        description: 'Ascending or descending rep schemes',
-        icon: '🪜',
-        color: 'emerald',
-        requiresMultipleExercises: false,
-        supportsTimeProtocols: false,
-        supportsDropSets: false,
-        supportsClusterSets: false,
-        supportsPyramidSets: false,
-        supportsRestPause: false,
-        supportsLadder: true
+        supportsRestPause: false
       }
     }
 

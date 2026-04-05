@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ClientProfileView from "@/components/coach/client-views/ClientProfileView";
@@ -19,7 +19,7 @@ const SECTIONS = [
   { id: "account", label: "Account" },
 ] as const;
 
-export default function ClientProfilePage() {
+function ClientProfilePageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const clientId = params.id as string;
@@ -141,5 +141,20 @@ export default function ClientProfilePage() {
         <ClientAccountSection clientId={clientId} />
       </div>
     </div>
+  );
+}
+
+export default function ClientProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6 p-4">
+          <div className="h-10 w-64 animate-pulse rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+          <div className="h-48 animate-pulse rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+        </div>
+      }
+    >
+      <ClientProfilePageContent />
+    </Suspense>
   );
 }

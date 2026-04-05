@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -32,6 +32,8 @@ const SET_TYPE_LABELS: Record<string, string> = {
   tabata: "Tabata",
   for_time: "For Time",
   hr_sets: "HR Sets",
+  speed_work: "Speed Work",
+  endurance: "Endurance",
 };
 
 export type PreviewDayStatus = "today" | "completed" | "missed" | "upcoming" | "rest";
@@ -49,9 +51,9 @@ export interface WorkoutDayPreviewProps {
   isStarting: boolean;
   startingScheduleId: string | null;
   clientId: string | undefined;
-  /** When provided, used instead of fetching blocks (avoids extra getWorkoutBlocks calls). */
+  /** Optional prefetched blocks from parent; hollow/empty entries trigger a full fetch in the preview. */
   blocks?: WorkoutSetEntry[] | null;
-  /** When provided (e.g. from Train page RPC), blocks are not loaded; summary shows this count and no exercise list. */
+  /** Optional count from schedule RPC — used as footer fallback when block.exercises is not hydrated yet. */
   exerciseCount?: number;
 }
 
@@ -74,11 +76,27 @@ export function WorkoutDayPreview({
   const [blocks, setBlocks] = useState<WorkoutSetEntry[] | null>(() =>
     blocksProp !== undefined && Array.isArray(blocksProp) ? blocksProp : null
   );
-  const [loading, setLoading] = useState(() =>
-    !!(templateId && blocksProp === undefined && exerciseCountProp === undefined)
-  );
+  const [loading, setLoading] = useState(() => {
+    if (!templateId || status === "rest") return false;
+    // Parent has not passed prefetched blocks yet (e.g. train page remount after workout) — effect will load.
+    if (blocksProp === undefined) return true;
+    const arr = Array.isArray(blocksProp) ? blocksProp : null;
+    const sum =
+      arr?.reduce((s, b) => s + (b.exercises?.length ?? 0), 0) ?? 0;
+    const unusable =
+      !arr ||
+      arr.length === 0 ||
+      (arr.length > 0 && sum === 0);
+    return !!(templateId && unusable);
+  });
   const [error, setError] = useState<string | null>(null);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(null);
+
+  const exerciseCountRef = useRef(exerciseCountProp);
+  exerciseCountRef.current = exerciseCountProp;
+
+  const sumPreviewExercises = (arr: WorkoutSetEntry[] | null | undefined) =>
+    (arr ?? []).reduce((s, b) => s + (b.exercises?.length ?? 0), 0);
 
   const loadBlocks = useCallback(async () => {
     if (!templateId) {
@@ -89,8 +107,22 @@ export function WorkoutDayPreview({
     setLoading(true);
     setError(null);
     try {
-      const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
-      const data = await WorkoutBlockService.getWorkoutBlocks(templateId);
+      const { WorkoutBlockService, WorkoutSetEntryService } = await import(
+        "@/lib/workoutBlockService"
+      );
+      let data = await WorkoutBlockService.getWorkoutBlocks(templateId);
+      const rpcCount = exerciseCountRef.current;
+      if (
+        data &&
+        data.length > 0 &&
+        sumPreviewExercises(data) === 0 &&
+        typeof rpcCount === "number" &&
+        rpcCount > 0
+      ) {
+        WorkoutSetEntryService.clearBlocksCacheForTemplates([templateId]);
+        await new Promise((r) => setTimeout(r, 350));
+        data = await WorkoutBlockService.getWorkoutBlocks(templateId);
+      }
       setBlocks(data ?? []);
     } catch (e) {
       console.error("[WorkoutDayPreview] loadBlocks failed:", e);
@@ -101,7 +133,7 @@ export function WorkoutDayPreview({
     }
   }, [templateId]);
 
-  // Use preloaded blocks when parent provides them; when exerciseCount is provided, skip block load (Train page)
+  // Use preloaded blocks when they include exercises; empty / "hollow" lite prefetch refetches full blocks once.
   useEffect(() => {
     if (status === "rest" || !templateId) {
       setBlocks(null);
@@ -110,19 +142,26 @@ export function WorkoutDayPreview({
       return;
     }
     if (blocksProp !== undefined) {
-      setBlocks(Array.isArray(blocksProp) ? blocksProp : null);
+      const arr = Array.isArray(blocksProp) ? blocksProp : null;
+      const sumExerciseRows =
+        arr?.reduce((s, b) => s + (b.exercises?.length ?? 0), 0) ?? 0;
+      const unusable =
+        !arr ||
+        arr.length === 0 ||
+        (arr.length > 0 && sumExerciseRows === 0);
+      if (unusable) {
+        void loadBlocks();
+        return;
+      }
+      setBlocks(arr);
       setLoading(false);
       setError(null);
       return;
     }
-    if (exerciseCountProp !== undefined) {
-      setBlocks(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    loadBlocks();
-  }, [templateId, status, loadBlocks, blocksProp, exerciseCountProp]);
+    // blocksProp undefined: do not use exerciseCount-only placeholder — that breaks after navigate-back
+    // when prefetch Map is empty but RPC still returns a count. Always load full blocks when we have templateId.
+    void loadBlocks();
+  }, [templateId, status, loadBlocks, blocksProp]);
 
   // Fetch workout log id for completed days (View Log link)
   useEffect(() => {
@@ -150,10 +189,14 @@ export function WorkoutDayPreview({
     return () => { cancelled = true; };
   }, [status, scheduleId, clientId]);
 
+  const sumBlockExercises =
+    blocks?.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0) ?? 0;
   const totalExercises =
-    exerciseCountProp !== undefined
-      ? exerciseCountProp
-      : (blocks?.reduce((sum, b) => sum + (b.exercises?.length ?? 0), 0) ?? 0);
+    sumBlockExercises > 0
+      ? sumBlockExercises
+      : typeof exerciseCountProp === "number"
+        ? exerciseCountProp
+        : 0;
   const canStart = scheduleId && status !== "rest" && status !== "completed";
   const isStartingThis = isStarting && startingScheduleId === scheduleId;
 

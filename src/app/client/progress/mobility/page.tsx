@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -14,24 +14,24 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import {
   Activity,
   Plus,
-  TrendingUp,
-  TrendingDown,
   Calendar,
   ArrowLeft,
   Edit,
   Trash2,
   Save,
 } from "lucide-react";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { isFromCheckIns, progressBackHref } from "@/lib/clientProgressNav";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   MobilityMetricsService,
   MobilityMetric,
 } from "@/lib/progressTrackingService";
 import MobilityFormFields from "@/components/progress/MobilityFormFields";
-import { EmptyState } from "@/components/ui/EmptyState";
 
-export default function MobilityMetricsPage() {
+function MobilityMetricsPageContent() {
+  const searchParams = useSearchParams();
+  const fromCheckIns = isFromCheckIns(searchParams);
   const { addToast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
@@ -238,10 +238,10 @@ export default function MobilityMetricsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+            <div className="py-6 text-center">
+              <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -254,20 +254,10 @@ export default function MobilityMetricsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-surface p-8">
-              <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`mobility-skeleton-${index}`}
-                      className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
-                    ></div>
-                  ))}
-                </div>
-                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
           </div>
         </AnimatedBackground>
@@ -279,32 +269,26 @@ export default function MobilityMetricsPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                    <Activity className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                      Mobility Metrics
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                      Track flexibility progress and mobility assessments over time.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary shrink-0">
-                <Plus className="mr-2 h-5 w-5" />
-                New Assessment
-              </Button>
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+          <div className="mb-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = progressBackHref(fromCheckIns);
+              }}
+              className="fc-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-4 w-4 text-[color:var(--fc-text-primary)]" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Mobility Assessment</h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">Flexibility and ROM over time</p>
             </div>
+            <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary h-9 shrink-0 px-3 text-sm">
+              <Plus className="mr-1 h-4 w-4" />
+              New
+            </Button>
           </div>
 
           {/* Metrics List */}
@@ -312,9 +296,9 @@ export default function MobilityMetricsPage() {
             <>
               {/* Mobility Progress summary */}
               {(progressionByType.length > 0 || singleAssessmentTypes.length > 0) && (
-                <div className="mt-6 fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-5">
-                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">Mobility Progress</h2>
-                  <div className="space-y-3">
+                <div className="mt-3 space-y-2 border-t border-[color:var(--fc-glass-border)] pt-3">
+                  <h2 className="text-base font-semibold text-[color:var(--fc-text-primary)]">Mobility progress</h2>
+                  <div className="space-y-2">
                     {progressionByType.map(({ type, firstVal, latestVal, firstDate }) => {
                       const change = latestVal - firstVal;
                       const improved = change > 0;
@@ -323,7 +307,7 @@ export default function MobilityMetricsPage() {
                       return (
                         <div
                           key={type}
-                          className="flex flex-wrap items-center justify-between gap-2 fc-glass-soft p-3 rounded-xl border border-[color:var(--fc-glass-border)]"
+                          className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--fc-glass-border)]/70 py-2 last:border-0"
                         >
                           <span className="capitalize font-medium text-[color:var(--fc-text-primary)]">{type}</span>
                           <span className="text-sm font-mono">
@@ -341,7 +325,7 @@ export default function MobilityMetricsPage() {
                     {singleAssessmentTypes.map((type) => (
                       <div
                         key={type}
-                        className="flex flex-wrap items-center justify-between gap-2 fc-glass-soft p-3 rounded-xl border border-[color:var(--fc-glass-border)]"
+                        className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--fc-glass-border)]/70 py-2 last:border-0"
                       >
                         <span className="capitalize font-medium text-[color:var(--fc-text-primary)]">{type}</span>
                         <span className="text-sm fc-text-dim">1 assessment — log another to track progress.</span>
@@ -351,68 +335,41 @@ export default function MobilityMetricsPage() {
                 </div>
               )}
 
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
-                      <Activity className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Total Assessments</p>
-                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                        {metrics.length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
-                      <Calendar className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Latest Assessment</p>
-                      <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
-                        {latestAssessment
-                          ? new Date(latestAssessment.assessed_date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Assessment Types</p>
-                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                        {assessmentTypes.size}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-[color:var(--fc-glass-border)] pt-3 text-sm text-[color:var(--fc-text-dim)]">
+                <span>
+                  <span className="fc-text-subtle">Total:</span>{" "}
+                  <span className="font-medium fc-text-primary">{metrics.length}</span>
+                </span>
+                <span>
+                  <span className="fc-text-subtle">Latest:</span>{" "}
+                  <span className="font-medium fc-text-primary">
+                    {latestAssessment
+                      ? new Date(latestAssessment.assessed_date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "—"}
+                  </span>
+                </span>
+                <span>
+                  <span className="fc-text-subtle">Types:</span>{" "}
+                  <span className="font-medium fc-text-primary">{assessmentTypes.size}</span>
+                </span>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-3 space-y-3">
                 {metrics.map((metric) => (
-                  <div key={metric.id} className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-domain-meals)]">
-                          <Calendar className="h-5 w-5" />
+                  <div key={metric.id} className="rounded-xl border border-[color:var(--fc-glass-border)]/80 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-domain-meals)]">
+                          <Calendar className="h-4 w-4" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                          <h3 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                             {new Date(metric.assessed_date).toLocaleDateString("en-US", {
                               year: "numeric",
-                              month: "long",
+                              month: "short",
                               day: "numeric",
                             })}
                           </h3>
@@ -425,41 +382,41 @@ export default function MobilityMetricsPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10" onClick={() => startEdit(metric)}>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-9 w-9" onClick={() => startEdit(metric)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-11 w-11 text-[color:var(--fc-status-error)]" onClick={() => handleDelete(metric.id)}>
+                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-9 w-9 text-[color:var(--fc-status-error)]" onClick={() => handleDelete(metric.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
                       {/* Shoulder Metrics */}
                       {((metric as any).left_shoulder_flexion ||
                         (metric as any).right_shoulder_flexion) && (
                         <div className="col-span-full">
-                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
-                            Shoulder Mobility
+                          <h4 className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            Shoulder mobility
                           </h4>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-2">
                             {(metric as any).left_shoulder_flexion && (
-                              <div className="fc-glass-soft fc-card p-3">
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
                                 <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Left Flexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_shoulder_flexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_shoulder_flexion && (
-                              <div className="fc-glass-soft fc-card p-3">
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
                                 <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Right Flexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_shoulder_flexion}°
                                 </p>
                               </div>
@@ -472,26 +429,26 @@ export default function MobilityMetricsPage() {
                       {((metric as any).left_hip_flexion ||
                         (metric as any).right_hip_flexion) && (
                         <div className="col-span-full mt-2">
-                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
-                            Hip Mobility
+                          <h4 className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            Hip mobility
                           </h4>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-2">
                             {(metric as any).left_hip_flexion && (
-                              <div className="fc-glass-soft fc-card p-3">
-                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
-                                  Left Flexion
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
+                                <span className="mb-1 block text-xs font-medium text-[color:var(--fc-text-subtle)]">
+                                  Left flexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_hip_flexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_hip_flexion && (
-                              <div className="fc-glass-soft fc-card p-3">
-                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
-                                  Right Flexion
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
+                                <span className="mb-1 block text-xs font-medium text-[color:var(--fc-text-subtle)]">
+                                  Right flexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_hip_flexion}°
                                 </p>
                               </div>
@@ -504,26 +461,26 @@ export default function MobilityMetricsPage() {
                       {((metric as any).left_ankle_dorsiflexion ||
                         (metric as any).right_ankle_dorsiflexion) && (
                         <div className="col-span-full mt-2">
-                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
-                            Ankle Mobility
+                          <h4 className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            Ankle mobility
                           </h4>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-2">
                             {(metric as any).left_ankle_dorsiflexion && (
-                              <div className="fc-glass-soft fc-card p-3">
-                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
-                                  Left Dorsiflexion
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
+                                <span className="mb-1 block text-xs font-medium text-[color:var(--fc-text-subtle)]">
+                                  Left dorsiflexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_ankle_dorsiflexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_ankle_dorsiflexion && (
-                              <div className="fc-glass-soft fc-card p-3">
-                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
-                                  Right Dorsiflexion
+                              <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 p-2">
+                                <span className="mb-1 block text-xs font-medium text-[color:var(--fc-text-subtle)]">
+                                  Right dorsiflexion
                                 </span>
-                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_ankle_dorsiflexion}°
                                 </p>
                               </div>
@@ -535,11 +492,11 @@ export default function MobilityMetricsPage() {
                       {/* Overall Score */}
                       {(metric as any).overall_score && (
                         <div className="col-span-full mt-2">
-                          <div className="fc-glass-soft fc-card p-4 border border-[color:var(--fc-status-success)]/30">
-                            <span className="text-sm font-medium text-[color:var(--fc-text-subtle)] block mb-1">
-                              Overall Score
+                          <div className="rounded-lg border border-[color:var(--fc-status-success)]/35 p-2">
+                            <span className="mb-0.5 block text-xs font-medium text-[color:var(--fc-text-subtle)]">
+                              Overall score
                             </span>
-                            <p className="text-3xl font-bold text-[color:var(--fc-status-success)]">
+                            <p className="text-xl font-bold text-[color:var(--fc-status-success)]">
                               {(metric as any).overall_score}/100
                             </p>
                           </div>
@@ -548,10 +505,8 @@ export default function MobilityMetricsPage() {
                     </div>
 
                     {metric.notes && (
-                      <div className="mt-4 fc-glass-soft fc-card p-3">
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">
-                          {metric.notes}
-                        </p>
+                      <div className="mt-2 border-t border-[color:var(--fc-glass-border)]/60 pt-2">
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">{metric.notes}</p>
                       </div>
                     )}
                   </div>
@@ -559,13 +514,12 @@ export default function MobilityMetricsPage() {
               </div>
             </>
           ) : (
-            <div className="mt-6 fc-surface p-10">
-              <EmptyState
-                icon={Activity}
-                title="No mobility assessments"
-                description="Add your first assessment"
-                action={{ label: "Add Assessment", onClick: () => setShowAddModal(true) }}
-              />
+            <div className="mt-6 space-y-3 border-t border-[color:var(--fc-glass-border)] pt-4 text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)]">No assessments yet</p>
+              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary mx-auto h-9 text-sm">
+                <Plus className="mr-1 h-4 w-4" />
+                New Assessment
+              </Button>
             </div>
           )}
 
@@ -655,5 +609,26 @@ export default function MobilityMetricsPage() {
         </div>
       </AnimatedBackground>
     </ProtectedRoute>
+  );
+}
+
+export default function MobilityMetricsPage() {
+  return (
+    <Suspense
+      fallback={
+        <ProtectedRoute>
+          <AnimatedBackground>
+            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </div>
+          </AnimatedBackground>
+        </ProtectedRoute>
+      }
+    >
+      <MobilityMetricsPageContent />
+    </Suspense>
   );
 }

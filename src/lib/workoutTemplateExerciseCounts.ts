@@ -132,7 +132,16 @@ export async function computeExerciseCountsByTemplateIds(
 
     const blockType = block.set_type
 
-    if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+    if (
+      [
+        'straight_set',
+        'superset',
+        'giant_set',
+        'pre_exhaustion',
+        'speed_work',
+        'endurance',
+      ].includes(blockType)
+    ) {
 
       blockIdsByType.usesBlockExercises.push(block.id)
 
@@ -350,7 +359,40 @@ export async function computeExerciseCountsByTemplateIds(
 
   }
 
+  const speedBlockIds = allBlocks.filter((b) => b.set_type === 'speed_work').map((b) => b.id)
+  const enduranceBlockIds = allBlocks.filter((b) => b.set_type === 'endurance').map((b) => b.id)
+  const speedEnduranceBlockIds = [...speedBlockIds, ...enduranceBlockIds]
 
+  if (speedEnduranceBlockIds.length > 0) {
+    const [rowsSpeedOnly, rowsEnduranceOnly, rowsWseeSe] = await Promise.all([
+      queryInChunksParallel('workout_speed_sets', 'set_entry_id', speedBlockIds),
+      queryInChunksParallel('workout_endurance_sets', 'set_entry_id', enduranceBlockIds),
+      queryInChunksParallel(
+        'workout_set_entry_exercises',
+        'set_entry_id',
+        speedEnduranceBlockIds,
+      ),
+    ])
+
+    const wseeByBlock = new Set<string>()
+    for (const row of rowsWseeSe) {
+      if (row.set_entry_id) wseeByBlock.add(row.set_entry_id)
+    }
+
+    for (const row of rowsSpeedOnly) {
+      const sid = row.set_entry_id
+      if (!sid || wseeByBlock.has(sid)) continue
+      const tid = blockToTemplate.get(sid)
+      if (tid) counts[tid] = (counts[tid] || 0) + 1
+    }
+
+    for (const row of rowsEnduranceOnly) {
+      const sid = row.set_entry_id
+      if (!sid || wseeByBlock.has(sid)) continue
+      const tid = blockToTemplate.get(sid)
+      if (tid) counts[tid] = (counts[tid] || 0) + 1
+    }
+  }
 
   return counts
 

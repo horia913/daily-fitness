@@ -7,6 +7,8 @@ const SET_TYPES_REQUIRING_WSEE = new Set([
   "superset",
   "giant_set",
   "pre_exhaustion",
+  "speed_work",
+  "endurance",
 ]);
 
 /**
@@ -235,13 +237,25 @@ export async function saveWorkoutTemplate(
                 set_order: i + 1,
                 set_name: generatedBlockName || undefined,
                 set_notes: exercise.notes || undefined,
-                total_sets: exercise.sets
-                  ? parseInt(exercise.sets)
-                  : undefined,
+                total_sets:
+                  exerciseType === "speed_work"
+                    ? exercise.speed_intervals
+                      ? parseInt(String(exercise.speed_intervals), 10)
+                      : exercise.sets
+                        ? parseInt(String(exercise.sets), 10)
+                        : 1
+                    : exerciseType === "endurance"
+                      ? 1
+                      : exercise.sets
+                        ? parseInt(exercise.sets)
+                        : undefined,
                 reps_per_set: exercise.reps || undefined,
-                rest_seconds: exercise.rest_seconds
-                  ? Math.round(parseFloat(exercise.rest_seconds))
-                  : undefined,
+                rest_seconds:
+                  exerciseType === "speed_work" && exercise.speed_rest_seconds
+                    ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
+                    : exercise.rest_seconds
+                      ? Math.round(parseFloat(exercise.rest_seconds))
+                      : undefined,
                 duration_seconds: exercise.amrap_duration
                   ? parseInt(exercise.amrap_duration) * 60
                   : exercise.emom_duration
@@ -314,13 +328,25 @@ export async function saveWorkoutTemplate(
               {
                 set_name: generatedBlockName || undefined,
                 set_notes: exercise.notes || undefined,
-                total_sets: exercise.sets
-                  ? parseInt(exercise.sets)
-                  : undefined,
+                total_sets:
+                  exerciseType === "speed_work"
+                    ? exercise.speed_intervals
+                      ? parseInt(String(exercise.speed_intervals), 10)
+                      : exercise.sets
+                        ? parseInt(String(exercise.sets), 10)
+                        : 1
+                    : exerciseType === "endurance"
+                      ? 1
+                      : exercise.sets
+                        ? parseInt(exercise.sets)
+                        : undefined,
                 reps_per_set: exercise.reps || undefined,
-                rest_seconds: exercise.rest_seconds
-                  ? Math.round(parseFloat(exercise.rest_seconds))
-                  : undefined,
+                rest_seconds:
+                  exerciseType === "speed_work" && exercise.speed_rest_seconds
+                    ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
+                    : exercise.rest_seconds
+                      ? Math.round(parseFloat(exercise.rest_seconds))
+                      : undefined,
                 duration_seconds: exercise.amrap_duration
                   ? parseInt(exercise.amrap_duration) * 60
                   : exercise.emom_duration
@@ -351,6 +377,52 @@ export async function saveWorkoutTemplate(
                 // Time-based blocks don't use workout_set_entry_exercises, only workout_time_protocols
                 // Set mainExerciseId directly for time protocol creation
                 mainExerciseId = exercise.exercise_id;
+              } else if (exerciseType === "speed_work") {
+                const intervals = exercise.speed_intervals
+                  ? parseInt(String(exercise.speed_intervals), 10)
+                  : exercise.sets
+                    ? parseInt(String(exercise.sets), 10)
+                    : 1;
+                const restSec = exercise.speed_rest_seconds
+                  ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
+                  : undefined;
+                const addedExercise =
+                  await WorkoutBlockService.addExerciseToBlock(
+                    block.id,
+                    exercise.exercise_id,
+                    1,
+                    {
+                      sets:
+                        Number.isFinite(intervals) && intervals >= 1
+                          ? intervals
+                          : 1,
+                      rest_seconds: restSec,
+                      notes:
+                        exercise.speed_notes ||
+                        exercise.notes ||
+                        undefined,
+                    },
+                  );
+                if (addedExercise) {
+                  mainExerciseId = exercise.exercise_id;
+                }
+              } else if (exerciseType === "endurance") {
+                const addedExercise =
+                  await WorkoutBlockService.addExerciseToBlock(
+                    block.id,
+                    exercise.exercise_id,
+                    1,
+                    {
+                      sets: 1,
+                      notes:
+                        exercise.endurance_notes ||
+                        exercise.notes ||
+                        undefined,
+                    },
+                  );
+                if (addedExercise) {
+                  mainExerciseId = exercise.exercise_id;
+                }
               } else if (exerciseType === "pre_exhaustion") {
                 // Isolation + compound are inserted in the pre_exhaustion section below
                 // (do not add isolation here — that duplicated the A exercise)
@@ -700,7 +772,99 @@ export async function saveWorkoutTemplate(
               );
             }
 
-            // pyramid_set and ladder_set block types removed
+            if (mainExerciseId && exerciseType === "speed_work" && block) {
+              const intervals = exercise.speed_intervals
+                ? parseInt(String(exercise.speed_intervals), 10)
+                : exercise.sets
+                  ? parseInt(String(exercise.sets), 10)
+                  : 1;
+              const distanceM = exercise.speed_distance_meters
+                ? parseFloat(String(exercise.speed_distance_meters))
+                : 0;
+              const restSec = exercise.speed_rest_seconds
+                ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
+                : 120;
+              const loadBw =
+                exercise.speed_load_percent_bw !== undefined &&
+                exercise.speed_load_percent_bw !== "" &&
+                exercise.speed_load_percent_bw !== null
+                  ? parseFloat(String(exercise.speed_load_percent_bw))
+                  : null;
+              const useHr = exercise.speed_intensity_mode === "hr";
+              const maxSp = useHr
+                ? null
+                : exercise.speed_max_speed_percent !== undefined &&
+                    exercise.speed_max_speed_percent !== ""
+                  ? parseFloat(String(exercise.speed_max_speed_percent))
+                  : null;
+              const maxHr = useHr
+                ? exercise.speed_max_hr_percent !== undefined &&
+                  exercise.speed_max_hr_percent !== ""
+                  ? parseFloat(String(exercise.speed_max_hr_percent))
+                  : null
+                : null;
+              if (!Number.isFinite(intervals) || intervals < 1) {
+                throw new Error("Speed work: intervals must be at least 1");
+              }
+              if (!Number.isFinite(distanceM) || distanceM <= 0) {
+                throw new Error("Speed work: distance (meters) is required");
+              }
+              await WorkoutBlockService.createSpeedSet(block.id, mainExerciseId, mainExerciseOrder, {
+                intervals,
+                distance_meters: distanceM,
+                rest_seconds: restSec,
+                load_pct_bw: loadBw ?? undefined,
+                target_speed_pct: maxSp ?? undefined,
+                target_hr_pct: maxHr ?? undefined,
+                notes: exercise.speed_notes || exercise.notes || undefined,
+              });
+            }
+
+            if (mainExerciseId && exerciseType === "endurance" && block) {
+              const km = exercise.endurance_distance_km
+                ? parseFloat(String(exercise.endurance_distance_km))
+                : 0;
+              const targetMeters = Math.round(km * 1000);
+              const tSec =
+                exercise.endurance_target_time_seconds !== undefined &&
+                exercise.endurance_target_time_seconds !== ""
+                  ? parseInt(String(exercise.endurance_target_time_seconds), 10)
+                  : null;
+              const pace =
+                exercise.endurance_target_pace_sec_per_km !== undefined &&
+                exercise.endurance_target_pace_sec_per_km !== ""
+                  ? parseFloat(String(exercise.endurance_target_pace_sec_per_km))
+                  : null;
+              const useHrPct = exercise.endurance_intensity_mode === "hr";
+              const hrZ =
+                !useHrPct &&
+                exercise.endurance_hr_zone !== undefined &&
+                exercise.endurance_hr_zone !== ""
+                  ? parseInt(String(exercise.endurance_hr_zone), 10)
+                  : null;
+              const hrPct =
+                useHrPct &&
+                exercise.endurance_hr_percentage !== undefined &&
+                exercise.endurance_hr_percentage !== ""
+                  ? parseFloat(String(exercise.endurance_hr_percentage))
+                  : null;
+              if (!Number.isFinite(targetMeters) || targetMeters <= 0) {
+                throw new Error("Endurance: target distance is required");
+              }
+              await WorkoutBlockService.createEnduranceSet(
+                block.id,
+                mainExerciseId,
+                mainExerciseOrder,
+                {
+                  target_distance_meters: targetMeters,
+                  target_time_seconds: tSec ?? undefined,
+                  target_pace_seconds_per_km: pace ?? undefined,
+                  hr_zone: hrZ ?? undefined,
+                  target_hr_pct: hrPct ?? undefined,
+                  notes: exercise.endurance_notes || exercise.notes || undefined,
+                },
+              );
+            }
 
             // Time-based protocols (AMRAP, EMOM, FOR_TIME)
             if (
@@ -865,7 +1029,6 @@ export async function saveWorkoutTemplate(
                                     : undefined,
                               // rest_after_set = rest after completing ALL exercises in the set (per set)
                               // For TABATA: use the general rest_after_set for ALL sets (same value)
-                              // For CIRCUIT: use per-set rest_between_sets
                               rest_after_set:
                                 exerciseType === "tabata" &&
                                 tabataRestAfterSet

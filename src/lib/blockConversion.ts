@@ -76,7 +76,6 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
     const dropSet = firstExercise?.drop_sets?.[0];
     const clusterSet = firstExercise?.cluster_sets?.[0];
     const restPauseSet = firstExercise?.rest_pause_sets?.[0];
-    // Deprecated: pyramid_set and ladder block types removed
 
     // Create exercise object from block
     // IMPORTANT: Preserve block.id so we can update existing blocks instead of deleting/recreating
@@ -231,9 +230,7 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
             rest_between_sets: String(restAfter),
           }));
 
-        // Circuit block type removed - no longer needed
       }
-      // Circuit removed - skip loading circuit blocks
     } else if (block.set_type === "drop_set") {
       // For dropset, main reps come from block.reps_per_set (initial/main set reps)
       // Form expects exercise.exercise_reps for "Main Reps" field
@@ -353,6 +350,58 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
         (exercise as any).compound_tempo = compoundExercise.tempo || "";
         (exercise as any).compound_rir =
           compoundExercise.rir?.toString() || "";
+      }
+    } else if (block.set_type === "speed_work") {
+      const sp =
+        firstExercise?.speed_sets?.[0] ||
+        (block as any).speed_sets?.[0];
+      if (sp) {
+        const loadBw = sp.load_pct_bw ?? (sp as any).load_percent_bw;
+        const targetSp = sp.target_speed_pct ?? (sp as any).max_speed_percent;
+        const targetHr = sp.target_hr_pct ?? (sp as any).max_hr_percent;
+        (exercise as any).speed_intervals =
+          sp.intervals?.toString() || block.total_sets?.toString() || "1";
+        (exercise as any).speed_distance_meters =
+          sp.distance_meters != null ? String(sp.distance_meters) : "";
+        (exercise as any).speed_rest_seconds =
+          sp.rest_seconds != null ? String(sp.rest_seconds) : "";
+        (exercise as any).speed_load_percent_bw =
+          loadBw != null ? String(loadBw) : "";
+        (exercise as any).speed_intensity_mode =
+          targetHr != null && (targetSp == null || targetSp === "")
+            ? "hr"
+            : "speed";
+        (exercise as any).speed_max_speed_percent =
+          targetSp != null ? String(targetSp) : "";
+        (exercise as any).speed_max_hr_percent =
+          targetHr != null ? String(targetHr) : "";
+        (exercise as any).speed_notes = sp.notes || "";
+      }
+    } else if (block.set_type === "endurance") {
+      const en =
+        firstExercise?.endurance_sets?.[0] ||
+        (block as any).endurance_sets?.[0];
+      if (en) {
+        (exercise as any).endurance_distance_km =
+          en.target_distance_meters != null
+            ? String(en.target_distance_meters / 1000)
+            : "";
+        (exercise as any).endurance_target_time_seconds =
+          en.target_time_seconds != null ? String(en.target_time_seconds) : "";
+        (exercise as any).endurance_target_pace_sec_per_km =
+          en.target_pace_seconds_per_km != null
+            ? String(en.target_pace_seconds_per_km)
+            : "";
+        (exercise as any).endurance_hr_zone =
+          en.hr_zone != null ? String(en.hr_zone) : "";
+        const enHrPct = en.target_hr_pct ?? (en as any).hr_percentage;
+        (exercise as any).endurance_hr_percentage =
+          enHrPct != null ? String(enHrPct) : "";
+        (exercise as any).endurance_intensity_mode =
+          enHrPct != null && (en.hr_zone == null || en.hr_zone === "")
+            ? "hr"
+            : "zone";
+        (exercise as any).endurance_notes = en.notes || "";
       }
     }
 

@@ -18,6 +18,119 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
 import { withTimeout } from "@/lib/withTimeout";
+import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
+
+function formatClientSpeedPrescription(row: Record<string, unknown> | null | undefined): string | null {
+  if (!row || typeof row !== "object") return null;
+  const intervals = typeof row.intervals === "number" ? row.intervals : Number(row.intervals);
+  const distanceM = typeof row.distance_meters === "number" ? row.distance_meters : Number(row.distance_meters);
+  if (!Number.isFinite(intervals) || intervals < 1) return null;
+  if (!Number.isFinite(distanceM) || distanceM <= 0) return null;
+  const parts: string[] = [];
+  const distStr =
+    distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)} km` : `${Math.round(distanceM)}m`;
+  parts.push(`${intervals} × ${distStr}`);
+  const tsp = row.target_speed_pct;
+  const thp = row.target_hr_pct;
+  const speedPct = typeof tsp === "number" ? tsp : tsp != null ? Number(tsp) : NaN;
+  const hrPct = typeof thp === "number" ? thp : thp != null ? Number(thp) : NaN;
+  if (Number.isFinite(speedPct)) {
+    parts.push(`${Math.round(speedPct)}% speed`);
+  } else if (Number.isFinite(hrPct)) {
+    parts.push(`${Math.round(hrPct)}% HR`);
+  }
+  const rs = row.rest_seconds;
+  const restSec = typeof rs === "number" ? rs : rs != null ? Number(rs) : NaN;
+  if (Number.isFinite(restSec)) {
+    parts.push(`${restSec}s rest`);
+  }
+  const lbw = row.load_pct_bw;
+  const loadBw = typeof lbw === "number" ? lbw : lbw != null ? Number(lbw) : NaN;
+  if (Number.isFinite(loadBw)) {
+    parts.push(`${loadBw}% BW`);
+  }
+  return parts.join(" · ");
+}
+
+function formatClientEndurancePrescription(row: Record<string, unknown> | null | undefined): string | null {
+  if (!row || typeof row !== "object") return null;
+  const td =
+    typeof row.target_distance_meters === "number"
+      ? row.target_distance_meters
+      : Number(row.target_distance_meters);
+  if (!Number.isFinite(td) || td <= 0) return null;
+  const parts: string[] = [`${(td / 1000).toFixed(1)} km`];
+  const paceRaw = row.target_pace_seconds_per_km;
+  const pace =
+    typeof paceRaw === "number" ? paceRaw : paceRaw != null ? Number(paceRaw) : NaN;
+  if (Number.isFinite(pace) && pace > 0) {
+    parts.push(formatPaceMinSecPerKm(pace));
+  }
+  const thp = row.target_hr_pct;
+  const hrPct = typeof thp === "number" ? thp : thp != null ? Number(thp) : NaN;
+  const hz = row.hr_zone;
+  const zone = typeof hz === "number" ? hz : hz != null ? Number(hz) : NaN;
+  if (Number.isFinite(hrPct)) {
+    parts.push(`${Math.round(hrPct)}% HR`);
+  } else if (Number.isFinite(zone)) {
+    parts.push(`Zone ${zone}`);
+  }
+  return parts.join(" · ");
+}
+
+function normExerciseOrder(o: unknown): number {
+  const n = typeof o === "number" ? o : Number(o);
+  return Number.isFinite(n) ? n : 1;
+}
+
+function getSpeedEnduranceDisplayFields(
+  block: StructuredBlock,
+  exercise: ClientExerciseDisplay
+): { label: string; value: string }[] {
+  const blockType = (block.blockType || "").toLowerCase();
+  const raw = exercise.raw as Record<string, unknown> | null | undefined;
+  const rb = block.rawBlock as Record<string, unknown> | null | undefined;
+  const exId = raw?.exercise_id as string | undefined;
+  const exOrder = normExerciseOrder(raw?.exercise_order);
+
+  if (blockType === "speed_work") {
+    const fromEx = Array.isArray(raw?.speed_sets)
+      ? (raw!.speed_sets as Record<string, unknown>[])
+      : [];
+    const fromBlock = Array.isArray(rb?.speed_sets)
+      ? (rb!.speed_sets as Record<string, unknown>[])
+      : [];
+    const list = fromEx.length > 0 ? fromEx : fromBlock;
+    const row =
+      list.find(
+        (s) =>
+          String(s.exercise_id) === String(exId) &&
+          normExerciseOrder(s.exercise_order) === exOrder,
+      ) || list[0];
+    const s = formatClientSpeedPrescription(row);
+    return s ? [{ label: "Prescription", value: s }] : [];
+  }
+
+  if (blockType === "endurance") {
+    const fromEx = Array.isArray(raw?.endurance_sets)
+      ? (raw!.endurance_sets as Record<string, unknown>[])
+      : [];
+    const fromBlock = Array.isArray(rb?.endurance_sets)
+      ? (rb!.endurance_sets as Record<string, unknown>[])
+      : [];
+    const list = fromEx.length > 0 ? fromEx : fromBlock;
+    const row =
+      list.find(
+        (e) =>
+          String(e.exercise_id) === String(exId) &&
+          normExerciseOrder(e.exercise_order) === exOrder,
+      ) || list[0];
+    const s = formatClientEndurancePrescription(row);
+    return s ? [{ label: "Prescription", value: s }] : [];
+  }
+
+  return [];
+}
 interface AssignmentInfo {
   id: string;
   name: string;
@@ -329,10 +442,14 @@ export default function WorkoutDetailsPage() {
         // Convert WorkoutBlock[] to ClientBlockRecord[] format, preserving special table data
         const clientBlocks: (ClientBlockRecord & { 
           time_protocols?: any[];
+          speed_sets?: any[];
+          endurance_sets?: any[];
           exercises?: Array<any & {
             drop_sets?: any[];
             cluster_sets?: any[];
             rest_pause_sets?: any[];
+            speed_sets?: any[];
+            endurance_sets?: any[];
           }>;
         })[] = workoutBlocks.map(
           (block) => ({
@@ -347,6 +464,8 @@ export default function WorkoutDetailsPage() {
           duration_seconds: block.duration_seconds ?? null,
           // Preserve special table data - ensure time_protocols is preserved
           time_protocols: (block as any).time_protocols ?? [],
+          speed_sets: (block as any).speed_sets ?? [],
+          endurance_sets: (block as any).endurance_sets ?? [],
           exercises: (block.exercises ?? []).map((ex) => ({
             id: ex.id,
             exercise_id: ex.exercise_id,
@@ -370,6 +489,8 @@ export default function WorkoutDetailsPage() {
             cluster_sets: ex.cluster_sets ?? [],
             rest_pause_sets: ex.rest_pause_sets ?? [],
             time_protocols: (ex as any).time_protocols ?? [], // For tabata/amrap/emom/for_time blocks
+            speed_sets: (ex as any).speed_sets ?? [],
+            endurance_sets: (ex as any).endurance_sets ?? [],
           })) as any[],
           })
         );
@@ -527,6 +648,8 @@ export default function WorkoutDetailsPage() {
                 ...block,
                 // Ensure time_protocols are preserved
                 time_protocols: (block as any).time_protocols || [],
+                speed_sets: (block as any).speed_sets || [],
+                endurance_sets: (block as any).endurance_sets || [],
               },
               parameters: blockParameters,
             };
@@ -737,7 +860,6 @@ export default function WorkoutDetailsPage() {
     if (type.includes("giant")) return vars.error;
     if (type.includes("cluster")) return vars.indigo;
     if (type.includes("rest_pause")) return vars.cyan;
-    if (type.includes("pyramid")) return vars.success;
     if (type.includes("amrap") || type.includes("emom") || type.includes("for_time") || type.includes("tabata")) return vars.warning;
     return vars.workouts;
   };
@@ -1539,6 +1661,24 @@ export default function WorkoutDetailsPage() {
                                       );
                                     }
                                     return null;
+                                  }
+
+                                  if (blockType === "speed_work" || blockType === "endurance") {
+                                    const seParams = getSpeedEnduranceDisplayFields(block, exercise);
+                                    if (seParams.length > 0) {
+                                      return (
+                                        <div className="space-y-3 mt-3">
+                                          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                                            {seParams.map((param, idx) => (
+                                              <div key={idx} className="flex items-baseline gap-2">
+                                                <span className="text-xs uppercase tracking-wider fc-text-dim">{param.label}</span>
+                                                <span className="font-mono font-bold text-xl fc-text-primary">{param.value}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
                                   }
 
                                   const exerciseFields = getExerciseCardFields(block, exercise);

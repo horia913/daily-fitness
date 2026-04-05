@@ -218,6 +218,21 @@ export default function WorkoutTemplateForm({
     hr_target_rounds: "",
     hr_distance_meters: "",
     hr_set_exercises: [] as Array<Record<string, any>>,
+    speed_intervals: "",
+    speed_distance_meters: "",
+    speed_load_percent_bw: "",
+    speed_rest_seconds: "120",
+    speed_intensity_mode: "speed" as "speed" | "hr",
+    speed_max_speed_percent: "",
+    speed_max_hr_percent: "",
+    speed_notes: "",
+    endurance_distance_km: "",
+    endurance_target_time_seconds: "",
+    endurance_target_pace_sec_per_km: "",
+    endurance_intensity_mode: "zone" as "zone" | "hr",
+    endurance_hr_zone: "",
+    endurance_hr_percentage: "",
+    endurance_notes: "",
     // Tabata specific
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Load percentage / Weight toggle
@@ -882,6 +897,21 @@ export default function WorkoutTemplateForm({
       hr_target_rounds: "",
       hr_distance_meters: "",
       hr_set_exercises: [] as Array<Record<string, any>>,
+      speed_intervals: "",
+      speed_distance_meters: "",
+      speed_load_percent_bw: "",
+      speed_rest_seconds: "120",
+      speed_intensity_mode: "speed" as const,
+      speed_max_speed_percent: "",
+      speed_max_hr_percent: "",
+      speed_notes: "",
+      endurance_distance_km: "",
+      endurance_target_time_seconds: "",
+      endurance_target_pace_sec_per_km: "",
+      endurance_intensity_mode: "zone" as const,
+      endurance_hr_zone: "",
+      endurance_hr_percentage: "",
+      endurance_notes: "",
       tabata_sets: [] as Array<{
         exercises: any[];
         rest_between_sets: string;
@@ -1005,6 +1035,12 @@ export default function WorkoutTemplateForm({
         return "Pre-Exhaustion";
       case "for_time":
         return "For Time";
+      case "hr_sets":
+        return "HR Zones";
+      case "speed_work":
+        return "Speed Work";
+      case "endurance":
+        return "Endurance";
       default:
         return "Straight Set";
     }
@@ -1108,6 +1144,26 @@ export default function WorkoutTemplateForm({
         (exercise as any).superset_weight_kg?.toString() || "",
       compound_weight_kg:
         (exercise as any).compound_weight_kg?.toString() || "",
+      speed_intervals: (exercise as any).speed_intervals ?? "",
+      speed_distance_meters: (exercise as any).speed_distance_meters ?? "",
+      speed_load_percent_bw: (exercise as any).speed_load_percent_bw ?? "",
+      speed_rest_seconds: (exercise as any).speed_rest_seconds ?? "120",
+      speed_intensity_mode:
+        ((exercise as any).speed_intensity_mode as "speed" | "hr") ?? "speed",
+      speed_max_speed_percent: (exercise as any).speed_max_speed_percent ?? "",
+      speed_max_hr_percent: (exercise as any).speed_max_hr_percent ?? "",
+      speed_notes: (exercise as any).speed_notes ?? "",
+      endurance_distance_km: (exercise as any).endurance_distance_km ?? "",
+      endurance_target_time_seconds:
+        (exercise as any).endurance_target_time_seconds ?? "",
+      endurance_target_pace_sec_per_km:
+        (exercise as any).endurance_target_pace_sec_per_km ?? "",
+      endurance_intensity_mode:
+        ((exercise as any).endurance_intensity_mode as "zone" | "hr") ??
+        "zone",
+      endurance_hr_zone: (exercise as any).endurance_hr_zone ?? "",
+      endurance_hr_percentage: (exercise as any).endurance_hr_percentage ?? "",
+      endurance_notes: (exercise as any).endurance_notes ?? "",
     });
     setShowAddExercise(true);
   };

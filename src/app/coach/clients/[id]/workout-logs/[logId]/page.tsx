@@ -9,6 +9,7 @@ import type { CoachWorkoutLogDetailPayload } from "@/lib/coachClientSummaryServe
 import {
   adherenceTierFromPercent,
   type CellOutcome,
+  type ExerciseAdherenceBlock,
 } from "@/lib/coachWorkoutAdherence";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,169 @@ function cellTone(o: CellOutcome): string {
   if (o === "green") return "text-emerald-400";
   if (o === "red") return "text-red-400";
   return "text-gray-400";
+}
+
+function fmtSec(s: number | null | undefined): string {
+  if (s === null || s === undefined || Number.isNaN(s)) return "—";
+  return `${Math.round(s)}s`;
+}
+
+function fmtKmFromM(m: number | null | undefined): string {
+  if (m === null || m === undefined || Number.isNaN(m)) return "—";
+  return `${(m / 1000).toFixed(2)} km`;
+}
+
+function fmtPaceSecPerKm(sec: number | null | undefined): string {
+  if (sec === null || sec === undefined || !Number.isFinite(sec) || sec <= 0)
+    return "—";
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
+}
+
+function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
+  if (block.displayVariant === "speed_work" && block.speedIntervals?.length) {
+    return (
+      <div className="overflow-x-auto">
+        <p className="text-[11px] text-gray-500 px-3 py-2 border-b border-white/5">
+          {block.prescribedSpeedIntervals != null &&
+          block.prescribedSpeedDistanceM != null
+            ? `Prescribed: ${block.prescribedSpeedIntervals}×${block.prescribedSpeedDistanceM}m per interval`
+            : null}
+          {block.speedConsistencyPct != null ? (
+            <span className="ml-2">
+              · Consistency:{" "}
+              <span className="text-cyan-400/90 font-medium tabular-nums">
+                {block.speedConsistencyPct}%
+              </span>
+            </span>
+          ) : null}
+        </p>
+        <table className="w-full text-xs sm:text-sm">
+          <thead>
+            <tr className="border-b border-white/5 fc-text-dim text-left">
+              <th className="py-2 px-3 font-medium">Interval</th>
+              <th className="py-2 px-3 font-medium">Time</th>
+              <th className="py-2 px-3 font-medium">RPE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {block.speedIntervals.map((row, idx) => (
+              <tr
+                key={`sp-${block.exerciseId}-${row.setNumber}-${idx}`}
+                className="border-b border-white/5 last:border-b-0"
+              >
+                <td className="py-2 px-3 tabular-nums text-white">
+                  {row.setNumber}
+                </td>
+                <td className="py-2 px-3 tabular-nums">
+                  {fmtSec(row.timeSeconds)}
+                </td>
+                <td className="py-2 px-3">{fmtNum(row.rpe)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (block.displayVariant === "endurance" && block.enduranceSummary) {
+    const e = block.enduranceSummary;
+    return (
+      <div className="overflow-x-auto px-3 py-3 space-y-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div>
+            <span className="fc-text-dim">Distance</span>
+            <div className={cellTone(e.distanceOutcome)}>
+              {fmtKmFromM(e.actualDistanceM)}{" "}
+              <span className="fc-text-dim">
+                / target {fmtKmFromM(e.prescribedDistanceM)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <span className="fc-text-dim">Time</span>
+            <div className={cellTone(e.timeOutcome)}>
+              {fmtSec(e.actualTimeSec)}{" "}
+              <span className="fc-text-dim">
+                / target {fmtSec(e.prescribedTimeSec)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <span className="fc-text-dim">Pace</span>
+            <div className={cellTone(e.paceOutcome)}>
+              {fmtPaceSecPerKm(e.actualPaceSecPerKm)}{" "}
+              <span className="fc-text-dim">
+                / target {fmtPaceSecPerKm(e.prescribedPaceSecPerKm)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <span className="fc-text-dim">HR</span>
+            <div className={cellTone(e.hrOutcome)}>
+              {fmtNum(e.actualHrAvg)}{" "}
+              <span className="fc-text-dim">
+                {e.prescribedHrZone != null
+                  ? `· Zone ${e.prescribedHrZone}`
+                  : e.prescribedHrPct != null
+                    ? `· ${e.prescribedHrPct}% max`
+                    : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs sm:text-sm">
+        <thead>
+          <tr className="border-b border-white/5 fc-text-dim text-left">
+            <th className="py-2 px-3 font-medium">Set</th>
+            <th className="py-2 px-3 font-medium">Weight</th>
+            <th className="py-2 px-3 font-medium">Reps</th>
+            <th className="py-2 px-3 font-medium">RPE</th>
+          </tr>
+        </thead>
+        <tbody>
+          {block.sets.map((s, idx) => (
+            <tr
+              key={`${block.exerciseId}-${s.setNumber}-${idx}`}
+              className="border-b border-white/5 last:border-b-0"
+            >
+              <td className="py-2 px-3 tabular-nums text-white">
+                {s.setNumber}
+              </td>
+              <td className="py-2 px-3">
+                <span className={cellTone(s.weight.outcome)}>
+                  {fmtNum(s.weight.actual)}{" "}
+                  <span className="fc-text-dim">/ {fmtNum(s.weight.prescribed)}</span>
+                </span>
+              </td>
+              <td className="py-2 px-3">
+                <span className={cellTone(s.reps.outcome)}>
+                  {fmtNum(s.reps.actual)}{" "}
+                  <span className="fc-text-dim">
+                    / {fmtNum(s.reps.prescribedMin)} target
+                  </span>
+                </span>
+              </td>
+              <td className="py-2 px-3">
+                <span className={cellTone(s.rpe.outcome)}>
+                  {fmtNum(s.rpe.actual)}{" "}
+                  <span className="fc-text-dim">/ {fmtNum(s.rpe.prescribed)}</span>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function CoachClientWorkoutLogDetailPage() {
@@ -257,54 +421,7 @@ export default function CoachClientWorkoutLogDetailPage() {
                       {block.blockTypeLabel} · Target: {block.prescribedSummary}
                     </p>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm">
-                      <thead>
-                        <tr className="border-b border-white/5 fc-text-dim text-left">
-                          <th className="py-2 px-3 font-medium">Set</th>
-                          <th className="py-2 px-3 font-medium">Weight</th>
-                          <th className="py-2 px-3 font-medium">Reps</th>
-                          <th className="py-2 px-3 font-medium">RPE</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {block.sets.map((s, idx) => (
-                          <tr
-                            key={`${block.exerciseId}-${s.setNumber}-${idx}`}
-                            className="border-b border-white/5 last:border-b-0"
-                          >
-                            <td className="py-2 px-3 tabular-nums text-white">
-                              {s.setNumber}
-                            </td>
-                            <td className="py-2 px-3">
-                              <span className={cellTone(s.weight.outcome)}>
-                                {fmtNum(s.weight.actual)}{" "}
-                                <span className="fc-text-dim">
-                                  / {fmtNum(s.weight.prescribed)}
-                                </span>
-                              </span>
-                            </td>
-                            <td className="py-2 px-3">
-                              <span className={cellTone(s.reps.outcome)}>
-                                {fmtNum(s.reps.actual)}{" "}
-                                <span className="fc-text-dim">
-                                  / {fmtNum(s.reps.prescribedMin)} target
-                                </span>
-                              </span>
-                            </td>
-                            <td className="py-2 px-3">
-                              <span className={cellTone(s.rpe.outcome)}>
-                                {fmtNum(s.rpe.actual)}{" "}
-                                <span className="fc-text-dim">
-                                  / {fmtNum(s.rpe.prescribed)}
-                                </span>
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {renderAdherenceBlock(block)}
                 </div>
               ))}
             </div>

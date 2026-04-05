@@ -52,6 +52,8 @@ export type ClientBlockExerciseRecord = {
   drop_sets?: unknown[];
   cluster_sets?: unknown[];
   rest_pause_sets?: unknown[];
+  speed_sets?: unknown[];
+  endurance_sets?: unknown[];
 };
 
 export type ClientBlockRecord = {
@@ -67,4 +69,6 @@ export type ClientBlockRecord = {
   block_parameters?: unknown;
   exercises?: ClientBlockExerciseRecord[] | null;
   time_protocols?: unknown[];
+  speed_sets?: unknown[];
+  endurance_sets?: unknown[];
 };

@@ -10,6 +10,7 @@ import {
   type AdherenceTier,
   type CoachSetLogRow,
   type PrescribedExerciseRow,
+  type WorkoutAdherencePrescriptions,
   type WorkoutAdherenceResult,
 } from "@/lib/coachWorkoutAdherence";
 import {
@@ -38,6 +39,84 @@ function mapEntryExercise(
     load_percentage: row.load_percentage as number | string | null | undefined,
     rir: row.rir as number | string | null | undefined,
   };
+}
+
+function prescKey(setEntryId: string, exerciseId: string): string {
+  return `${setEntryId}::${exerciseId}`;
+}
+
+async function loadSpeedEndurancePrescriptions(
+  sb: SupabaseClient,
+  entryIds: string[]
+): Promise<WorkoutAdherencePrescriptions> {
+  if (entryIds.length === 0) return {};
+  const [speedRes, enduranceRes] = await Promise.all([
+    sb
+      .from("workout_speed_sets")
+      .select("set_entry_id, exercise_id, intervals, distance_meters")
+      .in("set_entry_id", entryIds),
+    sb
+      .from("workout_endurance_sets")
+      .select(
+        "set_entry_id, exercise_id, target_distance_meters, target_time_seconds, target_pace_seconds_per_km, hr_zone, target_hr_pct"
+      )
+      .in("set_entry_id", entryIds),
+  ]);
+
+  const speedByKey = new Map<
+    string,
+    { intervals: number; distance_meters: number }
+  >();
+  for (const row of speedRes.data ?? []) {
+    const r = row as {
+      set_entry_id: string;
+      exercise_id: string;
+      intervals: number;
+      distance_meters: number;
+    };
+    if (!r.set_entry_id || !r.exercise_id) continue;
+    speedByKey.set(prescKey(r.set_entry_id, r.exercise_id), {
+      intervals: Number(r.intervals),
+      distance_meters: Number(r.distance_meters),
+    });
+  }
+
+  const enduranceByKey = new Map<
+    string,
+    {
+      target_distance_meters: number;
+      target_time_seconds: number | null;
+      target_pace_seconds_per_km: number | null;
+      hr_zone: number | null;
+      target_hr_pct: number | null;
+    }
+  >();
+  for (const row of enduranceRes.data ?? []) {
+    const r = row as {
+      set_entry_id: string;
+      exercise_id: string;
+      target_distance_meters: number;
+      target_time_seconds: number | null;
+      target_pace_seconds_per_km: number | null;
+      hr_zone: number | null;
+      target_hr_pct: number | null;
+    };
+    if (!r.set_entry_id || !r.exercise_id) continue;
+    enduranceByKey.set(prescKey(r.set_entry_id, r.exercise_id), {
+      target_distance_meters: Number(r.target_distance_meters),
+      target_time_seconds:
+        r.target_time_seconds != null ? Number(r.target_time_seconds) : null,
+      target_pace_seconds_per_km:
+        r.target_pace_seconds_per_km != null
+          ? Number(r.target_pace_seconds_per_km)
+          : null,
+      hr_zone: r.hr_zone != null ? Number(r.hr_zone) : null,
+      target_hr_pct:
+        r.target_hr_pct != null ? Number(r.target_hr_pct) : null,
+    });
+  }
+
+  return { speedByKey, enduranceByKey };
 }
 
 /**
@@ -159,7 +238,7 @@ export async function batchAdherenceForWorkoutLogs(
   const { data: allSetLogs } = await sb
     .from("workout_set_logs")
     .select(
-      "workout_log_id, set_entry_id, block_id, block_type, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b"
+      "workout_log_id, set_entry_id, block_id, block_type, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh"
     )
     .in("workout_log_id", logIds);
 
@@ -232,6 +311,8 @@ export async function batchAdherenceForWorkoutLogs(
     });
   }
 
+  const presc = await loadSpeedEndurancePrescriptions(sb, entryIds);
+
   for (const logId of logIds) {
     const tid = logIdToTemplate.get(logId);
     if (!tid) {
@@ -244,7 +325,13 @@ export async function batchAdherenceForWorkoutLogs(
       entIdsForTemplate.has(e.set_entry_id)
     );
     const logs = setLogsByLogId.get(logId) ?? [];
-    const res = computeWorkoutAdherence(logs, ents, exForTemplate, nameById);
+    const res = computeWorkoutAdherence(
+      logs,
+      ents,
+      exForTemplate,
+      nameById,
+      presc
+    );
     out[logId] = {
       adherencePercent: res.adherencePercent,
       tier: res.tier,

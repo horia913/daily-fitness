@@ -23,27 +23,32 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
 import { AchievementService } from "@/lib/achievementService";
+import { CompletedCheckInSummary } from "@/components/client/check-ins/CompletedCheckInSummary";
+import { cn } from "@/lib/utils";
 
 const MAX_NOTES = 500;
 
-// Color system for rating scales
+type RatingScaleKey = 1 | 2 | 3 | 4 | 5;
+
+/** Sleep quality: 1 = worst (red) → 5 = best (green); 4 = cyan per spec. */
+const CHECKIN_SLEEP_SCALE_COLORS: Record<RatingScaleKey, string> = {
+  1: "#EF4444",
+  2: "#F97316",
+  3: "#F59E0B",
+  4: "#0EA5E9",
+  5: "#22C55E",
+};
+
+/** Stress / soreness: 1 = best (green) → 5 = worst (red); matches severity gradient. */
+const CHECKIN_SEVERITY_SCALE_COLORS: Record<RatingScaleKey, string> = {
+  1: "#22C55E",
+  2: "#0EA5E9",
+  3: "#F59E0B",
+  4: "#F97316",
+  5: "#EF4444",
+};
+
 const ratingColors = {
-  positive: {
-    // Higher = better (sleep quality)
-    1: '#EF4444',  // Red
-    2: '#F97316',  // Orange
-    3: '#EAB308',  // Yellow
-    4: '#84CC16',  // Light green
-    5: '#22C55E',  // Green
-  },
-  negative: {
-    // Higher = worse (stress, soreness)
-    1: '#22C55E',  // Green
-    2: '#84CC16',  // Light green
-    3: '#EAB308',  // Yellow
-    4: '#F97316',  // Orange
-    5: '#EF4444',  // Red
-  },
   steps: {
     '1K': '#DC2626',  // Deep red
     '2K': '#EF4444',  // Red
@@ -65,32 +70,33 @@ const STEPS_QUICK_PRESETS = [
   { value: 20000, label: '20K' },
 ];
 
-// Sleep quality labels
-const SLEEP_QUALITY_LABELS = [
-  "Terrible",
-  "Poor",
-  "Fair",
-  "Good",
-  "Great",
-];
+const SLEEP_QUALITY_OPTIONS = [
+  { value: 1, emoji: "😴", label: "Terrible" },
+  { value: 2, emoji: "😐", label: "Poor" },
+  { value: 3, emoji: "😊", label: "Fair" },
+  { value: 4, emoji: "😃", label: "Good" },
+  { value: 5, emoji: "🌟", label: "Great" },
+] as const;
 
-// Stress labels
-const STRESS_LABELS = [
-  "Calm",
-  "Mild",
-  "Moderate",
-  "High",
-  "Extreme",
-];
+const STRESS_OPTIONS = [
+  { value: 1, emoji: "😌", label: "Calm" },
+  { value: 2, emoji: "😐", label: "Mild" },
+  { value: 3, emoji: "😟", label: "Moderate" },
+  { value: 4, emoji: "😰", label: "High" },
+  { value: 5, emoji: "🤯", label: "Extreme" },
+] as const;
 
-// Soreness labels
-const SORENESS_LABELS = [
-  "Fresh",
-  "Mild",
-  "Moderate",
-  "Sore",
-  "Severe",
-];
+const SORENESS_OPTIONS = [
+  { value: 1, emoji: "💪", label: "Fresh" },
+  { value: 2, emoji: "🙂", label: "Mild" },
+  { value: 3, emoji: "😐", label: "Moderate" },
+  { value: 4, emoji: "😣", label: "Sore" },
+  { value: 5, emoji: "😫", label: "Severe" },
+] as const;
+
+const SLEEP_QUALITY_LABELS = SLEEP_QUALITY_OPTIONS.map((o) => o.label);
+const STRESS_LABELS = STRESS_OPTIONS.map((o) => o.label);
+const SORENESS_LABELS = SORENESS_OPTIONS.map((o) => o.label);
 
 function getStreakMilestone(streak: number): { emoji: string; message: string; nextMilestone: number } | null {
   if (streak >= 100) {
@@ -139,13 +145,69 @@ function getSorenessLabel(value: number | null): string {
   return SORENESS_LABELS[Math.min(4, Math.max(0, (uiValue ?? 1) - 1))] || "—";
 }
 
+/** Section group: cyan left accent; put `text-base font-semibold text-white` on the title line. */
+function CheckInMetricHeading({ children }: { children: React.ReactNode }) {
+  return <div className="mb-3 border-l-2 border-cyan-500 pl-3">{children}</div>;
+}
+
+/** Horizontal RPE-style pills: emoji + label, wrap on narrow viewports. */
+function WellnessRatingPills({
+  options,
+  value,
+  onChange,
+  variant,
+  compact,
+}: {
+  options: readonly { readonly value: number; readonly emoji: string; readonly label: string }[];
+  value: number | null;
+  onChange: (v: number) => void;
+  variant: "sleep" | "severity";
+  compact?: boolean;
+}) {
+  const palette = variant === "sleep" ? CHECKIN_SLEEP_SCALE_COLORS : CHECKIN_SEVERITY_SCALE_COLORS;
+  return (
+    <div className={cn("flex flex-row flex-wrap items-stretch gap-2", compact && "gap-1.5")}>
+      {options.map((opt) => {
+        const selected = value === opt.value;
+        const color = palette[opt.value as RatingScaleKey];
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "rounded-full border-2 transition-all duration-150 flex items-center justify-center gap-1.5 font-semibold active:scale-95",
+              compact ? "text-[10px] px-2 py-1.5 min-h-[30px]" : "text-xs px-2.5 py-2 min-h-[34px]",
+              selected ? "shadow-sm" : "hover:opacity-90 bg-transparent",
+            )}
+            style={{
+              borderColor: selected ? color : `${color}B3`,
+              color: selected ? "#FFFFFF" : color,
+              background: selected ? color : "transparent",
+            }}
+            aria-pressed={selected}
+            aria-label={opt.label}
+          >
+            <span className={cn("leading-none", compact ? "text-sm" : "text-base")} aria-hidden>
+              {opt.emoji}
+            </span>
+            <span>{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface DailyWellnessFormProps {
   clientId: string;
   initialTodayLog?: DailyWellnessLog | null;
   onSuccess?: () => void;
+  /** Tighter layout for /client/check-ins: no card chrome, compact scales, no inline week strip. */
+  immersive?: boolean;
 }
 
-export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: DailyWellnessFormProps) {
+export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immersive = false }: DailyWellnessFormProps) {
   const [todayLog, setTodayLog] = useState<DailyWellnessLog | null>(initialTodayLog ?? null);
   const [loading, setLoading] = useState(false);
   const [streak, setStreak] = useState(0);
@@ -500,7 +562,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
 
   if (loading) {
     return (
-      <div className="space-y-4 border-y border-white/5 px-4 py-3">
+      <div className={`space-y-4 ${immersive ? "py-1" : "border-y border-white/5 px-4 py-3"}`}>
         <Skeleton className="h-8 w-48 rounded-lg" />
         <Skeleton className="h-24 w-full rounded-xl" />
         <Skeleton className="h-24 w-full rounded-xl" />
@@ -511,6 +573,63 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
 
   if (showSuccess && !showForm) {
     const log = todayLog;
+
+    if (immersive && log) {
+      return (
+        <div className="transition-all">
+          <CompletedCheckInSummary log={log} logDate={today} onEdit={startEdit} />
+          {showWeightPrompt && !hasWeightToday && (
+            <div className="mt-4 p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <div className="flex items-start gap-3">
+                <Scale className="w-5 h-5 fc-text-subtle mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium fc-text-primary mb-2">Also log your weight today?</p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={quickWeight}
+                      onChange={(e) => setQuickWeight(e.target.value)}
+                      placeholder="Weight (kg)"
+                      className="flex-1 min-w-[100px] px-3 py-2 rounded-lg text-sm fc-glass fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleQuickWeightSave}
+                      disabled={!quickWeight || savingWeight}
+                      className="px-4 py-2 rounded-lg text-sm font-medium fc-btn fc-btn-primary disabled:opacity-50"
+                    >
+                      {savingWeight ? "..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowWeightPrompt(false)}
+                      className="px-3 py-2 rounded-lg text-sm fc-text-subtle hover:fc-text-primary transition-colors"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {newAchievementsQueue.length > 0 && (
+            <AchievementUnlockModal
+              achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+              visible={achievementModalIndex < newAchievementsQueue.length}
+              onClose={() => {
+                if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                  setAchievementModalIndex((i) => i + 1);
+                } else {
+                  setNewAchievementsQueue([]);
+                  setAchievementModalIndex(0);
+                }
+              }}
+            />
+          )}
+        </div>
+      );
+    }
 
     return (
       <div className="border-y border-white/5 px-4 py-3 transition-all">
@@ -660,34 +779,36 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
     );
   }
 
+  const formShell = immersive ? "py-1" : "border-y border-white/5 px-4 py-3";
+  const formSpacing = "space-y-6";
+
   return (
     <>
-    <div className="border-y border-white/5 px-4 py-3">
-      <header className="mb-6">
-        <h2 className="text-[22px] font-bold fc-text-primary">Daily Check-in</h2>
+    <div className={formShell}>
+      <header className={immersive ? "mb-4" : "mb-6"}>
+        <h2 className={`font-bold fc-text-primary ${immersive ? "text-lg" : "text-[22px]"}`}>Daily Check-in</h2>
         <p className="text-sm fc-text-dim mt-0.5">{todayFormatted}</p>
-        {todayLog?.created_at && (
+        {!immersive && todayLog?.created_at && (
           <p className="text-xs fc-text-subtle mt-1">
             Updated at {formatTime(todayLog.created_at)} — you can edit below.
           </p>
         )}
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className={formSpacing}>
         {/* A) Sleep Duration */}
         <div>
-          <label className="block text-sm font-medium fc-text-primary mb-3">
-            Sleep Duration
+          <CheckInMetricHeading>
+            <span className="block text-base font-semibold text-white">Sleep Duration</span>
             {yesterdayLog?.sleep_hours != null && (
-              <span className="ml-2 text-xs font-normal fc-text-subtle">
-                (yesterday: {yesterdayLog.sleep_hours}h
+              <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                Yesterday: {yesterdayLog.sleep_hours}h
                 {sleepHours != null && yesterdayLog.sleep_hours !== sleepHours && (
                   <span className="ml-1">{sleepHours > yesterdayLog.sleep_hours ? "↑" : "↓"}</span>
                 )}
-                )
               </span>
             )}
-          </label>
+          </CheckInMetricHeading>
           
           {/* Stepper Control */}
           <div className="flex items-center justify-center gap-4 mb-4">
@@ -761,130 +882,79 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
 
         {/* B) Sleep Quality */}
         <div>
-          <label className="block text-sm font-medium fc-text-primary mb-3">
-            Sleep Quality
-          </label>
-          <div className="flex gap-3 justify-center">
-            {[1, 2, 3, 4, 5].map((n) => {
-              const selected = sleepQuality === n;
-              const color = ratingColors.positive[n as keyof typeof ratingColors.positive];
-              return (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setSleepQuality(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
-                  style={{
-                    backgroundColor: selected ? color : `${color}30`,
-                    borderColor: color,
-                  }}
-                >
-                  <span className="text-lg font-bold">{n}</span>
-                  <span className="text-[10px] mt-0.5 opacity-90">
-                    {SLEEP_QUALITY_LABELS[n - 1]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <CheckInMetricHeading>
+            <span className="block text-base font-semibold text-white">Sleep Quality</span>
+          </CheckInMetricHeading>
+          <WellnessRatingPills
+            options={SLEEP_QUALITY_OPTIONS}
+            value={sleepQuality}
+            onChange={setSleepQuality}
+            variant="sleep"
+            compact={immersive}
+          />
         </div>
 
         {/* C) Stress Level */}
         <div>
-          <label className="block text-sm font-medium fc-text-primary mb-3">
-            Stress Level
+          <CheckInMetricHeading>
+            <span className="block text-base font-semibold text-white">Stress Level</span>
             {yesterdayLog?.stress_level != null && (
-              <span className="ml-2 text-xs font-normal fc-text-subtle">
-                (yesterday: {getStressLabel(yesterdayLog.stress_level)}
+              <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                Yesterday: {getStressLabel(yesterdayLog.stress_level)}
                 {stressLevel != null && (() => {
                   const yUi = dbToUiScale(yesterdayLog.stress_level);
                   if (yUi == null) return null;
                   return <span className="ml-1">{stressLevel > yUi ? "↑" : stressLevel < yUi ? "↓" : ""}</span>;
                 })()}
-                )
               </span>
             )}
-          </label>
-          <div className="flex gap-3 justify-center">
-            {[1, 2, 3, 4, 5].map((n) => {
-              const selected = stressLevel === n;
-              const color = ratingColors.negative[n as keyof typeof ratingColors.negative];
-              return (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setStressLevel(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
-                  style={{
-                    backgroundColor: selected ? color : `${color}30`,
-                    borderColor: color,
-                  }}
-                >
-                  <span className="text-lg font-bold">{n}</span>
-                  <span className="text-[10px] mt-0.5 opacity-90">
-                    {STRESS_LABELS[n - 1]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          </CheckInMetricHeading>
+          <WellnessRatingPills
+            options={STRESS_OPTIONS}
+            value={stressLevel}
+            onChange={setStressLevel}
+            variant="severity"
+            compact={immersive}
+          />
         </div>
 
         {/* D) Muscle Soreness */}
         <div>
-          <label className="block text-sm font-medium fc-text-primary mb-3">
-            Muscle Soreness
+          <CheckInMetricHeading>
+            <span className="block text-base font-semibold text-white">Muscle Soreness</span>
             {yesterdayLog?.soreness_level != null && (
-              <span className="ml-2 text-xs font-normal fc-text-subtle">
-                (yesterday: {getSorenessLabel(yesterdayLog.soreness_level)}
+              <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                Yesterday: {getSorenessLabel(yesterdayLog.soreness_level)}
                 {sorenessLevel != null && (() => {
                   const yUi = dbToUiScale(yesterdayLog.soreness_level);
                   if (yUi == null) return null;
                   return <span className="ml-1">{sorenessLevel > yUi ? "↑" : sorenessLevel < yUi ? "↓" : ""}</span>;
                 })()}
-                )
               </span>
             )}
-          </label>
-          <div className="flex gap-3 justify-center">
-            {[1, 2, 3, 4, 5].map((n) => {
-              const selected = sorenessLevel === n;
-              const color = ratingColors.negative[n as keyof typeof ratingColors.negative];
-              return (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setSorenessLevel(n)}
-                  className="w-14 h-14 rounded-full flex flex-col items-center justify-center transition-all active:scale-95 border-2 text-white"
-                  style={{
-                    backgroundColor: selected ? color : `${color}30`,
-                    borderColor: color,
-                  }}
-                >
-                  <span className="text-lg font-bold">{n}</span>
-                  <span className="text-[10px] mt-0.5 opacity-90">
-                    {SORENESS_LABELS[n - 1]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          </CheckInMetricHeading>
+          <WellnessRatingPills
+            options={SORENESS_OPTIONS}
+            value={sorenessLevel}
+            onChange={setSorenessLevel}
+            variant="severity"
+            compact={immersive}
+          />
         </div>
 
         {/* E) Steps */}
         <div>
-          <label className="block text-sm font-medium fc-text-primary mb-3">
-            Steps
+          <CheckInMetricHeading>
+            <span className="block text-base font-semibold text-white">Steps</span>
             {yesterdayLog?.steps != null && (
-              <span className="ml-2 text-xs font-normal fc-text-subtle">
-                (yesterday: {yesterdayLog.steps.toLocaleString()}
+              <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                Yesterday: {yesterdayLog.steps.toLocaleString()}
                 {steps != null && yesterdayLog.steps != null && (
                   <span className="ml-1">{steps > yesterdayLog.steps ? "↑" : steps < yesterdayLog.steps ? "↓" : ""}</span>
                 )}
-                )
               </span>
             )}
-          </label>
+          </CheckInMetricHeading>
           
           {/* Stepper Control */}
           <div className="flex items-center justify-center gap-4 mb-4">
@@ -961,9 +1031,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
             <button
               type="button"
               onClick={() => setNotesExpanded(true)}
-              className="text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors"
+              className="flex w-full items-center justify-between text-left text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors py-1"
             >
-              Add note <ChevronDown className="w-4 h-4 inline" />
+              <span>{immersive ? "Notes (optional)" : "Add note"}</span>
+              <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
             </button>
           ) : (
             <div>
@@ -994,8 +1065,8 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
           )}
         </div>
 
-        {/* 7-day trend strip */}
-        {weekLogs.length > 0 && (
+        {/* 7-day trend strip (hidden on immersive check-in page — shown in WeeklyStrip below fold) */}
+        {!immersive && weekLogs.length > 0 && (
           <div className="border-t border-[color:var(--fc-glass-border)] pt-4">
             <p className="text-xs font-semibold fc-text-subtle uppercase mb-2">This week</p>
             <div className="grid grid-cols-7 gap-1 text-center">
@@ -1065,7 +1136,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess }: Dail
               Saving...
             </>
           ) : (
-            "Save"
+            immersive ? "Save Check-in" : "Save"
           )}
         </button>
       </form>

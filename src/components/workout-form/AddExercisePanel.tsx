@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -38,6 +38,12 @@ import {
   Activity,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import {
+  hmsPartsToSeconds,
+  minSecPartsToSecondsPerKm,
+  secondsPerKmToMinSecParts,
+  secondsToHmsParts,
+} from "@/lib/enduranceFormUtils";
 
 export interface AddExercisePanelProps {
   newExercise: any;
@@ -78,6 +84,113 @@ export function AddExercisePanel({
 }: AddExercisePanelProps) {
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles?.() ?? {};
+
+  const [endTimeH, setEndTimeH] = useState("");
+  const [endTimeM, setEndTimeM] = useState("");
+  const [endTimeS, setEndTimeS] = useState("");
+  const [endPaceMin, setEndPaceMin] = useState("");
+  const [endPaceSec, setEndPaceSec] = useState("");
+
+  useEffect(() => {
+    if (newExercise.exercise_type !== "endurance") return;
+    const sec = parseInt(
+      String(newExercise.endurance_target_time_seconds ?? "").trim(),
+      10,
+    );
+    const p = parseFloat(
+      String(newExercise.endurance_target_pace_sec_per_km ?? "").trim(),
+    );
+    const tp =
+      Number.isFinite(sec) && sec > 0
+        ? secondsToHmsParts(sec)
+        : { h: "", m: "", s: "" };
+    setEndTimeH(tp.h);
+    setEndTimeM(tp.m);
+    setEndTimeS(tp.s);
+    const pp =
+      Number.isFinite(p) && p > 0
+        ? secondsPerKmToMinSecParts(p)
+        : { min: "", sec: "" };
+    setEndPaceMin(pp.min);
+    setEndPaceSec(pp.sec);
+  }, [
+    newExercise.exercise_type,
+    newExercise.endurance_target_time_seconds,
+    newExercise.endurance_target_pace_sec_per_km,
+  ]);
+
+  const applyEnduranceTimeHMS = (h: string, m: string, s: string) => {
+    setEndTimeH(h);
+    setEndTimeM(m);
+    setEndTimeS(s);
+    const total = hmsPartsToSeconds(h, m, s);
+    const next: Record<string, unknown> = {
+      ...newExercise,
+      endurance_target_time_seconds:
+        total != null ? String(total) : "",
+    };
+    const km = parseFloat(String(next.endurance_distance_km || ""));
+    if (Number.isFinite(km) && km > 0 && total != null && total > 0) {
+      const pace = Math.round(total / km);
+      next.endurance_target_pace_sec_per_km = String(pace);
+      const pp = secondsPerKmToMinSecParts(pace);
+      setEndPaceMin(pp.min);
+      setEndPaceSec(pp.sec);
+    }
+    setNewExercise(next as typeof newExercise);
+  };
+
+  const applyEndurancePace = (minStr: string, secStr: string) => {
+    setEndPaceMin(minStr);
+    setEndPaceSec(secStr);
+    const p = minSecPartsToSecondsPerKm(minStr, secStr);
+    const next: Record<string, unknown> = {
+      ...newExercise,
+      endurance_target_pace_sec_per_km: p != null ? String(p) : "",
+    };
+    const km = parseFloat(String(next.endurance_distance_km || ""));
+    if (Number.isFinite(km) && km > 0 && p != null && p > 0) {
+      const t = Math.round(p * km);
+      next.endurance_target_time_seconds = String(t);
+      const tp = secondsToHmsParts(t);
+      setEndTimeH(tp.h);
+      setEndTimeM(tp.m);
+      setEndTimeS(tp.s);
+    }
+    setNewExercise(next as typeof newExercise);
+  };
+
+  const applyEnduranceDistance = (kmRaw: string) => {
+    const next: Record<string, unknown> = {
+      ...newExercise,
+      endurance_distance_km: kmRaw,
+    };
+    const km = parseFloat(kmRaw);
+    const t = parseInt(
+      String(next.endurance_target_time_seconds || "").trim(),
+      10,
+    );
+    const p = parseFloat(
+      String(next.endurance_target_pace_sec_per_km || "").trim(),
+    );
+    if (Number.isFinite(km) && km > 0) {
+      if (Number.isFinite(t) && t > 0) {
+        const pace = Math.round(t / km);
+        next.endurance_target_pace_sec_per_km = String(pace);
+        const pp = secondsPerKmToMinSecParts(pace);
+        setEndPaceMin(pp.min);
+        setEndPaceSec(pp.sec);
+      } else if (Number.isFinite(p) && p > 0) {
+        const nt = Math.round(p * km);
+        next.endurance_target_time_seconds = String(nt);
+        const tp = secondsToHmsParts(nt);
+        setEndTimeH(tp.h);
+        setEndTimeM(tp.m);
+        setEndTimeS(tp.s);
+      }
+    }
+    setNewExercise(next as typeof newExercise);
+  };
 
   return (
               <div style={{ order: 0 }} className="w-full">
@@ -240,6 +353,26 @@ export function AddExercisePanel({
                                 }
                               >
                                 HR Sets
+                              </SelectItem>
+                              <SelectItem
+                                value="speed_work"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("speed_work")
+                                }
+                              >
+                                Speed Work
+                              </SelectItem>
+                              <SelectItem
+                                value="endurance"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("endurance")
+                                }
+                              >
+                                Endurance
                               </SelectItem>
                               {(!isVolumeCalculatorActive ||
                                 !allowedBlockTypes) && (
@@ -2356,6 +2489,329 @@ export function AddExercisePanel({
                         </div>
                       )}
 
+                      {newExercise.exercise_type === "speed_work" && (
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-amber-200/50 bg-amber-50/80 p-2.5 dark:border-amber-800/50 dark:bg-amber-950/30 sm:p-3">
+                            <h4
+                              className={`mb-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold ${theme?.text ?? ""}`}
+                            >
+                              <CloudLightning className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                              Speed Work
+                            </h4>
+                            <p className={`mb-2 text-xs ${theme?.textSecondary ?? ""}`}>
+                              Sprint intervals with full recovery
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs">Intervals</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  min={1}
+                                  value={newExercise.speed_intervals ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_intervals: handleNumberChange(
+                                        e.target.value,
+                                        1,
+                                      ),
+                                      sets: handleNumberChange(
+                                        e.target.value,
+                                        1,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Distance (m)</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  min={1}
+                                  value={newExercise.speed_distance_meters ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_distance_meters: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Load (% BW, optional)</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.speed_load_percent_bw ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_load_percent_bw: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Rest (sec)</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.speed_rest_seconds ?? "120"}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_rest_seconds: handleNumberChange(
+                                        e.target.value,
+                                        120,
+                                      ),
+                                      rest_seconds: handleNumberChange(
+                                        e.target.value,
+                                        120,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <Label className="text-xs">Intensity</Label>
+                              <Select
+                                value={newExercise.speed_intensity_mode || "speed"}
+                                onValueChange={(v) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    speed_intensity_mode: v as "speed" | "hr",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="mt-1 h-10 rounded-lg text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="speed">% max speed</SelectItem>
+                                  <SelectItem value="hr">% max HR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {newExercise.speed_intensity_mode === "speed" ? (
+                              <div className="mt-2">
+                                <Label className="text-xs">% max speed</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.speed_max_speed_percent ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_max_speed_percent: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="mt-2">
+                                <Label className="text-xs">% max HR</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.speed_max_hr_percent ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      speed_max_hr_percent: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {newExercise.exercise_type === "endurance" && (
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-emerald-200/50 bg-emerald-50/80 p-2.5 dark:border-emerald-800/50 dark:bg-emerald-950/30 sm:p-3">
+                            <h4
+                              className={`mb-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold ${theme?.text ?? ""}`}
+                            >
+                              <Activity className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                              Endurance
+                            </h4>
+                            <p className={`mb-2 text-xs ${theme?.textSecondary ?? ""}`}>
+                              Distance or time-based continuous work
+                            </p>
+                            <div className="space-y-2">
+                              <div>
+                                <Label className="text-xs">Distance (km)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.endurance_distance_km ?? ""}
+                                  onChange={(e) =>
+                                    applyEnduranceDistance(e.target.value)
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Target time</Label>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="h"
+                                    className="h-10 w-[3.25rem] rounded-lg text-sm"
+                                    value={endTimeH}
+                                    onChange={(e) =>
+                                      applyEnduranceTimeHMS(
+                                        e.target.value,
+                                        endTimeM,
+                                        endTimeS,
+                                      )
+                                    }
+                                  />
+                                  <span className={`text-xs ${theme?.textSecondary ?? ""}`}>h</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="min"
+                                    className="h-10 w-[3.25rem] rounded-lg text-sm"
+                                    value={endTimeM}
+                                    onChange={(e) =>
+                                      applyEnduranceTimeHMS(
+                                        endTimeH,
+                                        e.target.value,
+                                        endTimeS,
+                                      )
+                                    }
+                                  />
+                                  <span className={`text-xs ${theme?.textSecondary ?? ""}`}>min</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={59}
+                                    placeholder="sec"
+                                    className="h-10 w-[3.25rem] rounded-lg text-sm"
+                                    value={endTimeS}
+                                    onChange={(e) =>
+                                      applyEnduranceTimeHMS(
+                                        endTimeH,
+                                        endTimeM,
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                  <span className={`text-xs ${theme?.textSecondary ?? ""}`}>sec</span>
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-xs">Target pace</Label>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="min"
+                                    className="h-10 w-[3.25rem] rounded-lg text-sm"
+                                    value={endPaceMin}
+                                    onChange={(e) =>
+                                      applyEndurancePace(e.target.value, endPaceSec)
+                                    }
+                                  />
+                                  <span className={`text-xs ${theme?.textSecondary ?? ""}`}>min</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={59}
+                                    placeholder="sec"
+                                    className="h-10 w-[3.25rem] rounded-lg text-sm"
+                                    value={endPaceSec}
+                                    onChange={(e) =>
+                                      applyEndurancePace(endPaceMin, e.target.value)
+                                    }
+                                  />
+                                  <span className={`text-xs ${theme?.textSecondary ?? ""}`}>sec /km</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <Label className="text-xs">Intensity</Label>
+                              <Select
+                                value={
+                                  newExercise.endurance_intensity_mode || "zone"
+                                }
+                                onValueChange={(v) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    endurance_intensity_mode: v as "zone" | "hr",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="mt-1 h-10 rounded-lg text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="zone">HR zone (1–5)</SelectItem>
+                                  <SelectItem value="hr">% max HR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {newExercise.endurance_intensity_mode === "zone" ? (
+                              <div className="mt-2">
+                                <Label className="text-xs">Zone</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={5}
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.endurance_hr_zone ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      endurance_hr_zone: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="mt-2">
+                                <Label className="text-xs">% max HR</Label>
+                                <Input
+                                  type="number"
+                                  className="mt-1 h-10 rounded-lg text-sm"
+                                  value={newExercise.endurance_hr_percentage ?? ""}
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      endurance_hr_percentage: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Common fields for all types */}
                       {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion, hr_sets which have their own fields) */}
                       {newExercise.exercise_type &&
@@ -2365,6 +2821,8 @@ export function AddExercisePanel({
                           "pre_exhaustion",
                           "tabata",
                           "hr_sets",
+                          "speed_work",
+                          "endurance",
                         ].includes(newExercise.exercise_type) &&
                         renderLoadWeightField(
                           newExercise.load_percentage,

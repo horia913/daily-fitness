@@ -82,6 +82,8 @@ export interface BaseBlockExecutorProps {
   loggedSets?: LoggedSet[];
   /** Called after a set is successfully updated via PATCH so parent can replace the set in its store. */
   onSetEditSaved?: (blockId: string, updatedSet: LoggedSet) => void;
+  /** Latest body weight (kg) for % BW display on speed work; from body_metrics. */
+  clientBodyWeightKg?: number | null;
 }
 
 export interface BlockDetail {

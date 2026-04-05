@@ -31,7 +31,8 @@ export interface GiantSetExerciseInput {
 /** The "new exercise" form state from AddExercisePanel */
 export interface NewExerciseInput {
   exercise_type: string;
-  exercise_id: string;
+  /** May be omitted for tabata/giant_set until resolved from nested arrays */
+  exercise_id?: string;
   sets?: string | number;
   reps?: string | number;
   rest_seconds?: string | number;
@@ -200,6 +201,29 @@ export function buildExerciseFromNewExercise(
     if (!newExercise.exercise_id || !newExercise.superset_exercise_id) {
       return { success: false, error: "Please select both exercises for your Superset" };
     }
+  } else if (newExercise.exercise_type === "speed_work") {
+    if (!newExercise.exercise_id) {
+      return { success: false, error: "Please select an exercise" };
+    }
+    const intervals = parseInt(
+      String((newExercise as any).speed_intervals || newExercise.sets || "1"),
+      10,
+    );
+    const dist = parseFloat(String((newExercise as any).speed_distance_meters));
+    if (!Number.isFinite(intervals) || intervals < 1) {
+      return { success: false, error: "Speed work: intervals must be at least 1" };
+    }
+    if (!Number.isFinite(dist) || dist <= 0) {
+      return { success: false, error: "Speed work: distance (meters) is required" };
+    }
+  } else if (newExercise.exercise_type === "endurance") {
+    if (!newExercise.exercise_id) {
+      return { success: false, error: "Please select an exercise" };
+    }
+    const km = parseFloat(String((newExercise as any).endurance_distance_km));
+    if (!Number.isFinite(km) || km <= 0) {
+      return { success: false, error: "Endurance: distance (km) is required" };
+    }
   } else {
     if (!newExercise.exercise_id) {
       return { success: false, error: "Please select an exercise" };
@@ -222,12 +246,15 @@ export function buildExerciseFromNewExercise(
     }
   }
 
+  const resolvedMainExerciseId =
+    (mainExerciseId ?? newExercise.exercise_id) || "";
+
   // For non-complex types, ensure selected exercise exists
   let selectedExercise: AvailableExercise | null = null;
   if (
     !["tabata", "giant_set", "superset"].includes(newExercise.exercise_type)
   ) {
-    const found = availableExercises.find((ex) => ex.id === mainExerciseId);
+    const found = availableExercises.find((ex) => ex.id === resolvedMainExerciseId);
     if (!found) {
       return { success: false, error: "Selected exercise not found" };
     }
@@ -241,7 +268,7 @@ export function buildExerciseFromNewExercise(
 
   const exercise: BuiltExercise = {
     id: editingExerciseId ?? `temp-${Date.now()}`,
-    exercise_id: mainExerciseId,
+    exercise_id: resolvedMainExerciseId,
     exercise_type: newExercise.exercise_type || "",
     order_index: orderIndex,
     sets: cleanNumericForForm(newExercise.sets),
@@ -279,6 +306,55 @@ export function buildExerciseFromNewExercise(
     load_percentage: cleanNumericForForm(newExercise.load_percentage),
     exercise: selectedExercise ?? null,
   };
+
+  const nx = newExercise as NewExerciseInput & Record<string, unknown>;
+  if (newExercise.exercise_type === "speed_work") {
+    (exercise as Record<string, unknown>).speed_intervals = cleanNumericForForm(
+      nx.speed_intervals as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_distance_meters = cleanNumericForForm(
+      nx.speed_distance_meters as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_load_percent_bw = cleanNumericForForm(
+      nx.speed_load_percent_bw as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_rest_seconds = cleanNumericForForm(
+      nx.speed_rest_seconds as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_intensity_mode = nx.speed_intensity_mode ?? "speed";
+    (exercise as Record<string, unknown>).speed_max_speed_percent = cleanNumericForForm(
+      nx.speed_max_speed_percent as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_max_hr_percent = cleanNumericForForm(
+      nx.speed_max_hr_percent as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).speed_notes = cleanStringForForm(
+      nx.speed_notes as string | undefined,
+    );
+    exercise.sets = cleanNumericForForm(nx.speed_intervals as string | number | undefined) || exercise.sets;
+  }
+  if (newExercise.exercise_type === "endurance") {
+    (exercise as Record<string, unknown>).endurance_distance_km = cleanStringForForm(
+      nx.endurance_distance_km as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).endurance_target_time_seconds = cleanNumericForForm(
+      nx.endurance_target_time_seconds as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).endurance_target_pace_sec_per_km = cleanNumericForForm(
+      nx.endurance_target_pace_sec_per_km as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).endurance_intensity_mode = nx.endurance_intensity_mode ?? "zone";
+    (exercise as Record<string, unknown>).endurance_hr_zone = cleanNumericForForm(
+      nx.endurance_hr_zone as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).endurance_hr_percentage = cleanNumericForForm(
+      nx.endurance_hr_percentage as string | number | undefined,
+    );
+    (exercise as Record<string, unknown>).endurance_notes = cleanStringForForm(
+      nx.endurance_notes as string | undefined,
+    );
+    exercise.sets = "1";
+  }
 
   return { success: true, exercise };
 }

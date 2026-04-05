@@ -25,11 +25,53 @@ import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { WorkoutBlock } from "@/types/workoutBlocks";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/toast-provider";
+import type { WorkoutSpeedSet, WorkoutEnduranceSet } from "@/types/workoutSetEntries";
+import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
+
+function formatSpeedPrescriptionRow(row: WorkoutSpeedSet | undefined): string | null {
+  if (!row) return null;
+  const parts: string[] = [];
+  const dist = row.distance_meters;
+  const distStr =
+    dist >= 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)}m`;
+  parts.push(`${row.intervals} × ${distStr}`);
+  if (row.target_speed_pct != null && Number.isFinite(row.target_speed_pct)) {
+    parts.push(`${Math.round(row.target_speed_pct)}% speed`);
+  } else if (row.target_hr_pct != null && Number.isFinite(row.target_hr_pct)) {
+    parts.push(`${Math.round(row.target_hr_pct)}% HR`);
+  }
+  if (row.rest_seconds != null && Number.isFinite(row.rest_seconds)) {
+    parts.push(`${row.rest_seconds}s rest`);
+  }
+  if (row.load_pct_bw != null && Number.isFinite(row.load_pct_bw)) {
+    parts.push(`${row.load_pct_bw}% BW`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function formatEndurancePrescriptionRow(row: WorkoutEnduranceSet | undefined): string | null {
+  if (!row) return null;
+  const km = row.target_distance_meters / 1000;
+  const parts: string[] = [`${km.toFixed(1)} km`];
+  if (
+    row.target_pace_seconds_per_km != null &&
+    Number.isFinite(row.target_pace_seconds_per_km)
+  ) {
+    parts.push(formatPaceMinSecPerKm(row.target_pace_seconds_per_km));
+  }
+  if (row.target_hr_pct != null && Number.isFinite(row.target_hr_pct)) {
+    parts.push(`${Math.round(row.target_hr_pct)}% HR`);
+  } else if (row.hr_zone != null && Number.isFinite(row.hr_zone)) {
+    parts.push(`Zone ${row.hr_zone}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
 
 function flatExerciseRowsFromBlocks(blocks: WorkoutBlock[]) {
   const rows: { key: string; name: string; setsReps: string }[] = [];
   blocks.forEach((block, bi) => {
     const exs = block.exercises || [];
+    const setType = block.set_type;
     if (exs.length === 0) {
       rows.push({
         key: `empty-${block.id ?? bi}`,
@@ -40,16 +82,38 @@ function flatExerciseRowsFromBlocks(blocks: WorkoutBlock[]) {
       });
       return;
     }
-    exs.forEach((ex: { exercise?: { name?: string }; exercise_id?: string; sets?: number; reps?: string | number }, ei: number) => {
-      const name = ex.exercise?.name || "Exercise";
-      const sets = ex.sets ?? block.total_sets ?? "—";
-      const reps = ex.reps ?? block.reps_per_set ?? "—";
-      rows.push({
-        key: `${block.id}-${ex.exercise_id ?? ei}-${ei}`,
-        name,
-        setsReps: `${sets} × ${reps}`,
-      });
-    });
+    exs.forEach(
+      (
+        ex: {
+          exercise?: { name?: string };
+          exercise_id?: string;
+          sets?: number;
+          reps?: string | number;
+          speed_sets?: WorkoutSpeedSet[];
+          endurance_sets?: WorkoutEnduranceSet[];
+        },
+        ei: number,
+      ) => {
+        const name = ex.exercise?.name || "Exercise";
+        const sets = ex.sets ?? block.total_sets ?? "—";
+        const reps = ex.reps ?? block.reps_per_set ?? "—";
+        let setsReps: string;
+        if (setType === "speed_work") {
+          const sp = formatSpeedPrescriptionRow(ex.speed_sets?.[0]);
+          setsReps = sp ?? `${sets} × ${reps}`;
+        } else if (setType === "endurance") {
+          const ep = formatEndurancePrescriptionRow(ex.endurance_sets?.[0]);
+          setsReps = ep ?? `${sets} × ${reps}`;
+        } else {
+          setsReps = `${sets} × ${reps}`;
+        }
+        rows.push({
+          key: `${block.id}-${ex.exercise_id ?? ei}-${ei}`,
+          name,
+          setsReps,
+        });
+      },
+    );
   });
   return rows;
 }

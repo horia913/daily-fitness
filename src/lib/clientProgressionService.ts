@@ -34,6 +34,11 @@ export interface LastSessionSetRow {
   weight_kg: number | null;
   reps_completed: number | null;
   rpe: number | null;
+  /** Populated for speed_work / endurance logs when present on workout_set_logs */
+  actual_time_seconds?: number | null;
+  actual_distance_meters?: number | null;
+  actual_hr_avg?: number | null;
+  actual_speed_kmh?: number | null;
 }
 
 export interface ExercisePreviousPerformance {
@@ -46,6 +51,8 @@ export interface ExercisePreviousPerformance {
     workout_log_id: string;
     /** Per-set log from that session, ordered by set_number */
     setDetails: LastSessionSetRow[];
+    /** When the last session used speed_work / endurance logging */
+    executionKind?: 'strength' | 'speed_work' | 'endurance';
   } | null;
   personalBest: {
     maxWeight: number | null;
@@ -93,6 +100,10 @@ function buildLastWorkoutFromSetRows(
     weight_kg: number | null;
     reps_completed: number | null;
     rpe: number | null;
+    actual_time_seconds?: number | null;
+    actual_distance_meters?: number | null;
+    actual_hr_avg?: number | null;
+    actual_speed_kmh?: number | null;
   }>,
   lastWorkoutLogId: string,
   completedAt: string
@@ -131,6 +142,10 @@ function buildLastWorkoutFromSetRows(
       weight_kg: s.weight_kg,
       reps_completed: s.reps_completed,
       rpe: s.rpe,
+      actual_time_seconds: s.actual_time_seconds ?? undefined,
+      actual_distance_meters: s.actual_distance_meters ?? undefined,
+      actual_hr_avg: s.actual_hr_avg ?? undefined,
+      actual_speed_kmh: s.actual_speed_kmh ?? undefined,
     }));
 
   return {
@@ -164,7 +179,9 @@ async function lastWorkoutFromWorkoutSetLogs(
 
   const { data: rows, error } = await supabase
     .from('workout_set_logs')
-    .select('workout_log_id, set_number, weight, reps, rpe')
+    .select(
+      'workout_log_id, set_number, weight, reps, rpe, set_type, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh'
+    )
     .eq('client_id', clientId)
     .eq('exercise_id', exerciseId)
     .in('workout_log_id', logIds);
@@ -200,7 +217,7 @@ async function lastWorkoutFromWorkoutSetLogs(
   });
 
   let fallbackNum = 1;
-  const normalized = sortedLast.map((r) => {
+  const normalized = sortedLast.map((r: any) => {
     const sn =
       r.set_number != null && !Number.isNaN(Number(r.set_number))
         ? Number(r.set_number)
@@ -210,14 +227,35 @@ async function lastWorkoutFromWorkoutSetLogs(
       weight_kg: r.weight != null ? Number(r.weight) : null,
       reps_completed: r.reps != null ? Number(r.reps) : null,
       rpe: r.rpe != null ? Number(r.rpe) : null,
+      actual_time_seconds:
+        r.actual_time_seconds != null ? Number(r.actual_time_seconds) : null,
+      actual_distance_meters:
+        r.actual_distance_meters != null ? Number(r.actual_distance_meters) : null,
+      actual_hr_avg: r.actual_hr_avg != null ? Number(r.actual_hr_avg) : null,
+      actual_speed_kmh:
+        r.actual_speed_kmh != null ? Number(r.actual_speed_kmh) : null,
     };
   });
 
-  const lastWorkout = buildLastWorkoutFromSetRows(
+  const blockType = String(
+    (sortedLast[0] as { set_type?: string | null })?.set_type || '',
+  ).toLowerCase();
+  let lastWorkout = buildLastWorkoutFromSetRows(
     normalized,
     lastLogId,
     logDateMap.get(lastLogId) || ''
   );
+  if (lastWorkout && blockType === 'speed_work') {
+    lastWorkout = {
+      ...lastWorkout,
+      executionKind: 'speed_work',
+    };
+  } else if (lastWorkout && blockType === 'endurance') {
+    lastWorkout = {
+      ...lastWorkout,
+      executionKind: 'endurance',
+    };
+  }
 
   const allWeights = rows
     .filter((s) => s.weight != null)

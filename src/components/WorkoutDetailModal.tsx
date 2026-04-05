@@ -99,9 +99,7 @@ interface WorkoutExercise {
   intra_cluster_rest?: number;
   rest_pause_duration?: number;
   max_rest_pauses?: number;
-  pyramid_type?: string;
   weight_increment?: number;
-  ladder_type?: string;
   start_reps?: number;
   peak_reps?: number;
   target_reps?: number;

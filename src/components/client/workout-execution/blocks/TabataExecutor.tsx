@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CloudLightning, CheckCircle, Play } from "lucide-react";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
-import { TabataCircuitTimerModal } from "../ui/TabataCircuitTimerModal";
+import { TabataTimerModal } from "../ui/TabataTimerModal";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { LoggedSet } from "@/types/workoutBlocks";
 export function TabataExecutor({
@@ -269,7 +269,7 @@ export function TabataExecutor({
 
       {/* Timer Modal */}
       {showTimerModal && (
-        <TabataCircuitTimerModal
+        <TabataTimerModal
           isOpen={showTimerModal}
           onClose={() => setShowTimerModal(false)}
           sets={tabataSets}

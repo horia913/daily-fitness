@@ -8,6 +8,7 @@ import { Share2 } from "lucide-react";
 import { rarityColors } from "@/lib/colors";
 import confetti from "canvas-confetti";
 import type { Achievement } from "./AchievementCard";
+import { AchievementIconDisplay } from "./achievementIconDisplay";
 
 const TIER_GRADIENT: Record<string, string[]> = {
   bronze: ["#CD7F32", "#8B4513"],
@@ -162,7 +163,10 @@ function AchievementUnlockContent({
               transition: "box-shadow 0.3s ease",
             }}
           >
-            <span className="text-5xl">{achievement.icon}</span>
+            <AchievementIconDisplay
+              icon={achievement.icon}
+              className="text-5xl leading-none text-white [&_svg]:h-14 [&_svg]:w-14 [&_svg]:shrink-0"
+            />
             <div
               className="absolute inset-0 rounded-full"
               style={{

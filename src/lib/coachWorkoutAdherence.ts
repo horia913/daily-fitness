@@ -11,6 +11,7 @@
  */
 
 import { parseRepsRange } from "@/lib/clientProgressionService";
+import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,10 @@ export type CoachSetLogRow = {
   superset_exercise_b_id?: string | null;
   superset_weight_b?: number | string | null;
   superset_reps_b?: number | null;
+  actual_time_seconds?: number | null;
+  actual_distance_meters?: number | null;
+  actual_hr_avg?: number | null;
+  actual_speed_kmh?: number | null;
 };
 
 export type PrescribedExerciseRow = {
@@ -59,6 +64,28 @@ export type SetEvaluation = {
   rpe: { outcome: CellOutcome; actual: number | null; prescribed: number | null };
 };
 
+export type SpeedIntervalCoachRow = {
+  setNumber: number;
+  timeSeconds: number | null;
+  rpe: number | null;
+};
+
+export type EnduranceCoachSummary = {
+  prescribedDistanceM: number | null;
+  prescribedTimeSec: number | null;
+  prescribedPaceSecPerKm: number | null;
+  prescribedHrZone: number | null;
+  prescribedHrPct: number | null;
+  actualDistanceM: number | null;
+  actualTimeSec: number | null;
+  actualPaceSecPerKm: number | null;
+  actualHrAvg: number | null;
+  distanceOutcome: CellOutcome;
+  timeOutcome: CellOutcome;
+  paceOutcome: CellOutcome;
+  hrOutcome: CellOutcome;
+};
+
 export type ExerciseAdherenceBlock = {
   exerciseId: string;
   exerciseName?: string;
@@ -68,6 +95,13 @@ export type ExerciseAdherenceBlock = {
   /** Sets that count toward adherence denom for this exercise. */
   setsOnTarget: number;
   setsEvaluated: number;
+  /** When set, coach detail page renders speed interval table instead of weight/reps. */
+  displayVariant?: "standard" | "speed_work" | "endurance";
+  speedIntervals?: SpeedIntervalCoachRow[];
+  speedConsistencyPct?: number | null;
+  prescribedSpeedIntervals?: number | null;
+  prescribedSpeedDistanceM?: number | null;
+  enduranceSummary?: EnduranceCoachSummary;
 };
 
 export type WorkoutAdherenceResult = {
@@ -96,6 +130,22 @@ function numInt(v: number | string | null | undefined): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : parseInt(String(v), 10);
   return Number.isFinite(n) ? n : null;
+}
+
+function prescKey(setEntryId: string, exerciseId: string): string {
+  return `${setEntryId}::${exerciseId}`;
+}
+
+/** Higher = more consistent interval times (100 = identical). */
+function intervalTimeConsistencyPct(times: number[]): number | null {
+  if (times.length < 2) return null;
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
+  if (mean <= 0) return null;
+  const variance =
+    times.reduce((s, t) => s + (t - mean) * (t - mean), 0) / times.length;
+  const sd = Math.sqrt(variance);
+  const cv = sd / mean;
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - Math.min(1, cv)))));
 }
 
 function prescribedRpe(pe: PrescribedExerciseRow): number | null {
@@ -362,15 +412,30 @@ function evaluateSuperset(
 
 // ─── Aggregate workout ───────────────────────────────────────────────────────
 
+export type WorkoutAdherencePrescriptions = {
+  speedByKey?: Map<string, { intervals: number; distance_meters: number }>;
+  enduranceByKey?: Map<
+    string,
+    {
+      target_distance_meters: number;
+      target_time_seconds: number | null;
+      target_pace_seconds_per_km: number | null;
+      hr_zone: number | null;
+      target_hr_pct: number | null;
+    }
+  >;
+};
+
 /**
  * Compute adherence and per-exercise blocks for one workout log.
- * Only processes `straight_set` and `superset` rows that match template prescriptions.
+ * Processes straight_set, superset, speed_work, and endurance rows.
  */
 export function computeWorkoutAdherence(
   logs: CoachSetLogRow[],
   setEntries: Array<{ id: string; set_type: string }>,
   entryExercises: Array<PrescribedExerciseRow & { set_entry_id: string }>,
-  exerciseNames?: Map<string, string>
+  exerciseNames?: Map<string, string>,
+  presc?: WorkoutAdherencePrescriptions
 ): WorkoutAdherenceResult {
   const { bySetEntry, setTypeByEntry } = buildPrescriptionMaps(
     setEntries,
@@ -398,9 +463,12 @@ export function computeWorkoutAdherence(
     const entryId = getSetEntryId(log);
     if (!entryId) continue;
 
-    const st =
+    const st = String(
       setTypeByEntry.get(entryId) ||
-      String(log.block_type || log.set_type || "").toLowerCase();
+        log.block_type ||
+        log.set_type ||
+        ""
+    ).toLowerCase();
     const prescMap = bySetEntry.get(entryId);
 
     if (st === "straight_set") {
@@ -472,6 +540,163 @@ export function computeWorkoutAdherence(
     }
   }
 
+  const speedPresc = presc?.speedByKey;
+  const endurancePresc = presc?.enduranceByKey;
+  const speedAgg = new Map<
+    string,
+    { setEntryId: string; exerciseId: string; logs: CoachSetLogRow[] }
+  >();
+  const enduranceAgg = new Map<
+    string,
+    { setEntryId: string; exerciseId: string; logs: CoachSetLogRow[] }
+  >();
+
+  for (const log of logs) {
+    const entryId = getSetEntryId(log);
+    if (!entryId) continue;
+    const st = String(
+      setTypeByEntry.get(entryId) ||
+        log.block_type ||
+        log.set_type ||
+        ""
+    ).toLowerCase();
+    const exId = log.exercise_id;
+    if (!exId) continue;
+    if (st === "speed_work") {
+      const k = prescKey(entryId, exId);
+      if (!speedAgg.has(k))
+        speedAgg.set(k, { setEntryId: entryId, exerciseId: exId, logs: [] });
+      speedAgg.get(k)!.logs.push(log);
+    }
+    if (st === "endurance") {
+      const k = prescKey(entryId, exId);
+      if (!enduranceAgg.has(k))
+        enduranceAgg.set(k, { setEntryId: entryId, exerciseId: exId, logs: [] });
+      enduranceAgg.get(k)!.logs.push(log);
+    }
+  }
+
+  const extraBlocks: ExerciseAdherenceBlock[] = [];
+
+  for (const agg of speedAgg.values()) {
+    const k = prescKey(agg.setEntryId, agg.exerciseId);
+    const sorted = [...agg.logs].sort(
+      (a, b) => (a.set_number ?? 0) - (b.set_number ?? 0)
+    );
+    const p = speedPresc?.get(k);
+    const prescribedN = p?.intervals ?? sorted.length;
+    totalPrescribedSets += prescribedN;
+    const withTime = sorted.filter((l) => num(l.actual_time_seconds) != null)
+      .length;
+    setsOnTarget += Math.min(prescribedN, withTime);
+
+    const times = sorted
+      .map((l) => num(l.actual_time_seconds))
+      .filter((t): t is number => t != null && t > 0);
+    const consistency = intervalTimeConsistencyPct(times);
+
+    const speedIntervals: SpeedIntervalCoachRow[] = sorted.map((l) => ({
+      setNumber: l.set_number ?? 0,
+      timeSeconds: num(l.actual_time_seconds),
+      rpe: numInt(l.rpe),
+    }));
+
+    const parts: string[] = [];
+    if (p?.intervals != null) parts.push(`${p.intervals}×`);
+    if (p?.distance_meters != null) parts.push(`${p.distance_meters}m`);
+    const prescribedSummary = parts.length ? parts.join("") : "Speed work";
+
+    extraBlocks.push({
+      exerciseId: agg.exerciseId,
+      exerciseName: exerciseNames?.get(agg.exerciseId),
+      blockTypeLabel: "SPEED WORK",
+      prescribedSummary,
+      sets: [],
+      setsOnTarget: Math.min(prescribedN, withTime),
+      setsEvaluated: prescribedN,
+      displayVariant: "speed_work",
+      speedIntervals,
+      speedConsistencyPct: consistency,
+      prescribedSpeedIntervals: p?.intervals ?? null,
+      prescribedSpeedDistanceM: p?.distance_meters ?? null,
+    });
+  }
+
+  for (const agg of enduranceAgg.values()) {
+    const k = prescKey(agg.setEntryId, agg.exerciseId);
+    const p = endurancePresc?.get(k);
+    const log0 = agg.logs[0];
+    const actD = num(log0?.actual_distance_meters);
+    const actT = num(log0?.actual_time_seconds);
+    const actHr = num(log0?.actual_hr_avg);
+    const prescD = p?.target_distance_meters ?? null;
+    const prescT = p?.target_time_seconds ?? null;
+    const prescP = p?.target_pace_seconds_per_km ?? null;
+    const actPace =
+      actD != null && actT != null && actD > 0
+        ? actT / (actD / 1000)
+        : null;
+
+    const distanceOutcome: CellOutcome = (() => {
+      if (prescD == null || actD == null || prescD <= 0) return "neutral";
+      const r = actD / prescD;
+      if (r >= 1) return "green";
+      if (r >= 0.92) return "neutral";
+      return "red";
+    })();
+
+    const timeOutcome: CellOutcome = (() => {
+      if (prescT == null || actT == null || prescT <= 0) return "neutral";
+      if (actT <= prescT) return "green";
+      if (actT <= prescT * 1.12) return "neutral";
+      return "red";
+    })();
+
+    const paceOutcome: CellOutcome = (() => {
+      if (prescP == null || actPace == null) return "neutral";
+      if (actPace <= prescP) return "green";
+      if (actPace <= prescP * 1.08) return "neutral";
+      return "red";
+    })();
+
+    totalPrescribedSets += 1;
+    const outs = [distanceOutcome, timeOutcome, paceOutcome];
+    const onTarget = !outs.some((o) => o === "red");
+    if (onTarget) setsOnTarget += 1;
+
+    const prescribedSummary =
+      prescD != null
+        ? `${(prescD / 1000).toFixed(1)} km` +
+          (prescP != null ? ` · ${formatPaceMinSecPerKm(prescP)}` : "")
+        : "Endurance";
+
+    extraBlocks.push({
+      exerciseId: agg.exerciseId,
+      exerciseName: exerciseNames?.get(agg.exerciseId),
+      blockTypeLabel: "ENDURANCE",
+      prescribedSummary,
+      sets: [],
+      setsOnTarget: onTarget ? 1 : 0,
+      setsEvaluated: 1,
+      displayVariant: "endurance",
+      enduranceSummary: {
+        prescribedDistanceM: prescD,
+        prescribedTimeSec: prescT,
+        prescribedPaceSecPerKm: prescP,
+        prescribedHrZone: p?.hr_zone ?? null,
+        prescribedHrPct: p?.target_hr_pct ?? null,
+        actualDistanceM: actD,
+        actualTimeSec: actT,
+        actualPaceSecPerKm: actPace,
+        actualHrAvg: actHr,
+        distanceOutcome,
+        timeOutcome,
+        paceOutcome,
+        hrOutcome: "neutral",
+      },
+    });
+  }
+
   const adherencePercent =
     totalPrescribedSets > 0
       ? Math.round((setsOnTarget / totalPrescribedSets) * 1000) / 10
@@ -513,8 +738,11 @@ export function computeWorkoutAdherence(
       sets: [...v.sets].sort((a, b) => a.setNumber - b.setNumber),
       setsOnTarget: exOn,
       setsEvaluated: exTot,
+      displayVariant: "standard",
     });
   }
+
+  exerciseBlocks.push(...extraBlocks);
 
   return {
     setsOnTarget,

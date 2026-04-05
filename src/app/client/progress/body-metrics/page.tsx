@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -16,10 +16,10 @@ import {
   Activity,
   Target,
   ListFilter,
-  ChevronRight,
   Camera,
 } from "lucide-react";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { isFromCheckIns, progressBackHref, withFromCheckIns } from "@/lib/clientProgressNav";
 import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
@@ -52,6 +52,8 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 function BodyMetricsPageContent() {
+  const searchParams = useSearchParams();
+  const fromCheckIns = isFromCheckIns(searchParams);
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -328,10 +330,10 @@ function BodyMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+            <div className="py-6 text-center">
+              <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
+              <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </div>
         </AnimatedBackground>
@@ -344,16 +346,11 @@ function BodyMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
-              <div className="animate-pulse space-y-6">
-                <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2 h-56 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-56 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
           </div>
         </AnimatedBackground>
@@ -364,55 +361,39 @@ function BodyMetricsPageContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
-        {/* Header */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-              </Link>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                  <Scale className="w-6 h-6" />
-                </div>
-                <div>
-                  <nav className="flex items-center gap-2 text-sm text-[color:var(--fc-text-dim)] mb-1">
-                    <Link href="/client/progress" className="hover:text-[color:var(--fc-text-primary)]">Progress</Link>
-                    <ChevronRight className="w-3 h-3 shrink-0" />
-                    <span className="text-[color:var(--fc-text-primary)]">Body Metrics</span>
-                  </nav>
-                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                    Body Metrics
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    {latestDate ? (
-                      <>Updated {formatTimeAgo(latestDate)}</>
-                    ) : (
-                      <>Weight and measurements over time</>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {latestDate && (
-                <div className="flex items-center gap-3 fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] shrink-0">
-                  <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" />
-                  <span className="text-sm fc-text-subtle">
-                    <span className="font-mono fc-text-primary">{formatTimeAgo(latestDate)}</span>
-                  </span>
-                </div>
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
+        {/* Header — compact */}
+        <div className="mb-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = progressBackHref(fromCheckIns);
+            }}
+            className="fc-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-4 w-4 text-[color:var(--fc-text-primary)]" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Body Metrics</h1>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">
+              {latestDate ? (
+                <>Updated {formatTimeAgo(latestDate)}</>
+              ) : (
+                <>Weight and measurements over time</>
               )}
-              <Link
-                href="/client/progress/photos"
-                className="fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] flex items-center gap-2 text-sm font-medium fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-              >
-                <Camera className="w-4 h-4" />
-                Photos
-              </Link>
-            </div>
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = withFromCheckIns("/client/progress/photos", fromCheckIns);
+            }}
+            className="fc-glass-soft flex shrink-0 items-center gap-1.5 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-1.5 text-sm font-medium fc-text-primary"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            Photos
+          </button>
         </div>
 
         {/* Goal Progress (check-in goals with body-metric targets) */}
@@ -445,8 +426,8 @@ function BodyMetricsPageContent() {
               ? (lowerIsBetter ? (current - target).toFixed(1) : (target - current).toFixed(1))
               : null;
             goalCards.push(
-              <div key={goal.id} className="fc-surface p-4 rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <div className="flex items-center gap-2 mb-2">
+              <div key={goal.id} className="border-b border-[color:var(--fc-glass-border)]/80 py-3 last:border-0 last:pb-0 first:pt-0">
+                <div className="mb-2 flex items-center gap-2">
                   <Target className="w-4 h-4 fc-text-subtle" />
                   <span className="font-semibold fc-text-primary">{goal.title}</span>
                 </div>
@@ -475,33 +456,27 @@ function BodyMetricsPageContent() {
             );
           }
           return goalCards.length > 0 ? (
-            <section className="mb-8 space-y-4">
-              <h2 className="text-lg font-semibold fc-text-primary mb-3">Goal Progress</h2>
-              <div className="space-y-4">{goalCards}</div>
+            <section className="mb-3 space-y-2">
+              <h2 className="text-base font-semibold fc-text-primary">Goal progress</h2>
+              <div>{goalCards}</div>
             </section>
           ) : null;
         })()}
 
         {/* Nutrition vs Body Composition insight — only if nutrition goals + ≥2 body metrics in 30d */}
         {nutritionVsBodyInsight && (
-          <section className="mb-8">
-            <div className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="mb-2 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_10px_20px_rgba(245,158,11,0.25)]">
-                  <Activity className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold fc-text-primary">Nutrition & Body Composition</h2>
-                  <p className="text-sm fc-text-dim">Last 30 days</p>
-                </div>
-              </div>
-              <p className="fc-text-primary">{nutritionVsBodyInsight.message}</p>
+          <section className="mb-3 space-y-2 border-t border-[color:var(--fc-glass-border)] pt-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[color:var(--fc-accent)]" />
+              <h2 className="text-base font-semibold fc-text-primary">Nutrition &amp; body composition</h2>
+              <span className="text-xs fc-text-dim">Last 30 days</span>
             </div>
+            <p className="text-sm fc-text-primary">{nutritionVsBodyInsight.message}</p>
           </section>
         )}
 
         {metrics.length === 0 ? (
-          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="py-6">
             <EmptyState
               icon={Scale}
               title="No measurements yet"
@@ -510,12 +485,12 @@ function BodyMetricsPageContent() {
             />
           </div>
         ) : (
-          <main className="space-y-8">
+          <main className="space-y-3">
             {/* Last vs current comparison */}
-            <section className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <h2 className="text-lg font-semibold fc-text-primary mb-1">Body check-in</h2>
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold fc-text-primary">Body check-in</h2>
               {previous && daysSincePrevious != null && (
-                <p className="text-sm fc-text-dim mb-6">
+                <p className="text-sm fc-text-dim mb-2">
                   Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
                 </p>
               )}
@@ -523,24 +498,24 @@ function BodyMetricsPageContent() {
                 <table className="w-full min-w-[280px] border-collapse">
                   <thead>
                     <tr className="border-b border-[color:var(--fc-glass-border)]">
-                      <th className="text-left py-3 pr-4 text-xs font-semibold fc-text-subtle uppercase"></th>
+                      <th className="py-2 pr-3 text-left text-xs font-semibold uppercase fc-text-subtle"></th>
                       {previous && (
                         <>
-                          <th className="text-right py-3 px-2 text-xs font-semibold fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
-                          <th className="text-right py-3 px-2 text-xs font-semibold fc-text-primary">Current</th>
-                          <th className="text-right py-3 pl-2 text-xs font-semibold fc-text-subtle">Change</th>
+                          <th className="px-2 py-2 text-right text-xs font-semibold fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
+                          <th className="px-2 py-2 text-right text-xs font-semibold fc-text-primary">Current</th>
+                          <th className="py-2 pl-2 text-right text-xs font-semibold fc-text-subtle">Change</th>
                         </>
                       )}
-                      {!previous && <th className="text-right py-3 px-2 text-xs font-semibold fc-text-primary">Current</th>}
+                      {!previous && <th className="px-2 py-2 text-right text-xs font-semibold fc-text-primary">Current</th>}
                     </tr>
                   </thead>
                   <tbody className="fc-text-primary">
                     <tr className="border-b border-[color:var(--fc-glass-border)]">
-                      <td className="py-3 pr-4 font-medium">Weight</td>
-                      {previous && <td className="text-right py-3 px-2 font-mono">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
-                      <td className="text-right py-3 px-2 font-mono">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
+                      <td className="py-2 pr-3 text-sm font-medium">Weight</td>
+                      {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
+                      <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
                       {previous && (
-                        <td className="text-right py-3 pl-2">
+                        <td className="py-2 pl-2 text-right">
                           {weightChange !== 0 ? (
                             <span className={`text-sm font-bold ${weightChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
                               {weightChange < 0 ? "▼" : "▲"} {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
@@ -551,11 +526,11 @@ function BodyMetricsPageContent() {
                     </tr>
                     {(latest?.body_fat_percentage != null || previous?.body_fat_percentage != null) && (
                       <tr className="border-b border-[color:var(--fc-glass-border)]">
-                        <td className="py-3 pr-4 font-medium">Body fat</td>
-                        {previous && <td className="text-right py-3 px-2 font-mono">{(previous.body_fat_percentage ?? "—")}%</td>}
-                        <td className="text-right py-3 px-2 font-mono">{(latest?.body_fat_percentage ?? "—")}%</td>
+                        <td className="py-2 pr-3 text-sm font-medium">Body fat</td>
+                        {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.body_fat_percentage ?? "—")}%</td>}
+                        <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.body_fat_percentage ?? "—")}%</td>
                         {previous && (
-                          <td className="text-right py-3 pl-2">
+                          <td className="py-2 pl-2 text-right">
                             {bodyFatChange != null && bodyFatChange !== 0 ? (
                               <span className={`text-sm font-bold ${bodyFatChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
                                 {bodyFatChange < 0 ? "▼" : "▲"} {bodyFatChange > 0 ? "+" : ""}{bodyFatChange.toFixed(1)}%
@@ -567,11 +542,11 @@ function BodyMetricsPageContent() {
                     )}
                     {(latest?.muscle_mass_kg != null || previous?.muscle_mass_kg != null) && (
                       <tr className="border-b border-[color:var(--fc-glass-border)]">
-                        <td className="py-3 pr-4 font-medium">Muscle mass</td>
-                        {previous && <td className="text-right py-3 px-2 font-mono">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
-                        <td className="text-right py-3 px-2 font-mono">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
+                        <td className="py-2 pr-3 text-sm font-medium">Muscle mass</td>
+                        {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
+                        <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
                         {previous && (
-                          <td className="text-right py-3 pl-2">
+                          <td className="py-2 pl-2 text-right">
                             {muscleChange != null && muscleChange !== 0 ? (
                               <span className={`text-sm font-bold ${muscleChange > 0 ? "fc-text-success" : "fc-text-warning"}`}>
                                 {muscleChange > 0 ? "▲" : "▼"} {muscleChange > 0 ? "+" : ""}{muscleChange.toFixed(1)} kg
@@ -592,9 +567,9 @@ function BodyMetricsPageContent() {
                 const maxW = Math.max(...sparkData.map((x) => x.weight));
                 const range = maxW - minW || 1;
                 return (
-                  <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
-                    <p className="text-xs font-semibold fc-text-subtle uppercase mb-2">Weight trend (last 3 months)</p>
-                    <div className="flex items-end gap-0.5 h-12">
+                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+                    <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Weight trend (last 3 months)</p>
+                    <div className="flex h-10 items-end gap-0.5">
                       {sparkData.map((m, i) => {
                         const h = ((m.weight - minW) / range) * 100;
                         return (
@@ -612,10 +587,16 @@ function BodyMetricsPageContent() {
                       <span>{sparkData[sparkData.length - 1]?.weight.toFixed(1)} kg</span>
                     </div>
                     {hasNutritionGoals && (
-                      <p className="mt-3 text-sm">
-                        <Link href="/client/nutrition" className="text-[color:var(--fc-accent)] hover:underline">
+                      <p className="mt-2 text-sm">
+                        <button
+                          type="button"
+                          className="text-[color:var(--fc-accent)] hover:underline"
+                          onClick={() => {
+                            window.location.href = "/client/nutrition";
+                          }}
+                        >
                           How&apos;s your nutrition?
-                        </Link>
+                        </button>
                       </p>
                     )}
                   </div>
@@ -635,8 +616,8 @@ function BodyMetricsPageContent() {
                 ].filter((r) => r.prev != null || r.curr != null);
                 if (rows.length === 0) return null;
                 return (
-                  <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
-                    <p className="text-xs font-semibold fc-text-subtle uppercase mb-3">Measurements</p>
+                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+                    <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Measurements</p>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[240px] text-sm">
                         <thead>
@@ -672,34 +653,29 @@ function BodyMetricsPageContent() {
 
               {/* Progress photos comparison */}
               {(latestDatePhotos.length > 0 || previousDatePhotos.length > 0) && (
-                <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
-                  <p className="text-xs font-semibold fc-text-subtle uppercase mb-3">Progress photos</p>
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+                  <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Progress photos</p>
+                  <div className="flex flex-wrap items-end gap-3">
                     {previous && previousDatePhotos.length > 0 && (
-                      <div>
-                        <p className="text-[10px] fc-text-subtle mb-1">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} (Previous)</p>
-                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[color:var(--fc-glass-soft)]">
-                          <img src={previousDatePhotos[0].url} alt="Previous" className="w-full h-full object-cover" />
-                        </div>
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · previous</p>
+                        <img src={previousDatePhotos[0].url} alt="Previous" className="h-20 w-14 rounded-lg object-cover bg-[color:var(--fc-glass-soft)] sm:h-24 sm:w-16" />
                       </div>
                     )}
                     {latest && latestDatePhotos.length > 0 && (
-                      <div>
-                        <p className="text-[10px] fc-text-subtle mb-1">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} (Current)</p>
-                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[color:var(--fc-glass-soft)]">
-                          <img src={latestDatePhotos[0].url} alt="Current" className="w-full h-full object-cover" />
-                        </div>
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] fc-text-subtle">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · current</p>
+                        <img src={latestDatePhotos[0].url} alt="Current" className="h-20 w-14 rounded-lg object-cover bg-[color:var(--fc-glass-soft)] sm:h-24 sm:w-16" />
                       </div>
                     )}
                   </div>
-                  <p className="text-[10px] fc-text-subtle mt-2">Swipe or scroll for more views</p>
                 </div>
               )}
             </section>
 
             {/* Tabs: Weight & BF and Measurements */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="space-y-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+              <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                 <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)]">
                   <TabsTrigger value="weight-bf" className="data-[state=active]:fc-glass">
                     Weight & BF
@@ -731,7 +707,7 @@ function BodyMetricsPageContent() {
               <TabsContent value="weight-bf" className="mt-0">
                 {metrics.length > 0 ? (
                   <div className="relative">
-                    <div className="flex items-end justify-between gap-1 sm:gap-2 h-64">
+                    <div className="flex h-48 items-end justify-between gap-1 sm:gap-2 sm:h-56">
                       {metrics.slice(-12).map((metric, index) => {
                         const maxW = Math.max(...metrics.map((m) => m.weight));
                         const minW = Math.min(...metrics.map((m) => m.weight));
@@ -803,7 +779,7 @@ function BodyMetricsPageContent() {
 
               <TabsContent value="measurements" className="mt-0">
                 {fullMeasurements.length > 0 ? (
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     {/* Comparison Summary Card */}
                     {(() => {
                       const sortedMeasurements = [...fullMeasurements].sort(
@@ -915,15 +891,15 @@ function BodyMetricsPageContent() {
                       if (comparisons.length === 0) return null;
 
                       return (
-                        <div className="fc-glass-soft p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
-                          <h3 className="text-sm font-semibold fc-text-primary mb-3">
+                        <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 py-2">
+                          <h3 className="mb-2 px-2 text-sm font-semibold fc-text-primary">
                             Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
                             })}
                           </h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                          <div className="grid grid-cols-2 gap-2 px-2 pb-2 sm:grid-cols-3 lg:grid-cols-5">
                             {comparisons.map((comp) => (
                               <div key={comp.label} className="text-center">
                                 <p className="text-xs fc-text-subtle mb-1">{comp.label}</p>
@@ -947,7 +923,7 @@ function BodyMetricsPageContent() {
                     })()}
 
                     {/* Measurement Charts Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {/* Waist */}
                       {fullMeasurements.filter((m) => m.waist_circumference != null).length >= 2 && (
                         <MeasurementMiniChart
@@ -1058,14 +1034,12 @@ function BodyMetricsPageContent() {
             </Tabs>
 
             {/* Log history */}
-            <div
-              className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-glass-border)] flex flex-col"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold fc-text-primary">Log history</h3>
-                <ListFilter className="w-5 h-5 fc-text-subtle" />
+            <div className="flex flex-col border-t border-[color:var(--fc-glass-border)] pt-3">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold fc-text-primary">Log history</h3>
+                <ListFilter className="h-4 w-4 fc-text-subtle" />
               </div>
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
                 {historyNewestFirst.map((metric, index) => {
                   const prev = historyNewestFirst[index + 1];
                   const delta = prev ? metric.weight - prev.weight : null;
@@ -1074,19 +1048,19 @@ function BodyMetricsPageContent() {
                   return (
                     <div
                       key={metric.date}
-                      className="flex items-center justify-between p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                      className="flex items-center justify-between rounded-lg border border-[color:var(--fc-glass-border)]/70 p-2.5 transition-colors hover:bg-[color:var(--fc-glass-highlight)]/40"
                     >
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <div className="w-12 h-12 rounded-xl fc-glass flex flex-col items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] font-bold fc-text-subtle uppercase">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg fc-glass">
+                          <span className="text-[9px] font-bold uppercase fc-text-subtle">
                             {d.toLocaleDateString("en-US", { month: "short" })}
                           </span>
-                          <span className="text-lg font-bold leading-none fc-text-primary">
+                          <span className="text-sm font-bold leading-none fc-text-primary">
                             {d.getDate()}
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold font-mono fc-text-primary">
+                          <p className="font-mono text-sm font-semibold fc-text-primary">
                             {metric.weight.toFixed(1)} kg
                           </p>
                           <p className="text-xs fc-text-subtle truncate">
@@ -1099,7 +1073,7 @@ function BodyMetricsPageContent() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
+                      <div className="shrink-0 text-right">
                         {delta !== null && delta !== 0 && (
                           <>
                             <p
@@ -1118,7 +1092,7 @@ function BodyMetricsPageContent() {
                   );
                 })}
               </div>
-              <p className="text-sm font-semibold fc-text-subtle mt-6 pt-4 border-t border-[color:var(--fc-glass-border)] text-center">
+              <p className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-2 text-center text-xs font-medium fc-text-subtle">
                 {metrics.length} entr{metrics.length === 1 ? "y" : "ies"} total
               </p>
             </div>
@@ -1180,7 +1154,20 @@ function BodyMetricsPageContent() {
 export default function BodyMetricsPage() {
   return (
     <ProtectedRoute>
-      <BodyMetricsPageContent />
+      <Suspense
+        fallback={
+          <AnimatedBackground>
+            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </div>
+          </AnimatedBackground>
+        }
+      >
+        <BodyMetricsPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }

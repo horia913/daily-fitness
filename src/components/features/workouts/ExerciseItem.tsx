@@ -96,9 +96,6 @@ export default function ExerciseItem({
       if (exercise.sets) details.push(`${exercise.sets} rounds`);
       if (exercise.duration_seconds)
         details.push(`${exercise.duration_seconds}s cap`);
-    } else if (blockType === "ladder") {
-      if (exercise.reps) details.push(`${exercise.reps} reps`);
-      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
     } else {
       // Default: show all available data
       if (exercise.sets) details.push(`${exercise.sets} sets`);

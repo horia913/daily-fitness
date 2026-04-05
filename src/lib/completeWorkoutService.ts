@@ -130,7 +130,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   // ========================================================================
   const { data: setLogs, error: setsError } = await supabaseAdmin
     .from('workout_set_logs')
-    .select('id, weight, reps, exercise_id, completed_at, workout_log_id')
+    .select('id, weight, reps, exercise_id, completed_at, workout_log_id, set_type')
     .eq('workout_log_id', workoutLogId)
     .eq('client_id', clientId)
 
@@ -139,9 +139,17 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     throw new Error(`Failed to fetch set logs: ${setsError.message}`)
   }
 
+  const countsTowardStrengthVolume = (t: string | null | undefined) =>
+    t !== 'speed_work' && t !== 'endurance'
+
   const totalSetsCompleted = setLogs?.length || 0
-  const totalRepsCompleted = setLogs?.reduce((sum, set) => sum + (set.reps || 0), 0) || 0
-  const totalWeightLifted = setLogs?.reduce((sum, set) => sum + ((set.weight || 0) * (set.reps || 0)), 0) || 0
+  let totalRepsCompleted = 0
+  let totalWeightLifted = 0
+  for (const set of setLogs ?? []) {
+    if (!countsTowardStrengthVolume(set.set_type)) continue
+    totalRepsCompleted += set.reps || 0
+    totalWeightLifted += (set.weight || 0) * (set.reps || 0)
+  }
 
   // ========================================================================
   // STEP 4: Calculate duration and update workout_logs

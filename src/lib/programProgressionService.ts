@@ -83,8 +83,6 @@ export interface ProgramProgressionRule {
   rest_after_set?: number | null
   time_cap_minutes?: number | null
   rest_after_exercise?: number | null
-  pyramid_order?: number | null
-  ladder_order?: number | null
   
   // HR-specific fields (for hr_sets block type)
   hr_zone?: number | null
@@ -95,6 +93,9 @@ export interface ProgramProgressionRule {
   hr_rest_duration_seconds?: number | null
   hr_target_rounds?: number | null
   hr_distance_meters?: number | null
+
+  /** Speed / endurance progression (matches DB jsonb on program_progression_rules) */
+  speed_endurance_config?: Record<string, unknown> | null
   
   training_block_id?: string | null // Added in Phase 2
 
@@ -163,7 +164,7 @@ export class ProgramProgressionService {
         const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'set_order', 'week_number', 
           'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
           'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 'work_seconds', 
-          'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 'pyramid_order', 'ladder_order',
+          'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise',
           'rest_between_pairs']
         
         for (const field of integerFields) {
@@ -211,7 +212,7 @@ export class ProgramProgressionService {
           'rest_between_pairs', 'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set',
           'intra_cluster_rest', 'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps',
           'work_seconds', 'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise',
-          'pyramid_order', 'ladder_order']
+          ]
         for (const field of integerFields) {
           if (rule[field] !== undefined && rule[field] !== null) {
             const value = rule[field]
@@ -346,8 +347,6 @@ export class ProgramProgressionService {
         notes: rule.notes ?? null,
         weight_kg: rule.weight_kg ?? null,
         load_percentage: rule.load_percentage ?? null,
-        pyramid_order: rule.pyramid_order ?? null,
-        ladder_order: rule.ladder_order ?? null,
         override_exercise_id: null,
       }))
 
@@ -427,6 +426,149 @@ export class ProgramProgressionService {
   }
 
   /**
+   * Match rows from workout_drop_sets / workout_cluster_sets / workout_rest_pause_sets /
+   * workout_time_protocols to a progression rule. Those tables always use the template's
+   * exercise_id; the rule may list the template in exercise_id and the swap in
+   * override_exercise_id, or (some flows) flip which column holds which — accept either.
+   */
+  private static specialTableRowMatchesProgressionRule(
+    row: { exercise_id: string; exercise_order: number },
+    rule: ProgramProgressionRule
+  ): boolean {
+    if (row.exercise_order !== rule.exercise_order) return false
+    if (row.exercise_id === rule.exercise_id) return true
+    const ov = rule.override_exercise_id
+    if (ov != null && row.exercise_id === ov) return true
+    return false
+  }
+
+  /** Overlay progression rule + speed_endurance_config onto template workout_speed_sets row. */
+  private static mergeSpeedSetRowWithRule(row: any, rule: ProgramProgressionRule): any {
+    const cfg =
+      rule.speed_endurance_config && typeof rule.speed_endurance_config === 'object'
+        ? (rule.speed_endurance_config as Record<string, unknown>)
+        : {}
+    const intervals =
+      rule.sets != null && rule.sets !== undefined
+        ? rule.sets
+        : (cfg.intervals as number | undefined) ?? row?.intervals
+    const rest =
+      rule.rest_seconds != null && rule.rest_seconds !== undefined
+        ? rule.rest_seconds
+        : (cfg.rest_seconds as number | undefined) ?? row?.rest_seconds
+    const cfgLoad = cfg.load_pct_bw ?? cfg.load_percent_bw
+    const cfgTargetSp = cfg.target_speed_pct ?? cfg.max_speed_percent
+    const cfgTargetHr = cfg.target_hr_pct ?? cfg.max_hr_percent
+    return {
+      ...row,
+      intervals,
+      rest_seconds: rest,
+      distance_meters: (cfg.distance_meters as number | undefined) ?? row?.distance_meters,
+      load_pct_bw:
+        (cfgLoad as number | null | undefined) ??
+        row?.load_pct_bw ??
+        row?.load_percent_bw ??
+        null,
+      target_speed_pct:
+        (cfgTargetSp as number | null | undefined) ??
+        row?.target_speed_pct ??
+        row?.max_speed_percent ??
+        null,
+      target_hr_pct:
+        (cfgTargetHr as number | null | undefined) ??
+        row?.target_hr_pct ??
+        row?.max_hr_percent ??
+        null,
+      notes: rule.notes ?? (cfg.notes as string | undefined) ?? row?.notes ?? null,
+    }
+  }
+
+  private static mergeEnduranceRowWithRule(row: any, rule: ProgramProgressionRule): any {
+    const cfg =
+      rule.speed_endurance_config && typeof rule.speed_endurance_config === 'object'
+        ? (rule.speed_endurance_config as Record<string, unknown>)
+        : {}
+    return {
+      ...row,
+      target_distance_meters:
+        (cfg.target_distance_meters as number | undefined) ?? row?.target_distance_meters,
+      target_time_seconds:
+        (cfg.target_time_seconds as number | null | undefined) ?? row?.target_time_seconds ?? null,
+      target_pace_seconds_per_km:
+        (cfg.target_pace_seconds_per_km as number | null | undefined) ??
+        row?.target_pace_seconds_per_km ??
+        null,
+      hr_zone: (cfg.hr_zone as number | null | undefined) ?? row?.hr_zone ?? null,
+      target_hr_pct:
+        (cfg.target_hr_pct as number | null | undefined) ??
+        (cfg.hr_percentage as number | null | undefined) ??
+        row?.target_hr_pct ??
+        row?.hr_percentage ??
+        null,
+      notes: rule.notes ?? (cfg.notes as string | undefined) ?? row?.notes ?? null,
+    }
+  }
+
+  private static mergeHrRowWithRule(row: any, rule: ProgramProgressionRule): any {
+    return {
+      ...row,
+      hr_zone: rule.hr_zone ?? row?.hr_zone,
+      hr_percentage_min: rule.hr_percentage_min ?? row?.hr_percentage_min,
+      hr_percentage_max: rule.hr_percentage_max ?? row?.hr_percentage_max,
+      duration_seconds: rule.hr_duration_seconds ?? row?.duration_seconds,
+      work_duration_seconds: rule.hr_work_duration_seconds ?? row?.work_duration_seconds,
+      rest_duration_seconds: rule.hr_rest_duration_seconds ?? row?.rest_duration_seconds,
+      target_rounds: rule.hr_target_rounds ?? row?.target_rounds,
+      distance_meters: rule.hr_distance_meters ?? row?.distance_meters,
+    }
+  }
+
+  private static syntheticSpeedSetFromRule(rule: ProgramProgressionRule): any {
+    const cfg = (rule.speed_endurance_config || {}) as Record<string, unknown>
+    return {
+      id: `synthetic-speed-${rule.set_entry_id}-${rule.exercise_order}`,
+      set_entry_id: rule.set_entry_id,
+      exercise_id: rule.exercise_id,
+      exercise_order: rule.exercise_order,
+      intervals: rule.sets ?? (cfg.intervals as number | undefined) ?? 1,
+      distance_meters: (cfg.distance_meters as number | undefined) ?? 0,
+      load_pct_bw:
+        (cfg.load_pct_bw as number | null | undefined) ??
+        (cfg.load_percent_bw as number | null | undefined) ??
+        null,
+      target_speed_pct:
+        (cfg.target_speed_pct as number | null | undefined) ??
+        (cfg.max_speed_percent as number | null | undefined) ??
+        null,
+      target_hr_pct:
+        (cfg.target_hr_pct as number | null | undefined) ??
+        (cfg.max_hr_percent as number | null | undefined) ??
+        null,
+      rest_seconds: rule.rest_seconds ?? (cfg.rest_seconds as number | undefined) ?? 120,
+      notes: rule.notes ?? (cfg.notes as string | undefined) ?? null,
+    }
+  }
+
+  private static syntheticEnduranceSetFromRule(rule: ProgramProgressionRule): any {
+    const cfg = (rule.speed_endurance_config || {}) as Record<string, unknown>
+    return {
+      id: `synthetic-endurance-${rule.set_entry_id}-${rule.exercise_order}`,
+      set_entry_id: rule.set_entry_id,
+      exercise_id: rule.exercise_id,
+      exercise_order: rule.exercise_order,
+      target_distance_meters: (cfg.target_distance_meters as number | undefined) ?? 0,
+      target_time_seconds: (cfg.target_time_seconds as number | null | undefined) ?? null,
+      target_pace_seconds_per_km: (cfg.target_pace_seconds_per_km as number | null | undefined) ?? null,
+      hr_zone: (cfg.hr_zone as number | null | undefined) ?? null,
+      target_hr_pct:
+        (cfg.target_hr_pct as number | null | undefined) ??
+        (cfg.hr_percentage as number | null | undefined) ??
+        null,
+      notes: rule.notes ?? (cfg.notes as string | undefined) ?? null,
+    }
+  }
+
+  /**
    * Convert client_program_progression_rules back to WorkoutSetEntry[] format
    * Groups rules by set_order to recreate set entries
    */
@@ -465,6 +607,9 @@ export class ProgramProgressionService {
     const dropSetBlockIds: string[] = []
     const clusterSetBlockIds: string[] = []
     const restPauseBlockIds: string[] = []
+    const hrSetBlockIds: string[] = []
+    const speedSetBlockIds: string[] = []
+    const enduranceSetBlockIds: string[] = []
     
     for (const [_, blockRules] of blocksMap.entries()) {
       if (blockRules.length > 0) {
@@ -482,6 +627,15 @@ export class ProgramProgressionService {
           if (firstRule.set_type === 'rest_pause') {
             restPauseBlockIds.push(firstRule.set_entry_id)
           }
+          if (firstRule.set_type === 'hr_sets') {
+            hrSetBlockIds.push(firstRule.set_entry_id)
+          }
+          if (firstRule.set_type === 'speed_work') {
+            speedSetBlockIds.push(firstRule.set_entry_id)
+          }
+          if (firstRule.set_type === 'endurance') {
+            enduranceSetBlockIds.push(firstRule.set_entry_id)
+          }
         }
       }
     }
@@ -492,6 +646,9 @@ export class ProgramProgressionService {
     const dropSetsByBlock = new Map<string, any[]>()
     const clusterSetsByBlock = new Map<string, any[]>()
     const restPauseSetsByBlock = new Map<string, any[]>()
+    const hrSetsByBlock = new Map<string, any[]>()
+    const speedSetsByBlock = new Map<string, any[]>()
+    const enduranceSetsByBlock = new Map<string, any[]>()
 
     // Helper to safely execute query with timeout protection
     const safeQuery = async (queryBuilder: any, fallback: any[] = []) => {
@@ -576,6 +733,60 @@ export class ProgramProgressionService {
       )
     }
 
+    if (hrSetBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase
+            .from('workout_hr_sets')
+            .select(
+              'id, set_entry_id, exercise_id, exercise_order, hr_zone, hr_percentage_min, hr_percentage_max, is_intervals, duration_seconds, work_duration_seconds, rest_duration_seconds, target_rounds, distance_meters'
+            )
+            .in('set_entry_id', hrSetBlockIds)
+        ).then(data => {
+          data.forEach((hr: any) => {
+            if (!hrSetsByBlock.has(hr.set_entry_id)) hrSetsByBlock.set(hr.set_entry_id, [])
+            hrSetsByBlock.get(hr.set_entry_id)!.push(hr)
+          })
+        })
+      )
+    }
+
+    if (speedSetBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase
+            .from('workout_speed_sets')
+            .select(
+              'id, set_entry_id, exercise_id, exercise_order, intervals, distance_meters, load_pct_bw, target_speed_pct, target_hr_pct, rest_seconds, notes'
+            )
+            .in('set_entry_id', speedSetBlockIds)
+        ).then(data => {
+          data.forEach((sp: any) => {
+            if (!speedSetsByBlock.has(sp.set_entry_id)) speedSetsByBlock.set(sp.set_entry_id, [])
+            speedSetsByBlock.get(sp.set_entry_id)!.push(sp)
+          })
+        })
+      )
+    }
+
+    if (enduranceSetBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase
+            .from('workout_endurance_sets')
+            .select(
+              'id, set_entry_id, exercise_id, exercise_order, target_distance_meters, target_time_seconds, target_pace_seconds_per_km, hr_zone, target_hr_pct, notes'
+            )
+            .in('set_entry_id', enduranceSetBlockIds)
+        ).then(data => {
+          data.forEach((en: any) => {
+            if (!enduranceSetsByBlock.has(en.set_entry_id)) enduranceSetsByBlock.set(en.set_entry_id, [])
+            enduranceSetsByBlock.get(en.set_entry_id)!.push(en)
+          })
+        })
+      )
+    }
+
     // Execute all queries in parallel
     await Promise.all(queryPromises)
 
@@ -613,6 +824,15 @@ export class ProgramProgressionService {
       const blockRestPauseSets = firstRule.set_entry_id
         ? restPauseSetsByBlock.get(firstRule.set_entry_id) || []
         : []
+      const blockHrSets = firstRule.set_entry_id
+        ? hrSetsByBlock.get(firstRule.set_entry_id) || []
+        : []
+      const blockSpeedSets = firstRule.set_entry_id
+        ? speedSetsByBlock.get(firstRule.set_entry_id) || []
+        : []
+      const blockEnduranceSets = firstRule.set_entry_id
+        ? enduranceSetsByBlock.get(firstRule.set_entry_id) || []
+        : []
 
       // Convert rules to WorkoutBlockExercise[]
       const blockExercises: WorkoutBlockExercise[] = blockRules
@@ -622,18 +842,51 @@ export class ProgramProgressionService {
           const exercise = resolvedExerciseId ? exerciseMap.get(resolvedExerciseId) : undefined
           
           // Get special table data for this specific exercise
-          const exerciseTimeProtocols = blockTimeProtocols.filter(
-            (tp: any) => tp.exercise_id === rule.exercise_id && tp.exercise_order === rule.exercise_order
+          const exerciseTimeProtocols = blockTimeProtocols.filter((tp: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(tp, rule)
           )
-          const exerciseDropSets = blockDropSets.filter(
-            (ds: any) => ds.exercise_id === rule.exercise_id && ds.exercise_order === rule.exercise_order
+          const exerciseDropSets = blockDropSets.filter((ds: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(ds, rule)
           )
-          const exerciseClusterSets = blockClusterSets.filter(
-            (cs: any) => cs.exercise_id === rule.exercise_id && cs.exercise_order === rule.exercise_order
+          const exerciseClusterSets = blockClusterSets.filter((cs: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(cs, rule)
           )
-          const exerciseRestPauseSets = blockRestPauseSets.filter(
-            (rp: any) => rp.exercise_id === rule.exercise_id && rp.exercise_order === rule.exercise_order
+          const exerciseRestPauseSets = blockRestPauseSets.filter((rp: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(rp, rule)
           )
+
+          const matchedHr = blockHrSets.filter((hr: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(hr, rule)
+          )
+          let exerciseHrSets = matchedHr.map((row: any) =>
+            ProgramProgressionService.mergeHrRowWithRule(row, rule)
+          )
+
+          const matchedSpeed = blockSpeedSets.filter((sp: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(sp, rule)
+          )
+          let exerciseSpeedSets = matchedSpeed.map((row: any) =>
+            ProgramProgressionService.mergeSpeedSetRowWithRule(row, rule)
+          )
+          if (
+            exerciseSpeedSets.length === 0 &&
+            String(firstRule.set_type).toLowerCase() === 'speed_work'
+          ) {
+            exerciseSpeedSets = [ProgramProgressionService.syntheticSpeedSetFromRule(rule)]
+          }
+
+          const matchedEndurance = blockEnduranceSets.filter((en: any) =>
+            ProgramProgressionService.specialTableRowMatchesProgressionRule(en, rule)
+          )
+          let exerciseEnduranceSets = matchedEndurance.map((row: any) =>
+            ProgramProgressionService.mergeEnduranceRowWithRule(row, rule)
+          )
+          if (
+            exerciseEnduranceSets.length === 0 &&
+            String(firstRule.set_type).toLowerCase() === 'endurance'
+          ) {
+            exerciseEnduranceSets = [ProgramProgressionService.syntheticEnduranceSetFromRule(rule)]
+          }
           
           const exerciseData = {
             id: rule.id || '',
@@ -653,6 +906,9 @@ export class ProgramProgressionService {
             drop_sets: exerciseDropSets,
             cluster_sets: exerciseClusterSets,
             rest_pause_sets: exerciseRestPauseSets,
+            hr_sets: exerciseHrSets,
+            speed_sets: exerciseSpeedSets,
+            endurance_sets: exerciseEnduranceSets,
             exercise: exercise ? {
               id: exercise.id,
               name: exercise.name,
@@ -668,6 +924,16 @@ export class ProgramProgressionService {
         ? blockMetaById?.get(firstRule.set_entry_id)
         : undefined
 
+      let resolvedTotalSets = blockMeta?.total_sets ?? undefined
+      if (String(firstRule.set_type).toLowerCase() === 'speed_work') {
+        const firstSpeed = (blockExercises[0] as any)?.speed_sets?.[0]
+        if (firstSpeed && typeof firstSpeed.intervals === 'number') {
+          resolvedTotalSets = firstSpeed.intervals
+        }
+      } else if (String(firstRule.set_type).toLowerCase() === 'endurance') {
+        resolvedTotalSets = 1
+      }
+
       // Create WorkoutSetEntry
       const block: WorkoutBlock = {
         id: firstRule.set_entry_id || `block-${blockOrder}`,
@@ -678,7 +944,7 @@ export class ProgramProgressionService {
         set_notes: blockMeta?.set_notes || undefined, // Notes are stored per-exercise in progression rules
         rest_seconds:
           blockMeta?.rest_seconds ?? blockRules[0]?.rest_seconds ?? undefined,
-        total_sets: blockMeta?.total_sets ?? undefined,
+        total_sets: resolvedTotalSets,
         reps_per_set: blockMeta?.reps_per_set ?? undefined,
         duration_seconds:
           blockMeta?.duration_seconds ??
@@ -688,6 +954,9 @@ export class ProgramProgressionService {
         drop_sets: blockDropSets,
         cluster_sets: blockClusterSets,
         rest_pause_sets: blockRestPauseSets,
+        hr_sets: blockExercises.flatMap((ex) => (ex as any).hr_sets ?? []),
+        speed_sets: blockExercises.flatMap((ex) => (ex as any).speed_sets ?? []),
+        endurance_sets: blockExercises.flatMap((ex) => (ex as any).endurance_sets ?? []),
         exercises: blockExercises.map(ex => ({
           ...ex,
           set_entry_id: firstRule.set_entry_id || `block-${blockOrder}`,
@@ -1096,6 +1365,88 @@ export class ProgramProgressionService {
           }
         }
         break
+
+      case 'hr_sets':
+        for (const exercise of block.exercises) {
+          const hr = (exercise as any).hr_sets?.[0]
+          rules.push({
+            ...baseRule,
+            exercise_id: exercise.exercise_id,
+            exercise_order: exercise.exercise_order,
+            hr_zone: hr?.hr_zone ?? undefined,
+            hr_percentage_min: hr?.hr_percentage_min ?? undefined,
+            hr_percentage_max: hr?.hr_percentage_max ?? undefined,
+            hr_duration_seconds: hr?.duration_seconds ?? undefined,
+            hr_work_duration_seconds: hr?.work_duration_seconds ?? undefined,
+            hr_rest_duration_seconds: hr?.rest_duration_seconds ?? undefined,
+            hr_target_rounds: hr?.target_rounds ?? undefined,
+            hr_distance_meters: hr?.distance_meters ?? undefined,
+            notes: exercise.notes || undefined,
+          })
+        }
+        break
+
+      case 'speed_work':
+        for (const exercise of block.exercises) {
+          const sp = (exercise as any).speed_sets?.[0]
+          rules.push({
+            ...baseRule,
+            exercise_id: exercise.exercise_id,
+            exercise_order: exercise.exercise_order,
+            sets: sp?.intervals ?? block.total_sets ?? undefined,
+            rest_seconds: sp?.rest_seconds ?? block.rest_seconds ?? undefined,
+            speed_endurance_config: {
+              kind: 'speed_work',
+              progression_order: ['intervals', 'intensity', 'distance', 'rest', 'load'],
+              progression_stage: 0,
+              intervals: sp?.intervals,
+              distance_meters: sp?.distance_meters ?? null,
+              load_pct_bw: sp?.load_pct_bw ?? (sp as any)?.load_percent_bw ?? null,
+              target_speed_pct: sp?.target_speed_pct ?? (sp as any)?.max_speed_percent ?? null,
+              target_hr_pct: sp?.target_hr_pct ?? (sp as any)?.max_hr_percent ?? null,
+              rest_seconds: sp?.rest_seconds ?? block.rest_seconds ?? null,
+              increment_intervals: 1,
+              min_intervals: 1,
+              max_intervals: 20,
+              increment_speed_percent: 2,
+              increment_distance_meters: 5,
+              decrement_rest_seconds: 10,
+              min_rest_seconds: 60,
+              increment_load_bw: 2,
+              max_load_bw: 40,
+              frequency: 'weekly',
+            },
+            notes: sp?.notes || exercise.notes || undefined,
+          })
+        }
+        break
+
+      case 'endurance':
+        for (const exercise of block.exercises) {
+          const en = (exercise as any).endurance_sets?.[0]
+          rules.push({
+            ...baseRule,
+            exercise_id: exercise.exercise_id,
+            exercise_order: exercise.exercise_order,
+            sets: 1,
+            speed_endurance_config: {
+              kind: 'endurance',
+              progression_order: ['distance', 'pace', 'time'],
+              progression_stage: 0,
+              target_distance_meters: en?.target_distance_meters ?? null,
+              target_time_seconds: en?.target_time_seconds ?? null,
+              target_pace_seconds_per_km: en?.target_pace_seconds_per_km ?? null,
+              hr_zone: en?.hr_zone ?? null,
+              target_hr_pct: en?.target_hr_pct ?? (en as any)?.hr_percentage ?? null,
+              increment_distance_percent: 10,
+              decrement_pace_seconds_per_week: 5,
+              increment_time_seconds_per_week: 30,
+              frequency: 'weekly',
+            },
+            notes: en?.notes || exercise.notes || undefined,
+          })
+        }
+        break
       
       default:
         // Generic fallback for any unknown types
@@ -1398,7 +1749,7 @@ export class ProgramProgressionService {
         'sets', 'rest_seconds', 'rir', 'exercise_order', 'set_order', 'week_number',
         'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
         'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 'work_seconds',
-        'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 'pyramid_order', 'ladder_order',
+        'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise',
         'rest_between_pairs'
       ]
       const stringRepsFields = ['reps', 'first_exercise_reps', 'second_exercise_reps', 'exercise_reps', 'drop_set_reps', 'isolation_reps', 'compound_reps']
@@ -1536,8 +1887,6 @@ export class ProgramProgressionService {
       notes: rule.notes ?? null,
       weight_kg: rule.weight_kg ?? null,
       load_percentage: rule.load_percentage ?? null,
-      pyramid_order: rule.pyramid_order ?? null,
-      ladder_order: rule.ladder_order ?? null,
       override_exercise_id: null,
     })
 

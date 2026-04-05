@@ -313,7 +313,16 @@ export class WorkoutTemplateService {
 
         const blockType = block.set_type
         // Categorize set entries by which table they use for exercises
-        if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+        if (
+          [
+            'straight_set',
+            'superset',
+            'giant_set',
+            'pre_exhaustion',
+            'speed_work',
+            'endurance',
+          ].includes(blockType)
+        ) {
           blockIdsByType.usesBlockExercises.push(block.id)
         } else if (blockType === 'drop_set') {
           blockIdsByType.usesDropSets.push(block.id)
@@ -483,6 +492,56 @@ export class WorkoutTemplateService {
         }
       }
 
+      const speedBlockIds = (blocks || [])
+        .filter((b: any) => b.set_type === 'speed_work')
+        .map((b: any) => b.id)
+      const enduranceBlockIds = (blocks || [])
+        .filter((b: any) => b.set_type === 'endurance')
+        .map((b: any) => b.id)
+      const speedEnduranceBlockIds = [...speedBlockIds, ...enduranceBlockIds]
+      if (speedEnduranceBlockIds.length > 0) {
+        const [speedRows, enduranceRows, wseeSeRows] = await Promise.all([
+          speedBlockIds.length > 0
+            ? safeQueryForCount<any[]>(
+                supabase
+                  .from('workout_speed_sets')
+                  .select('set_entry_id')
+                  .in('set_entry_id', speedBlockIds),
+              )
+            : Promise.resolve([]),
+          enduranceBlockIds.length > 0
+            ? safeQueryForCount<any[]>(
+                supabase
+                  .from('workout_endurance_sets')
+                  .select('set_entry_id')
+                  .in('set_entry_id', enduranceBlockIds),
+              )
+            : Promise.resolve([]),
+          safeQueryForCount<any[]>(
+            supabase
+              .from('workout_set_entry_exercises')
+              .select('set_entry_id')
+              .in('set_entry_id', speedEnduranceBlockIds),
+          ),
+        ])
+        const wseeByBlock = new Set<string>()
+        ;(wseeSeRows || []).forEach((row: any) => {
+          if (row.set_entry_id) wseeByBlock.add(row.set_entry_id)
+        })
+        ;(speedRows || []).forEach((row: any) => {
+          const sid = row.set_entry_id
+          if (!sid || wseeByBlock.has(sid)) return
+          const templateId = blockToTemplate.get(sid)
+          if (templateId) counts[templateId] = (counts[templateId] || 0) + 1
+        })
+        ;(enduranceRows || []).forEach((row: any) => {
+          const sid = row.set_entry_id
+          if (!sid || wseeByBlock.has(sid)) return
+          const templateId = blockToTemplate.get(sid)
+          if (templateId) counts[templateId] = (counts[templateId] || 0) + 1
+        })
+      }
+
       return templates.map((template: any) => ({
         ...template,
         exercise_count: counts[template.id] || 0,
@@ -577,7 +636,16 @@ export class WorkoutTemplateService {
 
       blocks.forEach((block: any) => {
         const blockType = block.set_type
-        if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+        if (
+          [
+            'straight_set',
+            'superset',
+            'giant_set',
+            'pre_exhaustion',
+            'speed_work',
+            'endurance',
+          ].includes(blockType)
+        ) {
           blockIdsByType.usesBlockExercises.push(block.id)
         } else if (blockType === 'drop_set') {
           blockIdsByType.usesDropSets.push(block.id)
@@ -676,7 +744,55 @@ export class WorkoutTemplateService {
 
       // Wait for all counts and sum them
       const counts = await Promise.all(countPromises)
-      return counts.reduce((sum, count) => sum + count, 0)
+      let total = counts.reduce((sum, count) => sum + count, 0)
+
+      const speedBlockIds = blocks
+        .filter((b: any) => b.set_type === 'speed_work')
+        .map((b: any) => b.id)
+      const enduranceBlockIds = blocks
+        .filter((b: any) => b.set_type === 'endurance')
+        .map((b: any) => b.id)
+      const speedEnduranceBlockIds = [...speedBlockIds, ...enduranceBlockIds]
+      if (speedEnduranceBlockIds.length > 0) {
+        const [speedRows, enduranceRows, wseeSeRows] = await Promise.all([
+          speedBlockIds.length > 0
+            ? this.safeQueryWithTimeout<any[]>(
+                supabase
+                  .from('workout_speed_sets')
+                  .select('set_entry_id')
+                  .in('set_entry_id', speedBlockIds),
+              )
+            : Promise.resolve([]),
+          enduranceBlockIds.length > 0
+            ? this.safeQueryWithTimeout<any[]>(
+                supabase
+                  .from('workout_endurance_sets')
+                  .select('set_entry_id')
+                  .in('set_entry_id', enduranceBlockIds),
+              )
+            : Promise.resolve([]),
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_set_entry_exercises')
+              .select('set_entry_id')
+              .in('set_entry_id', speedEnduranceBlockIds),
+          ),
+        ])
+        const wseeByBlock = new Set<string>()
+        ;(wseeSeRows || []).forEach((row: any) => {
+          if (row.set_entry_id) wseeByBlock.add(row.set_entry_id)
+        })
+        ;(speedRows || []).forEach((row: any) => {
+          const sid = row.set_entry_id
+          if (sid && !wseeByBlock.has(sid)) total += 1
+        })
+        ;(enduranceRows || []).forEach((row: any) => {
+          const sid = row.set_entry_id
+          if (sid && !wseeByBlock.has(sid)) total += 1
+        })
+      }
+
+      return total
     } catch (error) {
       console.error('Error counting exercises for template:', error)
       return 0

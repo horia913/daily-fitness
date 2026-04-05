@@ -21,8 +21,7 @@ export function getCategoryAccent(category: string): {
     };
   if (
     cat.includes("conditioning") ||
-    cat.includes("hiit") ||
-    cat.includes("circuit")
+    cat.includes("hiit")
   )
     return {
       border: "border-l-amber-500",
