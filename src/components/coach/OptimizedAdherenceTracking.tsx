@@ -351,7 +351,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-3 sm:p-6">
+              <div className="fc-card-shell p-3 sm:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-3 sm:mb-4"></div>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -393,7 +393,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           </div>
 
           <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
                   <div className="flex items-start gap-2 sm:gap-4 min-w-0 flex-1">
@@ -436,7 +436,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
 
                 {/* Overall Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -450,7 +450,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -464,7 +464,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -478,7 +478,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -503,7 +503,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
       <div className="p-2 sm:p-6 max-w-full overflow-x-hidden pt-0 sm:pt-6 min-w-0">
         <div className="max-w-7xl mx-auto space-y-3 sm:space-y-8">
           {/* Filters */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardContent className="p-3 sm:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1fr] gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 min-w-0">
@@ -569,7 +569,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           {/* Client Adherence Cards */}
           <div className="space-y-3 sm:space-y-6">
             {filteredClients.map(client => (
-              <Card key={client.clientId} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:shadow-lg transition-all duration-300">
+              <Card key={client.clientId} className="fc-card-shell hover:shadow-lg transition-all duration-300">
                 <CardHeader className="p-3 sm:p-6 pb-2">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 overflow-hidden">
@@ -755,7 +755,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           </div>
 
           {filteredClients.length === 0 && (
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="text-center py-12 px-4 sm:px-6">
                 <Users className="w-12 h-12 mx-auto mb-4 text-[color:var(--fc-text-dim)]" />
                 <h3 className="text-lg font-semibold mb-2 text-[color:var(--fc-text-primary)]">

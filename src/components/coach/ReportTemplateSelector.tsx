@@ -105,7 +105,7 @@ export default function ReportTemplateSelector({
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+    <div className="fc-card-shell">
       <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

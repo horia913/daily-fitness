@@ -328,7 +328,7 @@ function CategoriesHubContent() {
                   return (
                     <div
                       key={category.id}
-                      className="group fc-surface rounded-2xl p-6 overflow-hidden transition-all duration-300"
+                      className="group fc-card-shell p-6 overflow-hidden transition-all duration-300"
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "scale(1.02)";
                         e.currentTarget.style.boxShadow = isDark

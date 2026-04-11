@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { ClientPageShell } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
@@ -19,7 +20,6 @@ import {
   ChevronRight,
   AlertCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { normalizeSetType } from "@/lib/setTypeUtils";
 import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
@@ -122,7 +122,6 @@ interface BlockGroup {
 
 export default function WorkoutLogDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const workoutLogId = useMemo(() => String(params?.id || ""), [params?.id]);
@@ -947,14 +946,18 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-                <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-11 px-6 text-sm">Retry</button>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="fc-btn fc-btn-secondary fc-press h-10 px-4 text-sm"
+              >
+                Retry
+              </button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -965,17 +968,13 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-8 w-3/5 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-64 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-5 w-36 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-7 w-4/5 max-w-xs rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-48 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -986,21 +985,19 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-12">
-                <div className="text-center">
-                  <p className="text-sm fc-text-dim">Workout log not found</p>
-                  <Button
-                    onClick={() => router.push("/client/progress/workout-logs")}
-                    className="fc-btn fc-btn-secondary mt-4"
-                  >
-                    Back to Logs
-                  </Button>
-                </div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="text-center py-8">
+              <p className="text-sm fc-text-dim">Workout log not found</p>
+              <Button
+                onClick={() => {
+                  window.location.href = "/client/progress/workout-logs";
+                }}
+                className="fc-btn fc-btn-secondary mt-3 h-10 text-sm"
+              >
+                Back to Logs
+              </Button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -1035,27 +1032,26 @@ export default function WorkoutLogDetailPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen px-4 pb-36 pt-8 sm:px-6 lg:px-10 fc-page">
-          <div className="mx-auto w-full max-w-3xl space-y-6">
-            {/* Top bar */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6">
-              <div className="flex items-center justify-between gap-4">
-                <Link
-                  href="/client/progress/workout-logs"
-                  className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]"
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-36 pt-6 space-y-4">
+            {/* Top bar + session meta */}
+            <div className="fc-card-shell p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/progress/workout-logs";
+                  }}
+                  className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
                   aria-label="Back to logs"
                 >
                   <ChevronLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div className="flex items-center gap-3 flex-1 min-w-0 justify-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                    <FileText className="w-5 h-5" />
-                  </div>
+                </button>
+                <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
                   <div className="text-center min-w-0">
-                    <h1 className="text-sm font-bold uppercase tracking-[0.2em] text-[color:var(--fc-text-dim)]">
-                      Session Review
+                    <h1 className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--fc-text-dim)]">
+                      Session
                     </h1>
-                    <p className="text-lg font-bold font-mono text-[color:var(--fc-text-primary)]">
+                    <p className="text-sm font-bold font-mono text-[color:var(--fc-text-primary)] truncate">
                       {completedDate
                         ? completedDate.toLocaleDateString("en-US", {
                             month: "short",
@@ -1068,119 +1064,115 @@ export default function WorkoutLogDetailPage() {
                 </div>
                 <button
                   type="button"
-                  className="p-3 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors shrink-0"
+                  className="p-2 rounded-lg fc-glass border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors shrink-0"
                   aria-label="More options"
                 >
-                  <MoreHorizontal className="w-6 h-6 text-[color:var(--fc-text-primary)]" />
+                  <MoreHorizontal className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </button>
               </div>
             </div>
 
-            {/* Workout Hero */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-8">
+            {/* Workout summary */}
+            <div className="fc-card-shell p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  isAbandoned
-                    ? "text-[color:var(--fc-status-warning)] bg-[color:var(--fc-status-warning)]/10 border border-[color:var(--fc-status-warning)]/30"
-                    : "fc-status-success bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30"
-                }`}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    isAbandoned
+                      ? "text-[color:var(--fc-status-warning)] bg-[color:var(--fc-status-warning)]/10 border border-[color:var(--fc-status-warning)]/30"
+                      : "fc-status-success bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30"
+                  }`}
+                >
                   {isAbandoned ? "Incomplete" : "Completed"}
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight fc-text-primary mb-1">
+              <h2 className="text-xl font-bold tracking-tight fc-text-primary mb-1 leading-snug break-words">
                 {workoutName}
               </h2>
-              <p className="fc-text-dim flex items-center gap-2 text-sm mb-6">
-                <Clock className="w-4 h-4 fc-text-workouts" />
-                {completedDate
-                  ? completedDate.toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : "—"}
-                {durationM > 0 && ` · ${durationStr}`}
+              <p className="fc-text-dim flex flex-wrap items-center gap-1.5 text-xs mb-3">
+                <Clock className="w-3.5 h-3.5 fc-text-workouts shrink-0" />
+                <span>
+                  {completedDate
+                    ? completedDate.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "—"}
+                  {durationM > 0 && ` · ${durationStr}`}
+                </span>
               </p>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-[color:var(--fc-glass-border)]">
-                <div>
-                  <p className="text-xs fc-text-subtle uppercase font-bold tracking-widest mb-1">Sets</p>
-                  <p className="text-xl font-bold font-mono fc-text-primary">{totalStats.totalSets}</p>
-                </div>
-                <div>
-                  <p className="text-xs fc-text-subtle uppercase font-bold tracking-widest mb-1">Reps</p>
-                  <p className="text-xl font-bold font-mono fc-text-primary">{totalStats.totalReps}</p>
-                </div>
-                <div>
-                  <p className="text-xs fc-text-subtle uppercase font-bold tracking-widest mb-1">Volume</p>
-                  <p className="text-xl font-bold font-mono fc-text-primary">
+              {/* Inline stats */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs pt-3 border-t border-[color:var(--fc-glass-border)]">
+                <span className="fc-text-subtle">
+                  <span className="font-mono font-bold fc-text-primary tabular-nums">{totalStats.totalSets}</span> sets
+                </span>
+                <span className="fc-text-subtle">
+                  <span className="font-mono font-bold fc-text-primary tabular-nums">{totalStats.totalReps}</span> reps
+                </span>
+                <span className="fc-text-subtle">
+                  <span className="font-mono font-bold fc-text-primary tabular-nums">
                     {totalStats.totalWeight.toLocaleString()}
-                    <span className="text-sm ml-1 fc-text-dim">kg</span>
-                  </p>
-                </div>
+                  </span>{" "}
+                  kg vol
+                </span>
               </div>
 
-              {/* Difficulty rating */}
               {difficultyRating != null && difficultyRating > 0 && (
-                <div className="mt-6 pt-4 border-t border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs fc-text-subtle uppercase font-bold tracking-widest">Difficulty</span>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <span
-                          key={i}
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            i < difficultyRating
-                              ? "bg-[color:var(--fc-accent)]"
-                              : "bg-[color:var(--fc-glass-border)]"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm fc-text-dim">{difficultyRating}/5</span>
+                <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)] flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] fc-text-subtle uppercase font-bold tracking-widest">Difficulty</span>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`w-2 h-2 rounded-full ${
+                          i < difficultyRating
+                            ? "bg-[color:var(--fc-accent)]"
+                            : "bg-[color:var(--fc-glass-border)]"
+                        }`}
+                      />
+                    ))}
                   </div>
+                  <span className="text-xs fc-text-dim">{difficultyRating}/5</span>
                 </div>
               )}
 
-              {/* Workout notes */}
               {workoutNotes && (
-                <div className="mt-4 p-4 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)]">
-                  <p className="text-sm fc-text-primary italic leading-relaxed">
+                <div className="mt-3 p-3 rounded-lg bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)]">
+                  <p className="text-xs fc-text-primary italic leading-relaxed">
                     &ldquo;{workoutNotes}&rdquo;
                   </p>
                 </div>
               )}
             </div>
 
-            {/* PRs This Workout */}
             {personalRecords.length > 0 && (
-              <div className="fc-surface rounded-2xl border-l-[3px] border-l-[color:var(--fc-status-warning)] border border-[color:var(--fc-glass-border)] p-6">
-                <h3 className="flex items-center gap-2 text-base font-bold fc-text-primary mb-4">
-                  <Trophy className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
-                  PRs This Workout
+              <div className="fc-card-shell fc-card-shell--warning p-3 sm:p-4">
+                <h3 className="flex items-center gap-1.5 text-sm font-bold fc-text-primary mb-2">
+                  <Trophy className="w-4 h-4 text-[color:var(--fc-status-warning)] shrink-0" />
+                  PRs this session
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {personalRecords.map((pr: any) => {
                     const exerciseName = pr.exercises?.name || "Exercise";
                     const improvement = pr.previous_record_value
-                      ? (pr.record_value - pr.previous_record_value)
+                      ? pr.record_value - pr.previous_record_value
                       : null;
                     return (
                       <div
                         key={pr.id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)]"
+                        className="flex items-center justify-between gap-2 py-2 px-2 rounded-lg bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)]"
                       >
-                        <div>
-                          <p className="text-sm font-semibold fc-text-primary">{exerciseName}</p>
-                          <p className="text-xs fc-text-dim capitalize">{(pr.record_type || "").replace(/_/g, " ")}</p>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold fc-text-primary truncate">{exerciseName}</p>
+                          <p className="text-[10px] fc-text-dim capitalize">{(pr.record_type || "").replace(/_/g, " ")}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold font-mono fc-text-primary">
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold font-mono fc-text-primary tabular-nums">
                             {pr.record_value} {pr.record_unit || "kg"}
                           </p>
                           {improvement != null && improvement > 0 && (
-                            <p className="text-xs font-medium text-[color:var(--fc-status-success)]">
+                            <p className="text-[10px] font-medium text-[color:var(--fc-status-success)]">
                               +{improvement} {pr.record_unit || "kg"}
                             </p>
                           )}
@@ -1192,21 +1184,18 @@ export default function WorkoutLogDetailPage() {
               </div>
             )}
 
-            {/* Abandoned workout message */}
             {isAbandoned && hasNoSets && (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
-                <AlertCircle className="w-12 h-12 mx-auto mb-3 text-[color:var(--fc-text-subtle)]" />
-                <h3 className="text-lg font-bold fc-text-primary mb-2">Workout Not Completed</h3>
-                <p className="text-sm fc-text-dim">
-                  This workout was started but not completed. No sets were logged.
-                </p>
+              <div className="fc-card-shell p-4 text-center">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-[color:var(--fc-text-subtle)]" />
+                <h3 className="text-sm font-bold fc-text-primary mb-1">Workout not completed</h3>
+                <p className="text-xs fc-text-dim">Started but not finished — no sets logged.</p>
               </div>
             )}
 
             {/* Exercise Breakdown — all expanded, card-per-exercise with table layout */}
             {!(isAbandoned && hasNoSets) && (
-              <section className="space-y-4">
-                <h3 className="text-lg font-bold flex items-center gap-3 px-1 fc-text-primary">
+              <section className="space-y-3">
+                <h3 className="text-sm font-bold flex items-center gap-2 px-0.5 fc-text-primary">
                   Exercises
                   <span className="h-px flex-1 bg-[color:var(--fc-glass-border)]" />
                 </h3>
@@ -1234,7 +1223,7 @@ export default function WorkoutLogDetailPage() {
                   return (
                     <div
                       key={block.set_entry_id}
-                      className="fc-surface rounded-2xl border-l-[3px] border-l-[color:var(--fc-domain-workouts)] border border-[color:var(--fc-glass-border)] overflow-hidden"
+                      className="fc-card-shell overflow-hidden"
                     >
                       {/* Card header */}
                       <div className="p-5 pb-3">
@@ -1251,8 +1240,7 @@ export default function WorkoutLogDetailPage() {
                         </p>
                       </div>
 
-                      {/* Sets content */}
-                      <div className="px-5 pb-5">
+                      <div className="px-3 pb-3">
                         {block.sets.length === 0 ? (
                           renderTemplateExercises(block, block.exerciseNames)
                         ) : isMultiExerciseBlock ? (
@@ -1294,15 +1282,16 @@ export default function WorkoutLogDetailPage() {
                                   renderSetRow(set, block.set_type, block.exerciseNames, undefined, idx)
                                 )}
                                 {/* View progression link */}
-                                <Link
-                                  href={`/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`}
-                                  className="mt-3 flex items-center justify-between p-3 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)] group transition-colors hover:border-[color:var(--fc-accent)]/40"
+                                <button
+                                  type="button"
+                                  onClick={() => { window.location.href = `/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`; }}
+                                  className="mt-3 w-full text-left flex items-center justify-between p-3 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)] group transition-colors hover:border-[color:var(--fc-accent)]/40"
                                 >
                                   <span className="text-sm font-medium text-[color:var(--fc-accent)]">
                                     View progression for {exercise.exercise_name}
                                   </span>
                                   <ChevronRight className="w-4 h-4 text-[color:var(--fc-accent)] group-hover:translate-x-0.5 transition-transform" />
-                                </Link>
+                                </button>
                               </div>
                             ))}
                             {/* Orphan sets */}
@@ -1327,34 +1316,32 @@ export default function WorkoutLogDetailPage() {
               </section>
             )}
 
-            {/* Sticky footer */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 z-50 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm">
-              <div className="max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 z-50 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm">
+              <div className="max-w-lg mx-auto w-full grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Button
-                  onClick={() => router.push("/client/progress/workout-logs")}
-                  className="fc-btn rounded-2xl h-12 font-bold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0"
+                  onClick={() => { window.location.href = "/client/progress/workout-logs"; }}
+                  className="fc-btn rounded-xl h-10 text-sm font-semibold gap-1.5 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0"
                 >
-                  <Repeat2 className="w-5 h-5" />
+                  <Repeat2 className="w-4 h-4" />
                   Repeat
                 </Button>
                 <button
                   type="button"
-                  className="rounded-2xl h-12 fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center gap-2 font-bold fc-text-primary hover:fc-glass-soft"
+                  className="rounded-xl h-10 text-sm fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center gap-1.5 font-semibold fc-text-primary hover:fc-glass-soft"
                 >
-                  <Share2 className="w-5 h-5 fc-text-workouts" />
+                  <Share2 className="w-4 h-4 fc-text-workouts" />
                   Share
                 </button>
                 <button
                   type="button"
-                  className="rounded-2xl h-12 fc-glass border border-[color:var(--fc-glass-border)] hidden sm:flex items-center justify-center gap-2 font-bold fc-text-dim hover:fc-glass-soft col-span-2 sm:col-span-1"
+                  className="rounded-xl h-10 text-sm fc-glass border border-[color:var(--fc-glass-border)] hidden sm:flex items-center justify-center gap-1.5 font-semibold fc-text-dim hover:fc-glass-soft col-span-2 sm:col-span-1"
                 >
-                  <FileText className="w-5 h-5" />
-                  Export PDF
+                  <FileText className="w-4 h-4" />
+                  Export
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

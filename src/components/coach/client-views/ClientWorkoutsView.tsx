@@ -38,7 +38,7 @@ function sessionAdherenceTierClass(tier: AdherenceTier | null | undefined) {
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
 // workout_set_entry_exercises -> protocol tables (workout_time_protocols,
-// workout_cluster_sets, workout_rest_pause_sets, workout_drop_sets, workout_hr_sets)
+// workout_cluster_sets, workout_rest_pause_sets, workout_drop_sets, workout_speed_sets, workout_endurance_sets)
 interface ClientWorkoutsViewProps {
   clientId: string
 }
@@ -1002,7 +1002,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       </div>
 
       {activeProgramSummary && programHubHref ? (
-        <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] border-l-2 border-l-cyan-500 shadow-lg shadow-cyan-500/10 overflow-hidden">
+        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] border-l-2 border-l-cyan-500 shadow-lg shadow-cyan-500/10 overflow-hidden">
           <div className="p-4 sm:p-5 space-y-4 bg-gradient-to-br from-cyan-500/5 to-transparent">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0 space-y-2">
@@ -1136,7 +1136,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           </div>
         </div>
       ) : (
-        <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] p-8 sm:p-10 text-center space-y-6">
+        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] p-8 sm:p-10 text-center space-y-6">
           <div className="fc-icon-tile fc-icon-workouts mx-auto">
             <Target className="w-8 h-8" />
           </div>

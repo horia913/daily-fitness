@@ -117,7 +117,7 @@ export function LogActivityModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="fc-glass fc-card shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col overflow-hidden"
+        className="fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col overflow-hidden"
         style={{
           animation: "modalSlideIn 0.3s ease-out",
           maxWidth: "min(92vw, 28rem)",

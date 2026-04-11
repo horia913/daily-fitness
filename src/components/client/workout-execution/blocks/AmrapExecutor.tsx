@@ -3,28 +3,32 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  CheckCircle,
   Play,
   Pause,
   RotateCcw,
   MoreVertical,
   Pencil,
+  Clock,
+  Target,
+  Weight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
-  calculateSuggestedWeightUtil,
   formatTime,
 } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 
 export function AmrapExecutor({
   block,
@@ -48,6 +52,7 @@ export function AmrapExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
@@ -127,6 +132,7 @@ export function AmrapExecutor({
     ? timeProtocol.total_duration_minutes * 60
     : block.block.duration_seconds || 600;
   const targetReps = timeProtocol?.target_reps;
+  const targetRepsParsed = parseRepsTarget(targetReps);
 
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
@@ -165,10 +171,16 @@ export function AmrapExecutor({
     if (default_weight != null && default_weight > 0)
       setWeight(String(default_weight));
     else setWeight("");
+    setReps(
+      targetRepsParsed.numericDefault > 0
+        ? String(targetRepsParsed.numericDefault)
+        : "",
+    );
   }, [
     isViewingLoggedSet,
     isWeightPristine,
     default_weight,
+    targetRepsParsed.numericDefault,
     currentExerciseIndex,
     exerciseId,
   ]);
@@ -199,17 +211,23 @@ export function AmrapExecutor({
     };
   }, [isActive, timeRemaining, isPaused]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const durationMinutesDisplay = Math.floor(durationSeconds / 60);
+  const prescriptionItems: PrescriptionItem[] = [
     {
-      label: "DURATION",
-      value: `${Math.floor(durationSeconds / 60)} minutes`,
+      icon: Clock,
+      label: "Duration",
+      value: durationMinutesDisplay,
+      unit: "min",
     },
   ];
 
-  if (targetReps) {
-    blockDetails.push({
-      label: "TARGET REPS",
+  if (
+    targetReps != null &&
+    (typeof targetReps !== "string" || targetReps !== "")
+  ) {
+    prescriptionItems.push({
+      icon: Target,
+      label: "Target reps",
       value: targetReps,
     });
   }
@@ -221,7 +239,13 @@ export function AmrapExecutor({
       currentExercise.load_percentage,
       suggestedForDisplay,
     );
-    if (loadDisplay) blockDetails.push({ label: "LOAD", value: loadDisplay });
+    if (loadDisplay) {
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
+        value: loadDisplay,
+      });
+    }
   }
 
   const instructions =
@@ -652,6 +676,7 @@ export function AmrapExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
             {suggested_weight != null && suggested_weight > 0 && (
               <button
@@ -672,8 +697,12 @@ export function AmrapExecutor({
           </div>
           <LargeInput
             label="Total Reps"
+            hint={targetRepsParsed.displayHint ?? undefined}
             value={reps}
-            onChange={setReps}
+            onChange={(v) => {
+              setIsWeightPristine(false);
+              setReps(v);
+            }}
             placeholder="0"
             step="1"
             showStepper
@@ -709,7 +738,7 @@ export function AmrapExecutor({
   const hasExerciseId = !!currentExercise?.exercise_id;
 
   // Determine if button should be disabled
-  const isButtonDisabled = isLoggingSet || !isValidInput || !hasExerciseId;
+  const logReadyAmrap = isValidInput && hasExerciseId && !isLoggingSet;
 
   const isEditMode = !!editingSetId && !!editDraft;
   const logButton = (
@@ -739,15 +768,12 @@ export function AmrapExecutor({
           </Button>
         </div>
       ) : (
-        <Button
+        <LogSetButton
           onClick={handleLogSet}
-          disabled={isButtonDisabled}
-          variant="fc-primary"
-          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <CheckCircle className="w-5 h-5 mr-2" />
-          {isLoggingSet ? "Logging..." : "LOG SET"}
-        </Button>
+          ready={logReadyAmrap}
+          loading={isLoggingSet}
+          label="Log set"
+        />
       )}
     </div>
   );
@@ -774,16 +800,18 @@ export function AmrapExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={1}
       totalSets={1}
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle="LOG YOUR RESULT"
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}

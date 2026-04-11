@@ -12,7 +12,7 @@ export default function ClientMealsPage() {
 
   return (
     <div className="space-y-6">
-      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+      <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
             <Utensils className="w-6 h-6" />

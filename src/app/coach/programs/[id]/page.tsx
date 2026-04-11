@@ -388,7 +388,7 @@ function ProgramDetailsContent() {
 
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">Training Schedule</h2>
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-card-shell p-6">
             {/* Week selector */}
             <div className="flex items-center justify-between mb-4">
               <Button

@@ -247,7 +247,7 @@ export default function ProgramsDashboardContent() {
   if (!coachId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+        <div className="fc-card-shell p-6">
           <p className="text-[color:var(--fc-text-dim)]">
             Please sign in to view programs.
           </p>
@@ -421,7 +421,7 @@ export default function ProgramsDashboardContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-2xl w-full max-h-[90vh] overflow-hidden">
+          <div className="fc-card-shell max-w-2xl w-full max-h-[90vh] overflow-hidden">
             <div
               className="flex items-center justify-between p-6"
               style={{
@@ -618,7 +618,7 @@ export default function ProgramsDashboardContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-md w-full p-6">
+          <div className="fc-card-shell max-w-md w-full p-6">
             <h2 className="text-xl font-bold mb-2 fc-text-primary">
               Replace active program?
             </h2>
@@ -660,7 +660,7 @@ export default function ProgramsDashboardContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-md w-full p-6">
+          <div className="fc-card-shell max-w-md w-full p-6">
             <h2 className="text-xl font-bold mb-4 fc-text-primary">
               Delete Program?
             </h2>

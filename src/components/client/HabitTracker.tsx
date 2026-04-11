@@ -514,12 +514,12 @@ export default function HabitTracker() {
   }
 
   return (
-    <div className="fc-glass fc-card fc-accent-habits relative overflow-hidden">
+    <div className="fc-card-shell fc-accent-habits relative overflow-hidden">
 
       {/* Celebration overlay */}
       {showCelebration && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center fc-glass fc-card px-6 py-6">
+          <div className="text-center fc-card-shell px-6 py-6">
             <div className="p-4 fc-icon-tile fc-icon-habits mx-auto mb-4">
               <Trophy className="w-10 h-10 fc-text-habits animate-bounce" />
             </div>

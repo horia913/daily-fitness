@@ -2,11 +2,13 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CloudLightning, CheckCircle, Play } from "lucide-react";
+import { CloudLightning, Play, RotateCw, Zap, Timer } from "lucide-react";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
-import { TabataTimerModal } from "../ui/TabataTimerModal";
+import { BaseBlockExecutorProps } from "../types";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
+import { LogSetButton } from "../ui/LogSetButton";
+import { TabataTimerModal } from "../ui/TabataTimerModal";
 import { LoggedSet } from "@/types/workoutBlocks";
 export function TabataExecutor({
   block,
@@ -27,6 +29,8 @@ export function TabataExecutor({
   onVideoClick,
   onAlternativesClick,
   onRestTimerClick,
+  onWorkoutBack,
+  previousPerformanceMap,
 }: BaseBlockExecutorProps) {
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
   const [showTimerModal, setShowTimerModal] = useState(false);
@@ -104,12 +108,14 @@ export function TabataExecutor({
     (block.block.exercises?.[0]?.time_protocols?.[0]?.rounds) || 
     8;
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
-    {
-      label: "ROUNDS",
-      value: rounds,
-    },
+  const firstTabataEx = tabataSets[0]?.exercises?.[0];
+  const tabataWorkSec = firstTabataEx?.work_seconds ?? 20;
+  const tabataRestSec = firstTabataEx?.rest_after ?? 10;
+
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: RotateCw, label: "Rounds", value: rounds },
+    { icon: Zap, label: "Work", value: tabataWorkSec, unit: "s" },
+    { icon: Timer, label: "Rest", value: tabataRestSec, unit: "s" },
   ];
 
   const instructions =
@@ -156,7 +162,7 @@ export function TabataExecutor({
               <div className="space-y-2">
                 {set.exercises?.map((exercise: any, exIndex: number) => {
                   const exerciseMeta = block.block.exercises?.find(
-                    (ex) => ex.exercise_id === exercise.exercise_id
+                    (ex) => ex.exercise_id === exercise.exercise_id,
                   );
                   return (
                   <div
@@ -165,8 +171,20 @@ export function TabataExecutor({
                     style={{ background: "var(--fc-surface-card)" }}
                   >
                     <div className="flex flex-col gap-2">
-                      <div className="font-medium fc-text-primary">
-                        {exerciseLookup[exercise.exercise_id]?.name || "Exercise"}
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="min-w-0 flex-1 font-medium fc-text-primary">
+                          {exerciseLookup[exercise.exercise_id]?.name ||
+                            "Exercise"}
+                        </span>
+                        {exerciseMeta ? (
+                          <div className="shrink-0 pt-0.5">
+                            <ExerciseActionButtons
+                              exercise={exerciseMeta}
+                              onVideoClick={onVideoClick}
+                              onAlternativesClick={onAlternativesClick}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-4 text-sm fc-text-dim">
                         {exercise.work_seconds && (
@@ -179,13 +197,6 @@ export function TabataExecutor({
                           <span>Reps: {exercise.target_reps}</span>
                         )}
                       </div>
-                      {exerciseMeta && (
-                        <ExerciseActionButtons
-                          exercise={exerciseMeta}
-                          onVideoClick={onVideoClick}
-                          onAlternativesClick={onAlternativesClick}
-                        />
-                      )}
                     </div>
                   </div>
                 );
@@ -216,19 +227,11 @@ export function TabataExecutor({
 
   // Complete button (no set logging)
   const completeButton = (
-    <Button
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("TabataExecutor: Complete Block button clicked");
-        handleComplete();
-      }}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-    >
-      <CheckCircle className="w-5 h-5 mr-2" />
-      Complete Block
-    </Button>
+    <LogSetButton
+      onClick={handleComplete}
+      ready={tabataSets.length > 0}
+      label="Complete block"
+    />
   );
 
   return (
@@ -253,15 +256,18 @@ export function TabataExecutor({
           onVideoClick,
           onAlternativesClick,
           onRestTimerClick,
+          onWorkoutBack,
+          previousPerformanceMap,
         }}
         exerciseName={currentExercise?.exercise?.name || "Tabata"}
-        blockDetails={blockDetails}
+        prescriptionItems={prescriptionItems}
         instructions={instructions}
         currentSet={1}
         totalSets={rounds}
         progressLabel="Round"
         loggingInputs={loggingInputs}
         logButton={completeButton}
+        logSectionTitle="LOG BLOCK RESULT"
         showNavigation={true}
         currentExercise={currentExercise}
         showRestTimer={false}

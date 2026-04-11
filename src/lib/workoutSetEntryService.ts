@@ -8,7 +8,6 @@ import {
   WorkoutClusterSet,
   WorkoutRestPauseSet,
   WorkoutTimeProtocol,
-  WorkoutHRSet,
   WorkoutSpeedSet,
   WorkoutEnduranceSet,
   LiveWorkoutSetEntry,
@@ -94,7 +93,6 @@ export class WorkoutSetEntryService {
     const needsDropSets = setTypes.has('drop_set')
     const needsClusterSets = setTypes.has('cluster_set')
     const needsRestPause = setTypes.has('rest_pause')
-    const needsHRSets = setTypes.has('hr_sets')
     const needsSpeedSets = setTypes.has('speed_work')
     const needsEnduranceSets = setTypes.has('endurance')
 
@@ -112,9 +110,6 @@ export class WorkoutSetEntryService {
       : []
     const blockIdsForRestPause = needsRestPause
       ? blocks.filter((b: any) => b.set_type === 'rest_pause').map((b: any) => b.id)
-      : []
-    const blockIdsForHRSets = needsHRSets
-      ? blocks.filter((b: any) => b.set_type === 'hr_sets').map((b: any) => b.id)
       : []
     const blockIdsForSpeedSets = needsSpeedSets
       ? blocks.filter((b: any) => b.set_type === 'speed_work').map((b: any) => b.id)
@@ -220,13 +215,6 @@ export class WorkoutSetEntryService {
     const restPauseRes = !lite && needsRestPause
       ? await queryTableInChunks('workout_rest_pause_sets', 'id, set_entry_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage', blockIdsForRestPause)
       : { data: [], error: null }
-    const hrSetsRes = !lite && needsHRSets
-      ? await queryTableInChunks(
-          'workout_hr_sets',
-          'id, set_entry_id, exercise_id, exercise_order, hr_zone, hr_percentage_min, hr_percentage_max, is_intervals, duration_seconds, work_duration_seconds, rest_duration_seconds, target_rounds, distance_meters',
-          blockIdsForHRSets,
-        )
-      : { data: [], error: null }
     const speedSetsRes = !lite && needsSpeedSets
       ? await queryTableInChunks(
           'workout_speed_sets',
@@ -250,7 +238,6 @@ export class WorkoutSetEntryService {
       clusterRes.data,
       restPauseRes.data,
       timeProtocolsRes.data,
-      hrSetsRes.data,
       speedSetsRes.data,
       enduranceSetsRes.data,
     ])) {
@@ -334,7 +321,6 @@ export class WorkoutSetEntryService {
       const usesClusterSets = setType === 'cluster_set'
       const usesRestPause = setType === 'rest_pause'
       const usesTimeProtocols = ['amrap', 'emom', 'for_time', 'tabata'].includes(setType)
-      const usesHRSets = setType === 'hr_sets'
       const usesSpeedSets = setType === 'speed_work'
       const usesEnduranceSets = setType === 'endurance'
 
@@ -489,37 +475,6 @@ export class WorkoutSetEntryService {
             ...ex,
             exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
             time_protocols: [],
-          })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
-        } else {
-          block.exercises = []
-        }
-      } else if (usesHRSets) {
-        const hrSets = hrSetsRes.data?.filter((hr: any) => hr.set_entry_id === block.id) || []
-        const fromWseHr = exercisesByBlock.get(block.id) || []
-        if (hrSets.length > 0) {
-          block.exercises = hrSets.map((hr: any) => ({
-            id: hr.id,
-            set_entry_id: hr.set_entry_id,
-            exercise_id: hr.exercise_id,
-            exercise_order: hr.exercise_order,
-            exercise: exercisesMap.get(hr.exercise_id) || null,
-            hr_zone: hr.hr_zone,
-            hr_percentage_min: hr.hr_percentage_min,
-            hr_percentage_max: hr.hr_percentage_max,
-            hr_is_intervals: hr.is_intervals,
-            hr_duration_minutes: hr.duration_seconds ? Math.round(hr.duration_seconds / 60) : undefined,
-            hr_work_duration_minutes: hr.work_duration_seconds ? Math.round(hr.work_duration_seconds / 60) : undefined,
-            hr_rest_duration_minutes: hr.rest_duration_seconds ? Math.round(hr.rest_duration_seconds / 60) : undefined,
-            hr_target_rounds: hr.target_rounds,
-            hr_distance_meters: hr.distance_meters,
-            hr_sets: [hr]
-          })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-          block.hr_sets = hrSets.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
-        } else if (fromWseHr.length > 0) {
-          block.exercises = fromWseHr.map((ex: any) => ({
-            ...ex,
-            exercise: exercisesMap.get(ex.exercise_id) || ex.exercise || null,
-            hr_sets: [],
           })).sort((a: any, b: any) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0))
         } else {
           block.exercises = []
@@ -692,8 +647,7 @@ export class WorkoutSetEntryService {
       }
       n +=
         (b.cluster_sets?.length ?? 0) +
-        (b.rest_pause_sets?.length ?? 0) +
-        (b.hr_sets?.length ?? 0)
+        (b.rest_pause_sets?.length ?? 0)
     }
     return n
   }
@@ -1050,46 +1004,6 @@ export class WorkoutSetEntryService {
     }
   }
 
-  // Create HR set configuration (one per exercise)
-  static async createHRSet(
-    setEntryId: string,
-    exerciseId: string,
-    exerciseOrder: number,
-    hrSetData: Partial<WorkoutHRSet>
-  ): Promise<WorkoutHRSet | null> {
-    try {
-      const insertData: any = {
-        set_entry_id: setEntryId,
-        exercise_id: exerciseId,
-        exercise_order: exerciseOrder,
-        is_intervals: hrSetData.is_intervals ?? false,
-      }
-
-      if (hrSetData.hr_zone !== undefined) insertData.hr_zone = hrSetData.hr_zone
-      if (hrSetData.hr_percentage_min !== undefined) insertData.hr_percentage_min = hrSetData.hr_percentage_min
-      if (hrSetData.hr_percentage_max !== undefined) insertData.hr_percentage_max = hrSetData.hr_percentage_max
-      if (hrSetData.duration_seconds !== undefined) insertData.duration_seconds = hrSetData.duration_seconds
-      if (hrSetData.work_duration_seconds !== undefined) insertData.work_duration_seconds = hrSetData.work_duration_seconds
-      if (hrSetData.rest_duration_seconds !== undefined) insertData.rest_duration_seconds = hrSetData.rest_duration_seconds
-      if (hrSetData.target_rounds !== undefined) insertData.target_rounds = hrSetData.target_rounds
-      if (hrSetData.rounds_completed !== undefined) insertData.rounds_completed = hrSetData.rounds_completed
-      if (hrSetData.distance_meters !== undefined) insertData.distance_meters = hrSetData.distance_meters
-      if (hrSetData.average_hr_percentage !== undefined) insertData.average_hr_percentage = hrSetData.average_hr_percentage
-
-      const { data, error } = await supabase
-        .from('workout_hr_sets')
-        .insert(insertData)
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error creating HR set:', error)
-      return null
-    }
-  }
-
   static async createSpeedSet(
     setEntryId: string,
     exerciseId: string,
@@ -1219,8 +1133,6 @@ export class WorkoutSetEntryService {
         await safeDelete('workout_rest_pause_sets')
       } else if (['amrap', 'emom', 'for_time', 'tabata'].includes(setType)) {
         await safeDelete('workout_time_protocols')
-      } else if (setType === 'hr_sets') {
-        await safeDelete('workout_hr_sets')
       } else if (setType === 'speed_work') {
         await safeDelete('workout_speed_sets')
       } else if (setType === 'endurance') {
@@ -1235,7 +1147,6 @@ export class WorkoutSetEntryService {
       safeDelete('workout_cluster_sets'),
       safeDelete('workout_rest_pause_sets'),
       safeDelete('workout_time_protocols'),
-      safeDelete('workout_hr_sets'),
       safeDelete('workout_speed_sets'),
       safeDelete('workout_endurance_sets'),
     ])

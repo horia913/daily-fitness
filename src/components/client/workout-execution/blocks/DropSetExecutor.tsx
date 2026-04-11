@@ -9,15 +9,23 @@ import {
   MoreVertical,
   Pencil,
   Plus,
+  Target,
+  Repeat2,
+  Timer,
+  Weight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
   calculateSuggestedWeightUtil,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
@@ -51,6 +59,7 @@ export function DropSetExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestion,
@@ -119,14 +128,27 @@ export function DropSetExecutor({
   }, [loggedSetsList.length, viewingSetIndex]);
   useEffect(() => {
     if (viewingSetIndex >= 1 && loggedSetsList[viewingSetIndex - 1]) {
-      const s = loggedSetsList[viewingSetIndex - 1] as LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> };
+      const s = loggedSetsList[viewingSetIndex - 1] as LoggedSet & {
+        dropset_drops?: Array<{ weight: number; reps: number }>;
+      };
       const stored = s.dropset_drops;
       if (Array.isArray(stored) && stored.length >= 2) {
-        setDrops(stored.map((d) => ({ weight: String(d.weight), reps: String(d.reps) })));
+        setDrops(
+          stored.map((d) => ({
+            weight: String(d.weight),
+            reps: String(d.reps),
+          })),
+        );
       } else {
         setDrops([
-          { weight: String(s.weight_kg ?? ""), reps: String(s.reps_completed ?? "") },
-          { weight: String((s.weight_kg ?? 0) * 0.8), reps: String(s.reps_completed ?? "") },
+          {
+            weight: String(s.weight_kg ?? ""),
+            reps: String(s.reps_completed ?? ""),
+          },
+          {
+            weight: String((s.weight_kg ?? 0) * 0.8),
+            reps: String(s.reps_completed ?? ""),
+          },
         ]);
       }
     }
@@ -152,6 +174,7 @@ export function DropSetExecutor({
 
   const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
   const dropSetReps = exerciseReps;
+  const dropRepsParsed = parseRepsTarget(exerciseReps);
 
   useEffect(() => {
     setIsWeightPristine(true);
@@ -160,34 +183,42 @@ export function DropSetExecutor({
   useEffect(() => {
     if (viewingSetIndex >= 1) return;
     if (!isWeightPristine) return;
+    const repsPrefill =
+      dropRepsParsed.numericDefault > 0
+        ? String(dropRepsParsed.numericDefault)
+        : "";
     if (default_weight != null && default_weight > 0) {
       const dropWeightValue = default_weight * 0.8;
       setDrops([
-        { weight: String(default_weight), reps: "" },
-        { weight: String(Math.round(dropWeightValue * 2) / 2), reps: "" },
+        { weight: String(default_weight), reps: repsPrefill },
+        { weight: String(Math.round(dropWeightValue * 2) / 2), reps: repsPrefill },
       ]);
     } else {
-      setDrops([{ weight: "", reps: "" }, { weight: "", reps: "" }]);
+      setDrops([
+        { weight: "", reps: repsPrefill },
+        { weight: "", reps: repsPrefill },
+      ]);
     }
-  }, [viewingSetIndex, isWeightPristine, default_weight, completedSets, exerciseId]);
+  }, [
+    viewingSetIndex,
+    isWeightPristine,
+    default_weight,
+    dropRepsParsed.numericDefault,
+    completedSets,
+    exerciseId,
+  ]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const restSecDrop =
+    currentExercise?.rest_seconds ?? block.block.rest_seconds ?? 60;
+
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Sets", value: totalSets },
+    { icon: Repeat2, label: "Initial reps", value: exerciseReps || "—" },
+    { icon: TrendingDown, label: "Max drops", value: MAX_DROPS },
     {
-      label: "SETS",
-      value: totalSets,
-    },
-    {
-      label: "INITIAL REPS",
-      value: exerciseReps,
-    },
-    {
-      label: "DROPS",
-      value: "2-5",
-    },
-    {
-      label: "REST",
-      value: currentExercise?.rest_seconds || block.block.rest_seconds || 60,
+      icon: Timer,
+      label: "Rest",
+      value: formatRestSeconds(restSecDrop),
       unit: "s",
     },
   ];
@@ -200,7 +231,11 @@ export function DropSetExecutor({
       suggestedForDisplay,
     );
     if (loadDisplay) {
-      blockDetails.push({ label: "LOAD", value: loadDisplay });
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
+        value: loadDisplay,
+      });
     }
   }
 
@@ -208,15 +243,26 @@ export function DropSetExecutor({
     currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleEditSet = (setEntry: LoggedSet) => {
-    const s = setEntry as LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> };
+    const s = setEntry as LoggedSet & {
+      dropset_drops?: Array<{ weight: number; reps: number }>;
+    };
     const stored = s.dropset_drops;
     let editDrops: Array<{ weight: string; reps: string }>;
     if (Array.isArray(stored) && stored.length >= 2) {
-      editDrops = stored.map((d) => ({ weight: String(d.weight), reps: String(d.reps) }));
+      editDrops = stored.map((d) => ({
+        weight: String(d.weight),
+        reps: String(d.reps),
+      }));
     } else {
       editDrops = [
-        { weight: String(setEntry.weight_kg ?? ""), reps: String(setEntry.reps_completed ?? "") },
-        { weight: String((setEntry.weight_kg ?? 0) * 0.8), reps: String(setEntry.reps_completed ?? "") },
+        {
+          weight: String(setEntry.weight_kg ?? ""),
+          reps: String(setEntry.reps_completed ?? ""),
+        },
+        {
+          weight: String((setEntry.weight_kg ?? 0) * 0.8),
+          reps: String(setEntry.reps_completed ?? ""),
+        },
       ];
     }
     setEditingSetId(setEntry.id);
@@ -244,8 +290,14 @@ export function DropSetExecutor({
       return;
     }
     const dropsParsed = editDraft.drops
-      .map((d) => ({ weight: parseFloat(d.weight), reps: parseInt(d.reps, 10) }))
-      .filter((d) => !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0);
+      .map((d) => ({
+        weight: parseFloat(d.weight),
+        reps: parseInt(d.reps, 10),
+      }))
+      .filter(
+        (d) =>
+          !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0,
+      );
     if (dropsParsed.length < 2) {
       addToast({
         title: "Invalid values",
@@ -289,7 +341,9 @@ export function DropSetExecutor({
       });
       if (res.ok) {
         const current = loggedSetsList.find((s) => s.id === editingSetId);
-        const updatedEntry: LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> } = {
+        const updatedEntry: LoggedSet & {
+          dropset_drops?: Array<{ weight: number; reps: number }>;
+        } = {
           ...current,
           id: editingSetId,
           exercise_id:
@@ -334,8 +388,14 @@ export function DropSetExecutor({
     if (!currentExercise || isLoggingSet) return;
 
     const dropsParsed = drops
-      .map((d) => ({ weight: parseFloat(d.weight), reps: parseInt(d.reps, 10) }))
-      .filter((d) => !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0);
+      .map((d) => ({
+        weight: parseFloat(d.weight),
+        reps: parseInt(d.reps, 10),
+      }))
+      .filter(
+        (d) =>
+          !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0,
+      );
 
     if (dropsParsed.length < 2) {
       addToast({
@@ -361,7 +421,10 @@ export function DropSetExecutor({
 
     try {
       const last = dropsParsed[dropsParsed.length - 1];
-      const dropPct = initialWeightNum > 0 ? ((initialWeightNum - last.weight) / initialWeightNum) * 100 : 0;
+      const dropPct =
+        initialWeightNum > 0
+          ? ((initialWeightNum - last.weight) / initialWeightNum) * 100
+          : 0;
 
       const logData: any = {
         set_type: "dropset",
@@ -381,7 +444,9 @@ export function DropSetExecutor({
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const newLoggedSet: LoggedSet & { dropset_drops?: Array<{ weight: number; reps: number }> } = {
+        const newLoggedSet: LoggedSet & {
+          dropset_drops?: Array<{ weight: number; reps: number }>;
+        } = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
           set_entry_id: block.block.id,
@@ -419,7 +484,10 @@ export function DropSetExecutor({
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
         }
-        setDrops([{ weight: String(initialWeightNum), reps: "" }, { weight: String(Math.round(last.weight * 0.9 * 2) / 2), reps: "" }]);
+        setDrops([
+          { weight: String(initialWeightNum), reps: "" },
+          { weight: String(Math.round(last.weight * 0.9 * 2) / 2), reps: "" },
+        ]);
       } else {
         addToast({
           title: "Failed to Save",
@@ -471,106 +539,121 @@ export function DropSetExecutor({
             )}
           </div>
           <ul className="flex flex-col border-y border-white/5">
-            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
-              // Calculate the actual index in the full list for isLatestSet
-              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
-              const isLatestSet = actualIndex === loggedSetsList.length - 1;
-              return (
-              <li
-                key={setEntry.id}
-                className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm fc-text-primary">
-                    Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                    {setEntry.reps_completed ?? "—"} reps
-                  </span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === setEntry.id ? null : setEntry.id,
-                        )
-                      }
-                      className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                    {menuOpenSetId === setEntry.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setMenuOpenSetId(null)}
-                          aria-hidden
-                        />
-                        <div
-                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
-                          style={{
-                            background: "var(--fc-surface-elevated)",
-                            border: "1px solid var(--fc-surface-card-border)",
-                          }}
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map(
+              (setEntry, index) => {
+                // Calculate the actual index in the full list for isLatestSet
+                const actualIndex = showAllSets
+                  ? index
+                  : loggedSetsList.length - 2 + index;
+                const isLatestSet = actualIndex === loggedSetsList.length - 1;
+                return (
+                  <li
+                    key={setEntry.id}
+                    className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm fc-text-primary">
+                        Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"}{" "}
+                        kg × {setEntry.reps_completed ?? "—"} reps
+                      </span>
+                      <div className="relative flex items-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenuOpenSetId(
+                              menuOpenSetId === setEntry.id
+                                ? null
+                                : setEntry.id,
+                            )
+                          }
+                          className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
+                          aria-label="Options"
                         >
-                          <button
-                            type="button"
-                            onClick={() => handleEditSet(setEntry)}
-                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
-                          >
-                            <Pencil className="w-3.5 h-3.5" /> Edit
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <InlineRPERow
-                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
-                  currentRPE={setEntry.rpe ?? null}
-                  onRPESelect={async (rpe) => {
-                    const updatedEntry: LoggedSet = {
-                      ...setEntry,
-                      rpe,
-                    };
-                    onSetLogUpsert?.(block.block.id, updatedEntry, {
-                      replaceId: setEntry.id,
-                    });
-
-                    if (!setEntry.id.startsWith("temp-")) {
-                      try {
-                        const res = await fetch(`/api/sets/${setEntry.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ rpe }),
-                          credentials: "include",
-                        });
-                        if (!res.ok) {
-                          console.error("Failed to update RPE:", await res.text());
-                          const revertedEntry: LoggedSet = {
-                            ...setEntry,
-                            rpe: setEntry.rpe ?? undefined,
-                          };
-                          onSetLogUpsert?.(block.block.id, revertedEntry, {
-                            replaceId: setEntry.id,
-                          });
-                        }
-                      } catch (err) {
-                        console.error("Error updating RPE:", err);
-                        const revertedEntry: LoggedSet = {
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {menuOpenSetId === setEntry.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setMenuOpenSetId(null)}
+                              aria-hidden
+                            />
+                            <div
+                              className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
+                              style={{
+                                background: "var(--fc-surface-elevated)",
+                                border:
+                                  "1px solid var(--fc-surface-card-border)",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleEditSet(setEntry)}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                              >
+                                <Pencil className="w-3.5 h-3.5" /> Edit
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <InlineRPERow
+                      setLogId={
+                        setEntry.id.startsWith("temp-") ? null : setEntry.id
+                      }
+                      currentRPE={setEntry.rpe ?? null}
+                      onRPESelect={async (rpe) => {
+                        const updatedEntry: LoggedSet = {
                           ...setEntry,
-                          rpe: setEntry.rpe ?? undefined,
+                          rpe,
                         };
-                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                        onSetLogUpsert?.(block.block.id, updatedEntry, {
                           replaceId: setEntry.id,
                         });
-                      }
-                    }
-                  }}
-                  isLatestSet={isLatestSet}
-                />
-              </li>
-              );
-            })}
+
+                        if (!setEntry.id.startsWith("temp-")) {
+                          try {
+                            const res = await fetch(
+                              `/api/sets/${setEntry.id}`,
+                              {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ rpe }),
+                                credentials: "include",
+                              },
+                            );
+                            if (!res.ok) {
+                              console.error(
+                                "Failed to update RPE:",
+                                await res.text(),
+                              );
+                              const revertedEntry: LoggedSet = {
+                                ...setEntry,
+                                rpe: setEntry.rpe ?? undefined,
+                              };
+                              onSetLogUpsert?.(block.block.id, revertedEntry, {
+                                replaceId: setEntry.id,
+                              });
+                            }
+                          } catch (err) {
+                            console.error("Error updating RPE:", err);
+                            const revertedEntry: LoggedSet = {
+                              ...setEntry,
+                              rpe: setEntry.rpe ?? undefined,
+                            };
+                            onSetLogUpsert?.(block.block.id, revertedEntry, {
+                              replaceId: setEntry.id,
+                            });
+                          }
+                        }
+                      }}
+                      isLatestSet={isLatestSet}
+                    />
+                  </li>
+                );
+              },
+            )}
           </ul>
         </div>
       )}
@@ -622,7 +705,9 @@ export function DropSetExecutor({
           className="font-semibold mb-4 text-lg"
           style={{ color: "var(--fc-accent-cyan)" }}
         >
-          {editDraft ? "Edit set" : "Drop Set — Set " + displaySetNumber + " of " + totalSets}
+          {editDraft
+            ? "Edit set"
+            : "Drop Set — Set " + displaySetNumber + " of " + totalSets}
         </h4>
         {(editDraft ? editDraft.drops : drops).map((drop, idx) => (
           <div key={idx} className="mb-4">
@@ -660,22 +745,34 @@ export function DropSetExecutor({
                   unit="kg"
                   showStepper
                   stepAmount={2.5}
+                  plateCalculatorEnabled
                 />
-                {!editDraft && idx === 0 && coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
-                  <ApplySuggestedWeightButton
-                    suggestedKg={coachSuggestedWeight}
-                    onApply={() => {
-                      setDrops((prev) => [
-                        { weight: String(coachSuggestedWeight), reps: prev[0]?.reps ?? "" },
-                        ...prev.slice(1),
-                      ]);
-                      setIsWeightPristine(false);
-                    }}
-                  />
-                )}
+                {!editDraft &&
+                  idx === 0 &&
+                  coachSuggestedWeight != null &&
+                  coachSuggestedWeight > 0 && (
+                    <ApplySuggestedWeightButton
+                      suggestedKg={coachSuggestedWeight}
+                      onApply={() => {
+                        setDrops((prev) => [
+                          {
+                            weight: String(coachSuggestedWeight),
+                            reps: prev[0]?.reps ?? "",
+                          },
+                          ...prev.slice(1),
+                        ]);
+                        setIsWeightPristine(false);
+                      }}
+                    />
+                  )}
               </div>
               <LargeInput
                 label="Reps"
+                hint={
+                  idx === 0 && !editDraft
+                    ? dropRepsParsed.displayHint ?? undefined
+                    : undefined
+                }
                 value={drop.reps}
                 onChange={(val) => {
                   if (editDraft)
@@ -713,8 +810,7 @@ export function DropSetExecutor({
                           }
                         : null,
                     );
-                  else
-                    setDrops((prev) => prev.filter((_, i) => i !== idx));
+                  else setDrops((prev) => prev.filter((_, i) => i !== idx));
                 }}
                 className="mt-2 text-xs text-amber-500 hover:underline"
               >
@@ -730,7 +826,16 @@ export function DropSetExecutor({
               setDrops((prev) => [
                 ...prev,
                 {
-                  weight: prev.length > 0 ? String(Math.round(parseFloat(prev[prev.length - 1].weight || "0") * 0.85 * 2) / 2) : "",
+                  weight:
+                    prev.length > 0
+                      ? String(
+                          Math.round(
+                            parseFloat(prev[prev.length - 1].weight || "0") *
+                              0.85 *
+                              2,
+                          ) / 2,
+                        )
+                      : "",
                   reps: "",
                 },
               ])
@@ -751,9 +856,18 @@ export function DropSetExecutor({
                       drops: [
                         ...d.drops,
                         {
-                          weight: d.drops.length > 0
-                            ? String(Math.round(parseFloat(d.drops[d.drops.length - 1].weight || "0") * 0.85 * 2) / 2)
-                            : "",
+                          weight:
+                            d.drops.length > 0
+                              ? String(
+                                  Math.round(
+                                    parseFloat(
+                                      d.drops[d.drops.length - 1].weight || "0",
+                                    ) *
+                                      0.85 *
+                                      2,
+                                  ) / 2,
+                                )
+                              : "",
                           reps: "",
                         },
                       ],
@@ -769,6 +883,20 @@ export function DropSetExecutor({
       </div>
     </div>
   );
+
+  const dropsParsedPreview = drops
+    .map((d) => ({
+      weight: parseFloat(d.weight),
+      reps: parseInt(d.reps, 10),
+    }))
+    .filter(
+      (d) =>
+        !isNaN(d.weight) && d.weight >= 0 && !isNaN(d.reps) && d.reps > 0,
+    );
+  const dropLogReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    dropsParsedPreview.length >= 2;
 
   const isEditMode = !!editingSetId && !!editDraft;
   const logButton = isEditMode ? (
@@ -791,7 +919,7 @@ export function DropSetExecutor({
               isNaN(parseFloat(d.weight)) ||
               parseFloat(d.weight) < 0 ||
               isNaN(parseInt(d.reps, 10)) ||
-              parseInt(d.reps, 10) <= 0
+              parseInt(d.reps, 10) <= 0,
           )
         }
         variant="fc-primary"
@@ -810,15 +938,12 @@ export function DropSetExecutor({
       Edit this set
     </Button>
   ) : (
-    <Button
+    <LogSetButton
       onClick={handleLog}
-      disabled={isLoggingSet || completedSets >= totalSets}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <TrendingDown className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG DROP SET"}
-    </Button>
+      ready={dropLogReady}
+      loading={isLoggingSet}
+      label="Log drop set"
+    />
   );
 
   return (
@@ -843,24 +968,30 @@ export function DropSetExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         progressionSuggestion,
         previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle="LOG DROP SET"
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={
         !!(block.block.rest_seconds || currentExercise?.rest_seconds)
       }
       onApplySuggestion={(w, _r) => {
-        if (w != null) setDrops((prev) => [{ ...prev[0], weight: String(w) }, ...prev.slice(1)]);
+        if (w != null)
+          setDrops((prev) => [
+            { ...prev[0], weight: String(w) },
+            ...prev.slice(1),
+          ]);
       }}
     />
   );

@@ -63,6 +63,7 @@ import { GoalCard } from "@/components/goals/GoalCard";
 import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { withTimeout } from "@/lib/withTimeout";
+import { ClientPageShell } from "@/components/client-ui";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
 const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string; icon: LucideIcon }[] = [
   { id: "training", label: "Training", emoji: "🏋️", icon: Dumbbell },
@@ -1121,64 +1122,14 @@ export default function ClientGoals() {
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
           <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header Skeleton */}
-              <div className="text-center space-y-4 py-8">
-                <div className="animate-pulse">
-                  <div className="h-12 bg-[color:var(--fc-glass-highlight)] rounded-2xl w-64 mx-auto mb-4"></div>
-                  <div className="h-6 bg-[color:var(--fc-glass-highlight)] rounded-lg w-96 mx-auto mb-6"></div>
-                </div>
+            <ClientPageShell className="max-w-lg mx-auto space-y-3 py-4">
+              <div className="animate-pulse space-y-3">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded-lg w-48 mx-auto" />
+                <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-full max-w-xs mx-auto" />
+                <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
+                <div className="h-32 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
               </div>
-
-              {/* Stats Cards Skeleton */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="fc-surface rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                        <div>
-                          <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded-lg mb-2"></div>
-                          <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-3/4"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filter Skeleton */}
-              <div className="animate-pulse">
-                <div className="fc-surface rounded-2xl p-4 shadow-lg">
-                  <div className="flex gap-4">
-                    <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded-lg w-32"></div>
-                    <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded-lg w-32"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Goal Cards Skeleton */}
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="fc-surface rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                          <div>
-                            <div className="h-6 bg-[color:var(--fc-glass-highlight)] rounded-lg w-48 mb-2"></div>
-                            <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-32"></div>
-                          </div>
-                        </div>
-                        <div className="w-16 h-16 bg-[color:var(--fc-glass-highlight)] rounded-full"></div>
-                      </div>
-                      <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-full mb-2"></div>
-                      <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-2/3"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </ClientPageShell>
           </div>
         </div>
       </ProtectedRoute>
@@ -1189,12 +1140,14 @@ export default function ClientGoals() {
     return (
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center max-w-md">
-            <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-            <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary">
-              Retry
-            </Button>
-          </GlassCard>
+          <ClientPageShell className="max-w-lg w-full">
+            <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary h-10 text-sm">
+                Retry
+              </Button>
+            </GlassCard>
+          </ClientPageShell>
         </div>
       </ProtectedRoute>
     );
@@ -1232,7 +1185,7 @@ export default function ClientGoals() {
             </header>
 
             {/* Overall stats */}
-            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
+            <GlassCard elevation={2} className="fc-card-shell p-6">
               <div className="flex items-center gap-5">
                 <div className="relative w-16 h-16 flex-shrink-0">
                   <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
@@ -1252,7 +1205,7 @@ export default function ClientGoals() {
             </GlassCard>
 
             {/* Status and Sort (no category tabs) */}
-            <GlassCard elevation={1} className="fc-glass fc-card p-4 rounded-xl">
+            <GlassCard elevation={1} className="fc-card-shell p-4 rounded-xl">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="min-w-0">
                   <label className="fc-micro fc-text-subtle mb-2 block">Status</label>
@@ -1296,7 +1249,7 @@ export default function ClientGoals() {
               const adherence = pillarStat?.adherence ?? 0;
               return (
                 <section key={pillarId}>
-                  <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
+                  <GlassCard elevation={2} className="fc-card-shell p-6">
                     <div className="flex items-center justify-between gap-4 mb-4">
                       <h2 className="text-lg font-bold fc-text-primary flex items-center gap-2">
                         <PillarIcon className="w-5 h-5" style={{ color: "var(--fc-accent-primary)" }} />
@@ -1363,7 +1316,7 @@ export default function ClientGoals() {
             )}
 
             {/* Completed goals: collapsible */}
-            <section className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+            <section className="fc-card-shell overflow-hidden">
               <button
                 type="button"
                 onClick={() => setCompletedSectionOpen((o) => !o)}
@@ -2193,7 +2146,7 @@ color: "var(--fc-text-subtle)",
                   </Card>
                 </div>
               )}
-            </div>
+          </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

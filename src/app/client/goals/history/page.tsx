@@ -14,8 +14,6 @@ import {
   Pill,
 } from "@/components/client-ui";
 import { Target, ArrowLeft, Filter } from "lucide-react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 type CategoryFilter = "all" | "training" | "nutrition" | "lifestyle";
@@ -53,7 +51,6 @@ function inferCategory(title: string, category: string): CategoryFilter {
 export default function GoalHistoryPage() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
-  const router = useRouter();
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -108,9 +105,13 @@ export default function GoalHistoryPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-3xl flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <Link href="/client/goals" className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity">
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/client/goals"; }}
+              className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity"
+            >
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
-            </Link>
+            </button>
             <div>
               <h1 className="text-xl font-bold fc-text-primary">Goal History</h1>
               <p className="text-sm fc-text-dim">All goals across Training, Nutrition, Lifestyle</p>
@@ -154,7 +155,7 @@ export default function GoalHistoryPage() {
               <Target className="w-12 h-12 fc-text-dim mx-auto mb-4 opacity-50" />
               <p className="fc-text-primary font-medium mb-2">No goals found</p>
               <p className="text-sm fc-text-dim mb-6">Create goals from the Goals page to see them here.</p>
-              <SecondaryButton onClick={() => router.push("/client/goals")}>
+              <SecondaryButton onClick={() => { window.location.href = "/client/goals"; }}>
                 Open Goals
               </SecondaryButton>
             </ClientGlassCard>

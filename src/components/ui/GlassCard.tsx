@@ -3,16 +3,25 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 
+export type CoachCardShellTone = "neutral" | "success" | "error" | "warning" | "info";
+
+const toneModifier: Record<Exclude<CoachCardShellTone, "neutral">, string> = {
+  success: "fc-card-shell--success",
+  error: "fc-card-shell--error",
+  warning: "fc-card-shell--warning",
+  info: "fc-card-shell--info",
+};
+
 interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
-  intensity?: number; // blur amount; defaults to CSS var --fc-blur-card
-  elevation?: 1 | 2 | 3 | 4; // reserved for future token-based elevation scale
+  intensity?: number;
+  elevation?: 1 | 2 | 3 | 4;
   pressable?: boolean;
   onPress?: () => void;
   borderColor?: string;
-  /** Merged after base styles — use for attention tints (wins over default inline bg). */
   surfaceStyle?: React.CSSProperties;
+  tone?: CoachCardShellTone;
 }
 
 export function GlassCard({
@@ -24,42 +33,53 @@ export function GlassCard({
   onPress,
   borderColor,
   surfaceStyle,
+  tone = "neutral",
 }: GlassCardProps) {
   const [isPressed, setIsPressed] = useState(false);
 
-  // Omit default inline background when:
-  // - parent passes Tailwind bg-* (so utilities apply), or
-  // - parent uses fc-attention-* (stylesheet tint must not lose to inline bg), or
-  // - surfaceStyle sets a background.
-  const hasCustomBg = typeof className === "string" && /\bbg-/.test(className);
+  const cleanedClassName =
+    typeof className === "string"
+      ? className
+          .replace(/\bfc-glass\b/g, "")
+          .replace(/\bfc-card\b/g, "")
+          .replace(/\bfc-card-shell\b(?!-)/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+      : className;
+
+  const hasCustomBg =
+    typeof cleanedClassName === "string" && /\bbg-/.test(cleanedClassName);
   const hasAttentionTint =
-    typeof className === "string" &&
-    /\bfc-attention-(urgent|warning|good|inactive|info)\b/.test(className);
+    typeof cleanedClassName === "string" &&
+    /\bfc-attention-(urgent|warning|good|inactive|info)\b/.test(
+      cleanedClassName
+    );
   const hasSurfaceBg = Boolean(
     surfaceStyle?.background ?? surfaceStyle?.backgroundColor
   );
   const blurValue =
     intensity != null ? `${intensity}px` : "var(--fc-blur-card)";
-  // Opaque/solid attention tints + backdrop blur often produce harsh edge artifacts; use solid surface.
   const skipBlurForSurfaceTint = hasSurfaceBg;
-  const baseStyle: React.CSSProperties = {
-    ...(!(hasCustomBg || hasAttentionTint || hasSurfaceBg) && {
-      background: "var(--fc-glass-base)",
-    }),
-    border: `1px solid ${borderColor ?? "var(--fc-glass-border)"}`,
-    borderRadius: "var(--fc-radius-lg)",
-    boxShadow: "var(--fc-shadow-card)",
-    ...(skipBlurForSurfaceTint
+  const useShellFill = !(hasCustomBg || hasAttentionTint || hasSurfaceBg);
+  const shellToneClass =
+    useShellFill && tone !== "neutral" ? toneModifier[tone] : undefined;
+
+  const pressedStyle: React.CSSProperties =
+    pressable && isPressed ? { transform: "scale(0.98)" } : {};
+
+  const blurStyle: React.CSSProperties =
+    useShellFill || skipBlurForSurfaceTint
       ? { backdropFilter: "none", WebkitBackdropFilter: "none" }
       : {
           backdropFilter: `blur(${blurValue})`,
           WebkitBackdropFilter: `blur(${blurValue})`,
-        }),
+        };
+
+  const baseStyle: React.CSSProperties = {
+    ...(borderColor ? { borderLeftColor: borderColor } : {}),
+    ...blurStyle,
     transition: "all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)",
   };
-
-  const pressedStyle: React.CSSProperties =
-    pressable && isPressed ? { transform: "scale(0.98)" } : {};
 
   const handleMouseDown = () => {
     if (pressable) setIsPressed(true);
@@ -79,9 +99,12 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "overflow-hidden",
+        "overflow-hidden p-4",
+        useShellFill
+          ? cn("fc-card-shell", shellToneClass)
+          : "fc-card-shell-outline",
         pressable && "cursor-pointer",
-        className
+        cleanedClassName
       )}
       style={{ ...baseStyle, ...surfaceStyle, ...pressedStyle }}
       onMouseDown={handleMouseDown}

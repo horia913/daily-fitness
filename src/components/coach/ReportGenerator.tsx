@@ -142,7 +142,7 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+    <div className="fc-card-shell">
       <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">

@@ -1403,7 +1403,7 @@ export default function EnhancedClientWorkouts({
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen fc-page animate-pulse">
           <div className="max-w-5xl mx-auto flex flex-col gap-6">
-            <div className="fc-glass fc-card p-6 rounded-2xl">
+            <div className="fc-card-shell p-6 rounded-2xl">
               <div className="h-8 fc-glass-soft rounded mb-2" />
               <div className="h-4 fc-glass-soft rounded w-[75%]" />
             </div>

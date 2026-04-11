@@ -277,7 +277,7 @@ export default function CreateUserPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+        <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
           <div className="flex items-center justify-center gap-4 sm:justify-start">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
               <UserPlus className="w-6 h-6" />

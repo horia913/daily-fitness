@@ -325,7 +325,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+              <div className="fc-card-shell p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -345,7 +345,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
       {/* Header Section */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-5 sm:p-6 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-3 sm:gap-4">
@@ -397,7 +397,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
       <div className="p-4 sm:p-6">
         {/* Stats Overview */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+          <div className="fc-card-shell text-center p-5">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-domain-meals)]">
               <Utensils className="w-6 h-6" />
             </div>
@@ -405,7 +405,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
             <p className="text-sm text-[color:var(--fc-text-dim)]">Total Foods</p>
           </div>
 
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+          <div className="fc-card-shell text-center p-5">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-accent-cyan)]">
               <Star className="w-6 h-6" />
             </div>
@@ -413,7 +413,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
             <p className="text-sm text-[color:var(--fc-text-dim)]">Custom Foods</p>
           </div>
 
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+          <div className="fc-card-shell text-center p-5">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-accent-purple)]">
               <Target className="w-6 h-6" />
             </div>
@@ -421,7 +421,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
             <p className="text-sm text-[color:var(--fc-text-dim)]">High Protein</p>
           </div>
 
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+          <div className="fc-card-shell text-center p-5">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-status-warning)]">
               <Layers className="w-6 h-6" />
             </div>
@@ -435,7 +435,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {/* Search Bar */}
@@ -538,7 +538,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 return (
                   <Card 
                     key={food.id} 
-                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group hover:scale-105"
+                    className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group hover:scale-105"
                     onClick={() => handleFoodClick(food)}
                   >
                     <CardContent className="p-4 sm:p-6">
@@ -654,7 +654,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 return (
                   <Card 
                     key={food.id} 
-                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group"
+                    className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group"
                     onClick={() => handleFoodClick(food)}
                   >
                     <CardContent className="p-4 sm:p-6">
@@ -768,7 +768,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
           {/* Empty State */}
           {filteredAndSortedFoods.length === 0 && (
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
                   <Utensils className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
@@ -810,7 +810,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
       {/* Food Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="fc-card-shell max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-[color:var(--fc-text-primary)] flex items-center gap-3">
               {selectedFood && (

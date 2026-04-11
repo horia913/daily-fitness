@@ -8,7 +8,6 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Camera, Loader2, ShieldAlert, Utensils } from "lucide-react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
 import { getNutritionComplianceTrend } from "@/lib/nutritionLogService";
@@ -18,6 +17,7 @@ import {
 } from "@/lib/clientMealOverrideService";
 import { NutritionComplianceChart } from "@/components/progress/NutritionComplianceChart";
 import type { NutritionComplianceDay } from "@/lib/nutritionLogService";
+import { ClientPageShell } from "@/components/client-ui";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -434,7 +434,7 @@ export default function NutritionPage() {
   };
 
   const renderDailySummary = () => (
-    <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+    <div className="fc-card-shell p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -460,7 +460,7 @@ export default function NutritionPage() {
   const renderMeals = () => {
     if (!assignment) {
       return (
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+        <div className="fc-card-shell p-8 text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
               <ShieldAlert className="h-6 w-6" />
@@ -478,7 +478,7 @@ export default function NutritionPage() {
 
     if (meals.length === 0) {
       return (
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+        <div className="fc-card-shell p-8 text-center">
           <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
             This meal plan has no meals assigned.
           </p>
@@ -496,7 +496,7 @@ export default function NutritionPage() {
           return (
             <div
               key={meal.id}
-              className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-5 flex flex-col gap-4"
+              className="fc-card-shell p-5 flex flex-col gap-4"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -633,7 +633,7 @@ export default function NutritionPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+            <div className="fc-card-shell p-6">
               <div className="animate-pulse space-y-3">
                 <div className="h-6 rounded bg-[color:var(--fc-glass-highlight)] w-1/3" />
                 <div className="h-4 rounded bg-[color:var(--fc-glass-highlight)] w-1/2" />
@@ -650,45 +650,51 @@ export default function NutritionPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
-                    <Utensils className="w-6 h-6" />
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">
+          <div className="fc-card-shell p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/progress"; }}
+                  className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
+                >
+                  <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
+                </button>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
+                    <Utensils className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
                       Nutrition Tracker
                     </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                      View assigned meals and log photos for today.
+                    <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
+                      Meals and photos for today.
                     </p>
                   </div>
                 </div>
               </div>
               {errorMessage && (
-                <div className="fc-glass-soft fc-card px-4 py-3 text-sm text-[color:var(--fc-status-error)] border border-[color:var(--fc-status-error)]/30 max-w-md">
+                <div className="fc-glass-soft fc-card px-3 py-2 text-xs text-[color:var(--fc-status-error)] border border-[color:var(--fc-status-error)]/30 w-full">
                   {errorMessage}
                 </div>
               )}
             </div>
           </div>
 
-          <NutritionComplianceChart
-            data={complianceTrend}
-            defaultTimeRange="2W"
-            className="w-full"
-          />
+          <div className="min-w-0 overflow-x-auto -mx-1 px-1">
+            <NutritionComplianceChart
+              data={complianceTrend}
+              defaultTimeRange="2W"
+              className="w-full min-w-[280px]"
+            />
+          </div>
 
           {renderDailySummary()}
 
           {renderMeals()}
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

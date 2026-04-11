@@ -14,7 +14,6 @@ import { WellnessTrends } from "@/components/client/check-ins/WellnessTrends";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import {
   getTodayLog,
@@ -158,7 +157,7 @@ export default function ClientCheckInsPage() {
     };
   }, [user?.id, historyKey]);
 
-  const { data, loading: dataLoading } = usePageData(fetchCheckInData, [user?.id, historyKey]);
+  const { data, loading: dataLoading, error } = usePageData(fetchCheckInData, [user?.id, historyKey]);
 
   const todayLog = data?.todayLog ?? null;
   const logRange = data?.logRange ?? [];
@@ -207,6 +206,33 @@ export default function ClientCheckInsPage() {
     return overdueDays > 0;
   }, [daysSinceLast, frequencyDays]);
 
+  if (error) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <ClientPageShell>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h2 className="text-lg font-semibold text-white mb-2">
+                Couldn't load this page
+              </h2>
+              <p className="text-sm text-gray-400 mb-4">
+                Something went wrong. Please try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-cyan-500 text-white rounded-lg font-medium hover:bg-cyan-400 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </ClientPageShell>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -214,13 +240,14 @@ export default function ClientCheckInsPage() {
         <ClientPageShell className="max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4">
           <header className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Link
-                href="/client"
+              <button
+                type="button"
+                onClick={() => { window.location.href = "/client"; }}
                 className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
                 aria-label="Back to home"
               >
                 <ArrowLeft className="w-5 h-5" />
-              </Link>
+              </button>
               <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">Check-ins</h1>
             </div>
             <button

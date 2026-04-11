@@ -11,7 +11,7 @@ interface TrophyRoomProps {
 export function TrophyRoom({ personalRecords, loading = false }: TrophyRoomProps) {
   if (loading) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell">
         <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
@@ -42,7 +42,7 @@ export function TrophyRoom({ personalRecords, loading = false }: TrophyRoomProps
 
   if (personalRecords.length === 0) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell">
         <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
@@ -74,7 +74,7 @@ export function TrophyRoom({ personalRecords, loading = false }: TrophyRoomProps
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+    <div className="fc-card-shell">
       <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">
@@ -99,7 +99,7 @@ export function TrophyRoom({ personalRecords, loading = false }: TrophyRoomProps
             return (
               <div 
                 key={record.id}
-                className={`relative overflow-hidden transition-all fc-hover-rise fc-glass fc-card border border-[color:var(--fc-glass-border)] ${
+                className={`relative overflow-hidden transition-all fc-hover-rise fc-card-shell border border-[color:var(--fc-glass-border)] ${
                   record.isRecent ? 'ring-1 ring-[color:var(--fc-domain-workouts)]' : ''
                 }`}
               >

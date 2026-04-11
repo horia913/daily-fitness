@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -15,7 +15,6 @@ import {
   PrimaryButton,
   SecondaryButton,
 } from "@/components/client-ui";
-import { Badge } from "@/components/ui/badge";
 import { Stepper } from "@/components/ui/stepper";
 import { RestTimerOverlay } from "@/components/workout/RestTimerOverlay";
 import {
@@ -32,12 +31,10 @@ import {
   Calculator,
   Clock,
   Lightbulb,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Image,
   Video,
-  Zap,
   Activity,
   Square,
   TrendingUp,
@@ -80,7 +77,6 @@ import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
 import { collectExerciseIdsDeep } from "@/lib/collectExerciseIdsDeep";
 export default function LiveWorkout() {
   const params = useParams();
-  const router = useRouter();
   const assignmentId = params.id as string;
   const { addToast } = useToast();
   const { isDark, getThemeStyles, performanceSettings } = useTheme();
@@ -109,8 +105,6 @@ export default function LiveWorkout() {
   const [restTime, setRestTime] = useState(60);
 
   // Exercise Display Enhancements
-  const [showExerciseAlternatives, setShowExerciseAlternatives] =
-    useState(false);
   const [showExerciseImage, setShowExerciseImage] = useState(false);
   const [showPlateCalculator, setShowPlateCalculator] = useState(false);
   const [showDropSetCalculator, setShowDropSetCalculator] = useState(false);
@@ -1590,7 +1584,7 @@ export default function LiveWorkout() {
                   description: "This program workout has already been completed.",
                   variant: "default",
                 });
-                router.push("/client/train");
+                window.location.href = "/client/train";
                 return;
               }
             }
@@ -1602,7 +1596,7 @@ export default function LiveWorkout() {
                 description: "This program day is not a workout day.",
                 variant: "default",
               });
-              router.push("/client/train");
+              window.location.href = "/client/train";
               return;
             }
 
@@ -1637,7 +1631,7 @@ export default function LiveWorkout() {
                       "Could not start program workout. Please try again.",
                     variant: "destructive",
                   });
-                  router.push("/client/train");
+                  window.location.href = "/client/train";
                   return;
                 }
 
@@ -1670,7 +1664,7 @@ export default function LiveWorkout() {
                       "The workout was created but could not be loaded. Please try again.",
                     variant: "destructive",
                   });
-                  router.push("/client/train");
+                  window.location.href = "/client/train";
                   return;
                 }
 
@@ -1686,7 +1680,7 @@ export default function LiveWorkout() {
                     "Could not start program workout. Please try again.",
                   variant: "destructive",
                 });
-                router.push("/client/train");
+                window.location.href = "/client/train";
                 return;
               }
             } else {
@@ -1739,7 +1733,7 @@ export default function LiveWorkout() {
               "The requested workout could not be found. Please try again.",
             variant: "destructive",
           });
-          router.push("/client/workouts");
+          window.location.href = "/client/workouts";
           return;
         }
       }
@@ -2172,7 +2166,7 @@ export default function LiveWorkout() {
               description: "This workout has already been completed. Returning to training.",
               variant: "default",
             });
-            router.push("/client/train");
+            window.location.href = "/client/train";
             return;
           }
 
@@ -3538,7 +3532,7 @@ export default function LiveWorkout() {
         );
       }
 
-      // Use full page navigation so it works after tab switch (router.push is dead then).
+      // Use full page navigation so it works after tab switch.
       console.log("[COMPLETE-FLOW] navigating to complete page");
       window.location.href = `/client/workouts/${completeTargetId}/complete?${params.toString()}`;
 
@@ -4093,7 +4087,7 @@ export default function LiveWorkout() {
               {(!useBlockSystem || workoutBlocks.length === 0) && (
                 <div className="flex items-center gap-3 mb-3">
                   <button
-                    onClick={() => router.push("/client/train")}
+                    onClick={() => { window.location.href = "/client/train"; }}
                     className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -4269,7 +4263,7 @@ export default function LiveWorkout() {
                     }
                     onPlateCalculatorClick={() => setShowPlateCalculator(true)}
                     onPRDetected={(pr) => setPrCelebrationData(pr)}
-                    onAchievementsUnlocked={(achievements) => {
+                    onAchievementsUnlocked={(achievements, context) => {
                       const tierToRarity = (tier: string | null): Achievement["rarity"] => {
                         if (!tier) return "uncommon";
                         if (tier === "platinum") return "legendary";
@@ -4286,9 +4280,14 @@ export default function LiveWorkout() {
                         rarity: tierToRarity(a.tier),
                         unlocked: true,
                       }));
-                      // If PR modal is active, defer achievements until it closes
-                      if (prCelebrationData) {
-                        pendingAchievementsRef.current = [...pendingAchievementsRef.current, ...mapped];
+                      const deferForPr =
+                        prCelebrationData != null ||
+                        context?.prDetectedThisSync === true;
+                      if (deferForPr) {
+                        pendingAchievementsRef.current = [
+                          ...pendingAchievementsRef.current,
+                          ...mapped,
+                        ];
                       } else {
                         setNewAchievementsQueue((prev) => [...prev, ...mapped]);
                         setAchievementModalIndex(0);
@@ -4299,7 +4298,7 @@ export default function LiveWorkout() {
                         typeof window !== "undefined" &&
                         window.confirm("Exit workout? Progress is saved.")
                       ) {
-                        router.push("/client/train");
+                        window.location.href = "/client/train";
                       }
                     }}
                     clientBodyWeightKg={clientBodyWeightKg}
@@ -4373,7 +4372,7 @@ export default function LiveWorkout() {
                     )}
                   {/* AMRAP Flow */}
                   {currentType === "amrap" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)]">
+                    <div className="fc-card-shell p-6">
                       <div>
                         {!amrapActive ? (
                           <div
@@ -4460,16 +4459,6 @@ export default function LiveWorkout() {
                                       className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowExerciseAlternatives(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                   <div className="flex flex-wrap gap-2 text-sm">
@@ -4602,7 +4591,7 @@ export default function LiveWorkout() {
 
                   {/* EMOM Flow */}
                   {currentType === "emom" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)]">
+                    <div className="fc-card-shell fc-card-shell--success p-6">
                       <div>
                         {/* Rep-based behaves like AMRAP */}
                         {currentExercise?.meta?.emom_mode === "rep_based" ? (
@@ -4634,7 +4623,7 @@ export default function LiveWorkout() {
 
                               {/* Summary Info */}
                               <div className="grid grid-cols-2 gap-3">
-                                <div className="rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-700">
+                                <div className="fc-card-shell fc-card-shell--success p-4">
                                   <div
                                     className={`text-sm ${theme.textSecondary} mb-1`}
                                   >
@@ -4729,7 +4718,7 @@ export default function LiveWorkout() {
 
                             {/* Summary Info */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-700">
+                              <div className="fc-card-shell fc-card-shell--success p-4">
                                 <div
                                   className={`text-sm ${theme.textSecondary} mb-1`}
                                 >
@@ -4840,7 +4829,7 @@ export default function LiveWorkout() {
                   {/* Tabata Flow */}
                   {currentType === "tabata" && (
                     <div
-                      className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)]"
+                      className="fc-card-shell fc-card-shell--error p-6"
                     >
                       <div>
                         {!intervalActive ? (
@@ -4981,7 +4970,7 @@ export default function LiveWorkout() {
                                                     return (
                                                       <div
                                                         key={exerciseIndex}
-                                                        className="rounded-lg p-3 fc-surface border border-[color:var(--fc-glass-border)]"
+                                                        className="fc-card-shell p-3"
                                                       >
                                                         <div className="flex items-start gap-3">
                                                           <div
@@ -5017,18 +5006,6 @@ export default function LiveWorkout() {
                                                                 className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                                               >
                                                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                                              </Button>
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                  setShowExerciseAlternatives(
-                                                                    true,
-                                                                  )
-                                                                }
-                                                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                                              >
-                                                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                                               </Button>
                                                             </div>
                                                             <div className="flex flex-wrap gap-2 text-sm">
@@ -5237,7 +5214,7 @@ export default function LiveWorkout() {
 
                   {/* Cluster Set Flow */}
                   {currentType === "cluster_set" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)]">
+                    <div className="fc-card-shell p-6">
                       <div>
                         {/* Header */}
                         <div
@@ -5285,7 +5262,7 @@ export default function LiveWorkout() {
                                 1}
                             </div>
                           </div>
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700 relative">
+                          <div className="fc-card-shell fc-card-shell--success p-3 relative">
                             <div
                               className={`text-xs ${theme.textSecondary} mb-1`}
                             >
@@ -5321,16 +5298,6 @@ export default function LiveWorkout() {
                                 className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setShowExerciseAlternatives(true)
-                                }
-                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -5525,7 +5492,7 @@ export default function LiveWorkout() {
 
                   {/* Rest-Pause Flow */}
                   {currentType === "rest_pause" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)]">
+                    <div className="fc-card-shell fc-card-shell--success p-6">
                       <div>
                         {/* Header */}
                         <div
@@ -5567,7 +5534,7 @@ export default function LiveWorkout() {
                               {restPauseExtraReps.length}
                             </div>
                           </div>
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700">
+                          <div className="fc-card-shell fc-card-shell--success p-3">
                             <div
                               className={`text-xs ${theme.textSecondary} mb-1`}
                             >
@@ -5603,16 +5570,6 @@ export default function LiveWorkout() {
                                 className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setShowExerciseAlternatives(true)
-                                }
-                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -5836,7 +5793,7 @@ export default function LiveWorkout() {
 
                   {/* For Time Flow */}
                   {currentType === "for_time" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-warning)]">
+                    <div className="fc-card-shell fc-card-shell--warning p-6">
                       <div>
                         {!forTimeActive && forTimeCompletionSecs == null ? (
                           <div
@@ -6044,7 +6001,7 @@ export default function LiveWorkout() {
                   {/* Superset / Pre-Exhaustion Flow */}
                   {(currentType === "superset" ||
                     currentType === "pre_exhaustion") && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)]">
+                    <div className="fc-card-shell fc-card-shell--error p-6">
                       <div>
                         {/* Header */}
                         <div
@@ -6087,7 +6044,7 @@ export default function LiveWorkout() {
                           {/* Exercise A */}
                           <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
-                              className="p-4 fc-surface rounded-2xl space-y-3"
+                              className="fc-card-shell p-4 space-y-3"
                             >
                               {/* Exercise Header */}
                               <div className="flex items-center gap-3">
@@ -6114,16 +6071,6 @@ export default function LiveWorkout() {
                                       className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowExerciseAlternatives(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                 </div>
@@ -6224,7 +6171,7 @@ export default function LiveWorkout() {
                           {/* Exercise B */}
                           <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
-                              className="p-4 fc-surface rounded-2xl space-y-3"
+                              className="fc-card-shell p-4 space-y-3"
                             >
                               {/* Exercise Header */}
                               <div className="flex items-center gap-3">
@@ -6263,16 +6210,6 @@ export default function LiveWorkout() {
                                       className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowExerciseAlternatives(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                 </div>
@@ -6390,7 +6327,7 @@ export default function LiveWorkout() {
 
                   {/* Giant Set Flow */}
                   {currentType === "giant_set" && (
-                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] relative z-20">
+                    <div className="fc-card-shell p-6 relative z-20">
                       <div>
                         <div
                           className="flex items-center justify-between"
@@ -6424,7 +6361,7 @@ export default function LiveWorkout() {
                               className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
                             >
                               <div
-                                className="p-4 fc-surface rounded-2xl space-y-3"
+                                className="fc-card-shell p-4 space-y-3"
                               >
                                 {/* Header: name + video + number badge */}
                                 <div className="flex items-center gap-3">
@@ -6448,16 +6385,6 @@ export default function LiveWorkout() {
                                         className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                       >
                                         <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          setShowExerciseAlternatives(true)
-                                        }
-                                        className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                      >
-                                        <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                       </Button>
                                     </div>
                                   </div>
@@ -6554,7 +6481,7 @@ export default function LiveWorkout() {
                     currentType !== "pre_exhaustion" &&
                     currentType !== "cluster_set" &&
                     currentType !== "rest_pause" && (
-                      <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)]">
+                      <div className="fc-card-shell p-6">
                         <div>
                           {/* Header */}
                           <div
@@ -6628,16 +6555,6 @@ export default function LiveWorkout() {
                                   className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                 >
                                   <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    setShowExerciseAlternatives(true)
-                                  }
-                                  className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                 </Button>
                               </div>
                               <div
@@ -6904,7 +6821,7 @@ export default function LiveWorkout() {
                   </p>
                   <SecondaryButton
                     className="w-auto"
-                    onClick={() => router.push("/client/train")}
+                    onClick={() => { window.location.href = "/client/train"; }}
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Workouts
@@ -7398,117 +7315,8 @@ export default function LiveWorkout() {
           </div>
         )}
 
-        {/* Exercise Alternatives Modal */}
-        {showExerciseAlternatives && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl w-full max-w-2xl max-h-[80vh] overflow-hidden border border-white/20">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                    <RefreshCw className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">
-                    Exercise Alternatives
-                  </h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowExerciseAlternatives(false)}
-                  className="text-white hover:bg-white/20 rounded-2xl"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Alternatives Content */}
-              <div className="p-6">
-                <div className="space-y-4">
-                  <p className="text-white/70 text-center mb-6">
-                    Can&apos;t perform {currentExercise.exercise?.name}? Try
-                    these alternatives:
-                  </p>
-
-                  {/* Alternative Exercises */}
-                  <div className="space-y-3">
-                    {[
-                      {
-                        name: "Modified Push-ups",
-                        difficulty: "Easy",
-                        description: "Knee push-ups or wall push-ups",
-                      },
-                      {
-                        name: "Dumbbell Press",
-                        difficulty: "Medium",
-                        description: "Using dumbbells instead of bodyweight",
-                      },
-                      {
-                        name: "Incline Push-ups",
-                        difficulty: "Easy",
-                        description: "Using a bench or elevated surface",
-                      },
-                    ].map((alternative, index) => (
-                      <div
-                        key={index}
-                        className="p-4 bg-white/10 rounded-2xl border border-white/20 hover:bg-white/20 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-bold text-white">
-                              {alternative.name}
-                            </h4>
-                            <p className="text-sm text-white/70">
-                              {alternative.description}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              className={`text-xs ${
-                                alternative.difficulty === "Easy"
-                                  ? "bg-green-500/20 text-green-400"
-                                  : alternative.difficulty === "Medium"
-                                    ? "bg-yellow-500/20 text-yellow-400"
-                                    : "bg-red-500/20 text-red-400"
-                              }`}
-                            >
-                              {alternative.difficulty}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-white hover:bg-white/20 rounded-xl"
-                            >
-                              <Zap className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 p-4 bg-blue-500/20 rounded-2xl border border-blue-400/30">
-                    <div className="flex items-start gap-3">
-                      <Lightbulb className="w-5 h-5 text-blue-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-100 mb-1">
-                          Need Help?
-                        </p>
-                        <p className="text-sm text-blue-200">
-                          Ask your coach for personalized alternatives or
-                          modifications.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Plate Calculator Modal */}
-        {showPlateCalculator && (
+        {false && showPlateCalculator && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
               <div className="p-6">
@@ -7624,7 +7432,7 @@ export default function LiveWorkout() {
                         // Impossible weight - show closest options
                         return (
                           <div className="space-y-4">
-                            <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-700">
+                            <div className="fc-card-shell fc-card-shell--error p-4 text-center">
                               <div className="text-red-800 dark:text-red-200 font-semibold">
                                 Unable to load {targetWeight}kg exactly
                               </div>
@@ -7672,7 +7480,7 @@ export default function LiveWorkout() {
                             </div>
 
                             {/* Heavier option */}
-                            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-700">
+                            <div className="fc-card-shell fc-card-shell--success p-4">
                               <div className="text-center space-y-3">
                                 <div className="text-lg font-bold text-green-800 dark:text-green-200">
                                   Option 2:{" "}
@@ -7887,7 +7695,7 @@ export default function LiveWorkout() {
                           </div>
 
                           {/* Option 2 - Alternative */}
-                          <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700">
+                          <div className="fc-card-shell fc-card-shell--success p-4">
                             <div className="text-center space-y-3">
                               <div className="text-lg font-bold text-green-800 dark:text-green-200">
                                 Option 2 (Alternative):
@@ -7987,7 +7795,7 @@ export default function LiveWorkout() {
                 {/* Performance Stats */}
                 <div style={{ marginBottom: "32px" }}>
                   <div className="grid grid-cols-3" style={{ gap: "12px" }}>
-                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-accent-cyan)]">
+                    <div className="fc-card-shell p-4 text-center">
                       <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {(() => {
                           console.log(
@@ -8004,7 +7812,7 @@ export default function LiveWorkout() {
                         Minutes
                       </div>
                     </div>
-                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-accent-primary)]">
+                    <div className="fc-card-shell p-4 text-center">
                       <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {workoutStats.exercisesCompleted}
                       </div>
@@ -8012,7 +7820,7 @@ export default function LiveWorkout() {
                         Exercises
                       </div>
                     </div>
-                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-status-error)]">
+                    <div className="fc-card-shell fc-card-shell--error p-4 text-center">
                       <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {workoutStats.totalSets}
                       </div>
@@ -8067,9 +7875,9 @@ export default function LiveWorkout() {
                     variant="outline"
                     onClick={() => {
                       setShowWorkoutCompletion(false);
-                      router.push("/client/train");
+                      window.location.href = "/client/train";
                     }}
-                    className="w-full py-4 px-8 rounded-2xl border-2 border-[color:var(--fc-accent-primary)] fc-surface text-[color:var(--fc-accent-primary)] font-semibold flex items-center justify-center"
+                    className="fc-card-shell w-full py-4 px-8 text-[color:var(--fc-accent-primary)] font-semibold flex items-center justify-center"
                   >
                     Back to Dashboard
                   </Button>
@@ -8218,7 +8026,7 @@ export default function LiveWorkout() {
 
                 <div className="text-center space-y-6">
                   {/* Timer Display */}
-                  <div className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-2xl p-8 border-2 border-green-200 dark:border-green-700">
+                  <div className="fc-card-shell fc-card-shell--success p-8">
                     <div className="text-6xl font-extrabold text-green-600 dark:text-green-400 mb-2">
                       {Number(currentExercise?.meta?.intra_cluster_rest) ||
                         Number(currentExercise?.intra_cluster_rest) ||

@@ -7,12 +7,12 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { ClientPageShell } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
 import { ChevronLeft, Coffee, Apple, Utensils, Zap, Edit3, Trash2, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
 
 interface MealItem {
   id: string;
@@ -219,11 +219,18 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
-            <div className="fc-surface rounded-2xl p-8 text-center max-w-md">
+            <div className="fc-card-shell p-8 text-center max-w-md">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadMeal(); }} className="fc-btn fc-btn-primary">Retry</Button>
-                <Button asChild variant="outline" className="fc-btn fc-btn-secondary"><Link href="/client/nutrition"><ChevronLeft className="w-4 h-4 mr-2" />Back to Nutrition</Link></Button>
+                <Button
+                  variant="outline"
+                  className="fc-btn fc-btn-secondary"
+                  onClick={() => { window.location.href = "/client/nutrition"; }}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Back to Nutrition
+                </Button>
               </div>
             </div>
           </div>
@@ -237,17 +244,13 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-5xl">
-                <div className="fc-surface p-6 sm:p-10">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-48 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12">
+            <div className="animate-pulse space-y-3">
+              <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-40 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -258,25 +261,24 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-5xl">
-              <div className="fc-surface p-10 text-center">
-                <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                  Meal not found
-                </h2>
-                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
-                  This meal is not available or has been removed.
-                </p>
-                <div className="mt-6 flex justify-center">
-                  <Link href="/client/nutrition">
-                    <Button className="fc-btn fc-btn-secondary">
-                      Back to Nutrition
-                    </Button>
-                  </Link>
-                </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 text-center">
+            <div className="fc-card-shell p-6">
+              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                Meal not found
+              </h2>
+              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                This meal is not available or has been removed.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Button
+                  className="fc-btn fc-btn-secondary h-10 text-sm"
+                  onClick={() => { window.location.href = "/client/nutrition"; }}
+                >
+                  Back to Nutrition
+                </Button>
               </div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -309,32 +311,35 @@ export default function MealDetailPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen pb-32">
-          <nav className="absolute top-6 left-6 z-20">
-            <Link href="/client/nutrition">
-              <button type="button" className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-soft transition-colors" aria-label="Back">
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-            </Link>
+        <ClientPageShell className="max-w-lg mx-auto pb-32 overflow-x-hidden">
+          <nav className="mb-2">
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/client/nutrition"; }}
+              className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-soft transition-colors"
+              aria-label="Back"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
           </nav>
 
-          <div className="relative h-48 sm:h-56 bg-gradient-to-b from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-bg-base)] rounded-b-3xl overflow-hidden">
+          <div className="relative h-36 sm:h-40 bg-gradient-to-b from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-bg-base)] rounded-b-2xl overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-transparent to-transparent opacity-80" />
-            <div className="absolute bottom-6 left-6 right-6">
-              <div className="flex items-center gap-3 mb-2">
-                <span className={`${getMealTypeColor(meal.meal_type)}/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${getMealTypeColor(meal.meal_type)}/30 text-[color:var(--fc-text-primary)]`}>
+            <div className="absolute bottom-4 left-4 right-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`${getMealTypeColor(meal.meal_type)}/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getMealTypeColor(meal.meal_type)}/30 text-[color:var(--fc-text-primary)]`}>
                   {meal.meal_type}
                 </span>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary line-clamp-2">
                 {meal.name}
               </h1>
             </div>
           </div>
 
-          <main className="px-4 sm:px-6 -mt-6 relative z-10 max-w-2xl mx-auto">
-            <div className="fc-surface rounded-3xl p-6 border border-[color:var(--fc-surface-card-border)] space-y-8">
-              <div className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] pb-6">
+          <main className="px-1 -mt-4 relative z-10 w-full">
+            <div className="fc-surface rounded-2xl p-4 border border-[color:var(--fc-surface-card-border)] space-y-4">
+              <div className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] pb-3">
                 <div>
                   <p className="text-[10px] fc-text-subtle uppercase tracking-widest font-bold mb-1">Meal</p>
                   <p className="text-lg font-semibold font-mono fc-text-primary">{meal.name}</p>
@@ -526,7 +531,7 @@ export default function MealDetailPage() {
                   </div>
                 </section>
 
-                <div className="fc-surface rounded-2xl p-6">
+                <div className="fc-card-shell p-6">
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
@@ -625,26 +630,26 @@ export default function MealDetailPage() {
             )}
 
             {meal.notes && (
-              <div className="fc-surface rounded-2xl p-6">
+              <div className="fc-card-shell p-6">
                 <h3 className="text-lg font-semibold fc-text-primary">Notes</h3>
                 <p className="mt-2 text-sm fc-text-dim leading-relaxed">{meal.notes}</p>
               </div>
             )}
           </main>
 
-          <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent z-50 pointer-events-none">
-            <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4 pointer-events-auto">
-              <Button variant="outline" className="h-12 rounded-2xl fc-glass border font-semibold gap-2">
-                <Edit3 className="w-5 h-5" />
-                Edit Details
+          <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent z-50 pointer-events-none">
+            <div className="max-w-lg mx-auto w-full grid grid-cols-2 gap-2 pointer-events-auto">
+              <Button variant="outline" className="h-10 rounded-xl fc-glass border text-sm font-semibold gap-1.5">
+                <Edit3 className="w-4 h-4" />
+                Edit
               </Button>
-              <Button variant="outline" className="h-12 rounded-2xl border-[color:var(--fc-status-error)]/40 fc-text-error font-semibold gap-2 bg-[color:var(--fc-status-error)]/10">
-                <Trash2 className="w-5 h-5" />
+              <Button variant="outline" className="h-10 rounded-xl border-[color:var(--fc-status-error)]/40 fc-text-error text-sm font-semibold gap-1.5 bg-[color:var(--fc-status-error)]/10">
+                <Trash2 className="w-4 h-4" />
                 Delete
               </Button>
             </div>
           </div>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

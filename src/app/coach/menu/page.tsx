@@ -103,7 +103,7 @@ export default function CoachMenu() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 pb-32 space-y-8">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
@@ -133,7 +133,7 @@ export default function CoachMenu() {
                     <Link href={item.href} key={item.href}>
                       <GlassCard
                         elevation={2}
-                        className="fc-glass fc-card p-5 h-full transition-all hover:scale-[1.02] hover:shadow-xl"
+                        className="fc-card-shell p-5 h-full transition-all hover:scale-[1.02] hover:shadow-xl"
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent)]">
@@ -193,7 +193,7 @@ export default function CoachMenu() {
             </>
           )}
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <GlassCard elevation={2} className="fc-card-shell p-6">
             <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">
               Quick Actions
             </h2>

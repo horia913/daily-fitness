@@ -86,12 +86,6 @@ export interface BaseBlockExecutorProps {
   clientBodyWeightKg?: number | null;
 }
 
-export interface BlockDetail {
-  label: string;
-  value: string | number | null | undefined;
-  unit?: string;
-}
-
 export interface LogButtonProps {
   onClick: () => void;
   disabled?: boolean;

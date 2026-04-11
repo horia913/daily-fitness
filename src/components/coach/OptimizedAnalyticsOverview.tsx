@@ -276,7 +276,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-3 sm:p-6">
+              <div className="fc-card-shell p-3 sm:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -304,7 +304,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-start gap-3 sm:gap-4">
@@ -376,7 +376,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           {/* Key Performance Indicators */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
             {/* Total Clients */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -397,7 +397,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Active Clients */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -417,7 +417,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Overall Compliance */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -438,7 +438,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Total Workouts */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -458,7 +458,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Total Meals */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -478,7 +478,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Personal Bests */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -501,7 +501,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
             {/* Client Growth Chart */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardHeader className="p-3 sm:p-6 pb-2">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg min-w-0">
@@ -550,7 +550,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
             </Card>
 
             {/* Compliance Breakdown */}
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardHeader className="p-3 sm:p-6 pb-2">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg min-w-0">
@@ -599,7 +599,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </div>
 
           {/* Program Effectiveness */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardHeader className="p-3 sm:p-6 pb-2">
               <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                 <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -651,7 +651,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </Card>
 
           {/* Engagement Metrics */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardHeader className="p-3 sm:p-6 pb-2">
               <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                 <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -698,7 +698,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </Card>
 
           {/* Client Compliance Rankings */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardHeader className="p-3 sm:p-6 pb-2">
               <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                 <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">

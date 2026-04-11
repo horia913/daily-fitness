@@ -161,7 +161,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
 
   if (loading) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 text-center fc-text-dim">
+      <div className="fc-card-shell p-6 text-center fc-text-dim">
         Loading adherence…
       </div>
     )
@@ -174,7 +174,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
 
   if (showSetupHint) {
     return (
-      <div className="text-center py-12 px-4 fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="text-center py-12 px-4 fc-card-shell">
         <BarChart3 className="w-12 h-12 mx-auto mb-4 text-[color:var(--fc-text-dim)]" />
         <h3 className="text-lg font-semibold mb-2 fc-text-primary">No adherence data yet</h3>
         <p className="text-sm text-[color:var(--fc-text-dim)] mb-6 max-w-md mx-auto">
@@ -203,7 +203,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
     <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+        <div className="fc-card-shell p-5 text-center">
           <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
             <CheckCircle className="w-5 h-5" />
           </div>
@@ -213,7 +213,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           <p className="text-sm fc-text-dim">Workout Adherence</p>
         </div>
 
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+        <div className="fc-card-shell p-5 text-center">
           <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
             <BarChart3 className="w-5 h-5" />
           </div>
@@ -234,7 +234,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
           )}
         </div>
 
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+        <div className="fc-card-shell p-5 text-center">
           <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
             <Calendar className="w-5 h-5" />
           </div>
@@ -246,7 +246,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
       </div>
 
       {/* This Week Summary */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+      <div className="fc-card-shell p-6">
         <h3 className="text-xl font-semibold fc-text-primary mb-4">This Week</h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-4 py-4 text-center">
@@ -276,7 +276,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
       </div>
 
       {/* Weekly Calendar View (program week = rolling from start date; not calendar week) */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+      <div className="fc-card-shell p-6">
         <h3 className="text-xl font-semibold fc-text-primary mb-4">7-Day Activity</h3>
         <p className="text-xs fc-text-dim mb-3">Program week — completed vs scheduled above.</p>
         <div className="grid grid-cols-7 gap-2 min-w-0 overflow-x-auto">

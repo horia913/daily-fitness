@@ -147,7 +147,7 @@ export default function ProgramTimeline({
           const weekDuration = getWeekDuration(week)
           
           return (
-            <div key={week.id} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <div key={week.id} className="fc-card-shell">
               <div className="pb-3 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -303,7 +303,7 @@ export default function ProgramTimeline({
 
       {/* Empty State */}
       {weeks.length === 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <div className="fc-card-shell">
           <div className="text-center py-12">
             <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
               <Calendar className="w-8 h-8" />

@@ -15,7 +15,6 @@ export type {
   WorkoutClusterSet,
   WorkoutRestPauseSet,
   WorkoutTimeProtocol,
-  WorkoutHRSet,
   WorkoutSpeedSet,
   WorkoutEnduranceSet,
   SetTypeConfig,

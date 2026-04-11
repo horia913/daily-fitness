@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { ClientPageShell } from "@/components/client-ui";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -16,7 +17,6 @@ import {
   Edit3,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 
 interface Food {
   id: string;
@@ -57,7 +57,7 @@ const getFoodIcon = (category: string) => {
   }
 };
 
-const headerGradient = "fc-surface";
+const headerGradient = "fc-card-shell";
 
 const calculateNutritionForServing = (food: Food, servingSize: number) => {
   const multiplier = servingSize / food.serving_size;
@@ -72,7 +72,6 @@ const calculateNutritionForServing = (food: Food, servingSize: number) => {
 
 export default function FoodDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { performanceSettings } = useTheme();
 
   const foodId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -131,15 +130,15 @@ export default function FoodDetailPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
-            <div className="fc-surface rounded-2xl p-8 text-center max-w-md">
-              <p className="fc-text-dim mb-4">{loadError}</p>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 flex items-center justify-center min-h-[50vh]">
+            <div className="fc-card-shell p-4 text-center w-full">
+              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
               <div className="flex gap-2 justify-center flex-wrap">
                 <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadFood(); }} className="fc-btn fc-btn-primary">Retry</Button>
-                <Button variant="outline" onClick={() => router.push("/client/nutrition")} className="fc-btn fc-btn-secondary"><ChevronLeft className="w-4 h-4 mr-2" />Back</Button>
+                <Button variant="outline" onClick={() => { window.location.href = "/client/nutrition"; }} className="fc-btn fc-btn-secondary"><ChevronLeft className="w-4 h-4 mr-2" />Back</Button>
               </div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -152,7 +151,7 @@ export default function FoodDetailPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-4xl">
-              <div className="fc-surface p-6 sm:p-10">
+              <div className="fc-card-shell p-6 sm:p-10">
                 <div className="animate-pulse space-y-4">
                   <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
                   <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
@@ -171,25 +170,21 @@ export default function FoodDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-4xl">
-              <div className="fc-surface p-10 text-center">
-                <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                  Food not found
-                </h2>
-                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
-                  This food item is no longer available.
-                </p>
-                <div className="mt-6 flex justify-center">
-                  <Link href="/client/nutrition">
-                    <Button className="fc-btn fc-btn-secondary">
-                      Back to Nutrition
-                    </Button>
-                  </Link>
-                </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 text-center">
+            <div className="fc-card-shell p-6">
+              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                Food not found
+              </h2>
+              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                This food item is no longer available.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Button className="fc-btn fc-btn-secondary h-10 text-sm" onClick={() => { window.location.href = "/client/nutrition"; }}>
+                  Back to Nutrition
+                </Button>
               </div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -205,18 +200,20 @@ export default function FoodDetailPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen px-4 sm:px-6 pb-32 pt-8">
-          <div className="mx-auto w-full max-w-xl space-y-6">
-            <nav className="flex items-center justify-between mb-6">
-              <Link href="/client/nutrition">
-                <button type="button" className="min-h-[44px] min-w-[44px] rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors" aria-label="Back">
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-              </Link>
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">
+            <nav className="flex items-center justify-between mb-2">
+              <button
+                type="button"
+                onClick={() => { window.location.href = "/client/nutrition"; }}
+                className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors"
+                aria-label="Back"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
             </nav>
 
-            <header className="mb-6">
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">{food.name}</h1>
+            <header className="mb-3">
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary mb-1 break-words">{food.name}</h1>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm fc-text-subtle">Serving Size:</span>
                 <span className="font-mono text-sm font-bold fc-text-workouts">{foodServingSize} {food.serving_unit}</span>
@@ -229,7 +226,7 @@ export default function FoodDetailPage() {
               </div>
             </header>
 
-            <div className="fc-surface rounded-2xl p-8 text-center border-t-2 border-t-[color:var(--fc-domain-workouts)]/30">
+            <div className="fc-card-shell p-8 text-center border-t-2 border-t-[color:var(--fc-domain-workouts)]/30">
               <div className="text-xs fc-text-subtle font-medium uppercase tracking-widest mb-1">Total Energy</div>
               <div className="flex justify-center items-baseline gap-2">
                 <span className="text-4xl font-bold font-mono fc-text-primary">{nutrition.calories}</span>
@@ -243,7 +240,7 @@ export default function FoodDetailPage() {
               </div>
             </div>
 
-            <div className="fc-surface rounded-2xl p-6">
+            <div className="fc-card-shell p-6">
               <h3 className="text-sm font-bold uppercase tracking-widest fc-text-subtle mb-6">Macronutrients</h3>
               <div className="space-y-6">
                 <div>
@@ -280,22 +277,23 @@ export default function FoodDetailPage() {
               </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/90 to-transparent z-50">
-              <div className="max-w-xl mx-auto grid grid-cols-2 gap-4">
-                <Link href={`/client/nutrition/foods/create?edit=${food.id}`}>
-                  <Button variant="outline" className="w-full h-12 rounded-2xl fc-glass border border-[color:var(--fc-domain-workouts)]/40 fc-text-workouts font-bold uppercase tracking-wider text-sm gap-2">
-                    <Edit3 className="w-4 h-4" />
-                    Edit Food
-                  </Button>
-                </Link>
-                <Button variant="outline" className="w-full h-12 rounded-2xl border border-[color:var(--fc-status-error)]/40 fc-text-error font-bold uppercase tracking-wider text-sm gap-2 bg-[color:var(--fc-status-error)]/10">
-                  <Trash2 className="w-4 h-4" />
+            <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/90 to-transparent z-50">
+              <div className="max-w-lg mx-auto w-full grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { window.location.href = `/client/nutrition/foods/create?edit=${food.id}`; }}
+                  className="w-full h-10 rounded-xl fc-glass border border-[color:var(--fc-domain-workouts)]/40 fc-text-workouts font-semibold text-xs gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit
+                </Button>
+                <Button variant="outline" className="w-full h-10 rounded-xl border border-[color:var(--fc-status-error)]/40 fc-text-error font-semibold text-xs gap-1.5 bg-[color:var(--fc-status-error)]/10">
+                  <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

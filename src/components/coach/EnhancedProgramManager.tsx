@@ -3301,7 +3301,7 @@ function ProgramCreateForm({
                   {dayNames.map((dayName, dayIndex) => (
                     <Card
                       key={dayIndex}
-                      className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)]"
+                      className="fc-card-shell"
                     >
                       <CardContent className="p-4">
                         <h4 className="font-medium mb-3 text-center text-[color:var(--fc-text-primary)]">

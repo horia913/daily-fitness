@@ -11,7 +11,7 @@ const createMockQueryBuilder = (initialData: any = null) => {
   let data = initialData;
   let filters: any[] = [];
 
-  const builder = {
+  const builder: any = {
     select: jest.fn(() => builder),
     insert: jest.fn((insertData: any) => {
       data = Array.isArray(insertData) ? insertData[0] : insertData;

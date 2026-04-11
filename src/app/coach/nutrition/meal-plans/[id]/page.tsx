@@ -252,7 +252,7 @@ export default function MealPlanDetailPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="p-4 sm:p-6">
             <div className="max-w-4xl mx-auto">
-              <GlassCard elevation={2} className="fc-glass fc-card p-8">
+              <GlassCard elevation={2} className="fc-card-shell p-8">
                 <div className="animate-pulse space-y-4">
                   <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
                   <div className="h-64 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
@@ -272,7 +272,7 @@ export default function MealPlanDetailPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="p-4 sm:p-6">
             <div className="max-w-4xl mx-auto">
-              <GlassCard elevation={2} className="fc-glass fc-card p-10 text-center">
+              <GlassCard elevation={2} className="fc-card-shell p-10 text-center">
                 <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
                   Meal Plan Not Found
                 </h2>
@@ -297,9 +297,9 @@ export default function MealPlanDetailPage() {
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Back to Nutrition
             </Link>
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
               <div className="flex items-start gap-4">
-                <Link href="/coach/nutrition" className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                <Link href="/coach/nutrition" className="fc-card-shell w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
                 <div className="flex-1 min-w-0">
@@ -338,7 +338,7 @@ export default function MealPlanDetailPage() {
 
             {/* Daily totals summary — derived from Option 1 of each meal */}
             {dailyTotals && (
-              <GlassCard elevation={2} className="fc-glass fc-card p-5">
+              <GlassCard elevation={2} className="fc-card-shell p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-4 h-4 text-[color:var(--fc-accent)]" />
                   <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
@@ -569,7 +569,7 @@ export default function MealPlanDetailPage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) { setEditingMealOptions(null); loadMeals(); } }}
         >
-          <div className={`${theme.card} fc-glass fc-card rounded-3xl border ${theme.border} max-w-3xl max-h-[90vh] w-full overflow-hidden`}>
+          <div className={`${theme.card} fc-card-shell rounded-3xl border ${theme.border} max-w-3xl max-h-[90vh] w-full overflow-hidden`}>
             {/* Modal Header */}
             <div className={`sticky top-0 ${theme.card} fc-glass border-b ${theme.border} px-6 py-4 flex items-center justify-between`}>
               <div>

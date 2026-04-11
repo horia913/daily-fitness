@@ -77,7 +77,6 @@ const WHITELIST: Record<string, Set<string>> = {
     'fortime_target_reps',
     'rpe',
   ]),
-  hr_sets: new Set(['rpe']),
 }
 
 function parseNum(value: unknown): number | null {
@@ -216,7 +215,6 @@ function getAffectedExerciseIds(row: Record<string, unknown>, blockType: string)
       if (Array.isArray(arr)) arr.forEach((e) => add(e?.exercise_id))
       break
     }
-    case 'hr_sets':
     default:
       break
   }
@@ -279,7 +277,7 @@ export async function PATCH(
     const { set } = result
 
     const blockType = (set.set_type as string) || ''
-    const allowed = WHITELIST[blockType] ?? WHITELIST.hr_sets
+    const allowed = WHITELIST[blockType] ?? WHITELIST.straight_set
     const allowedKeys = Array.from(allowed)
 
     let body: Record<string, unknown>

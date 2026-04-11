@@ -135,7 +135,7 @@ export function ProgressPhotos({
 
   if (loading) {
     return (
-      <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden")}>
+      <div className={cn("fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden")}>
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -174,7 +174,7 @@ export function ProgressPhotos({
 
   if (photos.length === 0) {
     return (
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -225,7 +225,7 @@ export function ProgressPhotos({
   }
 
   return (
-    <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full")}>
+    <div className={cn("fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full")}>
       <div className="p-4 sm:p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -528,7 +528,7 @@ function TimelinePhotoCard({
   const transformationMessage = getTransformationMessage(photo)
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+    <div className="fc-card-shell overflow-hidden">
       <div className="flex flex-col md:flex-row">
         {/* Photo */}
         <div className="relative w-full md:w-48 h-48 md:h-32">

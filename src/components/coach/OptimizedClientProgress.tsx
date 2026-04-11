@@ -491,7 +491,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-4 sm:p-6">
+              <div className="fc-card-shell p-4 sm:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -519,7 +519,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
                 <div className="flex items-start gap-3 sm:gap-4 min-w-0">
@@ -604,7 +604,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.65fr] gap-6">
               {/* Client Info Header */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardContent className="p-3 sm:p-4 md:p-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center text-xl font-bold">
@@ -665,7 +665,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               </Card>
 
               {/* Momentum Snapshot */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-[color:var(--fc-text-primary)] text-base">
                     <div className="p-2 rounded-lg bg-[color:var(--fc-glass-soft)]">
@@ -712,7 +712,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
             {/* Key Progress Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {/* Current Weight */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+              <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
                 <CardContent className="p-3 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-4">
                     <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -733,7 +733,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               </Card>
 
               {/* Body Fat */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+              <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
                 <CardContent className="p-3 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-4">
                     <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -754,7 +754,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               </Card>
 
               {/* Overall Compliance */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+              <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
                 <CardContent className="p-3 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-4">
                     <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -775,7 +775,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               </Card>
 
               {/* Strength Gains */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+              <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
                 <CardContent className="p-3 sm:p-6">
                   <div className="flex items-center gap-2 sm:gap-4">
                     <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
@@ -802,7 +802,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
             {/* Detailed Progress Tabs */}
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
-              <TabsList className="flex w-full fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-1 min-h-[56px] overflow-hidden">
+              <TabsList className="flex w-full fc-card-shell p-1 min-h-[56px] overflow-hidden">
                 <TabsTrigger 
                   value="overview" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
@@ -844,7 +844,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
               <TabsContent value="overview" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Recent Activity */}
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                         <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -881,7 +881,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                   </Card>
 
                   {/* Achievements */}
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                         <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -916,7 +916,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
               {/* Weight Tab */}
               <TabsContent value="weight" className="space-y-6">
-                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <Card className="fc-card-shell">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                       <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -954,7 +954,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
               {/* Strength Tab */}
               <TabsContent value="strength" className="space-y-6">
-                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <Card className="fc-card-shell">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                       <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -992,7 +992,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
               {/* Compliance Tab */}
               <TabsContent value="compliance" className="space-y-6">
-                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <Card className="fc-card-shell">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                       <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -1042,7 +1042,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
               {/* Photos Tab */}
               <TabsContent value="photos" className="space-y-6">
-                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <Card className="fc-card-shell">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
                       <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -1087,7 +1087,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       {!clientProgressData && (
         <div className="p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
                   <User className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />

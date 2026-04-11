@@ -220,7 +220,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
   
   if (loading) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+      <div className="fc-card-shell p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
           <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded"></div>
@@ -231,7 +231,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
   }
   
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]" data-nutrition-goals>
+    <div className="fc-card-shell" data-nutrition-goals>
       <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">

@@ -3,21 +3,30 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Flame,
   ChevronLeft,
   ChevronRight,
   MoreVertical,
   Pencil,
+  Target,
+  Repeat2,
+  Timer,
+  Weight,
+  Gauge,
+  Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
-  calculateSuggestedWeightUtil,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
-import { LargeInput } from "../ui/LargeInput";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
+import { LargeInput } from "../ui/LargeInput";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
@@ -52,6 +61,7 @@ export function GiantSetExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestionsMap,
@@ -169,6 +179,7 @@ export function GiantSetExecutor({
   const isViewingLoggedSet = viewingSetIndex >= 1;
   useEffect(() => {
     if (exercises.length === 0 || isViewingLoggedSet) return;
+    if (editingSetId) return;
     const nextWeights: string[] =
       weights.length !== exercises.length ? [] : [...weights];
     for (let idx = 0; idx < exercises.length; idx++) {
@@ -192,56 +203,98 @@ export function GiantSetExecutor({
         nextWeights.length ? nextWeights : new Array(exercises.length).fill(""),
       );
     }
-    if (reps.length !== exercises.length) {
-      setReps(new Array(exercises.length).fill(""));
-    }
   }, [
     exercises.length,
     completedSets,
     isViewingLoggedSet,
+    editingSetId,
     lastPerformedWeightByExerciseId,
     lastSessionWeightByExerciseId,
     e1rmMap,
     weightsPristine,
   ]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const exerciseRepSig = exercises
+    .map((e) => `${e.exercise_id}:${e.reps ?? ""}`)
+    .join("|");
+
+  useEffect(() => {
+    if (viewingSetIndex >= 1) return;
+    if (editingSetId) return;
+    if (exercises.length === 0) return;
+    const nextReps = exercises.map((ex) => {
+      const { numericDefault } = parseRepsTarget(
+        ex.reps ?? block.block.reps_per_set ?? null,
+      );
+      return numericDefault > 0 ? String(numericDefault) : "";
+    });
+    setReps(nextReps);
+  }, [
+    viewingSetIndex,
+    editingSetId,
+    completedSets,
+    exercises.length,
+    exerciseRepSig,
+    block.block.reps_per_set,
+  ]);
+
+  const titleExercise =
+    exercises[currentExerciseIndex ?? 0] ?? exercises[0];
+  const exerciseTitleName =
+    titleExercise?.exercise?.name ?? "Exercise";
+
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Rounds", value: totalSets },
     {
-      label: "ROUNDS",
-      value: totalSets,
-    },
-    {
-      label: "REST BETWEEN",
-      value: block.block.rest_seconds || 90,
+      icon: Timer,
+      label: "Rest between",
+      value: formatRestSeconds(block.block.rest_seconds || 90),
       unit: "s",
     },
   ];
-
-  // Add exercises list
   exercises.forEach((ex, idx) => {
+    const name = ex.exercise?.name || `Exercise ${idx + 1}`;
     if (ex.reps) {
-      blockDetails.push({
-        label: `${idx + 1}. ${ex.exercise?.name || `Exercise ${idx + 1}`}`,
-        value: `${ex.reps} reps`,
+      prescriptionItems.push({
+        icon: Repeat2,
+        label: `${idx + 1}. ${name}`,
+        value: ex.reps,
       });
-      if (ex.load_percentage) {
-        const suggestedWeight = calculateSuggestedWeightUtil(
-          ex.exercise_id,
-          ex.load_percentage,
-          e1rmMap,
-        );
-        const loadDisplay = formatLoadPercentage(
-          ex.load_percentage,
-          suggestedWeight,
-        );
-        if (loadDisplay) {
-          blockDetails.push({
-            label: `LOAD (${idx + 1})`,
-            value: loadDisplay,
-          });
-        }
+    }
+    const resW = results[idx];
+    if (
+      ex.load_percentage != null &&
+      ex.load_percentage !== undefined &&
+      ex.exercise_id
+    ) {
+      const suggestedForDisplay =
+        resW?.source === "percent_e1rm" ? resW.suggested_weight : null;
+      const loadDisplay = formatLoadPercentage(
+        ex.load_percentage,
+        suggestedForDisplay,
+      );
+      if (loadDisplay) {
+        prescriptionItems.push({
+          icon: Weight,
+          label: `Load (${idx + 1})`,
+          value: loadDisplay,
+        });
       }
+    }
+    if (ex.tempo) {
+      prescriptionItems.push({
+        icon: Gauge,
+        label: `Tempo (${idx + 1})`,
+        value: ex.tempo,
+      });
+    }
+    if (ex.rir != null && ex.rir !== undefined) {
+      prescriptionItems.push({
+        icon: Flame,
+        label: `RPE (${idx + 1})`,
+        value:
+          formatPrescribedRpeLabel(ex.rir) ?? String(ex.rir).trim(),
+      });
     }
   });
 
@@ -766,26 +819,33 @@ export function GiantSetExecutor({
         </div>
       )}
       <div className="flex flex-col border-y border-white/5">
-      {exercises.map((exercise, idx) => (
+      {exercises.map((exercise, idx) => {
+        const { displayHint: repsHintGiant } = parseRepsTarget(
+          exercise.reps ?? null,
+        );
+        return (
         <div
           key={exercise.id || idx}
           className={`border-b border-white/5 py-4 ${idx === exercises.length - 1 ? "last:border-b-0" : ""}`}
         >
-          <div className="mb-4">
-            <h4 className="font-semibold fc-text-primary text-lg">
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <h4 className="min-w-0 flex-1 font-semibold fc-text-primary text-lg">
               {idx + 1}. {exercise.exercise?.name || `Exercise ${idx + 1}`}
               {exercise.exercise_letter && ` (${exercise.exercise_letter})`}
             </h4>
-            <ExerciseActionButtons
-              exercise={exercise}
-              onVideoClick={onVideoClick}
-              onAlternativesClick={onAlternativesClick}
-            />
+            <div className="shrink-0 pt-0.5">
+              <ExerciseActionButtons
+                exercise={exercise}
+                onVideoClick={onVideoClick}
+                onAlternativesClick={onAlternativesClick}
+              />
+            </div>
           </div>
           {exercise.exercise_id && (
             <ProgressionNudge
               suggestion={progressionSuggestionsMap?.get(exercise.exercise_id)}
               previousPerformance={previousPerformanceMap?.get(exercise.exercise_id) ?? null}
+              previousSessionSetNumber={displaySetNumber}
               onApplySuggestion={(w, r) => {
                 if (w != null) {
                   setWeightsPristine((prev) => {
@@ -846,6 +906,7 @@ export function GiantSetExecutor({
                 unit="kg"
                 showStepper
                 stepAmount={2.5}
+                plateCalculatorEnabled
               />
               {!editDraft &&
                 (() => {
@@ -878,6 +939,7 @@ export function GiantSetExecutor({
             </div>
             <LargeInput
               label="Reps"
+              hint={!editDraft ? repsHintGiant ?? undefined : undefined}
               value={editDraft ? (editDraft.reps[idx] ?? "") : reps[idx] || ""}
               onChange={(value) => {
                 if (editDraft) {
@@ -902,7 +964,8 @@ export function GiantSetExecutor({
             />
           </div>
         </div>
-      ))}
+        );
+      })}
       </div>
     </div>
   );
@@ -913,53 +976,77 @@ export function GiantSetExecutor({
       ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
       : [];
   const viewedSetEntry = forViewedRound[0] ?? null;
-  const logButton = isEditMode ? (
-    <div className="flex gap-2 w-full">
-      <Button
-        variant="outline"
-        onClick={handleCancelEdit}
-        className="flex-1 h-12 text-base font-semibold rounded-xl"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handleSaveEdit}
-        disabled={
-          isSavingEdit ||
-          !editDraft ||
-          editDraft.weights.some(
-            (w, i) => !w?.trim() || isNaN(parseFloat(w)) || parseFloat(w) < 0,
-          ) ||
-          editDraft.reps.some(
-            (r, i) =>
-              !r?.trim() || isNaN(parseInt(r, 10)) || parseInt(r, 10) <= 0,
-          )
-        }
-        variant="fc-primary"
-        className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-      >
-        {isSavingEdit ? "Saving…" : "Save edits"}
-      </Button>
+
+  const logInputsReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    exercises.length > 0 &&
+    exercises.every((_, idx) => {
+      const ws = weights[idx];
+      const rs = reps[idx];
+      const w = parseFloat(String(ws ?? ""));
+      const r = parseInt(String(rs ?? ""), 10);
+      return (
+        String(ws ?? "").trim() !== "" &&
+        !isNaN(w) &&
+        w > 0 &&
+        String(rs ?? "").trim() !== "" &&
+        !isNaN(r) &&
+        r > 0
+      );
+    });
+
+  const logButton = (
+    <div className="space-y-2">
+      {allowSetEditDelete && isEditMode ? (
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            onClick={handleCancelEdit}
+            className="flex-1 h-12 text-base font-semibold rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            disabled={
+              isSavingEdit ||
+              !editDraft ||
+              editDraft.weights.some(
+                (w, i) =>
+                  !w?.trim() || isNaN(parseFloat(w)) || parseFloat(w) < 0,
+              ) ||
+              editDraft.reps.some(
+                (r, i) =>
+                  !r?.trim() ||
+                  isNaN(parseInt(r, 10)) ||
+                  parseInt(r, 10) <= 0,
+              )
+            }
+            variant="fc-primary"
+            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+          >
+            {isSavingEdit ? "Saving…" : "Save edits"}
+          </Button>
+        </div>
+      ) : allowSetEditDelete && viewedSetEntry ? (
+        <Button
+          onClick={() => handleEditSet(viewedSetEntry)}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+        >
+          <Pencil className="w-5 h-5 mr-2" />
+          Edit this round
+        </Button>
+      ) : (
+        <LogSetButton
+          onClick={handleLog}
+          ready={logInputsReady}
+          loading={isLoggingSet}
+          label="Log giant set"
+        />
+      )}
     </div>
-  ) : viewedSetEntry ? (
-    <Button
-      onClick={() => handleEditSet(viewedSetEntry)}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-    >
-      <Pencil className="w-5 h-5 mr-2" />
-      Edit this round
-    </Button>
-  ) : (
-    <Button
-      onClick={handleLog}
-      disabled={isLoggingSet || completedSets >= totalSets}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Flame className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG GIANT SET"}
-    </Button>
   );
 
   return (
@@ -984,17 +1071,20 @@ export function GiantSetExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
+        previousPerformanceMap,
       }}
-      exerciseName={`Giant Set: ${exercises.length} Exercises`}
-      blockDetails={blockDetails}
+      exerciseName={exerciseTitleName}
+      prescriptionItems={prescriptionItems}
+      currentExercise={titleExercise}
       instructions={instructions}
       currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Round"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle={`LOG ROUND ${displaySetNumber}`}
       showNavigation={true}
-      currentExercise={exercises[0]}
       showRestTimer={!!block.block.rest_seconds}
     />
   );

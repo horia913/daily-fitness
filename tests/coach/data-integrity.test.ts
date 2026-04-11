@@ -235,7 +235,7 @@ describe('Data Integrity', () => {
       };
 
       // Should fail validation
-      expect(invalidExercise.name).toBeUndefined();
+      expect("name" in invalidExercise).toBe(false);
     });
 
     it('should validate number ranges', () => {

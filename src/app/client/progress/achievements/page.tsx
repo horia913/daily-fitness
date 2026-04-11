@@ -9,7 +9,6 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AchievementCard } from "@/components/ui/AchievementCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Award, Filter } from "lucide-react";
-import Link from "next/link";
 import { AchievementService } from "@/lib/achievementService";
 import type { AchievementProgress } from "@/lib/achievementService";
 
@@ -199,12 +198,16 @@ function AchievementsPageContent() {
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
         <div className="space-y-8">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10">
+          <div className="fc-card-shell backdrop-blur-[8px] p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-6">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/progress"; }}
+                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]"
+                >
                   <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
+                </button>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
                     <Award className="w-6 h-6" />
@@ -356,12 +359,12 @@ function AchievementsPageContent() {
           </div>
 
           {loadError ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
+            <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
             </div>
           ) : loading ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
+            <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]" />
               <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
                 Loading achievements...
@@ -380,7 +383,7 @@ function AchievementsPageContent() {
               </div>
 
               {filteredAchievements.length === 0 && (
-                <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12 text-center">
+                <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
                   <Award className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
                   <p className="mb-2 text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     No achievements found

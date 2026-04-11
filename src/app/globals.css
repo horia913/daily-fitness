@@ -339,24 +339,88 @@
     }
   }
 
-  @keyframes confetti-fall {
-    0% {
-      transform: translateY(-100vh) rotate(0deg);
-      opacity: 1;
-    }
+  @keyframes pr-celebration-border-flow {
+    0%,
     100% {
-      transform: translateY(100vh) rotate(720deg);
-      opacity: 0;
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
     }
   }
 
-  .pr-confetti-piece {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    animation: confetti-fall 3s ease-out forwards;
-    pointer-events: none;
+  .pr-celebration-gradient-border {
+    background: linear-gradient(
+      90deg,
+      #fbbf24,
+      #f59e0b,
+      #22d3ee,
+      #fcd34d,
+      #eab308,
+      #fbbf24,
+      #f59e0b
+    );
+    background-size: 400% 100%;
+    animation: pr-celebration-border-flow 4s ease-in-out infinite;
+  }
+
+  @keyframes pr-card-shake {
+    0% {
+      transform: translateX(0);
+    }
+
+    20% {
+      transform: translateX(-2px);
+    }
+
+    40% {
+      transform: translateX(2px);
+    }
+
+    60% {
+      transform: translateX(-1px);
+    }
+
+    80%,
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .pr-celebration-card-shake {
+    animation: pr-card-shake 0.3s ease-out forwards;
+  }
+
+  @keyframes pr-arrow-nudge {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+
+    50% {
+      transform: translateX(4px);
+    }
+  }
+
+  .pr-celebration-arrow-animated {
+    animation: pr-arrow-nudge 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pr-gold-shimmer {
+    0% {
+      transform: translateX(-40%) skewX(-14deg);
+      opacity: 0.12;
+    }
+
+    100% {
+      transform: translateX(40%) skewX(-14deg);
+      opacity: 0.2;
+    }
+  }
+
+  .pr-celebration-shimmer-sweep {
+    animation: pr-gold-shimmer 5s ease-in-out infinite alternate;
   }
 
   @keyframes rotate-shimmer {
@@ -446,22 +510,6 @@
 /* Lock main content scroll when a full-screen modal is open */
 body.fc-modal-open main {
   overflow: hidden !important;
-}
-
-/* Workout execution: sticky card in <main>; full rounding; small bottom offset so lower corners show */
-.workout-input-area {
-  position: sticky;
-  bottom: 0.75rem;
-  z-index: 10;
-  margin-left: max(0.75rem, env(safe-area-inset-left, 0px));
-  margin-right: max(0.75rem, env(safe-area-inset-right, 0px));
-  padding: 12px 16px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 0.75rem;
-  background: var(--fc-surface-card);
-  box-sizing: border-box;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
 }
 
 /*

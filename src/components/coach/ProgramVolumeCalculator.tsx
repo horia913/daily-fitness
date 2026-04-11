@@ -248,7 +248,7 @@ export default function ProgramVolumeCalculator({
   return (
     <>
       <div
-        className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] ${className || ""}`}
+        className={`fc-card-shell ${className || ""}`}
       >
         <div className="p-4">
           <div

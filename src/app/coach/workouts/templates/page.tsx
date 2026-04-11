@@ -317,7 +317,7 @@ export default function WorkoutTemplatesPage() {
     return (
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 max-w-md">
+          <div className="fc-card-shell p-6 max-w-md">
             <p className="text-center fc-text-dim">
               Please sign in to view workout templates.
             </p>
@@ -334,7 +334,7 @@ export default function WorkoutTemplatesPage() {
         <div className="relative z-10 min-h-screen p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="animate-pulse space-y-6">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-card-shell p-6">
                 <div
                   className="h-8 rounded mb-4"
                   style={{
@@ -349,7 +349,7 @@ export default function WorkoutTemplatesPage() {
                 ></div>
               </div>
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+                <div key={i} className="fc-card-shell p-6">
                   <div
                     className="h-24 rounded"
                     style={{

@@ -26,17 +26,17 @@ export function LoadingSkeleton({
           </div>
           {/* Card skeletons */}
           <div className="space-y-4">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-card-shell p-6">
               <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
               <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
               <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-card-shell p-6">
               <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
               <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
               <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="fc-card-shell p-6">
               <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
               <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
               <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
@@ -48,7 +48,7 @@ export function LoadingSkeleton({
     case 'card':
       return (
         <div className={`${baseClasses} ${className}`}>
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-card-shell p-6">
             <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
             <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
             <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
@@ -75,7 +75,7 @@ export function LoadingSkeleton({
     case 'chart':
       return (
         <div className={`${baseClasses} ${className}`}>
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-card-shell p-6">
             {/* Chart header */}
             <div className="h-6 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-6" />
             {/* Chart area with grid lines */}

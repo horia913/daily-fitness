@@ -114,27 +114,6 @@ export const pulseAnimation = {
   `,
 };
 
-// Confetti/celebration animation
-export const celebrationAnimation = {
-  duration: 2000,
-  keyframes: `
-    @keyframes celebrate {
-      0% {
-        transform: translateY(0) scale(0);
-        opacity: 0;
-      }
-      50% {
-        transform: translateY(-50px) scale(1.2);
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(-100px) scale(1);
-        opacity: 0;
-      }
-    }
-  `,
-};
-
 // Gradient shift animation for background
 export const gradientShiftAnimation = {
   duration: 10000,

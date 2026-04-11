@@ -47,7 +47,7 @@ export default function NewClientRequests() {
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+    <div className="fc-card-shell">
       <div className="pb-4 p-6 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-3">
           <div className="fc-icon-tile fc-icon-workouts">

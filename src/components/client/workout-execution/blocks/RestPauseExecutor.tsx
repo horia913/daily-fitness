@@ -4,13 +4,16 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   PauseCircle,
-  CheckCircle,
   X,
   Plus,
   ChevronLeft,
   ChevronRight,
   MoreVertical,
   Pencil,
+  Target,
+  Timer,
+  Hash,
+  Weight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -18,9 +21,13 @@ import {
   formatLoadPercentage,
   calculateSuggestedWeightUtil,
   formatTime,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
@@ -54,6 +61,7 @@ export function RestPauseExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestion,
@@ -156,16 +164,25 @@ export function RestPauseExecutor({
     setIsWeightPristine(true);
   }, [completedSets, currentExerciseIndex, exerciseId]);
 
+  const prescribedTargetRepsRaw =
+    currentExercise?.reps ?? block.block.reps_per_set ?? 8;
+  const { numericDefault: prescribedTargetRepsNum, displayHint: targetRepsHint } =
+    parseRepsTarget(prescribedTargetRepsRaw);
+
   useEffect(() => {
     if (viewingSetIndex >= 1) return;
     if (!isWeightPristine) return;
     if (default_weight != null && default_weight > 0)
       setWeight(String(default_weight));
     else setWeight("");
+    setInitialReps(
+      prescribedTargetRepsNum > 0 ? String(prescribedTargetRepsNum) : "",
+    );
   }, [
     viewingSetIndex,
     isWeightPristine,
     default_weight,
+    prescribedTargetRepsNum,
     completedSets,
     exerciseId,
   ]);
@@ -196,25 +213,20 @@ export function RestPauseExecutor({
     };
   }, [showTimer, timerSeconds, restPauseDuration]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Sets", value: totalSets },
     {
-      label: "SETS",
-      value: totalSets,
+      icon: Target,
+      label: "Target reps",
+      value: prescribedTargetRepsRaw,
     },
     {
-      label: "REPS TO FAILURE",
-      value: currentExercise?.reps || block.block.reps_per_set || 8,
-    },
-    {
-      label: "PAUSE DURATION",
-      value: restPauseDuration,
+      icon: Timer,
+      label: "Pause",
+      value: formatRestSeconds(restPauseDuration),
       unit: "s",
     },
-    {
-      label: "MAX PAUSES",
-      value: maxRestPauses,
-    },
+    { icon: Hash, label: "Max pauses", value: maxRestPauses },
   ];
 
   if (currentExercise?.load_percentage != null) {
@@ -224,7 +236,13 @@ export function RestPauseExecutor({
       currentExercise.load_percentage,
       suggestedForDisplay,
     );
-    if (loadDisplay) blockDetails.push({ label: "LOAD", value: loadDisplay });
+    if (loadDisplay) {
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
+        value: loadDisplay,
+      });
+    }
   }
 
   const instructions =
@@ -676,6 +694,7 @@ export function RestPauseExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
             {!editDraft &&
               coachSuggestedWeight != null &&
@@ -691,11 +710,15 @@ export function RestPauseExecutor({
           </div>
           <LargeInput
             label="Reps"
+            hint={!editDraft ? targetRepsHint ?? undefined : undefined}
             value={editDraft ? editDraft.initialReps : initialReps}
             onChange={(val) => {
               if (editDraft)
                 setEditDraft((d) => (d ? { ...d, initialReps: val } : null));
-              else setInitialReps(val);
+              else {
+                setIsWeightPristine(false);
+                setInitialReps(val);
+              }
             }}
             placeholder="0"
             step="1"
@@ -781,6 +804,18 @@ export function RestPauseExecutor({
     </div>
   );
 
+  const initialRepsNumPreview = parseInt(initialReps, 10);
+  const weightNumPreviewRp = parseFloat(weight);
+  const restPauseLogReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    weight.trim() !== "" &&
+    !isNaN(weightNumPreviewRp) &&
+    weightNumPreviewRp >= 0 &&
+    initialReps.trim() !== "" &&
+    !isNaN(initialRepsNumPreview) &&
+    initialRepsNumPreview > 0;
+
   const isEditMode = !!editingSetId && !!editDraft;
   const logButton = isEditMode ? (
     <div className="flex gap-2 w-full">
@@ -819,15 +854,12 @@ export function RestPauseExecutor({
       Edit this set
     </Button>
   ) : (
-    <Button
+    <LogSetButton
       onClick={handleLog}
-      disabled={isLoggingSet || completedSets >= totalSets}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <PauseCircle className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG REST-PAUSE SET"}
-    </Button>
+      ready={restPauseLogReady}
+      loading={isLoggingSet}
+      label="Log rest-pause set"
+    />
   );
 
   return (
@@ -852,17 +884,19 @@ export function RestPauseExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         progressionSuggestion,
         previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle="LOG REST-PAUSE SET"
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={!!block.block.rest_seconds}

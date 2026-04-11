@@ -189,7 +189,7 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
                   {filteredExercises.map(exercise => (
                     <div 
                       key={exercise.id} 
-                      className="fc-glass fc-card border border-[color:var(--fc-glass-border)] transition-all fc-hover-rise cursor-pointer"
+                      className="fc-card-shell border border-[color:var(--fc-glass-border)] transition-all fc-hover-rise cursor-pointer"
                       onClick={() => handleSelectExercise(exercise)}
                     >
                       <div className="p-4">

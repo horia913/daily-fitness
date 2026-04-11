@@ -15,7 +15,6 @@ export type SetType =
   | 'emom'              // Every Minute On the Minute
   | 'tabata'            // 20s work / 10s rest protocol
   | 'for_time'          // Complete as fast as possible
-  | 'hr_sets'           // Heart rate zone training for aerobic endurance
   | 'speed_work'        // Sprint intervals with full recovery
   | 'endurance'         // Distance or time-based continuous work
 
@@ -35,18 +34,12 @@ export interface WorkoutSetEntry {
   total_sets?: number                 // Total sets for the set entry
   reps_per_set?: string               // Reps for each set (can be ranges like "10-12")
 
-  // HR-specific parameters (for hr_sets set type)
-  hr_zone_target?: number             // Optional set-entry-level HR zone target (1-5)
-  hr_percentage_min?: number          // Optional set-entry-level HR percentage min (50-100)
-  hr_percentage_max?: number          // Optional set-entry-level HR percentage max (50-100)
-
   // Relations
   exercises?: WorkoutSetEntryExercise[]
   drop_sets?: WorkoutDropSet[]
   cluster_sets?: WorkoutClusterSet[]
   rest_pause_sets?: WorkoutRestPauseSet[]
   time_protocols?: WorkoutTimeProtocol[]  // One per exercise for time-based set entries
-  hr_sets?: WorkoutHRSet[]                // One per exercise for HR-based set entries
   speed_sets?: WorkoutSpeedSet[]          // workout_speed_sets (RPC key: speed_sets)
   endurance_sets?: WorkoutEnduranceSet[]  // workout_endurance_sets (RPC key: endurance_sets)
 
@@ -77,7 +70,6 @@ export interface WorkoutSetEntryExercise {
   cluster_sets?: WorkoutClusterSet[]
   rest_pause_sets?: WorkoutRestPauseSet[]
   time_protocols?: WorkoutTimeProtocol[]  // For time-based set entries (amrap, emom, for_time, tabata)
-  hr_sets?: WorkoutHRSet[]                // For HR-based set entries (hr_sets)
   speed_sets?: WorkoutSpeedSet[]
   endurance_sets?: WorkoutEnduranceSet[]
 
@@ -164,27 +156,6 @@ export interface WorkoutTimeProtocol {
   created_at: string
 }
 
-// HR Set Configuration (Heart Rate Zone Training)
-export interface WorkoutHRSet {
-  id: string
-  set_entry_id: string                 // Links to workout set entry
-  exercise_id: string                   // Links to exercise from library
-  exercise_order: number                // Order of exercise within set entry
-  hr_zone?: number                      // Heart rate zone (1-5). Either hr_zone OR hr_percentage_min/max must be set
-  hr_percentage_min?: number            // Minimum heart rate percentage (50-100)
-  hr_percentage_max?: number            // Maximum heart rate percentage (50-100)
-  is_intervals: boolean                 // True for interval training, false for continuous
-  duration_seconds?: number             // Duration for continuous sessions (required when is_intervals = false)
-  work_duration_seconds?: number        // Work duration for interval rounds (required when is_intervals = true)
-  rest_duration_seconds?: number        // Rest duration for interval rounds (required when is_intervals = true)
-  target_rounds?: number                // Target number of intervals (required when is_intervals = true)
-  rounds_completed?: number             // Actual rounds completed during workout execution
-  distance_meters?: number              // Distance covered (optional, for running/cycling/rowing)
-  average_hr_percentage?: number        // Average heart rate percentage for the session/interval
-  created_at: string
-  updated_at?: string
-}
-
 /** workout_speed_sets — must match database columns */
 export interface WorkoutSpeedSet {
   id: string
@@ -227,7 +198,6 @@ export interface SetTypeConfig {
   color: string
   requiresMultipleExercises: boolean
   supportsTimeProtocols: boolean
-  supportsHRSets: boolean
   supportsDropSets: boolean
   supportsClusterSets: boolean
   supportsRestPause: boolean
@@ -286,7 +256,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'blue',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -299,7 +268,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'orange',
     requiresMultipleExercises: true,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: true,
     supportsClusterSets: true,
     supportsRestPause: false
@@ -312,7 +280,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'red',
     requiresMultipleExercises: true,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -325,7 +292,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'purple',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: true,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -338,7 +304,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'indigo',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: true,
     supportsRestPause: false
@@ -351,7 +316,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'teal',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: true
@@ -364,7 +328,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'pink',
     requiresMultipleExercises: true,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -377,7 +340,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'yellow',
     requiresMultipleExercises: false,
     supportsTimeProtocols: true,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -390,7 +352,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'cyan',
     requiresMultipleExercises: false,
     supportsTimeProtocols: true,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -403,7 +364,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'amber',
     requiresMultipleExercises: false,
     supportsTimeProtocols: true,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -416,20 +376,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'rose',
     requiresMultipleExercises: false,
     supportsTimeProtocols: true,
-    supportsHRSets: false,
-    supportsDropSets: false,
-    supportsClusterSets: false,
-    supportsRestPause: false
-  },
-  hr_sets: {
-    type: 'hr_sets',
-    name: 'HR Sets',
-    description: 'Heart rate zone training for aerobic endurance',
-    icon: '❤️',
-    color: 'red',
-    requiresMultipleExercises: false,
-    supportsTimeProtocols: false,
-    supportsHRSets: true,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -442,7 +388,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'amber',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false
@@ -455,7 +400,6 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     color: 'emerald',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
-    supportsHRSets: false,
     supportsDropSets: false,
     supportsClusterSets: false,
     supportsRestPause: false

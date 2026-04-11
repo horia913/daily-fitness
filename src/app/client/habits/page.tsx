@@ -15,6 +15,7 @@ import { Flame, Target, CheckCircle, ChevronDown, LayoutGrid, Repeat, Plus } fro
 import { EmptyState } from '@/components/ui/EmptyState'
 import { supabase } from '@/lib/supabase'
 import { withTimeout } from '@/lib/withTimeout'
+import { ClientPageShell } from '@/components/client-ui'
 interface HabitAssignment {
   id: string
   habit_id: string
@@ -439,19 +440,13 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <GlassCard elevation={2} className="fc-glass fc-card p-8">
-              <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                  ))}
-                </div>
-                <div className="h-80 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
-            </GlassCard>
-          </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
+              <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]"></div>
+              <div className="h-48 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
+            </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -462,14 +457,14 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadHabits(); }} className="fc-btn fc-btn-primary">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadHabits(); }} className="fc-btn fc-btn-primary h-10 text-sm">
                 Retry
               </Button>
             </GlassCard>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -492,50 +487,39 @@ export default function ClientHabitsPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex flex-col pb-36" style={{ gap: "var(--fc-gap-sections)" }}>
-          {/* Header: title left, streak badge right */}
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-36 pt-6 overflow-x-hidden flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
           <header>
-            <div className="flex justify-between items-start gap-4 mb-6">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
+            <div className="flex justify-between items-start gap-3 mb-3">
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold tracking-tight fc-text-primary">
                   Daily Habits
                 </h1>
-                <p className="text-sm fc-text-dim mt-1">
+                <p className="text-xs fc-text-dim mt-0.5">
                   {getMotivationalMessage()}
                 </p>
               </div>
               {habits.length > 0 && (
-                <div className="flex items-center gap-1.5 px-4 py-2 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-lg fc-text-success font-bold text-sm font-mono">
-                  <Flame className="w-5 h-5 fill-current" />
-                  {totalStreakDays} day{totalStreakDays !== 1 ? 's' : ''}
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-success font-bold text-xs font-mono shrink-0">
+                  <Flame className="w-3.5 h-3.5 fill-current" />
+                  {totalStreakDays}d
                 </div>
               )}
             </div>
 
-            {/* Stats grid: 4 cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 flex flex-col justify-center rounded-2xl">
-                <span className="text-sm fc-text-subtle mb-1">Active habits</span>
-                <span className="text-2xl font-bold font-mono fc-text-primary">{habits.length}</span>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 flex flex-col justify-center rounded-2xl border-l-4 border-l-[color:var(--fc-status-success)]">
-                <span className="text-sm fc-text-subtle mb-1">Today</span>
-                <span className="text-2xl font-bold font-mono fc-text-primary">{completedHabitsCount}<span className="text-lg opacity-50">/{habits.length || 1}</span></span>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 hidden md:flex flex-col justify-center rounded-2xl">
-                <span className="text-sm fc-text-subtle mb-1">Completion rate</span>
-                <span className="text-2xl font-bold font-mono fc-text-primary">{averageCompletionRate}%</span>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 hidden md:flex flex-col justify-center rounded-2xl">
-                <span className="text-sm fc-text-subtle mb-1">Best streak</span>
-                <span className="text-2xl font-bold font-mono fc-text-primary">{bestStreak}</span>
-              </GlassCard>
-            </div>
+            <p className="text-xs fc-text-dim border-b border-[color:var(--fc-glass-border)] pb-3 leading-relaxed">
+              <span className="font-mono font-semibold fc-text-primary">{habits.length}</span> active
+              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
+              <span className="font-mono font-semibold fc-text-primary">{completedHabitsCount}/{habits.length || 1}</span> today
+              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
+              <span className="font-mono font-semibold fc-text-primary">{averageCompletionRate}%</span> avg
+              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
+              best <span className="font-mono font-semibold fc-text-primary">{bestStreak}</span>d
+            </p>
           </header>
 
           {/* Habit completion heatmap — only when client has habits */}
           {habits.length > 0 && (
-            <section className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4 sm:p-6">
+            <section className="fc-card-shell backdrop-blur-[8px] p-4 sm:p-6">
               <h2 className="text-lg font-semibold fc-text-primary mb-2 flex items-center gap-2">
                 <LayoutGrid className="w-5 h-5" />
                 Completion overview
@@ -597,7 +581,7 @@ export default function ClientHabitsPage() {
             </div>
 
             {showAddHabitForm && (
-              <GlassCard elevation={2} className="fc-glass fc-card p-4 rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <GlassCard elevation={2} className="p-4 rounded-2xl">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="block text-sm fc-text-subtle mb-1">Habit name</label>
@@ -663,7 +647,7 @@ export default function ClientHabitsPage() {
             {habits.length > 0 ? (
               <div className="space-y-6">
                 {habits.map(habit => (
-                  <GlassCard key={habit.id} elevation={2} className="fc-glass fc-card p-5 rounded-2xl border border-[color:var(--fc-glass-border)] transition-all hover:border-[color:var(--fc-glass-border-strong)]">
+                  <GlassCard key={habit.id} elevation={2} className="p-5 rounded-2xl transition-all hover:opacity-95">
                     <div className="flex items-center gap-5 mb-5">
                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border ${getCategoryIconBg(habit.category)}`}>
                         {habit.habit_icon}
@@ -716,7 +700,7 @@ export default function ClientHabitsPage() {
                 ))}
               </div>
             ) : (
-              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+              <GlassCard elevation={2} className="fc-card-shell p-8 rounded-2xl">
                 <EmptyState
                   icon={Repeat}
   title="No habits yet"
@@ -728,7 +712,7 @@ export default function ClientHabitsPage() {
 
           {/* Collapsible: Weekly progress */}
           {habits.length > 0 && (
-            <section className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+            <section className="fc-card-shell overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowAnalytics(!showAnalytics)}
@@ -780,7 +764,7 @@ export default function ClientHabitsPage() {
             </section>
           )}
 
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   )

@@ -83,7 +83,7 @@ export function VolumeTrendChart({
   const currentWeekIndex = chartData.length - 1;
 
   return (
-    <div className={cn("fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6", className)}>
+    <div className={cn("fc-card-shell p-6", className)}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-[0_10px_20px_rgba(139,92,246,0.25)]">

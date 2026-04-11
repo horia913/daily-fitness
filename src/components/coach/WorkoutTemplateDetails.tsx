@@ -327,7 +327,7 @@ export default function WorkoutTemplateDetails({
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 pb-6">
           <div className="space-y-6 w-full">
             {/* Template Overview */}
-            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+            <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
               <div className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="fc-icon-tile fc-icon-workouts">
@@ -403,7 +403,7 @@ export default function WorkoutTemplateDetails({
             </div>
 
             {/* Exercises */}
-            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+            <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
               <div className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="fc-icon-tile fc-icon-workouts">

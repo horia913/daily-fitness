@@ -3,11 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Activity,
-  CheckCircle,
   Play,
   MoreVertical,
   Pencil,
+  Clock,
+  Hash,
+  Target,
+  Weight,
+  Dumbbell,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -17,14 +20,16 @@ import {
   formatTime,
 } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
-import { supabase } from "@/lib/supabase";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 
 export function ForTimeExecutor({
   block,
@@ -48,6 +53,7 @@ export function ForTimeExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
@@ -103,31 +109,12 @@ export function ForTimeExecutor({
 
   const isViewingLoggedSet = viewingSetIndex >= 1;
 
-  // DEBUG: Log data structure at component initialization
   const exercises = block.block.exercises || [];
   const effectiveIndex =
     exercises.length > 0
       ? Math.min(currentExerciseIndex, exercises.length - 1)
       : 0;
   const currentExercise = exercises[effectiveIndex];
-
-  console.log("ForTimeExecutor DEBUG:", {
-    blockId: block?.block?.id,
-    blockType: block?.block?.set_type,
-    currentExercise: currentExercise,
-    currentExerciseKeys: currentExercise
-      ? Object.keys(currentExercise)
-      : "null",
-    exercises: exercises,
-    exercisesLength: exercises?.length || 0,
-    exercisesData: exercises?.map((ex) => ({
-      id: ex.id,
-      exercise_id: ex.exercise_id,
-      name: (ex as any).name || ex.exercise?.name,
-      keys: Object.keys(ex),
-    })),
-    allBlockData: block,
-  });
 
   const { addToast } = useToast();
 
@@ -142,91 +129,14 @@ export function ForTimeExecutor({
 
   const timeCapMinutes = timeProtocol?.time_cap_minutes || 15;
   const targetReps = timeProtocol?.target_reps;
+  const forTimeScheme = (timeProtocol as { scheme?: string } | undefined)
+    ?.scheme;
+  const targetRepsParsed = parseRepsTarget(targetReps);
 
-  // Debug logging for exercise data
-  useEffect(() => {
-    console.log("ForTimeExecutor exercise data:", {
-      exercisesCount: exercises.length,
-      currentExerciseIndex,
-      effectiveIndex,
-      currentExercise: currentExercise
-        ? {
-            id: currentExercise.id,
-            exercise_id: currentExercise.exercise_id,
-            hasExerciseId: !!currentExercise.exercise_id,
-          }
-        : null,
-      allExercises: exercises.map((ex) => ({
-        id: ex.id,
-        exercise_id: ex.exercise_id,
-      })),
-    });
-  }, [exercises, currentExerciseIndex, currentExercise]);
-
-  // Get exercise name - try multiple sources
-  const [exerciseNameState, setExerciseNameState] =
-    useState<string>("For Time");
-
-  useEffect(() => {
-    const loadExerciseName = async () => {
-      // If no exercises, use block name or "For Time"
-      if (exercises.length === 0) {
-        if (block.block.set_name) {
-          setExerciseNameState(block.block.set_name);
-        } else {
-          setExerciseNameState("For Time");
-        }
-        return;
-      }
-
-      if (exercises.length > 1) {
-        setExerciseNameState("For Time");
-        return;
-      }
-
-      // Try exercise relation first
-      if (currentExercise?.exercise?.name) {
-        setExerciseNameState(currentExercise.exercise.name);
-        return;
-      }
-
-      // Try block name
-      if (block.block.set_name) {
-        setExerciseNameState(block.block.set_name);
-        return;
-      }
-
-      // Fetch exercise name from database if we have exercise_id
-      // Try current exercise first, then any exercise in the block
-      const exerciseIdToFetch =
-        currentExercise?.exercise_id ||
-        exercises.find((ex) => ex.exercise_id)?.exercise_id;
-
-      if (exerciseIdToFetch) {
-        try {
-          const { data: exerciseData } = await supabase
-            .from("exercises")
-            .select("name")
-            .eq("id", exerciseIdToFetch)
-            .single();
-
-          if (exerciseData?.name) {
-            setExerciseNameState(exerciseData.name);
-            return;
-          }
-        } catch (error) {
-          console.error("Error fetching exercise name:", error);
-        }
-      }
-
-      // Final fallback
-      setExerciseNameState("For Time");
-    };
-
-    loadExerciseName();
-  }, [currentExercise, exercises, block.block.set_name]);
-
-  const exerciseName = exerciseNameState;
+  const exerciseName =
+    currentExercise?.exercise?.name ||
+    block.block.set_name ||
+    (exercises.length > 1 ? "For Time" : "For Time");
 
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
@@ -266,10 +176,16 @@ export function ForTimeExecutor({
     if (default_weight != null && default_weight > 0)
       setWeight(String(default_weight));
     else setWeight("");
+    setReps(
+      targetRepsParsed.numericDefault > 0
+        ? String(targetRepsParsed.numericDefault)
+        : "",
+    );
   }, [
     isViewingLoggedSet,
     isWeightPristine,
     default_weight,
+    targetRepsParsed.numericDefault,
     currentExerciseIndex,
     exerciseId,
   ]);
@@ -303,21 +219,30 @@ export function ForTimeExecutor({
     };
   }, [startTime, timeCapMinutes]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
-    {
-      label: "TIME CAP",
-      value: `${timeCapMinutes} minutes`,
-    },
-  ];
-
-  if (targetReps) {
-    blockDetails.push({
-      label: "TARGET REPS",
+  const prescriptionItems: PrescriptionItem[] = [];
+  if (forTimeScheme) {
+    prescriptionItems.push({
+      icon: Hash,
+      label: "Scheme",
+      value: forTimeScheme,
+    });
+  }
+  prescriptionItems.push({
+    icon: Clock,
+    label: "Time cap",
+    value: timeCapMinutes,
+    unit: "min",
+  });
+  if (
+    targetReps != null &&
+    (typeof targetReps !== "string" || targetReps !== "")
+  ) {
+    prescriptionItems.push({
+      icon: Target,
+      label: "Target reps",
       value: targetReps,
     });
   }
-
   if (currentExercise?.load_percentage != null) {
     const suggestedForDisplay =
       source === "percent_e1rm" ? suggested_weight : null;
@@ -326,19 +251,19 @@ export function ForTimeExecutor({
       suggestedForDisplay,
     );
     if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD",
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
         value: loadDisplay,
       });
     }
   }
-
-  // Exercise list if multi-exercise
   if (exercises.length > 1) {
     exercises.forEach((ex, idx) => {
-      blockDetails.push({
-        label: `${idx + 1}. ${ex.exercise?.name || `Exercise ${idx + 1}`}`,
-        value: ex.reps || "-",
+      prescriptionItems.push({
+        icon: Dumbbell,
+        label: ex.exercise?.name || `Exercise ${idx + 1}`,
+        value: ex.reps || "—",
       });
     });
   }
@@ -452,57 +377,18 @@ export function ForTimeExecutor({
   };
 
   const handleLog = async () => {
-    console.log("ForTimeExecutor handleLog called", {
-      currentExercise: !!currentExercise,
-      exercise_id: currentExercise?.exercise_id,
-      isLoggingSet,
-      weight,
-      reps,
-      exercises: exercises.map((ex) => ({
-        id: ex.id,
-        exercise_id: ex.exercise_id,
-      })),
-    });
+    if (isLoggingSet) return;
 
-    if (isLoggingSet) {
-      console.log("ForTimeExecutor: Already logging");
-      return;
-    }
-
-    // For For Time, exercise_id is optional (can be null)
-    // Try to get exercise_id if available, but don't require it
     let exerciseIdToUse: string | undefined = currentExercise?.exercise_id;
     if (!exerciseIdToUse && exercises.length > 0) {
-      // Try to find any exercise with an exercise_id
       const exerciseWithId = exercises.find((ex) => ex.exercise_id);
       exerciseIdToUse = exerciseWithId?.exercise_id || undefined;
     }
 
-    console.log("ForTimeExecutor handleLog: exercise_id check", {
-      exerciseIdToUse,
-      currentExercise: currentExercise
-        ? {
-            id: currentExercise.id,
-            exercise_id: currentExercise.exercise_id,
-          }
-        : null,
-      exercisesCount: exercises.length,
-    });
-
-    // Parse weight (optional) and reps (required)
     const weightNum = weight && weight.trim() !== "" ? parseFloat(weight) : 0;
     const repsNum = parseInt(reps, 10);
 
-    console.log("ForTimeExecutor: Parsed values", {
-      weightNum,
-      repsNum,
-      weightStr: weight,
-      repsStr: reps,
-    });
-
-    // Validate reps is required and > 0, weight is optional
     if (isNaN(repsNum) || repsNum <= 0) {
-      console.log("ForTimeExecutor: Invalid reps validation failed");
       addToast({
         title: "Invalid Input",
         description:
@@ -515,7 +401,6 @@ export function ForTimeExecutor({
     }
 
     if (weight && weight.trim() !== "" && (isNaN(weightNum) || weightNum < 0)) {
-      console.log("ForTimeExecutor: Invalid weight validation failed");
       addToast({
         title: "Invalid Input",
         description: "If weight is provided, it must be 0 or greater.",
@@ -526,7 +411,6 @@ export function ForTimeExecutor({
       return;
     }
 
-    console.log("ForTimeExecutor: Validation passed, starting log...");
     setIsLoggingSet(true);
 
     try {
@@ -559,8 +443,6 @@ export function ForTimeExecutor({
       if (weightNum > 0) {
         logData.weight = weightNum;
       }
-
-      console.log("ForTimeExecutor: Logging set with:", logData);
 
       const result = await logSetToDatabase(logData);
 
@@ -845,6 +727,7 @@ export function ForTimeExecutor({
                 unit="kg"
                 showStepper
                 stepAmount={2.5}
+                plateCalculatorEnabled
               />
               {!editDraft &&
                 suggested_weight != null &&
@@ -867,6 +750,9 @@ export function ForTimeExecutor({
             </div>
             <LargeInput
               label="Completed Reps"
+              hint={
+                !editDraft ? targetRepsParsed.displayHint ?? undefined : undefined
+              }
               value={editDraft ? editDraft.reps : reps}
               onChange={(val) => {
                 if (editDraft)
@@ -903,40 +789,14 @@ export function ForTimeExecutor({
   // For "for_time" blocks, exercise_id is optional, so we don't require exercises to be configured
   // The button should work as long as reps are entered
 
-  // Debug logging for button state
   const buttonDisabledReason = !isValidInput
     ? `Invalid input (reps: ${reps || "empty"}, weight: ${weight || "empty"})`
     : isLoggingSet
       ? "Currently logging"
       : null;
 
-  // Debug button state
-  useEffect(() => {
-    console.log("ForTimeExecutor button state:", {
-      isLoggingSet,
-      isValidInput,
-      exercisesCount: exercises.length,
-      weight,
-      reps,
-      weightNum,
-      repsNum,
-      timerStopped,
-      completionTime,
-      disabled: isLoggingSet || !isValidInput,
-      reason: buttonDisabledReason,
-    });
-  }, [
-    isLoggingSet,
-    isValidInput,
-    exercises,
-    weight,
-    reps,
-    weightNum,
-    repsNum,
-    timerStopped,
-    completionTime,
-    buttonDisabledReason,
-  ]);
+  const forTimeLogReady =
+    timerStopped && isValidInput && !isLoggingSet;
 
   const isEditMode = !!editingSetId && !!editDraft;
   const viewedSetEntry =
@@ -982,25 +842,17 @@ export function ForTimeExecutor({
         </Button>
       ) : (
         <>
-          <Button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!isLoggingSet && isValidInput) handleLog();
-            }}
-            disabled={isLoggingSet || !isValidInput}
-            variant="fc-primary"
-            className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-            title={buttonDisabledReason || undefined}
-          >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            {isLoggingSet ? "Logging..." : "Complete Set"}
-          </Button>
-          {buttonDisabledReason && (
-            <p className="text-xs text-red-500 mt-2 text-center">
+          <LogSetButton
+            onClick={handleLog}
+            ready={forTimeLogReady}
+            loading={isLoggingSet}
+            label="Complete set"
+          />
+          {!isValidInput && buttonDisabledReason ? (
+            <p className="mt-2 text-center text-xs text-red-500">
               {buttonDisabledReason}
             </p>
-          )}
+          ) : null}
         </>
       )}
     </div>
@@ -1028,16 +880,18 @@ export function ForTimeExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         previousPerformanceMap,
       }}
       exerciseName={exerciseName}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={1}
       totalSets={1}
       progressLabel="Exercise"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle="LOG YOUR TIME"
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}

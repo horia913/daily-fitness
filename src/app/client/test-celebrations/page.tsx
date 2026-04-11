@@ -4,12 +4,55 @@ import React, { useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PRCelebrationModal } from "@/components/client/workout-execution/ui/PRCelebrationModal";
 import type { PRDetectedPayload } from "@/components/client/workout-execution/ui/PRCelebrationModal";
-import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
+import {
+  AchievementUnlockModal,
+  type AchievementLabCelebrationTier,
+} from "@/components/ui/AchievementUnlockModal";
 import { AchievementCard } from "@/components/ui/AchievementCard";
 import type { Achievement, AchievementRarity } from "@/components/ui/AchievementCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trophy, Award, Sparkles, Zap, Star, Flame } from "lucide-react";
 import Link from "next/link";
+
+const prCelebrationDemo: PRDetectedPayload = {
+  type: "weight",
+  exercise_name: "Deadlift",
+  new_value: 150,
+  previous_value: 120,
+  unit: "kg",
+  weight_kg: 150,
+  reps: 3,
+  context_subtitle: "Straight Set · Barbell",
+};
+
+// ─── Simplified achievement tier lab demos ───
+
+const achievementLabBronze: Achievement = {
+  id: "lab-bronze",
+  name: "First Steps",
+  description: "Complete your first workout",
+  icon: "🏃",
+  rarity: "common",
+  unlocked: true,
+};
+
+const achievementLabGold: Achievement = {
+  id: "lab-gold",
+  name: "Iron Will",
+  description: "Complete 50 workouts",
+  icon: "💪",
+  rarity: "rare",
+  unlocked: true,
+};
+
+const achievementLabPlatinum: Achievement = {
+  id: "lab-platinum",
+  name: "Unstoppable",
+  description: "Complete 365 days of training",
+  icon: "⚡",
+  rarity: "legendary",
+  unlocked: true,
+};
 
 // ─── Sample PR Data ───
 
@@ -177,6 +220,8 @@ export default function TestCelebrationsPage() {
   const [selectedPR, setSelectedPR] = useState<PRDetectedPayload>(samplePRs.weight_with_prev);
   const [showAchievement, setShowAchievement] = useState(false);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement>(sampleAchievements.common_bronze);
+  const [achievementLabTier, setAchievementLabTier] =
+    useState<AchievementLabCelebrationTier | null>(null);
   const [sequenceRunning, setSequenceRunning] = useState(false);
 
   const runSequence = () => {
@@ -195,6 +240,7 @@ export default function TestCelebrationsPage() {
 
   const handleAchievementCloseInSequence = () => {
     setShowAchievement(false);
+    setAchievementLabTier(null);
     setSequenceRunning(false);
   };
 
@@ -222,6 +268,84 @@ export default function TestCelebrationsPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+        {/* ─── PR celebration quick demo ─── */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5" style={{ color: "#FFD700" }} />
+            <h2 className="text-base font-bold" style={{ color: textPrimary }}>
+              PR celebration
+            </h2>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full py-3 text-sm font-bold"
+            style={{ borderColor: border, color: textPrimary }}
+            onClick={() => {
+              setSelectedPR(prCelebrationDemo);
+              setShowPR(true);
+            }}
+          >
+            Show PR Celebration
+          </Button>
+        </section>
+
+        {/* ─── Achievement tier lab row ─── */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Award className="w-5 h-5" style={{ color: "#FFD700" }} />
+            <h2 className="text-base font-bold" style={{ color: textPrimary }}>
+              Achievement tiers (lab visuals)
+            </h2>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col gap-0.5 text-xs font-bold"
+              style={{ borderColor: border, color: textPrimary }}
+              onClick={() => {
+                setSelectedAchievement(achievementLabBronze);
+                setAchievementLabTier("bronze");
+                setShowAchievement(true);
+              }}
+            >
+              Bronze
+              <span className="text-[10px] font-normal opacity-70 truncate w-full text-center">
+                First Steps
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col gap-0.5 text-xs font-bold"
+              style={{ borderColor: border, color: textPrimary }}
+              onClick={() => {
+                setSelectedAchievement(achievementLabGold);
+                setAchievementLabTier("gold");
+                setShowAchievement(true);
+              }}
+            >
+              Gold
+              <span className="text-[10px] font-normal opacity-70 truncate w-full text-center">
+                Iron Will
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col gap-0.5 text-xs font-bold"
+              style={{ borderColor: border, color: textPrimary }}
+              onClick={() => {
+                setSelectedAchievement(achievementLabPlatinum);
+                setAchievementLabTier("platinum");
+                setShowAchievement(true);
+              }}
+            >
+              Platinum
+              <span className="text-[10px] font-normal opacity-70 truncate w-full text-center">
+                Unstoppable
+              </span>
+            </Button>
+          </div>
+        </section>
+
         {/* ─── SECTION: PR CELEBRATION MODAL ─── */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -233,7 +357,10 @@ export default function TestCelebrationsPage() {
             {Object.entries(samplePRs).map(([key, pr]) => (
               <button
                 key={key}
-                onClick={() => { setSelectedPR(pr); setShowPR(true); }}
+                onClick={() => {
+                  setSelectedPR(pr);
+                  setShowPR(true);
+                }}
                 className="w-full text-left px-4 py-3 rounded-xl flex items-center justify-between gap-3 transition-all hover:scale-[1.01] active:scale-[0.99]"
                 style={{ background: cardBg, border: `1px solid ${border}` }}
               >
@@ -274,7 +401,11 @@ export default function TestCelebrationsPage() {
               return (
                 <button
                   key={key}
-                  onClick={() => { setSelectedAchievement(ach); setShowAchievement(true); }}
+                  onClick={() => {
+                    setSelectedAchievement(ach);
+                    setAchievementLabTier(null);
+                    setShowAchievement(true);
+                  }}
                   className="w-full text-left px-4 py-3 rounded-xl flex items-center justify-between gap-3 transition-all hover:scale-[1.01] active:scale-[0.99]"
                   style={{ background: cardBg, border: `1px solid ${border}` }}
                 >
@@ -343,7 +474,11 @@ export default function TestCelebrationsPage() {
       {/* ─── MODALS ─── */}
       <PRCelebrationModal
         visible={showPR}
-        onClose={sequenceRunning ? handlePRCloseInSequence : () => setShowPR(false)}
+        onClose={
+          sequenceRunning
+            ? handlePRCloseInSequence
+            : () => setShowPR(false)
+        }
         pr={selectedPR}
         bodyWeightKg={78}
       />
@@ -351,8 +486,16 @@ export default function TestCelebrationsPage() {
       <AchievementUnlockModal
         achievement={selectedAchievement}
         visible={showAchievement}
-        onClose={sequenceRunning ? handleAchievementCloseInSequence : () => setShowAchievement(false)}
+        onClose={
+          sequenceRunning
+            ? handleAchievementCloseInSequence
+            : () => {
+                setShowAchievement(false);
+                setAchievementLabTier(null);
+              }
+        }
         onShare={() => alert("Share clicked — would open share sheet in production")}
+        labCelebrationTier={achievementLabTier ?? undefined}
       />
     </div>
   );

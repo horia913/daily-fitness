@@ -122,7 +122,7 @@ export default function EditWorkoutTemplatePage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="min-h-screen p-4">
             <div className="max-w-7xl mx-auto">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-card-shell p-6">
                 <div className="animate-pulse">
                   <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 </div>
@@ -141,7 +141,7 @@ export default function EditWorkoutTemplatePage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="min-h-screen p-4">
             <div className="max-w-7xl mx-auto">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-card-shell p-6">
                 <p className="text-[color:var(--fc-text-dim)]">Template not found.</p>
               </div>
             </div>

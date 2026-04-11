@@ -1035,8 +1035,6 @@ export default function WorkoutTemplateForm({
         return "Pre-Exhaustion";
       case "for_time":
         return "For Time";
-      case "hr_sets":
-        return "HR Zones";
       case "speed_work":
         return "Speed Work";
       case "endurance":
@@ -1191,7 +1189,7 @@ export default function WorkoutTemplateForm({
         className={`relative ${
           isPage
             ? ""
-            : `${theme.card} ${theme.shadow} fc-glass fc-card rounded-2xl sm:rounded-3xl border ${theme.border}`
+            : `${theme.card} ${theme.shadow} fc-card-shell sm:rounded-3xl border ${theme.border}`
         } w-full flex flex-col transform transition-all duration-300 ease-out ${
           isPage ? "" : "overflow-hidden"
         }`}
@@ -1205,7 +1203,7 @@ export default function WorkoutTemplateForm({
         {/* Header — modal only; page mode uses parent nav */}
         {!isPage && (
         <div
-          className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-3 py-3 sm:px-4 sm:py-3 rounded-t-3xl`}
+          className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} px-3 py-3 sm:px-4 sm:py-3 rounded-t-3xl`}
         >
           <div className="flex items-center justify-between gap-2 min-h-10">
             <h2 className={`text-lg font-semibold truncate ${theme.text}`}>

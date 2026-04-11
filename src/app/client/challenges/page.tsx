@@ -12,16 +12,15 @@ import { Trophy } from "lucide-react";
 import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges, type ChallengeParticipant } from "@/lib/challengeService";
 import { ChallengeCard } from "@/components/client/ChallengeCard";
 import { ChallengesPageShell } from "@/components/client/challenges/ChallengesPageShell";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/ui/toast-provider";
+import { ClientPageShell } from "@/components/client-ui";
 
 function ChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
-  const router = useRouter();
 
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
   const [myChallenges, setMyChallenges] = useState<string[]>([]);
@@ -109,7 +108,7 @@ function ChallengesPageContent() {
   };
 
   const handleView = (challenge: Challenge) => {
-    router.push(`/client/challenges/${challenge.id}`);
+    window.location.href = `/client/challenges/${challenge.id}`;
   };
 
   const displayedChallenges = activeTab === "all"
@@ -126,7 +125,7 @@ function ChallengesPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-glass fc-card p-8">
+            <div className="fc-card-shell p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -146,14 +145,14 @@ function ChallengesPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary h-10 text-sm">
                 Retry
               </Button>
             </GlassCard>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -171,9 +170,9 @@ function ChallengesPageContent() {
         setActiveTab={setActiveTab}
       >
         {displayedChallenges.length === 0 ? (
-          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
-            <Trophy className="w-20 h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
-            <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
+          <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
+            <Trophy className="w-10 h-10 text-[color:var(--fc-text-subtle)] mx-auto mb-3 opacity-80" />
+            <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-1">
               {activeTab === "history"
                 ? "No Past Challenges"
                 : activeTab === "invited"
@@ -191,7 +190,7 @@ function ChallengesPageContent() {
             </p>
           </GlassCard>
         ) : (
-          <div className="flex w-full flex-col gap-6">
+          <div className="flex w-full flex-col gap-3">
             <ChallengeCard
               key={displayedChallenges[0].id}
               challenge={displayedChallenges[0]}
@@ -223,7 +222,7 @@ function ChallengesPageContent() {
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
         >
           <div
-            className="w-full max-w-md fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6"
+            className="w-full max-w-md fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6"
           >
             <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
               Select Your Track

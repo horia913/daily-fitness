@@ -195,7 +195,7 @@ export function AddExercisePanel({
   return (
               <div style={{ order: 0 }} className="w-full">
                 <Card
-                  className={`${theme?.card ?? ''} fc-glass fc-card border ${theme?.border ?? ''} rounded-lg`}
+                  className={`${theme?.card ?? ''} fc-card-shell border ${theme?.border ?? ''} rounded-lg`}
                 >
                   <CardHeader className="px-3 py-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
@@ -344,16 +344,6 @@ export function AddExercisePanel({
                               <SelectLabel className="text-xs font-bold uppercase tracking-wider px-2 py-1.5 text-[color:var(--fc-text-dim)]">
                                 Time-Based
                               </SelectLabel>
-                              <SelectItem
-                                value="hr_sets"
-                                className="rounded-lg"
-                                disabled={
-                                  isVolumeCalculatorActive &&
-                                  !allowedBlockTypes?.includes("hr_sets")
-                                }
-                              >
-                                HR Sets
-                              </SelectItem>
                               <SelectItem
                                 value="speed_work"
                                 className="rounded-lg"
@@ -2187,7 +2177,7 @@ export function AddExercisePanel({
                         </div>
                       )}
 
-                      {newExercise.exercise_type === "hr_sets" && (
+                      {false && (
                         <div className="space-y-4">
                           <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-700">
                             <h4
@@ -2813,14 +2803,13 @@ export function AddExercisePanel({
                       )}
 
                       {/* Common fields for all types */}
-                      {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion, hr_sets which have their own fields) */}
+                      {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion, speed_work, endurance which have their own fields) */}
                       {newExercise.exercise_type &&
                         ![
                           "superset",
                           "giant_set",
                           "pre_exhaustion",
                           "tabata",
-                          "hr_sets",
                           "speed_work",
                           "endurance",
                         ].includes(newExercise.exercise_type) &&

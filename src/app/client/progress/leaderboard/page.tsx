@@ -185,6 +185,7 @@ function LeaderboardPageContent() {
     <AnimatedBackground>
       {performanceSettings?.floatingParticles && <FloatingParticles />}
       <ClientLeaderboardPageBody
+        denseLayout={true}
         userId={user?.id}
         leaderboardData={leaderboardData}
         champions={champions}

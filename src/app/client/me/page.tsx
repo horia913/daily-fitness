@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -119,10 +118,11 @@ export default function MePage() {
               {NAV_CARDS.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <Link
+                  <button
                     key={`${card.href}-${card.title}`}
-                    href={card.href}
-                    className="flex min-h-[52px] items-center gap-4 border-b border-white/5 py-3 last:border-b-0 transition-colors hover:bg-white/[0.02]"
+                    type="button"
+                    onClick={() => { window.location.href = card.href; }}
+                    className="w-full text-left flex min-h-[52px] items-center gap-4 border-b border-white/5 py-3 last:border-b-0 transition-colors hover:bg-white/[0.02]"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)]">
                       <Icon className="h-5 w-5 fc-text-primary" />
@@ -138,7 +138,7 @@ export default function MePage() {
                       )}
                     </div>
                     <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
-                  </Link>
+                  </button>
                 );
               })}
             </nav>

@@ -68,7 +68,6 @@ const WHITELIST: Record<string, Set<string>> = {
     'fortime_target_reps',
     'rpe',
   ]),
-  hr_sets: new Set(['rpe']),
 }
 
 /**
@@ -80,7 +79,7 @@ export function buildSetEditPatchPayload(
   editDraft: Record<string, unknown>
 ): Record<string, unknown> {
   const apiBlockType = BLOCK_TYPE_TO_API[blockType] ?? blockType
-  const allowed = WHITELIST[apiBlockType] ?? WHITELIST.hr_sets
+  const allowed = WHITELIST[apiBlockType] ?? WHITELIST.straight_set
   const payload: Record<string, unknown> = {}
   for (const key of Object.keys(editDraft)) {
     if (!allowed.has(key)) continue

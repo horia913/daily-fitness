@@ -6,16 +6,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import {
-  Trophy,
-  Zap,
-  Award,
-  ChevronDown,
-  ArrowLeft,
-  Dumbbell,
-  Filter,
-} from "lucide-react";
-import Link from "next/link";
+import { ClientPageShell } from "@/components/client-ui";
+import { Trophy, ChevronDown, ArrowLeft, Dumbbell, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   Select,
@@ -82,14 +74,12 @@ export default function PersonalRecordsPage() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grouped" | "timeline">("grouped");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadPersonalRecords = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     setLoadError(null);
-    setLoadingStartedAt(Date.now());
     try {
       const [stats, timeline] = await Promise.all([
         getPRStats(user.id),
@@ -133,7 +123,6 @@ export default function PersonalRecordsPage() {
       setLoadError(err instanceof Error ? err.message : "Failed to load personal records");
     } finally {
       setLoading(false);
-      setLoadingStartedAt(null);
     }
   }, [user]);
 
@@ -256,14 +245,21 @@ export default function PersonalRecordsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-                <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-                <button type="button" onClick={() => { setLoadError(null); loadPersonalRecords(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] px-2 text-center">
+              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoadError(null);
+                  loadPersonalRecords();
+                }}
+                className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium hover:bg-cyan-400 transition-colors"
+              >
+                Retry
+              </button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -274,116 +270,83 @@ export default function PersonalRecordsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)]">
-                <div className="animate-pulse space-y-6">
-                  <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
-                      />
-                    ))}
-                  </div>
-                  <div className="h-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-24 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
+  const summaryLine = [
+    `${prStats?.totalPRs ?? totalRecords} PR${(prStats?.totalPRs ?? totalRecords) === 1 ? "" : "s"}`,
+    prStats && prStats.prsThisWeek > 0 ? `${prStats.prsThisWeek} this week` : null,
+    (prStats?.prsThisMonth ?? thisMonthCount) > 0
+      ? `${prStats?.prsThisMonth ?? thisMonthCount} this month`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-10 fc-page space-y-6">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-              </Link>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                  <Trophy className="w-6 h-6" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                    Personal Records
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    Best lifts tracked
-                  </p>
-                </div>
-              </div>
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden space-y-4">
+          <header className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/progress";
+              }}
+              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+              aria-label="Back to progress"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
+                Personal Records
+              </h1>
+              <p className="text-xs fc-text-dim mt-0.5">Best lifts tracked</p>
             </div>
-          </div>
+          </header>
 
           {backfilling ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-8 text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-4" />
-              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                Analyzing your workout history...
-              </p>
+            <div className="py-6 text-center border-y border-white/5">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-2" />
+              <p className="text-sm fc-text-dim">Analyzing your workout history...</p>
             </div>
           ) : (prStats && prStats.totalPRs > 0) || totalRecords > 0 ? (
             <>
-              {/* PR Summary Hero (Enhanced) */}
-              <div
-                className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-8 mb-8"
-              >
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="text-center md:text-left flex-1">
-                    <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                      <span className="text-xs font-semibold fc-text-success uppercase tracking-widest">
-                        Personal records
-                      </span>
-                      <div className="h-px w-8 bg-[color:var(--fc-status-success)]/30" />
-                    </div>
-                    <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none fc-text-primary mb-2">
-                      {prStats?.totalPRs || totalRecords}{" "}
-                      <span className="text-lg font-light fc-text-subtle italic">
-                        PRs
-                      </span>
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start mb-4">
-                      {prStats && prStats.prsThisWeek > 0 && (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                          <Zap className="w-4 h-4 fc-text-success" />
-                          <span className="text-sm font-semibold fc-text-success">
-                            {prStats.prsThisWeek} this week
-                          </span>
-                        </div>
-                      )}
-                      {(prStats?.prsThisMonth || thisMonthCount) > 0 && (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                          <Zap className="w-4 h-4 fc-text-success" />
-                          <span className="text-sm font-semibold fc-text-success">
-                            {prStats?.prsThisMonth || thisMonthCount} this month
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {prStats?.latestPR && (
-                      <div className="text-sm fc-text-subtle">
-                        Latest: <span className="font-semibold fc-text-primary">{prStats.latestPR.exercises?.name || "Unknown Exercise"}</span> — {prStats.latestPR.record_value}{prStats.latestPR.record_unit} ({prStats.latestPR.record_type === "weight" ? "weight" : "reps"}) ({new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })})
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                      <Trophy className="w-12 h-12 sm:w-16 sm:h-16 fc-text-warning" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <section className="border-b border-white/5 pb-4">
+                <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                  Overview
+                </p>
+                <p className="text-sm font-medium fc-text-primary leading-snug">{summaryLine}</p>
+                {prStats?.latestPR && (
+                  <p className="text-xs fc-text-dim mt-2 leading-snug">
+                    Latest:{" "}
+                    <span className="font-semibold fc-text-primary">
+                      {prStats.latestPR.exercises?.name || "Unknown Exercise"}
+                    </span>{" "}
+                    — {prStats.latestPR.record_value}
+                    {prStats.latestPR.record_unit} (
+                    {new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                    )
+                  </p>
+                )}
+              </section>
 
-              {/* PR Progress — timeline chart (collapsible), wired to exercise filter */}
-              <section className="mb-6">
+              <section className="min-w-0 -mx-1 px-1 overflow-x-auto">
                 <PRTimelineChart
                   milestones={chartExercise?.milestones ?? []}
                   exerciseName={chartExercise?.name ?? "—"}
@@ -393,15 +356,14 @@ export default function PersonalRecordsPage() {
                 />
               </section>
 
-              {/* View Mode Toggle */}
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setViewMode("grouped")}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide border transition-colors ${
                     viewMode === "grouped"
-                      ? "fc-surface fc-text-primary shadow-sm"
-                      : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
+                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
                   }`}
                 >
                   Grouped
@@ -409,74 +371,61 @@ export default function PersonalRecordsPage() {
                 <button
                   type="button"
                   onClick={() => setViewMode("timeline")}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide border transition-colors ${
                     viewMode === "timeline"
-                      ? "fc-surface fc-text-primary shadow-sm"
-                      : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
+                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
                   }`}
                 >
                   Timeline
                 </button>
               </div>
 
-              {/* Recent Breakthroughs — grid on mobile (no horizontal scroll) */}
-              <section className="mb-8">
-                <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
-                  <Zap className="w-5 h-5 fc-text-error" />
+              <section>
+                <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
                   Recent PRs
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {recentRecords.map((record, idx) => {
-                    const type = getRecordType(record.weight, record.reps);
-                    const iconClass =
-                      type.type === "power"
-                        ? "bg-[color:var(--fc-status-warning)]/10 text-[color:var(--fc-status-warning)] border border-[color:var(--fc-status-warning)]/20"
-                        : type.type === "endurance"
-                          ? "bg-[color:var(--fc-status-success)]/10 fc-text-success border border-[color:var(--fc-status-success)]/20"
-                          : "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20";
+                </p>
+                <div className="flex flex-col border-y border-white/5">
+                  {recentRecords.map((record) => {
+                    const display =
+                      record.weight > 0
+                        ? `${record.weight} kg`
+                        : formatRecordDisplay(record.weight, record.reps);
                     return (
                       <div
                         key={record.id}
-                        className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-5"
+                        className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 pl-1 pr-1 border-b border-white/5 last:border-0 text-left"
                       >
-                        <div className="flex justify-between items-start mb-3">
-                          <div className={`p-2 rounded-lg ${iconClass}`}>
-                            <Award className="w-5 h-5" />
-                          </div>
-                          <span className="text-[10px] font-mono fc-text-subtle uppercase">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold fc-text-primary truncate">
+                            {record.exerciseName}
+                          </p>
+                          <p className="text-[11px] font-mono uppercase tracking-wide fc-text-dim">
                             {formatRelative(record.date)}
-                          </span>
+                          </p>
                         </div>
-                        <h3 className="text-lg font-bold fc-text-primary mb-1">
-                          {record.exerciseName}
-                        </h3>
-                        <div className="text-xl font-black font-mono fc-text-primary mb-2">
-                          {record.weight > 0
-                            ? `${record.weight} kg`
-                            : formatRecordDisplay(record.weight, record.reps)}
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-mono font-bold fc-text-primary">{display}</p>
+                          <p className="text-[10px] fc-text-dim">
+                            {record.reps} rep{record.reps !== 1 ? "s" : ""}
+                          </p>
                         </div>
-                        <p className="text-sm fc-text-dim">
-                          {record.reps} rep{record.reps !== 1 ? "s" : ""}
-                        </p>
                       </div>
                     );
                   })}
                 </div>
               </section>
 
-              {/* Exercise filter dropdown */}
-              <div className="sticky top-0 z-10 py-2 mb-4 bg-[color:var(--fc-bg-base)]/80 backdrop-blur-xl fc-page">
-                <label className="text-xs font-medium fc-text-subtle uppercase tracking-wider mb-2 block">
-                  Filter by exercise
+              <div className="sticky top-0 z-10 -mx-1 py-2 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-sm px-1">
+                <label className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5 block">
+                  Filter
                 </label>
                 <Select
                   value={filterExercise ?? "__all__"}
-                  onValueChange={(v) =>
-                    setFilterExercise(v === "__all__" ? null : v)
-                  }
+                  onValueChange={(v) => setFilterExercise(v === "__all__" ? null : v)}
                 >
-                  <SelectTrigger className="w-full max-w-sm fc-select h-11">
-                    <Filter className="w-4 h-4 fc-text-subtle" />
+                  <SelectTrigger className="w-full fc-select h-10 text-sm">
+                    <Filter className="w-3.5 h-3.5 fc-text-subtle shrink-0" />
                     <SelectValue placeholder="All exercises" />
                   </SelectTrigger>
                   <SelectContent align="start" className="max-h-[min(16rem,70vh)]">
@@ -490,51 +439,56 @@ export default function PersonalRecordsPage() {
                 </Select>
               </div>
 
-              {/* Timeline View */}
               {viewMode === "timeline" && prTimeline.length > 0 && (
-                <main className="space-y-3">
+                <main className="space-y-2">
                   {prTimeline
                     .filter((pr) => !filterExercise || pr.exercises?.name === filterExercise)
                     .map((pr) => {
                       const exerciseName = pr.exercises?.name || "Unknown Exercise";
-                      const isRecent = new Date(pr.achieved_date + "T12:00:00") >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                      const achievementText = 
+                      const isRecent =
+                        new Date(pr.achieved_date + "T12:00:00") >=
+                        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                      const achievementText =
                         pr.record_type === "weight"
                           ? `${exerciseName}: ${pr.record_value}${pr.record_unit}`
                           : pr.record_type === "reps"
-                          ? `${exerciseName}: ${pr.record_value} ${pr.record_unit}`
-                          : `${exerciseName}: ${pr.record_value} ${pr.record_unit}`;
-                      
+                            ? `${exerciseName}: ${pr.record_value} ${pr.record_unit}`
+                            : `${exerciseName}: ${pr.record_value} ${pr.record_unit}`;
+
                       return (
                         <div
                           key={pr.id}
-                          className={`fc-surface rounded-2xl border p-4 transition-all ${
+                          className={`rounded-xl border px-3 py-2 transition-all ${
                             isRecent
                               ? "border-[color:var(--fc-status-success)]/30 bg-[color:var(--fc-status-success)]/5"
-                              : "border-[color:var(--fc-glass-border)]"
+                              : "border-[color:var(--fc-glass-border)] fc-surface"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-semibold fc-text-primary">
-                                  {achievementText}
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs font-semibold fc-text-primary leading-snug">
+                                {achievementText}
+                              </span>
+                              {isRecent && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]">
+                                  Recent
                                 </span>
-                                {isRecent && (
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]">
-                                    Recent
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 text-xs fc-text-subtle">
-                                <span>{new Date(pr.achieved_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                                {pr.improvement_percentage != null && pr.improvement_percentage > 0 && (
-                                  <span className="fc-text-success font-medium">
-                                    +{pr.improvement_percentage.toFixed(1)}% improvement
-                                  </span>
-                                )}
-                                <span className="capitalize">{pr.record_type.replace("_", " ")}</span>
-                              </div>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] fc-text-subtle">
+                              <span>
+                                {new Date(pr.achieved_date + "T12:00:00").toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              {pr.improvement_percentage != null && pr.improvement_percentage > 0 && (
+                                <span className="fc-text-success font-medium">
+                                  +{pr.improvement_percentage.toFixed(1)}%
+                                </span>
+                              )}
+                              <span className="capitalize">{pr.record_type.replace("_", " ")}</span>
                             </div>
                           </div>
                         </div>
@@ -543,115 +497,93 @@ export default function PersonalRecordsPage() {
                 </main>
               )}
 
-              {/* Grouped PR list (collapsible) */}
               {viewMode === "grouped" && (
-              <main className="space-y-4">
-                {groupedByExercise.map(({ exerciseName, records }, groupIdx) => {
-                  const latest = records[0];
-                  const isOpen = openGroup === exerciseName;
-                  const iconClass = getExerciseIconClass(
-                    exerciseName,
-                    groupIdx
-                  );
+                <main className="flex flex-col border-y border-white/5">
+                  {groupedByExercise.map(({ exerciseName, records }, groupIdx) => {
+                    const latest = records[0];
+                    const isOpen = openGroup === exerciseName;
+                    const iconClass = getExerciseIconClass(exerciseName, groupIdx);
 
-                  return (
-                    <div
-                      key={exerciseName}
-                      className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] overflow-hidden"
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenGroup(isOpen ? null : exerciseName)
-                        }
-                        className="w-full flex items-center justify-between p-5 sm:p-6 text-left"
-                      >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 ${iconClass}`}
-                          >
-                            <Dumbbell className="w-6 h-6" />
+                    return (
+                      <div key={exerciseName} className="border-b border-white/5 last:border-0">
+                        <button
+                          type="button"
+                          onClick={() => setOpenGroup(isOpen ? null : exerciseName)}
+                          className="w-full flex items-center justify-between gap-2 py-2.5 pl-1 pr-1 text-left hover:bg-white/[0.02] transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${iconClass}`}
+                            >
+                              <Dumbbell className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-bold fc-text-primary truncate">{exerciseName}</h3>
+                              <p className="text-[11px] fc-text-dim truncate">
+                                Latest:{" "}
+                                {latest
+                                  ? `${latest.weight} kg · ${formatRelative(latest.date)}`
+                                  : "—"}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <h3 className="text-lg font-bold fc-text-primary truncate">
-                              {exerciseName}
-                            </h3>
-                            <p className="text-sm fc-text-subtle italic truncate">
-                              Latest:{" "}
-                              {latest
-                                ? `${latest.weight} kg · ${formatRelative(latest.date)}`
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronDown
-                          className={`w-6 h-6 fc-text-subtle flex-shrink-0 transition-transform ${
-                            isOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                      {isOpen && (
-                        <div className="px-5 sm:px-6 pb-6 border-t border-[color:var(--fc-glass-border)]">
-                          <div className="pt-4 space-y-3">
+                          <ChevronDown
+                            className={`w-4 h-4 fc-text-subtle shrink-0 transition-transform ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isOpen && (
+                          <div className="pb-2 pl-1 space-y-1.5 border-t border-white/5 pt-2">
                             {records.map((record) => (
                               <div
                                 key={record.id}
-                                className="flex justify-between items-center p-3 rounded-xl fc-glass-soft"
+                                className="flex justify-between items-center gap-2 py-1.5 px-2 rounded-lg fc-glass-soft text-xs"
                               >
-                                <span className="text-sm fc-text-dim">
-                                  {new Date(record.date).toLocaleDateString(
-                                    "en-US",
-                                    {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    }
-                                  )}
+                                <span className="fc-text-dim shrink-0">
+                                  {new Date(record.date).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
                                 </span>
-                                <div className="flex items-center gap-3">
-                                  <span className="font-mono font-bold fc-text-primary">
+                                <div className="flex items-center gap-2 min-w-0 justify-end">
+                                  <span className="font-mono font-bold fc-text-primary tabular-nums">
                                     {record.weight} kg × {record.reps}
                                   </span>
-                                  <span className="text-[10px] font-semibold fc-text-success">
-                                    {getRecordType(record.weight, record.reps)
-                                      .label}
+                                  <span className="text-[9px] font-semibold fc-text-success whitespace-nowrap">
+                                    {getRecordType(record.weight, record.reps).label}
                                   </span>
                                 </div>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </main>
+                        )}
+                      </div>
+                    );
+                  })}
+                </main>
               )}
-
             </>
           ) : (
-            <div
-              className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-10 text-center"
-            >
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                <Trophy className="h-10 w-10 fc-text-warning" />
-              </div>
-              <h3 className="mt-6 text-2xl font-semibold fc-text-primary">
-                No records yet
-              </h3>
-              <p className="mt-2 text-sm fc-text-dim">
-                Complete workouts to build your personal records. We track your
-                best lifts here.
+            <div className="py-8 px-2 text-center border-y border-white/5">
+              <Trophy className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
+              <p className="text-sm font-semibold fc-text-primary mb-1">No records yet</p>
+              <p className="text-sm fc-text-dim mb-4">
+                Complete workouts to build your personal records.
               </p>
-              <Link href="/client/workouts" className="inline-block mt-6">
-                <span className="fc-btn fc-btn-primary inline-flex items-center gap-2 px-6 py-3 rounded-xl">
-                  <Dumbbell className="w-5 h-5" />
-                  Start a workout
-                </span>
-              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/workouts";
+                }}
+                className="fc-btn fc-btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm"
+              >
+                <Dumbbell className="w-4 h-4" />
+                Start a workout
+              </button>
             </div>
           )}
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

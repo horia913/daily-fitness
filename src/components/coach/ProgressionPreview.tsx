@@ -68,7 +68,6 @@ export const SET_TYPE_SHORT: Record<string, string> = {
   emom: "EMOM",
   for_time: "For Time",
   tabata: "Tabata",
-  hr_sets: "HR Sets",
   speed_work: "Speed",
   endurance: "Endurance",
 };

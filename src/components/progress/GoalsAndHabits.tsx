@@ -414,7 +414,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
   return (
     <div className="space-y-8">
       {/* Segmented control: Goals | Habits */}
-      <div className="relative grid grid-cols-2 p-1.5 fc-glass fc-card rounded-2xl max-w-[280px]">
+      <div className="relative grid grid-cols-2 p-1.5 fc-card-shell max-w-[280px]">
         <button
           type="button"
           onClick={() => setActiveTab("goals")}
@@ -464,7 +464,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
           {/* Active Goals list */}
           {activeGoals.length > 0 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <GlassCard elevation={2} className="fc-card-shell p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold fc-text-primary">
                   Current targets
@@ -553,7 +553,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
           {/* Completed Goals */}
           {completedGoals.length > 0 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 mb-24">
+            <GlassCard elevation={2} className="fc-card-shell p-6 mb-24">
               <div className="flex items-center gap-3">
                 <Trophy className="w-5 h-5 text-[color:var(--fc-status-success)]" />
                 <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -590,7 +590,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
           {/* Empty State - Goals */}
           {activeGoals.length === 0 && completedGoals.length === 0 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center mb-24">
+            <GlassCard elevation={2} className="fc-card-shell p-12 text-center mb-24">
               <Target className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
                 No Goals Set Yet
@@ -619,7 +619,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 setSelectedHabitType("water");
                 setShowLogHabit(true);
               }}
-              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="fc-card-shell p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white">
                 <Droplets className="h-8 w-8" />
@@ -642,7 +642,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 setSelectedHabitType("sleep");
                 setShowLogHabit(true);
               }}
-              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="fc-card-shell p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
                 <Moon className="h-8 w-8" />
@@ -666,7 +666,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 setSelectedHabitType("steps");
                 setShowLogHabit(true);
               }}
-              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="fc-card-shell p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 text-white">
                 <Footprints className="h-8 w-8" />
@@ -689,7 +689,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 setSelectedHabitType("cardio");
                 setShowLogHabit(true);
               }}
-              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="fc-card-shell p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 text-white">
                 <Dumbbell className="h-8 w-8" />
@@ -711,7 +711,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
             todayLog.water ||
             todayLog.steps ||
             todayLog.cardio) && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 mb-24">
+            <GlassCard elevation={2} className="fc-card-shell p-6 mb-24">
               <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
                 Today's Wellness Summary
               </h3>
@@ -760,7 +760,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
           {/* Empty State - Goals */}
           {activeGoals.length === 0 && completedGoals.length === 0 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center mb-24">
+            <GlassCard elevation={2} className="fc-card-shell p-12 text-center mb-24">
               <Target className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
                 No Goals Set Yet
@@ -780,7 +780,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setShowCreateGoal(false)}
         >
           <div
-            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl my-8 fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-t-3xl">
@@ -1307,7 +1307,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setShowLogHabit(false)}
         >
           <div
-            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl my-8 fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -1629,7 +1629,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setSelectedGoal(null)}
         >
           <div
-            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl my-8 fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {

@@ -23,16 +23,8 @@ type RpcBlock = {
   cluster_sets?: RpcClusterSet[];
   rest_pause_sets?: RpcRestPauseSet[];
   time_protocols?: RpcTimeProtocol[];
-  hr_sets?: RpcHRRow[];
   speed_sets?: RpcSpeedSet[];
   endurance_sets?: RpcEnduranceSet[];
-};
-
-type RpcHRRow = {
-  id: string;
-  set_entry_id?: string;
-  exercise_id: string;
-  exercise_order?: number;
 };
 
 type RpcSpeedSet = {
@@ -278,18 +270,6 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
         load_percentage: rp.load_percentage,
         rest_pause_sets: [rp],
       })) as any;
-    } else if (setType === "hr_sets" && Array.isArray(b.hr_sets) && b.hr_sets.length > 0) {
-      const hrList = [...b.hr_sets].sort((a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0));
-      block.exercises = hrList.map((hr) => ({
-        id: hr.id,
-        set_entry_id: b.id,
-        exercise_id: hr.exercise_id,
-        exercise_order: hr.exercise_order ?? 1,
-        exercise: null,
-        sets: b.total_sets,
-        hr_sets: [hr],
-      })) as any;
-      block.hr_sets = hrList as any;
     } else if (setType === "speed_work") {
       const speedList = [...(b.speed_sets ?? [])].sort(
         (a, b) => (a.exercise_order ?? 0) - (b.exercise_order ?? 0),

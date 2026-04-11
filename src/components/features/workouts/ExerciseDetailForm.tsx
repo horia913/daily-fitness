@@ -50,7 +50,6 @@ const complexGroupLabels: Record<string, string> = {
   drop_set: "Drop Set Configuration",
   pre_exhaustion: "Pre-Exhaustion Configuration",
   for_time: "For Time Configuration",
-  hr_sets: "HR Sets Configuration",
 };
 
 export default function ExerciseDetailForm({
@@ -141,10 +140,7 @@ export default function ExerciseDetailForm({
 
   const exerciseType = exercise.exercise_type || "straight_set";
   
-  // Debug: Log exercise type to help troubleshoot HR Sets form visibility
-  if (exerciseType === "hr_sets") {
-    console.log("🔍 HR Sets form should be visible. Exercise type:", exerciseType, "Exercise:", exercise);
-  }
+  // Debug logging removed for retired set types.
 
   // Helper function to render Load % / Weight field with toggle
   const renderLoadWeightField = (
@@ -326,16 +322,6 @@ export default function ExerciseDetailForm({
               >
                 Pre-Exhaustion
               </SelectItem>
-              <SelectItem
-                value="hr_sets"
-                className="rounded-lg"
-                disabled={
-                  allowedBlockTypes &&
-                  !allowedBlockTypes.includes("hr_sets")
-                }
-              >
-                HR Sets
-              </SelectItem>
               {/* Time-Based - Hidden when filtering */}
               {(!allowedBlockTypes || allowedBlockTypes.length === 0) && (
                 <>
@@ -357,7 +343,7 @@ export default function ExerciseDetailForm({
           </Select>
         </div>
 
-        {!["tabata", "giant_set", "hr_sets"].includes(exerciseType) && (
+        {!["tabata", "giant_set"].includes(exerciseType) && (
           <div>
             <Label className={`text-sm font-medium ${theme.text}`}>
               {exerciseLabel}
@@ -1968,8 +1954,8 @@ export default function ExerciseDetailForm({
         </div>
       )}
 
-      {/* HR Sets */}
-      {exerciseType === "hr_sets" && (
+      {/* Removed set type */}
+      {false && (
         <div className="space-y-4">
           <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4

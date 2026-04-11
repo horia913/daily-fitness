@@ -483,7 +483,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)]">
+              <div className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)]">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -546,7 +546,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
           </div>
 
           {/* Filters */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] mb-6 sm:mb-8">
+          <div className="fc-card-shell mb-6 sm:mb-8">
             <div className="p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-2 flex-1">
@@ -610,7 +610,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
           {/* Overall Compliance Summary */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {/* Overall Compliance */}
-            <div className="fc-glass fc-card fc-accent-workouts rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
+            <div className="fc-card-shell fc-accent-workouts rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
               <div className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="fc-icon-tile fc-icon-workouts">
@@ -631,7 +631,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
             </div>
 
             {/* Workout Compliance */}
-            <div className="fc-glass fc-card fc-accent-workouts rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
+            <div className="fc-card-shell fc-accent-workouts rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
               <div className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="fc-icon-tile fc-icon-workouts">
@@ -651,7 +651,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
             </div>
 
             {/* Nutrition Compliance */}
-            <div className="fc-glass fc-card fc-accent-meals rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
+            <div className="fc-card-shell fc-accent-meals rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
               <div className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="fc-icon-tile fc-icon-meals">
@@ -671,7 +671,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
             </div>
 
             {/* Habit Compliance */}
-            <div className="fc-glass fc-card fc-accent-habits rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
+            <div className="fc-card-shell fc-accent-habits rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300">
               <div className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="fc-icon-tile fc-icon-habits">
@@ -692,7 +692,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
           </div>
 
           {/* Compliance Trend Chart */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="fc-card-shell">
             <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 fc-text-primary font-semibold">

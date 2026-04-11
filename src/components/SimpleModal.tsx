@@ -104,7 +104,7 @@ export default function SimpleModal({
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`fc-modal relative w-full ${sizeStyles} max-h-[90vh] fc-glass fc-card rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
+        className={`fc-modal relative w-full ${sizeStyles} max-h-[90vh] fc-card-shell rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
         onClick={(e) => e.stopPropagation()}
         style={{
           animation: 'modalSlideIn 0.3s ease-out'

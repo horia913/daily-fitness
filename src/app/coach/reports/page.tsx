@@ -21,7 +21,7 @@ export default function CoachReports() {
         <div className="min-h-screen p-4 sm:p-6 md:p-6 pb-32">
           <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
             <AnalyticsNav />
-            <GlassCard elevation={2} className="fc-glass fc-card p-3 sm:p-6 md:p-6 lg:p-8">
+            <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-6 lg:p-8">
               <div className="flex flex-col gap-3 sm:gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                   <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] flex-shrink-0">

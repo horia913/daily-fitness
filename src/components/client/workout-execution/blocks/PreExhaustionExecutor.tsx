@@ -8,23 +8,35 @@ import {
   ChevronRight,
   MoreVertical,
   Pencil,
+  Repeat2,
+  Timer,
+  Weight,
+  Gauge,
+  Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
-  calculateSuggestedWeightUtil,
   formatTime,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
-import { LargeInput } from "../ui/LargeInput";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
+import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
+import { LargeInput } from "../ui/LargeInput";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { ProgressionNudge } from "../ui/ProgressionNudge";
-import { getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import {
+  getCoachSuggestedWeight,
+  getWeightDefaultAndSuggestion,
+} from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
@@ -34,6 +46,8 @@ export function PreExhaustionExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -48,6 +62,7 @@ export function PreExhaustionExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestionsMap,
@@ -74,6 +89,10 @@ export function PreExhaustionExecutor({
   const [isolationReps, setIsolationReps] = useState("");
   const [compoundWeight, setCompoundWeight] = useState("");
   const [compoundReps, setCompoundReps] = useState("");
+  const [isWeightIsolationPristine, setIsWeightIsolationPristine] =
+    useState(true);
+  const [isWeightCompoundPristine, setIsWeightCompoundPristine] =
+    useState(true);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [showTimer, setShowTimer] = useState(false);
@@ -153,33 +172,129 @@ export function PreExhaustionExecutor({
   ]);
 
   const isViewingLoggedSet = viewingSetIndex >= 1;
-  // Pre-fill with suggested weights (skip when viewing a previous set)
+
+  const resultIso = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: isolationExercise?.exercise_id
+      ? (lastPerformedWeightByExerciseId[isolationExercise.exercise_id] ??
+        null)
+      : null,
+    lastSessionWeight: isolationExercise?.exercise_id
+      ? (lastSessionWeightByExerciseId[isolationExercise.exercise_id] ??
+        null)
+      : null,
+    loadPercentage: isolationExercise?.load_percentage ?? null,
+    e1rm: isolationExercise?.exercise_id
+      ? (e1rmMap[isolationExercise.exercise_id] ?? null)
+      : null,
+  });
+  const resultComp = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: compoundExercise?.exercise_id
+      ? (lastPerformedWeightByExerciseId[compoundExercise.exercise_id] ??
+        null)
+      : null,
+    lastSessionWeight: compoundExercise?.exercise_id
+      ? (lastSessionWeightByExerciseId[compoundExercise.exercise_id] ?? null)
+      : null,
+    loadPercentage: compoundExercise?.load_percentage ?? null,
+    e1rm: compoundExercise?.exercise_id
+      ? (e1rmMap[compoundExercise.exercise_id] ?? null)
+      : null,
+  });
+  const coachSuggestedIso = getCoachSuggestedWeight(
+    isolationExercise?.load_percentage ?? null,
+    isolationExercise?.exercise_id
+      ? (e1rmMap[isolationExercise.exercise_id] ?? null)
+      : null,
+  );
+  const coachSuggestedComp = getCoachSuggestedWeight(
+    compoundExercise?.load_percentage ?? null,
+    compoundExercise?.exercise_id
+      ? (e1rmMap[compoundExercise.exercise_id] ?? null)
+      : null,
+  );
+
+  useEffect(() => {
+    setIsWeightIsolationPristine(true);
+    setIsWeightCompoundPristine(true);
+  }, [completedSets]);
+
   useEffect(() => {
     if (isViewingLoggedSet) return;
-    if (isolationExercise?.load_percentage && !isolationWeight) {
-      const suggested = calculateSuggestedWeightUtil(
-        isolationExercise.exercise_id,
-        isolationExercise.load_percentage,
-        e1rmMap,
-      );
-      if (suggested) setIsolationWeight(suggested.toString());
-    }
-    if (compoundExercise?.load_percentage && !compoundWeight) {
-      const suggested = calculateSuggestedWeightUtil(
-        compoundExercise.exercise_id,
-        compoundExercise.load_percentage,
-        e1rmMap,
-      );
-      if (suggested) setCompoundWeight(suggested.toString());
+    if (editingSetId) return;
+    if (isWeightIsolationPristine) {
+      if (
+        resultIso.default_weight != null &&
+        resultIso.default_weight > 0
+      ) {
+        setIsolationWeight(String(resultIso.default_weight));
+      } else {
+        setIsolationWeight("");
+      }
     }
   }, [
     isViewingLoggedSet,
-    isolationExercise,
-    compoundExercise,
-    e1rmMap,
-    isolationWeight,
-    compoundWeight,
+    editingSetId,
+    isWeightIsolationPristine,
+    resultIso.default_weight,
+    completedSets,
   ]);
+
+  useEffect(() => {
+    if (isViewingLoggedSet) return;
+    if (editingSetId) return;
+    if (isWeightCompoundPristine) {
+      if (
+        resultComp.default_weight != null &&
+        resultComp.default_weight > 0
+      ) {
+        setCompoundWeight(String(resultComp.default_weight));
+      } else {
+        setCompoundWeight("");
+      }
+    }
+  }, [
+    isViewingLoggedSet,
+    editingSetId,
+    isWeightCompoundPristine,
+    resultComp.default_weight,
+    completedSets,
+  ]);
+
+  const {
+    numericDefault: prescribedRepsIso,
+    displayHint: repsHintIso,
+  } = parseRepsTarget(isolationExercise?.reps ?? null);
+  const {
+    numericDefault: prescribedRepsComp,
+    displayHint: repsHintComp,
+  } = parseRepsTarget(compoundExercise?.reps ?? null);
+
+  useEffect(() => {
+    if (viewingSetIndex >= 1) return;
+    if (editingSetId) return;
+    setIsolationReps(
+      prescribedRepsIso > 0 ? String(prescribedRepsIso) : "",
+    );
+    setCompoundReps(
+      prescribedRepsComp > 0 ? String(prescribedRepsComp) : "",
+    );
+  }, [
+    viewingSetIndex,
+    editingSetId,
+    prescribedRepsIso,
+    prescribedRepsComp,
+    completedSets,
+    isolationExercise?.reps,
+    compoundExercise?.reps,
+  ]);
+
+  const exercisesPre = block.block.exercises ?? [];
+  const titleExercisePre =
+    exercisesPre[currentExerciseIndex ?? 0] ??
+    isolationExercise ??
+    compoundExercise;
+  const exerciseTitleName =
+    titleExercisePre?.exercise?.name ?? "Exercise";
 
   // Timer logic
   useEffect(() => {
@@ -207,69 +322,105 @@ export function PreExhaustionExecutor({
     };
   }, [showTimer, timerSeconds, restBetween]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Sets", value: totalSets },
     {
-      label: "SETS",
-      value: totalSets,
-    },
-    {
-      label: "ISOLATION",
-      value: isolationExercise?.exercise?.name || "Isolation Exercise",
-    },
-    {
-      label: "ISOLATION REPS",
-      value: isolationExercise?.reps || "-",
-    },
-    {
-      label: "REST BETWEEN",
-      value: restBetween,
+      icon: Timer,
+      label: "Rest between",
+      value: formatRestSeconds(restBetween),
       unit: "s",
     },
-    {
-      label: "COMPOUND",
-      value: compoundExercise?.exercise?.name || "Compound Exercise",
-    },
-    {
-      label: "COMPOUND REPS",
-      value: compoundExercise?.reps || "-",
-    },
   ];
-
-  if (isolationExercise?.load_percentage) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      isolationExercise.exercise_id,
+  if (isolationExercise?.reps) {
+    prescriptionItems.push({
+      icon: Repeat2,
+      label: "Reps (isolation)",
+      value: isolationExercise.reps,
+    });
+  }
+  if (compoundExercise?.reps) {
+    prescriptionItems.push({
+      icon: Repeat2,
+      label: "Reps (compound)",
+      value: compoundExercise.reps,
+    });
+  }
+  if (
+    isolationExercise?.load_percentage != null &&
+    isolationExercise.load_percentage !== undefined &&
+    isolationExercise.exercise_id
+  ) {
+    const suggestedForIso =
+      resultIso.source === "percent_e1rm"
+        ? resultIso.suggested_weight
+        : null;
+    const loadIso = formatLoadPercentage(
       isolationExercise.load_percentage,
-      e1rmMap,
+      suggestedForIso,
     );
-    const loadDisplay = formatLoadPercentage(
-      isolationExercise.load_percentage,
-      suggestedWeight,
-    );
-    if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD (ISOLATION)",
-        value: loadDisplay,
+    if (loadIso) {
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load (isolation)",
+        value: loadIso,
       });
     }
   }
-
-  if (compoundExercise?.load_percentage) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      compoundExercise.exercise_id,
+  if (
+    compoundExercise?.load_percentage != null &&
+    compoundExercise.load_percentage !== undefined &&
+    compoundExercise.exercise_id
+  ) {
+    const suggestedForComp =
+      resultComp.source === "percent_e1rm"
+        ? resultComp.suggested_weight
+        : null;
+    const loadComp = formatLoadPercentage(
       compoundExercise.load_percentage,
-      e1rmMap,
+      suggestedForComp,
     );
-    const loadDisplay = formatLoadPercentage(
-      compoundExercise.load_percentage,
-      suggestedWeight,
-    );
-    if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD (COMPOUND)",
-        value: loadDisplay,
+    if (loadComp) {
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load (compound)",
+        value: loadComp,
       });
     }
+  }
+  if (isolationExercise?.tempo) {
+    prescriptionItems.push({
+      icon: Gauge,
+      label: "Tempo (isolation)",
+      value: isolationExercise.tempo,
+    });
+  }
+  if (compoundExercise?.tempo) {
+    prescriptionItems.push({
+      icon: Gauge,
+      label: "Tempo (compound)",
+      value: compoundExercise.tempo,
+    });
+  }
+  if (
+    isolationExercise?.rir != null &&
+    isolationExercise?.rir !== undefined
+  ) {
+    prescriptionItems.push({
+      icon: Flame,
+      label: "RPE (isolation)",
+      value:
+        formatPrescribedRpeLabel(isolationExercise.rir) ??
+        String(isolationExercise.rir).trim(),
+    });
+  }
+  if (compoundExercise?.rir != null && compoundExercise?.rir !== undefined) {
+    prescriptionItems.push({
+      icon: Flame,
+      label: "RPE (compound)",
+      value:
+        formatPrescribedRpeLabel(compoundExercise.rir) ??
+        String(compoundExercise.rir).trim(),
+    });
   }
 
   const instructions = block.block.set_notes || undefined;
@@ -708,20 +859,17 @@ export function PreExhaustionExecutor({
             Isolation:{" "}
             {isolationExercise?.exercise?.name || "Isolation Exercise"}
           </h4>
-          {isolationExercise && (
-            <ExerciseActionButtons
-              exercise={isolationExercise}
-              onVideoClick={onVideoClick}
-              onAlternativesClick={onAlternativesClick}
-            />
-          )}
         </div>
         {isolationExercise?.exercise_id && (
           <ProgressionNudge
             suggestion={progressionSuggestionsMap?.get(isolationExercise.exercise_id)}
             previousPerformance={previousPerformanceMap?.get(isolationExercise.exercise_id) ?? null}
+            previousSessionSetNumber={displaySetNumber}
             onApplySuggestion={(w, r) => {
-              if (w != null) setIsolationWeight(String(w));
+              if (w != null) {
+                setIsWeightIsolationPristine(false);
+                setIsolationWeight(String(w));
+              }
               if (r != null) setIsolationReps(String(r));
             }}
           />
@@ -730,31 +878,41 @@ export function PreExhaustionExecutor({
           <div className="space-y-2">
             <LargeInput
               label="Weight"
-              value={isolationWeight}
-              onChange={setIsolationWeight}
+              value={
+                editDraft ? editDraft.isolationWeight : isolationWeight
+              }
+              onChange={(val) => {
+                if (editDraft) {
+                  setEditDraft((d) =>
+                    d ? { ...d, isolationWeight: val } : null,
+                  );
+                } else {
+                  setIsWeightIsolationPristine(false);
+                  setIsolationWeight(val);
+                }
+              }}
               placeholder="0"
               step="0.5"
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
-            {isolationExercise?.load_percentage != null &&
-              (() => {
-                const suggested = calculateSuggestedWeightUtil(
-                  isolationExercise.exercise_id,
-                  isolationExercise.load_percentage,
-                  e1rmMap,
-                );
-                return suggested != null && suggested > 0 ? (
-                  <ApplySuggestedWeightButton
-                    suggestedKg={Math.round(suggested * 2) / 2}
-                    onApply={() => setIsolationWeight(String(suggested))}
-                  />
-                ) : null;
-              })()}
+            {!editDraft &&
+              coachSuggestedIso != null &&
+              coachSuggestedIso > 0 && (
+                <ApplySuggestedWeightButton
+                  suggestedKg={coachSuggestedIso}
+                  onApply={() => {
+                    setIsolationWeight(String(coachSuggestedIso));
+                    setIsWeightIsolationPristine(false);
+                  }}
+                />
+              )}
           </div>
           <LargeInput
             label="Reps"
+            hint={!editDraft ? repsHintIso ?? undefined : undefined}
             value={editDraft ? editDraft.isolationReps : isolationReps}
             onChange={(val) => {
               if (editDraft)
@@ -786,27 +944,33 @@ export function PreExhaustionExecutor({
 
       {/* Compound Exercise */}
       <div className="py-4">
-        <div className="mb-4">
+        <div className="mb-4 flex items-start justify-between gap-2">
           <h4
-            className="font-semibold text-lg"
+            className="min-w-0 flex-1 font-semibold text-lg"
             style={{ color: "var(--fc-accent-purple)" }}
           >
             Compound: {compoundExercise?.exercise?.name || "Compound Exercise"}
           </h4>
-          {compoundExercise && (
-            <ExerciseActionButtons
-              exercise={compoundExercise}
-              onVideoClick={onVideoClick}
-              onAlternativesClick={onAlternativesClick}
-            />
-          )}
+          {compoundExercise ? (
+            <div className="shrink-0 pt-0.5">
+              <ExerciseActionButtons
+                exercise={compoundExercise}
+                onVideoClick={onVideoClick}
+                onAlternativesClick={onAlternativesClick}
+              />
+            </div>
+          ) : null}
         </div>
         {compoundExercise?.exercise_id && (
           <ProgressionNudge
             suggestion={progressionSuggestionsMap?.get(compoundExercise.exercise_id)}
             previousPerformance={previousPerformanceMap?.get(compoundExercise.exercise_id) ?? null}
+            previousSessionSetNumber={displaySetNumber}
             onApplySuggestion={(w, r) => {
-              if (w != null) setCompoundWeight(String(w));
+              if (w != null) {
+                setIsWeightCompoundPristine(false);
+                setCompoundWeight(String(w));
+              }
               if (r != null) setCompoundReps(String(r));
             }}
           />
@@ -815,31 +979,39 @@ export function PreExhaustionExecutor({
           <div className="space-y-2">
             <LargeInput
               label="Weight"
-              value={compoundWeight}
-              onChange={setCompoundWeight}
+              value={editDraft ? editDraft.compoundWeight : compoundWeight}
+              onChange={(val) => {
+                if (editDraft) {
+                  setEditDraft((d) =>
+                    d ? { ...d, compoundWeight: val } : null,
+                  );
+                } else {
+                  setIsWeightCompoundPristine(false);
+                  setCompoundWeight(val);
+                }
+              }}
               placeholder="0"
               step="0.5"
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
-            {(() => {
-              const coachSuggested = getCoachSuggestedWeight(
-                compoundExercise?.load_percentage,
-                compoundExercise?.exercise_id
-                  ? (e1rmMap[compoundExercise.exercise_id] ?? null)
-                  : null,
-              );
-              return coachSuggested != null && coachSuggested > 0 ? (
+            {!editDraft &&
+              coachSuggestedComp != null &&
+              coachSuggestedComp > 0 && (
                 <ApplySuggestedWeightButton
-                  suggestedKg={coachSuggested}
-                  onApply={() => setCompoundWeight(String(coachSuggested))}
+                  suggestedKg={coachSuggestedComp}
+                  onApply={() => {
+                    setCompoundWeight(String(coachSuggestedComp));
+                    setIsWeightCompoundPristine(false);
+                  }}
                 />
-              ) : null;
-            })()}
+              )}
           </div>
           <LargeInput
             label="Reps"
+            hint={!editDraft ? repsHintComp ?? undefined : undefined}
             value={editDraft ? editDraft.compoundReps : compoundReps}
             onChange={(val) => {
               if (editDraft)
@@ -863,6 +1035,27 @@ export function PreExhaustionExecutor({
       ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
       : [];
   const viewedSetEntry = forViewedSet[0] ?? null;
+
+  const wIso = parseFloat(isolationWeight);
+  const wComp = parseFloat(compoundWeight);
+  const rIso = parseInt(isolationReps, 10);
+  const rComp = parseInt(compoundReps, 10);
+  const logInputsReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    isolationWeight.trim() !== "" &&
+    !isNaN(wIso) &&
+    wIso > 0 &&
+    compoundWeight.trim() !== "" &&
+    !isNaN(wComp) &&
+    wComp > 0 &&
+    isolationReps.trim() !== "" &&
+    !isNaN(rIso) &&
+    rIso > 0 &&
+    compoundReps.trim() !== "" &&
+    !isNaN(rComp) &&
+    rComp > 0;
+
   const logButton = (
     <div className="space-y-2">
       {allowSetEditDelete && isEditMode ? (
@@ -904,15 +1097,12 @@ export function PreExhaustionExecutor({
           Edit this set
         </Button>
       ) : (
-        <Button
+        <LogSetButton
           onClick={handleLog}
-          disabled={isLoggingSet || completedSets >= totalSets}
-          variant="fc-primary"
-          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Target className="w-5 h-5 mr-2" />
-          {isLoggingSet ? "Logging..." : "LOG PRE-EXHAUSTION SET"}
-        </Button>
+          ready={logInputsReady}
+          loading={isLoggingSet}
+          label="Log pre-exhaustion set"
+        />
       )}
     </div>
   );
@@ -939,19 +1129,20 @@ export function PreExhaustionExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
+        previousPerformanceMap,
       }}
-      exerciseName={`${isolationExercise?.exercise?.name || "Isolation"} + ${
-        compoundExercise?.exercise?.name || "Compound"
-      }`}
-      blockDetails={blockDetails}
+      exerciseName={exerciseTitleName}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle={`LOG ROUND ${displaySetNumber}`}
       showNavigation={true}
-      currentExercise={isolationExercise}
+      currentExercise={titleExercisePre}
       showRestTimer={!!block.block.rest_seconds}
     />
   );

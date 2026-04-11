@@ -461,7 +461,7 @@ export default function CoachClientSubscriptionSection({
 
   if (loading) {
     return (
-      <GlassCard elevation={1} className="fc-glass fc-card p-6 animate-pulse">
+      <GlassCard elevation={1} className="fc-card-shell p-6 animate-pulse">
         <div className="h-24 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
       </GlassCard>
     )

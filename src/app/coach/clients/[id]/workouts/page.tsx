@@ -11,7 +11,7 @@ export default function ClientWorkoutsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+      <div className="fc-card-shell p-6 sm:p-10">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
             <Dumbbell className="w-6 h-6" />

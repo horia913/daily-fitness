@@ -98,10 +98,6 @@ const blockTypeStyles: Record<
     icon: Zap,
     label: "For Time",
   },
-  hr_sets: {
-    icon: Activity,
-    label: "HR Sets",
-  },
   speed_work: {
     icon: Zap,
     label: "Speed Work",
@@ -539,7 +535,7 @@ export default function ExerciseBlockCard({
       draggable={draggable}
       onDragStart={(e) => draggable && onDragStart?.(e, exercise.id)}
       onDragEnd={draggable ? onDragEnd : undefined}
-      className={`fc-glass fc-card border border-[color:var(--fc-glass-border)] transition-all duration-200 fc-hover-rise w-full ${
+      className={`fc-card-shell border border-[color:var(--fc-glass-border)] transition-all duration-200 fc-hover-rise w-full ${
         compact ? "rounded-lg p-3" : "rounded-2xl p-3 sm:p-5"
       } ${draggable ? "cursor-move" : ""} ${
         isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent-cyan)]/30" : ""

@@ -305,7 +305,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+              <div className="fc-card-shell p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -337,7 +337,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
           </div>
 
           <div className="max-w-7xl mx-auto relative z-10 space-y-6">
-            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="p-5 sm:p-6 space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="space-y-2">
@@ -371,7 +371,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
                 {/* Overall Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -385,7 +385,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -399,7 +399,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -413,7 +413,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                     </CardContent>
                   </Card>
 
-                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <Card className="fc-card-shell">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
@@ -437,7 +437,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
       <div className="p-4 sm:p-6 pt-0 sm:pt-6 min-w-0">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
           {/* Filters */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardContent className="p-6">
               <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1fr] gap-4">
                 <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
               const engagementLevel = getEngagementLevel(client.compliance.engagement_score)
               
               return (
-                <Card key={client.client.id} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:shadow-lg transition-all duration-300">
+                <Card key={client.client.id} className="fc-card-shell hover:shadow-lg transition-all duration-300">
                   <CardHeader className="pb-4">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                       <div className="flex items-center gap-4">
@@ -716,7 +716,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
               </div>
 
               {filteredAndSortedClients.length === 0 && (
-                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <Card className="fc-card-shell">
                   <CardContent className="text-center py-12">
                     <Users className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-[color:var(--fc-text-primary)] mb-2">No clients found</h3>

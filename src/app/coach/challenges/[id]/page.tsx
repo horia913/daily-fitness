@@ -305,7 +305,7 @@ function CoachChallengeDetailContent() {
 
         {showEditModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="fc-glass fc-card p-6 rounded-2xl max-w-md w-full border border-[color:var(--fc-glass-border)]">
+            <div className="fc-card-shell p-6 rounded-2xl max-w-md w-full border border-[color:var(--fc-glass-border)]">
               <h3 className="text-lg font-bold fc-text-primary mb-4">Edit challenge</h3>
               <div className="space-y-4">
                 <div>
@@ -331,7 +331,7 @@ function CoachChallengeDetailContent() {
 
         {showEndConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="fc-glass fc-card p-6 rounded-2xl max-w-sm w-full border border-[color:var(--fc-glass-border)]">
+            <div className="fc-card-shell p-6 rounded-2xl max-w-sm w-full border border-[color:var(--fc-glass-border)]">
               <p className="text-[color:var(--fc-text-primary)] font-semibold mb-2">End this challenge?</p>
               <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">This will finalize rankings and announce results. This cannot be undone.</p>
               <div className="flex gap-2 justify-end">
@@ -343,7 +343,7 @@ function CoachChallengeDetailContent() {
         )}
 
         <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-2xl font-bold fc-text-primary">{challenge.name}</h2>
               <span className="fc-glass-soft px-3 py-1 rounded-lg text-sm font-semibold border border-[color:var(--fc-glass-border)]">

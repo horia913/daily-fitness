@@ -6,18 +6,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import {
-  ArrowLeft,
-  ChevronRight,
-  FileText,
-  Clock,
-  TrendingUp,
-  Search,
-  Trophy,
-  Layers,
-  Download,
-} from "lucide-react";
-import Link from "next/link";
+import { ClientPageShell } from "@/components/client-ui";
+import { ArrowLeft, FileText, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
 
@@ -56,13 +46,37 @@ interface WorkoutSet {
   };
 }
 
+function logCompletedDate(log: WorkoutLog): Date {
+  return log.completed_at ? new Date(log.completed_at) : new Date(log.started_at);
+}
+
+function durationMinutesForLog(log: WorkoutLog): number {
+  if (log.total_duration_minutes != null) {
+    return Math.round(log.total_duration_minutes);
+  }
+  if (log.completed_at && log.started_at) {
+    return Math.round(
+      (new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 60000,
+    );
+  }
+  return 0;
+}
+
+function formatDurationLabel(totalMinutes: number): string {
+  if (totalMinutes <= 0) return "0m";
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
 export default function WorkoutLogsPage() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [timeFilter, setTimeFilter] = useState<"all" | "this_month" | "this_week">("all");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,7 +92,6 @@ export default function WorkoutLogsPage() {
     if (!user?.id) return;
     setLoading(true);
     setError(null);
-    setLoadingStartedAt(Date.now());
     try {
       // Ensure user is authenticated before querying
       const { ensureAuthenticated } = await import('@/lib/supabase');
@@ -285,7 +298,6 @@ export default function WorkoutLogsPage() {
       setWorkoutLogs([]);
     } finally {
       setLoading(false);
-      setLoadingStartedAt(null);
     }
   }, [user]);
 
@@ -350,21 +362,42 @@ export default function WorkoutLogsPage() {
       .reduce((sum, log) => sum + log.totalWeight, 0);
   }, [workoutLogs]);
 
+  const thisMonthDurationMinutes = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return workoutLogs
+      .filter((log) => logCompletedDate(log) >= startOfMonth)
+      .reduce((sum, log) => sum + durationMinutesForLog(log), 0);
+  }, [workoutLogs]);
+
+  const thisMonthSummaryLine = useMemo(() => {
+    const vol =
+      thisMonthWeight >= 1000
+        ? `${(thisMonthWeight / 1000).toFixed(1)}k kg`
+        : `${Math.round(thisMonthWeight)} kg`;
+    return `${thisMonthCount} workout${thisMonthCount === 1 ? "" : "s"} · ${formatDurationLabel(thisMonthDurationMinutes)} · ${vol}`;
+  }, [thisMonthCount, thisMonthDurationMinutes, thisMonthWeight]);
+
   if (error && !loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-                <p className="text-[color:var(--fc-text-dim)] mb-4">{error}</p>
-                <button type="button" onClick={() => { setError(null); loadWorkoutLogs(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">
-                  Retry
-                </button>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] px-2 text-center">
+              <p className="text-sm fc-text-dim mb-3">{error}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  loadWorkoutLogs();
+                }}
+                className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium hover:bg-cyan-400 transition-colors"
+              >
+                Retry
+              </button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -375,17 +408,15 @@ export default function WorkoutLogsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="fc-surface p-8">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-8 w-3/5 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-64 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-10 w-full rounded-full bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -395,141 +426,95 @@ export default function WorkoutLogsPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
-          <div className="mx-auto w-full max-w-6xl space-y-6">
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                    <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                  </Link>
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                        Workout Logs
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                        Reflecting on the grind.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors shrink-0"
-                  aria-label="Search"
-                >
-                  <Search className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <header className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/progress";
+              }}
+              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+              aria-label="Back to progress"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
+              Workout History
+            </h1>
+          </header>
 
-            {/* Monthly summary hero */}
-            {workoutLogs.length > 0 && (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <span className="text-[10px] font-bold font-mono uppercase tracking-widest fc-text-warning">This month</span>
-                    <h2 className="text-2xl font-bold fc-text-primary mt-2">
-                      {thisMonthCount} <span className="text-lg font-medium fc-text-subtle">workouts</span>
-                    </h2>
-                  </div>
-                  <div className="w-14 h-14 rounded-2xl bg-[color:var(--fc-status-warning)]/20 flex items-center justify-center">
-                    <Trophy className="w-8 h-8 fc-text-warning" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 fc-text-success" />
-                      <span className="text-xs fc-text-subtle font-medium">Volume this month</span>
-                    </div>
-                    <div className="text-xl font-bold font-mono fc-text-primary">
-                      {(thisMonthWeight / 1000).toFixed(1)}k<span className="text-sm fc-text-subtle ml-1">kg</span>
-                    </div>
-                  </div>
-                  <div className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Layers className="w-4 h-4 fc-text-workouts" />
-                      <span className="text-xs fc-text-subtle font-medium">Total sets</span>
-                    </div>
-                    <div className="text-xl font-bold font-mono fc-text-primary">
-                      {workoutLogs
-                        .filter((log) => {
-                          const d = log.completed_at ? new Date(log.completed_at) : new Date(log.started_at);
-                          const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-                          return d >= start;
-                        })
-                        .reduce((s, log) => s + log.totalSets, 0)}
-                    </div>
-                  </div>
-                  <Link
-                    href="/client/progress/personal-records"
-                    className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)] flex items-center justify-center gap-2 fc-text-subtle hover:fc-text-primary transition-colors"
-                  >
-                    <span className="text-sm font-semibold">View all PRs</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Sticky filter bar */}
-            {workoutLogs.length > 0 && (
-              <nav className="sticky top-0 z-10 my-3 flex flex-wrap items-center gap-2 overflow-x-auto bg-[color:var(--fc-bg-base)]/80 py-2 backdrop-blur-xl">
-                {(["all", "this_month", "this_week"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setTimeFilter(key)}
-                    className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border ${
-                      timeFilter === key
-                        ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
-                        : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                    }`}
-                  >
-                    {key === "all" ? "All time" : key === "this_month" ? "This month" : "This week"}
-                  </button>
-                ))}
-              </nav>
-            )}
-
-            {/* Workout Logs List */}
-            {filteredLogs.length === 0 ? (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-12">
-                <div className="text-center">
-                  <FileText className="mx-auto mb-3 h-12 w-12 fc-text-subtle" />
-                  <h3 className="mb-1 text-lg font-bold fc-text-primary">
-                    Your first workout awaits
-                  </h3>
-                  <p className="text-sm fc-text-dim max-w-xs mx-auto">
-                    Once you complete a workout, your training history will appear here. Go crush it!
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col border-y border-white/5">
-                {filteredLogs.map((log) => (
-                  <WorkoutLogCard key={log.id} log={log} />
-                ))}
-              </div>
-            )}
-
-            {/* FAB: Download (export placeholder) */}
-            {filteredLogs.length > 0 && (
+          {workoutLogs.length > 0 && (
+            <section className="mb-4 border-b border-white/5 pb-4">
+              <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                This month
+              </p>
+              <p className="text-sm font-medium fc-text-primary leading-snug">
+                {thisMonthSummaryLine}
+              </p>
               <button
                 type="button"
-                className="fixed bottom-24 right-6 w-14 h-14 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-strong shadow-lg z-20"
-                aria-label="Download / export logs"
+                onClick={() => {
+                  window.location.href = "/client/progress/personal-records";
+                }}
+                className="mt-2 text-left text-xs font-medium fc-text-primary hover:opacity-80 bg-transparent border-0 p-0 cursor-pointer"
               >
-                <Download className="w-6 h-6" />
+                View PRs →
               </button>
-            )}
-          </div>
-        </div>
+            </section>
+          )}
+
+          {workoutLogs.length > 0 && (
+            <nav
+              className="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1.5 bg-[color:var(--fc-bg-base)]/90 py-2 backdrop-blur-sm px-1"
+              aria-label="Time range"
+            >
+              {(["all", "this_month", "this_week"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTimeFilter(key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors border ${
+                    timeFilter === key
+                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
+                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
+                  }`}
+                >
+                  {key === "all" ? "All time" : key === "this_month" ? "This month" : "This week"}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {filteredLogs.length === 0 ? (
+            <div className="py-8 px-2 text-center border-y border-white/5">
+              <FileText className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
+              <p className="text-sm font-semibold fc-text-primary mb-1">
+                {workoutLogs.length === 0 ? "No workouts yet" : "No workouts in this range"}
+              </p>
+              <p className="text-sm fc-text-dim">
+                {workoutLogs.length === 0
+                  ? "Complete a workout and your history will show up here."
+                  : "Try another time filter."}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col border-y border-white/5">
+              {filteredLogs.map((log) => (
+                <WorkoutLogCard key={log.id} log={log} />
+              ))}
+            </div>
+          )}
+
+          {filteredLogs.length > 0 && (
+            <button
+              type="button"
+              className="fixed bottom-24 right-4 w-12 h-12 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-strong shadow-lg z-20 sm:right-6"
+              aria-label="Download / export logs"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+          )}
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

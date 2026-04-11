@@ -232,7 +232,7 @@ export default function SetLoggingForm({
       {/* Main Set Logging Form */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-3xl ${theme.shadow} overflow-hidden`}>
+          <Card className={`${theme.card} fc-card-shell border ${theme.border} rounded-3xl ${theme.shadow} overflow-hidden`}>
             {/* Header */}
             <CardHeader className="p-6 border-b border-slate-200 dark:border-slate-700 fc-glass fc-card">
               <div className="flex items-center justify-between">
@@ -496,7 +496,7 @@ export default function SetLoggingForm({
       {/* Video Modal */}
       {showVideoModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-60 flex items-center justify-center p-4">
-          <div className={`w-full max-w-md ${theme.card} fc-glass fc-card border ${theme.border} rounded-3xl overflow-hidden`}>
+          <div className={`w-full max-w-md ${theme.card} fc-card-shell border ${theme.border} rounded-3xl overflow-hidden`}>
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <h3 className={`text-lg font-semibold ${theme.text}`}>
                 {templateExercise?.exercise?.name || 'Exercise'} Video

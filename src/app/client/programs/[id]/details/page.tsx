@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
@@ -11,7 +11,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { MetricGauge } from "@/components/ui/MetricGauge";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -23,6 +22,7 @@ import { withTimeout } from "@/lib/withTimeout";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { ClientPageShell } from "@/components/client-ui";
 interface Program {
   id: string;
   name: string;
@@ -119,7 +119,6 @@ function buildInlineExerciseLines(blocks: any[]): InlineExerciseLine[] {
 function ProgramDetailsContent() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const router = useRouter();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
   const [program, setProgram] = useState<Program | null>(null);
   const [weeks, setWeeks] = useState<ProgramWeekExtended[]>([]);
@@ -305,14 +304,14 @@ function ProgramDetailsContent() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen p-4 max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <div className="animate-pulse space-y-3">
+            <div className="h-8 w-28 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-6 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
           </div>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     );
   }
@@ -321,17 +320,19 @@ function ProgramDetailsContent() {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-3">
+          <ClientPageShell className="max-w-lg w-full">
+          <div className="w-full space-y-3">
             <ErrorBanner
               title={error ? "Couldn't load program" : "Program not found"}
               message="Please check your connection and try again."
               onRetry={error && id ? () => loadProgramDetails(id as string) : undefined}
             />
-            <Button onClick={() => router.back()} variant="outline" className="w-full">
+            <Button onClick={() => window.history.back()} variant="outline" className="w-full h-10 text-sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Go back
             </Button>
           </div>
+          </ClientPageShell>
         </div>
       </AnimatedBackground>
     );
@@ -347,16 +348,17 @@ function ProgramDetailsContent() {
         <div className="min-h-screen pb-44 sm:pb-48">
           <main className="max-w-4xl mx-auto space-y-6 relative z-10 fc-page px-4 sm:px-6 py-8">
             {/* Back + Program Header */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8 mb-4">
+            <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-8 mb-4">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                  <Link
-                    href="/client"
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = "/client"; }}
                     className="flex items-center justify-center shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] sm:fc-glass sm:fc-card"
                     aria-label="Back to dashboard"
                   >
                     <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </Link>
+                  </button>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
                       <BookOpen className="w-6 h-6" />
@@ -444,11 +446,11 @@ function ProgramDetailsContent() {
             )}
 
             {/* Selected week content */}
-            <section className="space-y-4">
+            <section className="space-y-3">
               {selectedWeekData && (
                 <>
-                  <div className="flex items-center justify-between px-2">
-                    <h2 className="text-lg font-bold fc-text-primary">
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-base font-bold fc-text-primary">
                       Week {selectedWeek} of {program.duration_weeks}
                     </h2>
                     {selectedWeek < unlockedWeekMax && (
@@ -469,18 +471,18 @@ function ProgramDetailsContent() {
                   </div>
 
                   {selectedWeekData.workouts.length === 0 ? (
-                    <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
-                      <p className="text-center fc-text-dim">No workouts in this week.</p>
+                    <GlassCard elevation={2} className="fc-card-shell p-4 rounded-xl">
+                      <p className="text-center text-sm fc-text-dim">No workouts in this week.</p>
                     </GlassCard>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {selectedWeekData.workouts.map((workout) => {
                         const isUnlocked = selectedWeek <= unlockedWeekMax;
                         return (
                           <GlassCard
                             key={workout.id}
                             elevation={2}
-                            className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden"
+                            className="fc-card-shell overflow-hidden"
                           >
                             <div className="p-5">
                               <div className="flex items-start justify-between gap-4 mb-4">
@@ -497,9 +499,9 @@ function ProgramDetailsContent() {
                                     size="sm"
                                     variant="outline"
                                     className="fc-btn rounded-lg border-[color:var(--fc-glass-border)]"
-                                    onClick={() =>
-                                      router.push(`/client/workouts/${workout.id}/details`)
-                                    }
+                                    onClick={() => {
+                                      window.location.href = `/client/workouts/${workout.id}/details`;
+                                    }}
                                   >
                                     View details
                                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -507,10 +509,10 @@ function ProgramDetailsContent() {
                                   {isUnlocked && (
                                     <Button
                                       size="sm"
-                                      className="fc-btn rounded-lg bg-[color:var(--fc-domain-workouts)] hover:opacity-90 text-white border-0"
-                                      onClick={() =>
-                                        router.push(`/client/workouts/${workout.id}/details`)
-                                      }
+                                      className="fc-btn h-8 w-8 p-0 rounded-lg bg-[color:var(--fc-domain-workouts)] hover:opacity-90 text-white border-0"
+                                      onClick={() => {
+                                        window.location.href = `/client/workouts/${workout.id}/details`;
+                                      }}
                                     >
                                       <Play className="w-4 h-4" />
                                     </Button>
@@ -548,22 +550,22 @@ function ProgramDetailsContent() {
             </section>
 
             {/* Sticky bottom actions — above app bottom nav (~64px + 12px margin) */}
-            <div className="fixed left-0 right-0 p-4 sm:p-6 z-[9999] bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]" style={{ bottom: "76px" }}>
-              <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4">
+            <div className="fixed left-0 right-0 p-3 sm:p-4 z-[9999] bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]" style={{ bottom: "76px" }}>
+              <div className="max-w-lg mx-auto w-full flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={() => {
                     if (firstWorkoutOfUnlockedWeek) {
-                      router.push(`/client/workouts/${firstWorkoutOfUnlockedWeek.id}/details`);
+                      window.location.href = `/client/workouts/${firstWorkoutOfUnlockedWeek.id}/details`;
                     } else {
-                      router.push("/client/workouts");
+                      window.location.href = "/client/workouts";
                     }
                   }}
                   disabled={!firstWorkoutOfUnlockedWeek}
-                  className="flex-1 rounded-2xl h-14 font-bold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0 uppercase tracking-widest disabled:opacity-50"
+                  className="flex-1 rounded-xl h-11 text-sm font-semibold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0 uppercase tracking-wide disabled:opacity-50"
                 >
-                  <Play className="w-5 h-5 fill-current" />
-                  Continue Program
-                  <ArrowLeft className="w-5 h-5 rotate-180" />
+                  <Play className="w-4 h-4 fill-current" />
+                  Continue
+                  <ArrowLeft className="w-4 h-4 rotate-180" />
                 </Button>
               </div>
             </div>

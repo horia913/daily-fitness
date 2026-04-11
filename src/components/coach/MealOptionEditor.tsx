@@ -320,7 +320,7 @@ export default function MealOptionEditor({
 
       {/* Options List */}
       {options.length === 0 ? (
-        <div className={`text-center py-12 ${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
+        <div className={`text-center py-12 ${theme.card} fc-card-shell border ${theme.border} rounded-2xl`}>
           <AlertCircle className={`w-12 h-12 mx-auto ${theme.textSecondary} mb-4`} />
           <h4 className={`text-lg font-semibold ${theme.text} mb-2`}>No Options Yet</h4>
           <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -339,7 +339,7 @@ export default function MealOptionEditor({
           {options.map((option, index) => (
             <div
               key={option.id}
-              className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl overflow-hidden`}
+              className={`${theme.card} fc-card-shell border ${theme.border} rounded-2xl overflow-hidden`}
             >
               {/* Option Header */}
               <div 

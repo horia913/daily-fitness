@@ -10,7 +10,6 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import {
   getChallengeDetails,
   getChallengeLeaderboard,
@@ -20,6 +19,7 @@ import {
 } from "@/lib/challengeService";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChallengeDetailPageBody } from "@/components/client/challenges/ChallengeDetailPageBody";
+import { ClientPageShell } from "@/components/client-ui";
 
 function ChallengeDetailContent() {
   const params = useParams();
@@ -163,14 +163,12 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-glass fc-card p-8">
-              <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="h-80 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-12 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
+              <div className="h-56 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -181,9 +179,9 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
-              <p className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
+              <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
                 {loadError || "Challenge not found"}
               </p>
               {loadError ? (
@@ -199,16 +197,17 @@ function ChallengeDetailContent() {
                   Retry
                 </Button>
               ) : (
-                <Link
-                  href="/client/challenges"
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/challenges"; }}
                   className="fc-btn fc-btn-secondary fc-press inline-flex"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Challenges
-                </Link>
+                </button>
               )}
             </GlassCard>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );

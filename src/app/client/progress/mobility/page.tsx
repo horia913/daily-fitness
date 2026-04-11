@@ -28,6 +28,7 @@ import {
   MobilityMetric,
 } from "@/lib/progressTrackingService";
 import MobilityFormFields from "@/components/progress/MobilityFormFields";
+import { ClientPageShell } from "@/components/client-ui";
 
 function MobilityMetricsPageContent() {
   const searchParams = useSearchParams();
@@ -238,12 +239,12 @@ function MobilityMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
             <div className="py-6 text-center">
               <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -254,12 +255,12 @@ function MobilityMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
             <div className="animate-pulse space-y-3">
               <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -269,7 +270,7 @@ function MobilityMetricsPageContent() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
           <div className="mb-3 flex items-center gap-3">
             <button
               type="button"
@@ -606,7 +607,7 @@ function MobilityMetricsPageContent() {
               </div>
             </form>
           </ResponsiveModal>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );
@@ -618,12 +619,12 @@ export default function MobilityMetricsPage() {
       fallback={
         <ProtectedRoute>
           <AnimatedBackground>
-            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
               <div className="animate-pulse space-y-3">
                 <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
                 <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
               </div>
-            </div>
+            </ClientPageShell>
           </AnimatedBackground>
         </ProtectedRoute>
       }

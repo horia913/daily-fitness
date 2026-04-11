@@ -181,7 +181,7 @@ export function CreateChallengeModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto fc-glass fc-card border border-[color:var(--fc-glass-border)]">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto fc-card-shell border border-[color:var(--fc-glass-border)]">
         <DialogHeader>
           <DialogTitle className="fc-text-primary">Create Challenge</DialogTitle>
         </DialogHeader>

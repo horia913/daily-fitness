@@ -66,7 +66,8 @@ export const WorkoutBlockTypeSchema = z.enum([
   'emom',
   'for_time',
   'tabata',
-  'hr_sets'
+  'speed_work',
+  'endurance'
 ])
 
 export const WorkoutBlockSchema = z.object({

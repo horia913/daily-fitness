@@ -297,7 +297,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
           <div className="p-12">
             <div className="flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-12 h-12 animate-spin fc-text-workouts" />
@@ -312,7 +312,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
@@ -330,7 +330,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
       </div>
 
       {/* Sex Filter */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6">
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 fc-text-subtle" />
@@ -382,7 +382,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
       </div>
 
       {/* Time Filter */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 fc-text-subtle" />
@@ -445,7 +445,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
       </div>
 
       {/* Category Selection */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 space-y-4">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 fc-text-subtle" />
@@ -601,7 +601,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
       </div>
 
       {/* Leaderboard */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div>
@@ -694,7 +694,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
       </div>
 
       {/* Info Card */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6">
           <div className="flex items-start gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-10 h-10 flex-shrink-0">

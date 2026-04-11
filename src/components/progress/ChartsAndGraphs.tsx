@@ -290,7 +290,7 @@ export function ChartsAndGraphs({
 
   if (loading) {
     return (
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -321,7 +321,7 @@ export function ChartsAndGraphs({
   }
 
   return (
-    <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full", className)}>
+    <div className={cn("fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full", className)}>
       <div className="p-4 sm:p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -541,7 +541,7 @@ function ChartCard({
 
   const cardClasses = cn(
     "rounded-2xl p-6 transition-all duration-300 cursor-pointer",
-    "fc-glass fc-card border border-[color:var(--fc-glass-border)]",
+    "fc-card-shell border border-[color:var(--fc-glass-border)]",
     "fc-hover-rise",
     isSelected && "ring-2 ring-[color:var(--fc-domain-workouts)]",
     isExpanded && "col-span-2 row-span-2"

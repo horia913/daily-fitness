@@ -265,7 +265,7 @@ export function ClientFmsAssessmentsPanel({
   if (loading) {
     return (
       <div className="space-y-6">
-        <GlassCard elevation={2} className="fc-glass fc-card p-8">
+        <GlassCard elevation={2} className="fc-card-shell p-8">
           <div className="animate-pulse space-y-4">
             <div className="h-12 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
             <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -278,12 +278,12 @@ export function ClientFmsAssessmentsPanel({
   return (
     <div className="space-y-6">
           {showPageHeader ? (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link
                   href={`/coach/clients/${clientId}`}
-                  className="fc-glass fc-card inline-flex p-2.5 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)] shrink-0"
+                  className="fc-card-shell inline-flex p-2.5 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)] shrink-0"
                   aria-label="Back to client hub"
                 >
                   <ArrowLeft className="w-5 h-5 shrink-0" aria-hidden />
@@ -319,7 +319,7 @@ export function ClientFmsAssessmentsPanel({
           )}
 
           {assessments.length >= 2 && (
-            <GlassCard elevation={1} className="fc-glass fc-card p-4 rounded-2xl">
+            <GlassCard elevation={1} className="fc-card-shell p-4 rounded-2xl">
               <p className="text-xs font-medium fc-text-subtle mb-2">Total score trend (oldest → newest)</p>
               {(() => {
                 const maxPts = FMS_TESTS.length * 3;
@@ -509,7 +509,7 @@ export function ClientFmsAssessmentsPanel({
               })}
             </div>
           ) : (
-            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl">
+            <GlassCard elevation={2} className="fc-card-shell">
               <CardContent className="p-12">
                 <EmptyState
                   icon={ClipboardList}

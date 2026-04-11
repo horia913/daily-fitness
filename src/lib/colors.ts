@@ -55,15 +55,15 @@ export const semanticColors = {
 export const timeBasedGradients = {
   morning: {
     light: ['#f6f2ec', '#e8e3db', '#BAE6FD', '#A5F3FC'], // Warm base + cyan tint
-    dark: ['#0b0f14', '#121824', '#0e7490', '#155e75'],   // Basalt + cyan
+    dark: ['#0b0f14', '#121824', '#07394a', '#0a2f3a'],   // Basalt + muted cyan
   },
   afternoon: {
     light: ['#f6f2ec', '#e8e3db', '#A5F3FC', '#99F6E4'], // Warm base + cyan/teal
-    dark: ['#0b0f14', '#121824', '#0e7490', '#0f766e'],   // Basalt + cyan/teal
+    dark: ['#0b0f14', '#121824', '#07394a', '#07332e'],   // Basalt + muted cyan/teal
   },
   evening: {
     light: ['#f6f2ec', '#e8e3db', '#7DD3FC', '#60A5FA'],  // Warm base + blue
-    dark: ['#0b0f14', '#121824', '#0E7490', '#155E75'],   // Basalt + cyan/blue
+    dark: ['#0b0f14', '#121824', '#07394a', '#0a2f3a'],   // Basalt + muted cyan/blue
   },
   night: {
     light: ['#f6f2ec', '#e8e3db', '#A5B4FC', '#818CF8'],  // Warm base + purple/indigo

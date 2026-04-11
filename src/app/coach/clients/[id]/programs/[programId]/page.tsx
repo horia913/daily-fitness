@@ -366,7 +366,7 @@ function ClientProgramDetailsContent() {
         </Link>
 
         {/* Header */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-8">
+        <div className="fc-card-shell p-6 sm:p-8">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="flex items-start gap-4">
               <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
@@ -488,7 +488,7 @@ function ClientProgramDetailsContent() {
         </div>
 
         {/* Progress Section — week control works even before a program_progress row exists */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+        <div className="fc-card-shell p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 fc-text-workouts" />
             Client Progress
@@ -589,14 +589,14 @@ function ClientProgramDetailsContent() {
 
         {/* Description */}
         {program.description && (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+          <div className="fc-card-shell p-6">
             <h2 className="text-xl font-bold fc-text-primary mb-3">Description</h2>
             <p className="fc-text-dim leading-relaxed">{program.description}</p>
           </div>
         )}
 
         {/* Weekly Schedule */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+        <div className="fc-card-shell p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5 fc-text-workouts" />
             Weekly Schedule
@@ -659,7 +659,7 @@ function ClientProgramDetailsContent() {
         </div>
 
         {/* Full Schedule by Week */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+        <div className="fc-card-shell p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Dumbbell className="w-5 h-5 fc-text-workouts" />
             Full Program Schedule ({schedule.length} workouts)

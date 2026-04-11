@@ -353,7 +353,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
                   </div>
 
                   {/* Meal totals */}
-                  <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                  <div className="fc-card-shell">
                     <div className="p-4">
                       <h4 className="font-semibold fc-text-primary mb-3">Meal Totals</h4>
                       <div className="grid grid-cols-2 gap-4">

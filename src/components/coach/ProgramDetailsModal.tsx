@@ -87,7 +87,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           <div className="space-y-6">
             {/* Program Overview */}
-            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+            <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
               <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
                   <div className="fc-icon-tile fc-icon-workouts">
@@ -143,7 +143,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
             </div>
 
             {/* Weekly Schedule */}
-            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+            <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
               <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
                   <div className="fc-icon-tile fc-icon-workouts">
@@ -190,7 +190,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
             </div>
 
             {/* Workout Templates */}
-            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+            <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
               <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
                   <div className="fc-icon-tile fc-icon-workouts">

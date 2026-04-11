@@ -3,20 +3,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Link,
   ChevronLeft,
   ChevronRight,
   MoreVertical,
   Pencil,
+  Target,
+  Layers,
+  Timer,
+  Clock,
+  Weight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
-  calculateSuggestedWeightUtil,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
@@ -50,6 +56,7 @@ export function ClusterSetExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestion,
@@ -101,9 +108,9 @@ export function ClusterSetExecutor({
     set_number: number;
   } | null>(null);
   const [currentClusterInSet, setCurrentClusterInSet] = useState(1);
-  /** idle = logging; prompt = cluster done, user starts timer; ticking = countdown running */
+  /** idle = logging; ticking = intra-cluster rest countdown */
   const [intraClusterRestPhase, setIntraClusterRestPhase] = useState<
-    "idle" | "prompt" | "ticking"
+    "idle" | "ticking"
   >("idle");
   const [intraClusterTimeLeft, setIntraClusterTimeLeft] = useState(intraClusterRest);
 
@@ -204,28 +211,23 @@ export function ClusterSetExecutor({
     exerciseId,
   ]);
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Sets", value: totalSets },
     {
-      label: "SETS",
-      value: totalSets,
+      icon: Layers,
+      label: "Clusters × reps",
+      value: `${clustersPerSet}×${repsPerCluster}`,
     },
     {
-      label: "CLUSTERS/SET",
-      value: clustersPerSet,
-    },
-    {
-      label: "REPS/CLUSTER",
-      value: repsPerCluster,
-    },
-    {
-      label: "INTRA-CLUSTER REST",
-      value: intraClusterRest,
+      icon: Timer,
+      label: "Intra-cluster",
+      value: formatRestSeconds(intraClusterRest),
       unit: "s",
     },
     {
-      label: "REST BETWEEN SETS",
-      value: restBetweenSets,
+      icon: Clock,
+      label: "Between sets",
+      value: formatRestSeconds(restBetweenSets),
       unit: "s",
     },
   ];
@@ -237,7 +239,13 @@ export function ClusterSetExecutor({
       currentExercise.load_percentage,
       suggestedForDisplay,
     );
-    if (loadDisplay) blockDetails.push({ label: "LOAD", value: loadDisplay });
+    if (loadDisplay) {
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
+        value: loadDisplay,
+      });
+    }
   }
 
   const instructions =
@@ -367,7 +375,7 @@ export function ClusterSetExecutor({
         setCurrentClusterInSet((c) => c + 1);
         return;
       }
-      setIntraClusterRestPhase("prompt");
+      setIntraClusterRestPhase("ticking");
       return;
     }
 
@@ -634,15 +642,13 @@ export function ClusterSetExecutor({
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-        <div className="text-sm font-semibold fc-text-dim mb-4">
-          {editDraft
-            ? "Edit set"
-            : intraClusterRestPhase === "ticking"
-              ? `Rest ${intraClusterTimeLeft}s — next cluster`
-              : intraClusterRestPhase === "prompt"
-                ? `Cluster ${currentClusterInSet} done — start rest before cluster ${currentClusterInSet + 1}`
-                : `Set ${displaySetNumber} — Cluster ${currentClusterInSet} of ${clustersPerSet}`}
-        </div>
+        {!(intraClusterRestPhase === "ticking" && !editDraft) ? (
+          <div className="text-sm font-semibold fc-text-dim mb-4">
+            {editDraft
+              ? "Edit set"
+              : `Set ${displaySetNumber} — Cluster ${currentClusterInSet} of ${clustersPerSet}`}
+          </div>
+        ) : null}
         <div className="space-y-4">
           {intraClusterRestPhase !== "ticking" && (
           <>
@@ -663,6 +669,7 @@ export function ClusterSetExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
             {!editDraft &&
               coachSuggestedWeight != null &&
@@ -687,38 +694,16 @@ export function ClusterSetExecutor({
           </>
           )}
         </div>
-        {intraClusterRestPhase === "prompt" && (
-          <div
-            className="mb-4 rounded-xl p-4 space-y-3"
-            style={{ background: "var(--fc-surface-elevated)" }}
-          >
-            <p className="text-sm fc-text-dim text-center">
-              Intra-cluster rest: {intraClusterRest}s between mini-sets (same weight for the full set).
-            </p>
-            <Button
-              type="button"
-              variant="fc-primary"
-              className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-              onClick={() => setIntraClusterRestPhase("ticking")}
-            >
-              Start rest timer
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-11 text-sm font-semibold rounded-xl"
-              onClick={() => {
-                setIntraClusterRestPhase("idle");
-                setCurrentClusterInSet((c) => c + 1);
-              }}
-            >
-              Skip rest — next cluster
-            </Button>
-          </div>
-        )}
         {intraClusterRestPhase === "ticking" && (
-          <div className="mb-4 rounded-xl p-4 space-y-3" style={{ background: "var(--fc-surface-elevated)" }}>
-            <p className="text-lg font-bold fc-text-primary text-center">{intraClusterTimeLeft}s</p>
+          <div className="mb-4 rounded-xl p-5 space-y-4" style={{ background: "var(--fc-surface-elevated)" }}>
+            <p
+              className="text-center font-black tabular-nums tracking-tight text-cyan-300"
+              style={{ fontSize: "clamp(2.75rem, 11vw, 3.75rem)", lineHeight: 1.05 }}
+              aria-live="polite"
+              aria-label={`${intraClusterTimeLeft} seconds rest, next cluster`}
+            >
+              {intraClusterTimeLeft}s
+            </p>
             <p className="text-xs fc-text-dim text-center">Rest before next cluster</p>
             <Button
               type="button"
@@ -737,6 +722,17 @@ export function ClusterSetExecutor({
       </div>
     </div>
   );
+
+  const weightNumPreview = parseFloat(weight);
+  const clusterWeightReady =
+    weight.trim() !== "" &&
+    !isNaN(weightNumPreview) &&
+    weightNumPreview >= 0;
+  const clusterLogReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    intraClusterRestPhase === "idle" &&
+    clusterWeightReady;
 
   const isEditMode = !!editingSetId && !!editDraft;
   const logButton = isEditMode ? (
@@ -773,23 +769,16 @@ export function ClusterSetExecutor({
       Edit this set
     </Button>
   ) : (
-    <Button
+    <LogSetButton
       onClick={handleClusterDone}
-      disabled={
-        isLoggingSet ||
-        completedSets >= totalSets ||
-        intraClusterRestPhase !== "idle"
+      ready={clusterLogReady}
+      loading={isLoggingSet}
+      label={
+        currentClusterInSet >= clustersPerSet
+          ? "Log set"
+          : `Done cluster ${currentClusterInSet}`
       }
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Link className="w-5 h-5 mr-2" />
-      {isLoggingSet
-        ? "Logging..."
-        : currentClusterInSet >= clustersPerSet
-          ? "LOG SET"
-          : `Done cluster ${currentClusterInSet}`}
-    </Button>
+    />
   );
 
   return (
@@ -814,17 +803,19 @@ export function ClusterSetExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         progressionSuggestion,
         previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle={`LOG SET ${displaySetNumber}`}
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={!!intraClusterRest}

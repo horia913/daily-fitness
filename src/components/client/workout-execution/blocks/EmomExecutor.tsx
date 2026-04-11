@@ -8,16 +8,23 @@ import {
   Play,
   MoreVertical,
   Pencil,
+  Clock,
+  Hash,
+  Repeat2,
+  Zap,
+  Weight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
-  calculateSuggestedWeightUtil,
   formatTime,
 } from "../BaseBlockExecutor";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
@@ -47,6 +54,7 @@ export function EmomExecutor({
   onAlternativesClick,
   onPlateCalculatorClick,
   onRestTimerClick,
+  onWorkoutBack,
   previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
@@ -119,6 +127,7 @@ export function EmomExecutor({
   const emomMode = timeProtocol?.emom_mode || "target_reps";
   const targetReps = timeProtocol?.target_reps || timeProtocol?.reps_per_round;
   const workSeconds = timeProtocol?.work_seconds;
+  const targetRepsParsed = parseRepsTarget(targetReps);
 
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
@@ -167,6 +176,21 @@ export function EmomExecutor({
     exerciseId,
   ]);
 
+  useEffect(() => {
+    if (isViewingLoggedSet) return;
+    if (emomMode === "target_reps" && targetRepsParsed.numericDefault > 0) {
+      setReps(String(targetRepsParsed.numericDefault));
+    } else if (emomMode !== "target_reps") {
+      setReps("");
+    }
+  }, [
+    isViewingLoggedSet,
+    emomMode,
+    targetRepsParsed.numericDefault,
+    currentExerciseIndex,
+    exerciseId,
+  ]);
+
   // Timer logic - countdown each minute
   useEffect(() => {
     if (isActive && timeRemaining > 0) {
@@ -207,29 +231,38 @@ export function EmomExecutor({
     setCurrentMinute(1);
   };
 
-  // Block details
-  const blockDetails: BlockDetail[] = [
+  const prescriptionItems: PrescriptionItem[] = [
     {
-      label: "DURATION",
-      value: `${durationMinutes} minutes`,
+      icon: Clock,
+      label: "Duration",
+      value: durationMinutes,
+      unit: "min",
     },
     {
-      label: "MODE",
-      value: emomMode === "target_reps" ? "Target Reps" : "Time Based",
+      icon: Hash,
+      label: "Mode",
+      value: emomMode === "target_reps" ? "Target reps" : "Time based",
     },
   ];
 
-  if (emomMode === "target_reps" && targetReps) {
-    blockDetails.push({
-      label: "REPS/MINUTE",
+  if (
+    emomMode === "target_reps" &&
+    targetReps != null &&
+    (typeof targetReps !== "string" || targetReps !== "")
+  ) {
+    prescriptionItems.push({
+      icon: Repeat2,
+      label: "Reps/min",
       value: targetReps,
     });
   }
 
   if (emomMode === "time_based" && workSeconds) {
-    blockDetails.push({
-      label: "WORK",
-      value: `${workSeconds}s`,
+    prescriptionItems.push({
+      icon: Zap,
+      label: "Work",
+      value: workSeconds,
+      unit: "s",
     });
   }
 
@@ -241,8 +274,9 @@ export function EmomExecutor({
       suggestedForDisplay,
     );
     if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD",
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
         value: loadDisplay,
       });
     }
@@ -405,7 +439,11 @@ export function EmomExecutor({
           onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
 
-        setReps("");
+        setReps(
+          emomMode === "target_reps" && targetRepsParsed.numericDefault > 0
+            ? String(targetRepsParsed.numericDefault)
+            : "",
+        );
 
         const newLoggedSet: LoggedSet = {
           id:
@@ -635,6 +673,7 @@ export function EmomExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
+              plateCalculatorEnabled
             />
             {suggested_weight != null && suggested_weight > 0 && (
               <button
@@ -655,6 +694,11 @@ export function EmomExecutor({
           </div>
           <LargeInput
             label="Reps Completed"
+            hint={
+              !editDraft && emomMode === "target_reps"
+                ? targetRepsParsed.displayHint ?? undefined
+                : undefined
+            }
             value={editDraft ? editDraft.reps : reps}
             onChange={(val) => {
               if (editDraft)
@@ -675,6 +719,18 @@ export function EmomExecutor({
     const loggedSetsArray: LoggedSet[] = [];
     onBlockComplete(block.block.id, loggedSetsArray);
   };
+
+  const emomWeightNum = parseFloat(weight);
+  const emomRepsNum = parseInt(reps, 10);
+  const emomLogWorkReady =
+    isActive &&
+    !isLoggingSet &&
+    weight.trim() !== "" &&
+    !isNaN(emomWeightNum) &&
+    emomWeightNum >= 0 &&
+    reps.trim() !== "" &&
+    !isNaN(emomRepsNum) &&
+    emomRepsNum > 0;
 
   const isEditMode = !!editingSetId && !!editDraft;
   const viewedSetEntry =
@@ -719,15 +775,12 @@ export function EmomExecutor({
         </Button>
       ) : (
         <>
-          <Button
+          <LogSetButton
             onClick={handleLog}
-            disabled={isLoggingSet || !isActive}
-            variant="fc-primary"
-            className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <CheckCircle className="w-5 h-5 mr-2" />
-            {isLoggingSet ? "Logging..." : "LOG WORK"}
-          </Button>
+            ready={emomLogWorkReady}
+            loading={isLoggingSet}
+            label="Log work"
+          />
           <Button
             onClick={handleCompleteBlock}
             variant="fc-primary"
@@ -763,16 +816,18 @@ export function EmomExecutor({
         onAlternativesClick,
         onPlateCalculatorClick,
         onRestTimerClick,
+        onWorkoutBack,
         previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       currentSet={displayMinute}
       totalSets={durationMinutes}
       progressLabel="Minute"
       loggingInputs={loggingInputs}
       logButton={logButton}
+      logSectionTitle={`LOG MINUTE ${displayMinute}`}
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}

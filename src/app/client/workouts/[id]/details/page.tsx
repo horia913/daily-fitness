@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ChevronLeft,
   MoreHorizontal,
@@ -249,7 +249,6 @@ const safeParse = (value: unknown) => {
 
 export default function WorkoutDetailsPage() {
   const { id } = useParams();
-  const router = useRouter();
   const { isDark } = useTheme();
   const [assignment, setAssignment] = useState<AssignmentInfo | null>(null);
   const [blocks, setBlocks] = useState<StructuredBlock[]>([]);
@@ -775,7 +774,7 @@ export default function WorkoutDetailsPage() {
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen fc-page">
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center space-y-4 fc-glass fc-card px-8 py-6">
+            <div className="text-center space-y-4 fc-card-shell px-8 py-6">
               <p className="text-base font-semibold fc-text-error">
                 {error || "Workout not found"}
               </p>
@@ -794,7 +793,7 @@ export default function WorkoutDetailsPage() {
                 </Button>
                 <Button
                   variant="fc-secondary"
-                  onClick={() => router.push("/client/train")}
+                  onClick={() => { window.location.href = "/client/train"; }}
                   className="gap-2 fc-btn"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -1387,7 +1386,7 @@ export default function WorkoutDetailsPage() {
           {/* Navigation */}
           <nav className="flex justify-between items-center mb-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
             <button
-              onClick={() => router.push("/client/train")}
+              onClick={() => { window.location.href = "/client/train"; }}
               className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95"
             >
               <ChevronLeft className="w-5 h-5 fc-text-primary" />

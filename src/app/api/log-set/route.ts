@@ -149,12 +149,11 @@ export async function POST(req: NextRequest) {
       'tabata',
       'fortime',
       'for_time',
-      'hr_sets',
       'speed_work',
       'endurance',
     ] as const
 
-    type BlockType = (typeof validBlockTypes)[number] | 'hr_sets'
+    type BlockType = (typeof validBlockTypes)[number]
 
     let blockType: BlockType = 'straight_set'
 
@@ -476,7 +475,7 @@ export async function POST(req: NextRequest) {
       return isNaN(num) ? null : num
     }
 
-    const blockTypeForPerformance = blockType as BlockType | 'hr_sets'
+    const blockTypeForPerformance = blockType as BlockType
 
     switch (blockTypeForPerformance) {
         case 'straight_set': {
@@ -660,23 +659,6 @@ export async function POST(req: NextRequest) {
           insertData.fortime_time_taken_sec = parseIntNumber(body.fortime_time_taken_sec)
           insertData.fortime_time_cap_sec = parseIntNumber(body.fortime_time_cap_sec)
           insertData.fortime_target_reps = parseIntNumber(body.fortime_target_reps) || null
-          break
-        }
-
-        case 'hr_sets': {
-          if (body.exercise_id) {
-            insertData.exercise_id = body.exercise_id
-          }
-          insertData.set_number = body.set_number ?? 1
-          insertData.hr_zone = parseIntNumber(body.hr_zone)
-          insertData.hr_percentage = parseNumber(body.hr_percentage)
-          insertData.hr_distance_meters = parseNumber(body.hr_distance_meters)
-          insertData.hr_interval_round = parseIntNumber(body.hr_interval_round)
-          insertData.hr_work_duration_seconds = parseIntNumber(body.hr_work_duration_seconds)
-          insertData.hr_rest_duration_seconds = parseIntNumber(body.hr_rest_duration_seconds)
-          insertData.hr_average_percentage = parseNumber(body.hr_average_percentage)
-          insertData.hr_duration_seconds = parseIntNumber(body.hr_duration_seconds)
-          primaryExerciseId = typeof body.exercise_id === 'string' ? body.exercise_id : null
           break
         }
 
@@ -891,7 +873,6 @@ export async function POST(req: NextRequest) {
         break
       }
       case 'tabata':
-      case 'hr_sets':
       case 'speed_work':
       case 'endurance':
         break

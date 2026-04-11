@@ -77,12 +77,12 @@ export function CoachClientActivitiesPanel({
 
       {!loading && activities.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+          <GlassCard elevation={1} className="fc-card-shell p-4 text-center">
             <TrendingUp className="w-4 h-4 fc-text-dim mx-auto mb-1" />
             <p className="text-xl font-bold fc-text-primary">{activities.length}</p>
             <p className="text-xs fc-text-dim">Activities</p>
           </GlassCard>
-          <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+          <GlassCard elevation={1} className="fc-card-shell p-4 text-center">
             <Clock className="w-4 h-4 fc-text-dim mx-auto mb-1" />
             <p className="text-xl font-bold fc-text-primary">{totalDuration}</p>
             <p className="text-xs fc-text-dim">Total Minutes</p>
@@ -160,7 +160,7 @@ export function CoachClientActivitiesPanel({
           })}
         </div>
       ) : (
-        <GlassCard elevation={1} className="fc-glass fc-card p-12">
+        <GlassCard elevation={1} className="fc-card-shell p-12">
           <EmptyState
             icon={Activity}
             title="No extra activities"

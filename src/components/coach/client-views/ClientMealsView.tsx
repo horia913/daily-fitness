@@ -954,7 +954,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   return (
     <div className="space-y-4">
       {/* Mode Badge & Unified Compliance Score */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] px-3 py-2">
+      <div className="fc-card-shell px-3 py-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">
@@ -1083,7 +1083,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
                     key={plan.id}
                     type="button"
                     onClick={() => handleSelectPlanToAssign(plan)}
-                    className="w-full text-left fc-glass fc-card rounded-xl border border-[color:var(--fc-glass-border)] p-4 hover:border-[color:var(--fc-accent-cyan)] transition-colors"
+                    className="w-full text-left fc-card-shell rounded-xl border border-[color:var(--fc-glass-border)] p-4 hover:border-[color:var(--fc-accent-cyan)] transition-colors"
                   >
                     <span className="font-medium fc-text-primary">{plan.name}</span>
                     {plan.target_calories != null && (
@@ -1106,7 +1106,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
 // No Plan/Goals State
 function NoPlanState({ onAssignMealPlan }: { onAssignMealPlan: () => void }) {
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+    <div className="fc-card-shell p-8 text-center">
       <EmptyState
         variant="compact"
         icon={UtensilsCrossed}
@@ -1344,7 +1344,7 @@ function MealPlanModeView({
 
       {/* Macro Adherence — This Week Avg (Phase N5) */}
       {weeklyMacroAdherence && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="fc-card-shell p-4 sm:p-6 mb-6">
           <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (This Week Avg)</h4>
           <p className="text-xs fc-text-dim mb-3">Based on completed meals&apos; option macros.</p>
           <div className="space-y-2 text-sm">
@@ -1414,7 +1414,7 @@ function MealPlanModeView({
 function GoalBasedModeView({ adherence }: { adherence: MacroAdherence | null }) {
   if (!adherence) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+      <div className="fc-card-shell p-8 text-center">
         <p className="fc-text-dim">Loading macro adherence data...</p>
       </div>
     )
@@ -1583,7 +1583,7 @@ function HybridModeView({
 }) {
   if (!mealPlanCompliance || !macroAdherence) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+      <div className="fc-card-shell p-8 text-center">
         <p className="fc-text-dim">Loading hybrid data...</p>
       </div>
     )
@@ -1610,7 +1610,7 @@ function HybridModeView({
     <>
       {/* Today's Plan (Phase N5) */}
       {todayPlanSummary && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="fc-card-shell p-4 sm:p-6 mb-6">
           <h3 className="text-lg font-semibold fc-text-primary mb-2">
             Today&apos;s Plan: {todayPlanSummary.planName}
             {todayPlanSummary.targetCalories != null && ` — ${todayPlanSummary.targetCalories} kcal`}
@@ -1631,7 +1631,7 @@ function HybridModeView({
 
       {/* This Week (Phase N5) — Hybrid */}
       {weeklyCompliance && weeklyCompliance.days.length > 0 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="fc-card-shell p-4 sm:p-6 mb-6">
           <h4 className="text-sm font-semibold fc-text-primary mb-3">This Week</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -1670,7 +1670,7 @@ function HybridModeView({
 
       {/* Macro Adherence — This Week Avg (Phase N5) — Hybrid */}
       {weeklyMacroAdherence && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 sm:p-6 mb-6">
+        <div className="fc-card-shell p-4 sm:p-6 mb-6">
           <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (This Week Avg)</h4>
           <p className="text-xs fc-text-dim mb-3">Based on completed meals&apos; option macros.</p>
           <div className="space-y-2 text-sm">
@@ -1719,7 +1719,7 @@ function HybridModeView({
       )}
 
       {/* Meal Plan Compliance Section */}
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell">
         <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts">

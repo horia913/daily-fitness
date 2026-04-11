@@ -1,135 +1,181 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { useToast } from '@/components/ui/toast-provider'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { DatabaseService } from '@/lib/database'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { 
-  User, 
-  Mail, 
-  Calendar, 
-  Target, 
-  Award, 
-  Edit, 
-  Save, 
+import {
+  User,
+  Calendar,
+  Edit,
+  Save,
   X,
   Camera,
-  Settings,
-  Shield,
-  Activity,
-  Bell,
   Lock,
-  Eye,
-  EyeOff,
   LogOut,
-  Trash2,
-  AlertTriangle,
   CheckCircle,
-  Info,
-  Star,
-  Globe,
-  Palette,
-  Users,
-  MessageCircle,
-  BarChart3,
-  Heart,
-  Sparkles,
-  Dumbbell,
-  Clock,
-  MapPin,
-  Phone,
-  Mail as MailIcon,
-  UserCheck,
-  Trophy,
-  Zap,
-  Target as TargetIcon,
-  CreditCard
+  ChevronRight,
+  CreditCard,
+  Award,
+  Target,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
-import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton } from '@/components/client-ui'
+import { ClientPageShell } from '@/components/client-ui'
+import { LogSetButton } from '@/components/client/workout-execution/ui/LogSetButton'
+import { cn } from '@/lib/utils'
+
+const FITNESS_LEVELS = ['beginner', 'intermediate', 'advanced'] as const
+type FitnessLevel = (typeof FITNESS_LEVELS)[number]
+
+const SEX_OPTIONS: { value: string; label: string }[] = [
+  { value: 'M', label: 'Male' },
+  { value: 'F', label: 'Female' },
+]
+
+function normalizeFitnessLevelFromDb(raw: string): string {
+  const v = raw.trim().toLowerCase()
+  if (v === 'beginner' || v === 'beginning' || v === 'novice') return 'beginner'
+  if (v === 'intermediate') return 'intermediate'
+  if (v === 'advanced' || v === 'expert') return 'advanced'
+  if ((FITNESS_LEVELS as readonly string[]).includes(v)) return v
+  return ''
+}
+
+type ProfileForm = {
+  first_name: string
+  last_name: string
+  phone: string
+  sex: string
+  height_cm: string
+  date_of_birth: string
+  fitness_level: string
+  bio: string
+  medical_conditions: string
+  injuries: string
+  bodyweight: string
+}
+
+function emptyForm(): ProfileForm {
+  return {
+    first_name: '',
+    last_name: '',
+    phone: '',
+    sex: '',
+    height_cm: '',
+    date_of_birth: '',
+    fitness_level: '',
+    bio: '',
+    medical_conditions: '',
+    injuries: '',
+    bodyweight: '',
+  }
+}
+
+function profileRowToForm(row: Record<string, unknown> | null): ProfileForm {
+  if (!row) return emptyForm()
+  const dob = row.date_of_birth
+  let dobStr = ''
+  if (typeof dob === 'string') {
+    dobStr = dob.slice(0, 10)
+  }
+  const hw = row.height_cm
+  const bw = row.bodyweight
+  return {
+    first_name: String(row.first_name ?? ''),
+    last_name: String(row.last_name ?? ''),
+    phone: String(row.phone ?? ''),
+    sex: normalizeSexFromDb(String(row.sex ?? '')),
+    height_cm: hw != null && hw !== '' ? String(hw) : '',
+    date_of_birth: dobStr,
+    fitness_level: normalizeFitnessLevelFromDb(String(row.fitness_level ?? '')),
+    bio: String(row.bio ?? ''),
+    medical_conditions: String(row.medical_conditions ?? ''),
+    injuries: String(row.injuries ?? ''),
+    bodyweight: bw != null && bw !== '' ? String(bw) : '',
+  }
+}
+
+/** Map DB or legacy string values to M, F, or empty. */
+function normalizeSexFromDb(raw: string): string {
+  const v = raw.trim()
+  if (v === 'M' || v === 'm' || v === 'male' || v === 'Male') return 'M'
+  if (v === 'F' || v === 'f' || v === 'female' || v === 'Female') return 'F'
+  return ''
+}
+
+function formsEqual(a: ProfileForm, b: ProfileForm): boolean {
+  return (Object.keys(a) as (keyof ProfileForm)[]).every((k) => a[k] === b[k])
+}
+
+function buildUpdatePayload(form: ProfileForm): Record<string, unknown> {
+  const trim = (s: string) => s.trim()
+  const first = trim(form.first_name)
+  const last = trim(form.last_name)
+  const phone = trim(form.phone)
+  const bio = trim(form.bio)
+  const med = trim(form.medical_conditions)
+  const inj = trim(form.injuries)
+
+  const heightNum = form.height_cm.trim() === '' ? null : Number(form.height_cm)
+  const weightNum = form.bodyweight.trim() === '' ? null : Number(form.bodyweight)
+
+  const payload: Record<string, unknown> = {
+    first_name: first || null,
+    last_name: last || null,
+    phone: phone || null,
+    sex: form.sex.trim() ? form.sex.trim() : null,
+    height_cm: heightNum != null && !Number.isNaN(heightNum) ? heightNum : null,
+    date_of_birth: form.date_of_birth.trim() || null,
+    fitness_level: form.fitness_level.trim() || null,
+    bio: bio || null,
+    medical_conditions: med || null,
+    injuries: inj || null,
+    bodyweight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
+  }
+
+  return payload
+}
 
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
   const { addToast } = useToast()
   const { performanceSettings } = useTheme()
-  // Check if we're viewing as another user (for coach view)
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
   const PROFILE_LOAD_TIMEOUT_MS = 30000
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [avatarUrlKey, setAvatarUrlKey] = useState(0)
   const profileUserIdRef = useRef<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordData, setPasswordData] = useState({
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
-  const [notifications, setNotifications] = useState({
-    workoutReminders: true,
-    coachMessages: true,
-    progressUpdates: true,
-    weeklyReports: true,
-    motivationalTips: true,
-    systemUpdates: false
-  })
-  const [appSettings, setAppSettings] = useState({
-    theme: 'light',
-    units: 'metric',
-    language: 'en'
-  })
-  const [fitnessPreferences, setFitnessPreferences] = useState({
-    workoutTypes: ['strength', 'cardio'],
-    timeOfDay: 'morning',
-    workoutDuration: '45',
-    difficulty: 'intermediate'
-  })
-  const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    fitness_level: '',
-    goals: [] as string[],
-    bio: '',
-    phone: '',
-    date_of_birth: '',
-    height: '',
-    weight: '',
-    emergency_contact: '',
-    medical_conditions: '',
-    injuries: ''
-  })
 
-  const [subscriptionCard, setSubscriptionCard] = useState<{
-    headline: string
-    subline: string
-  } | null>(null)
+  const [formData, setFormData] = useState<ProfileForm>(emptyForm())
+  /** Last saved baseline; dirty when formData differs (client-only; viewAs ignores). */
+  const [savedSnapshot, setSavedSnapshot] = useState<ProfileForm>(emptyForm())
+
+  const [subscriptionLine, setSubscriptionLine] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check URL for viewAs parameter
     const params = new URLSearchParams(window.location.search)
     const viewAs = params.get('viewAs')
-    if (viewAs) {
-      setViewAsUserId(viewAs)
-    }
+    if (viewAs) setViewAsUserId(viewAs)
   }, [])
 
   const loadProfile = useCallback(async (userId: string | undefined) => {
@@ -147,32 +193,22 @@ export default function ClientProfilePage() {
       )
       const data = await Promise.race([
         DatabaseService.getProfile(userId),
-        timeoutPromise
+        timeoutPromise,
       ])
       if (data) {
-        setProfile(data)
-        const profileData = data as any
-        setFormData({
-          first_name: profileData?.first_name || '',
-          last_name: profileData?.last_name || '',
-          email: profileData?.email || '',
-          fitness_level: profileData?.fitness_level || '',
-          goals: profileData?.goals || [],
-          bio: profileData?.bio || '',
-          phone: profileData?.phone || '',
-          date_of_birth: profileData?.date_of_birth || '',
-          height: profileData?.height || '',
-          weight: profileData?.weight || '',
-          emergency_contact: profileData?.emergency_contact || '',
-          medical_conditions: profileData?.medical_conditions || '',
-          injuries: profileData?.injuries || ''
-        })
+        const row = data as unknown as Record<string, unknown>
+        setProfile(row)
+        const next = profileRowToForm(row)
+        setFormData(next)
+        setSavedSnapshot(next)
       }
     } catch (error) {
       console.error('Error loading profile:', error)
-      setLoadError(error instanceof Error && error.message === 'timeout'
-        ? 'Loading took too long. Check your connection.'
-        : 'Could not load profile.')
+      setLoadError(
+        error instanceof Error && error.message === 'timeout'
+          ? 'Loading took too long. Check your connection.'
+          : 'Could not load profile.'
+      )
     } finally {
       setLoading(false)
     }
@@ -187,7 +223,7 @@ export default function ClientProfilePage() {
     profileTimeoutRef.current = setTimeout(() => {
       profileTimeoutRef.current = null
       setLoading(false)
-      setLoadError("Loading took too long. Tap Retry to try again.")
+      setLoadError('Loading took too long. Tap Retry to try again.')
     }, 20_000)
     loadProfile(userId).finally(() => {
       if (profileTimeoutRef.current) {
@@ -206,7 +242,7 @@ export default function ClientProfilePage() {
   useEffect(() => {
     const uid = viewAsUserId || user?.id
     if (!uid) {
-      setSubscriptionCard(null)
+      setSubscriptionLine(null)
       return
     }
     void (async () => {
@@ -220,7 +256,7 @@ export default function ClientProfilePage() {
         .order('created_at', { ascending: false })
         .limit(10)
       if (error) {
-        setSubscriptionCard(null)
+        setSubscriptionLine(null)
         return
       }
       const rows = (data || []) as Array<{
@@ -237,35 +273,41 @@ export default function ClientProfilePage() {
         return r.end_date >= today
       })
       if (!row) {
-        setSubscriptionCard(null)
+        setSubscriptionLine(null)
         return
       }
-      setSubscriptionCard({
-        headline: row.subscription_plan_label || 'Active subscription',
-        subline: `Started ${new Date(row.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })} · Ends ${new Date(row.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}`,
+      const start = new Date(row.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       })
+      const end = new Date(row.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+      setSubscriptionLine(
+        `${row.subscription_plan_label || 'Active subscription'} · ${start} – ${end}`
+      )
     })()
   }, [user?.id, viewAsUserId])
 
+  const effectiveUserId = viewAsUserId || user?.id
+  const canEdit = !viewAsUserId
+  const isDirty = useMemo(
+    () => canEdit && !formsEqual(formData, savedSnapshot),
+    [canEdit, formData, savedSnapshot]
+  )
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !user?.id) return
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       addToast({ title: 'Please select an image file', variant: 'default' })
       return
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       addToast({ title: 'Image size should be less than 5MB', variant: 'default' })
       return
@@ -273,15 +315,10 @@ export default function ClientProfilePage() {
 
     try {
       setUploadingImage(true)
-      
-      // Create unique filename
       const fileExt = file.name.split('.').pop()
-      const fileName = `${user?.id}-${Date.now()}.${fileExt}`
-      
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file)
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file)
 
       if (uploadError) {
         console.error('Profile picture upload error:', uploadError)
@@ -296,32 +333,38 @@ export default function ClientProfilePage() {
         return
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName)
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(fileName)
 
       const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .select()
         .single()
 
       if (updateError) {
         console.error('Profile picture update error:', updateError)
-        addToast({ title: 'Photo uploaded but profile could not be updated. Please try again.', variant: 'destructive' })
+        addToast({
+          title: updateError.message || 'Photo uploaded but profile could not be updated.',
+          variant: 'destructive',
+        })
         setUploadingImage(false)
         return
       }
 
       if (updatedProfile) {
-        setProfile((prev: any) => (prev ? { ...prev, avatar_url: updatedProfile.avatar_url } : updatedProfile))
+        setProfile((prev) =>
+          prev
+            ? { ...prev, avatar_url: (updatedProfile as { avatar_url?: string }).avatar_url }
+            : (updatedProfile as unknown as Record<string, unknown>)
+        )
       } else {
-        setProfile((prev: any) => (prev ? { ...prev, avatar_url: publicUrl } : prev))
+        setProfile((prev) => (prev ? { ...prev, avatar_url: publicUrl } : prev))
       }
       setAvatarUrlKey(Date.now())
       addToast({ title: 'Profile picture updated successfully', variant: 'success' })
-      
     } catch (error) {
       console.error('Profile picture upload exception:', error)
       addToast({ title: "Couldn't upload photo. Check your connection and try again.", variant: 'destructive' })
@@ -331,62 +374,66 @@ export default function ClientProfilePage() {
   }
 
   const handleSave = async () => {
+    if (!effectiveUserId || !canEdit) return
+
+    const fl = formData.fitness_level.trim()
+    if (fl && !FITNESS_LEVELS.includes(fl as FitnessLevel)) {
+      addToast({
+        title: 'Fitness level must be Beginner, Intermediate, or Advanced.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const heightNum = formData.height_cm.trim() === '' ? null : Number(formData.height_cm)
+    if (formData.height_cm.trim() !== '' && (Number.isNaN(heightNum) || heightNum! < 0)) {
+      addToast({ title: 'Height must be a valid number (cm).', variant: 'destructive' })
+      return
+    }
+
+    const weightNum = formData.bodyweight.trim() === '' ? null : Number(formData.bodyweight)
+    if (formData.bodyweight.trim() !== '' && (Number.isNaN(weightNum) || weightNum! < 0)) {
+      addToast({ title: 'Bodyweight must be a valid number (kg).', variant: 'destructive' })
+      return
+    }
+
+    const payload = buildUpdatePayload(formData)
+
     try {
       setSaving(true)
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .update(formData)
-        .eq('id', user?.id)
+        .update(payload)
+        .eq('id', effectiveUserId)
+        .select()
+        .single()
 
       if (error) {
         console.error('Error updating profile:', error)
-        addToast({ title: "Couldn't update profile. Please try again.", variant: 'destructive' })
+        addToast({
+          title: error.message || "Couldn't update profile. Please try again.",
+          variant: 'destructive',
+        })
         return
       }
 
-      setProfile({ ...profile, ...formData })
-      setEditing(false)
+      if (data) {
+        const row = data as unknown as Record<string, unknown>
+        setProfile(row)
+        const next = profileRowToForm(row)
+        setFormData(next)
+        setSavedSnapshot(next)
+      }
+      addToast({ title: 'Profile saved', variant: 'success' })
     } catch (error) {
       console.error('Error updating profile:', error)
-      addToast({ title: "Couldn't update profile. Please try again.", variant: 'destructive' })
+      addToast({
+        title: error instanceof Error ? error.message : "Couldn't update profile. Please try again.",
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleCancel = () => {
-    setFormData({
-      first_name: profile?.first_name || '',
-      last_name: profile?.last_name || '',
-      email: profile?.email || '',
-      fitness_level: profile?.fitness_level || '',
-      goals: profile?.goals || [],
-      bio: profile?.bio || '',
-      phone: profile?.phone || '',
-      date_of_birth: profile?.date_of_birth || '',
-      height: profile?.height || '',
-      weight: profile?.weight || '',
-      emergency_contact: profile?.emergency_contact || '',
-      medical_conditions: profile?.medical_conditions || '',
-      injuries: profile?.injuries || ''
-    })
-    setEditing(false)
-  }
-
-  const addGoal = (goal: string) => {
-    if (goal && !formData.goals.includes(goal)) {
-      setFormData(prev => ({
-        ...prev,
-        goals: [...prev.goals, goal]
-      }))
-    }
-  }
-
-  const removeGoal = (goalToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      goals: prev.goals.filter(goal => goal !== goalToRemove)
-    }))
   }
 
   const handleSignOut = async () => {
@@ -415,7 +462,7 @@ export default function ClientProfilePage() {
     try {
       setChangingPassword(true)
       const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
+        password: passwordData.newPassword,
       })
 
       if (error) {
@@ -425,18 +472,20 @@ export default function ClientProfilePage() {
 
       setPasswordSuccess(true)
       setPasswordData({ newPassword: '', confirmPassword: '' })
-      
-      // Close modal after 2 seconds on success
+
       setTimeout(() => {
         setShowPasswordModal(false)
         setPasswordSuccess(false)
       }, 2000)
-    } catch (error: any) {
-      setPasswordError(error.message || 'Failed to change password')
+    } catch (error: unknown) {
+      setPasswordError(error instanceof Error ? error.message : 'Failed to change password')
     } finally {
       setChangingPassword(false)
     }
   }
+
+  const displayEmail =
+    (typeof profile?.email === 'string' && profile.email) || user?.email || '—'
 
   if (loadError && !loading) {
     const retryUserId = profileUserIdRef.current || viewAsUserId || user?.id
@@ -444,18 +493,19 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-6xl flex items-center justify-center min-h-[60vh]">
-            <ClientGlassCard className="p-8 max-w-md w-full text-center space-y-4">
-              <p className="fc-text-primary font-medium">{loadError}</p>
-              <PrimaryButton
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 flex items-center justify-center min-h-[50vh]">
+            <div className="p-4 max-w-md w-full text-center space-y-3 rounded-xl border border-white/10 bg-black/20">
+              <p className="text-sm text-gray-400">{loadError}</p>
+              <Button
                 onClick={() => {
                   if (retryUserId) loadProfile(retryUserId)
                   else loadProfile(user?.id)
                 }}
+                className="fc-btn fc-btn-primary"
               >
                 Retry
-              </PrimaryButton>
-            </ClientGlassCard>
+              </Button>
+            </div>
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -467,482 +517,365 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-6xl">
-            <ClientGlassCard className="p-8">
-              <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
-            </ClientGlassCard>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-16 rounded-lg bg-white/5" />
+              <div className="h-10 rounded-lg bg-white/5" />
+              <div className="h-40 rounded-lg bg-white/5" />
+            </div>
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
   }
 
-  const displayName = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'Profile'
-  const joinedDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null
+  const avatarUrl = typeof profile?.avatar_url === 'string' ? profile.avatar_url : null
+  const createdAt = profile?.created_at
+  const memberSince =
+    typeof createdAt === 'string'
+      ? new Date(createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : null
+
+  const inputClass = 'h-11 rounded-lg fc-input'
+  const labelClass = 'text-xs uppercase tracking-wider text-gray-400 mb-1 block'
+  const sectionTitleClass = 'text-sm uppercase tracking-wider text-cyan-300/70 mb-2'
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-4xl pb-32" style={{ gap: 'var(--fc-gap-sections)' }}>
-          {/* Header: avatar + name + email + joined (mockup layout) */}
-          <header className="flex flex-col md:flex-row items-center gap-8 mb-8 mt-4">
-            <div className="relative group">
-              <div className="w-32 h-32 rounded-full border-4 border-[color:var(--fc-glass-border)] overflow-hidden fc-glass p-1 group-hover:border-[color:var(--fc-domain-workouts)] transition-colors duration-300">
-                {profile?.avatar_url ? (
+        <ClientPageShell
+          className={cn(
+            'max-w-lg mx-auto px-4 pt-6 overflow-x-hidden',
+            isDirty && canEdit ? 'pb-48' : 'pb-32'
+          )}
+        >
+          {/* 1. Header */}
+          <header className="flex items-start gap-3 mb-6 pb-6 border-b border-white/5">
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 rounded-full border border-white/10 overflow-hidden bg-white/5">
+                {avatarUrl ? (
                   <img
-                    key={`${profile.avatar_url}-${avatarUrlKey}`}
-                    src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarUrlKey || 0}`}
+                    key={`${avatarUrl}-${avatarUrlKey}`}
+                    src={`${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${avatarUrlKey || 0}`}
                     alt=""
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full rounded-full bg-[color:var(--fc-glass-soft)] flex items-center justify-center">
-                    <User className="w-16 h-16 fc-text-subtle" />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-gray-500" />
                   </div>
                 )}
               </div>
-              {!viewAsUserId && (
-                <label className="absolute bottom-1 right-1 w-10 h-10 rounded-full bg-[color:var(--fc-domain-workouts)] flex items-center justify-center border-4 border-[color:var(--fc-bg-deep)] shadow-lg hover:scale-110 active:scale-95 transition-transform cursor-pointer">
-                  <Camera className="w-5 h-5 text-white" />
-                  <input id="avatar-upload" type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+              {canEdit && (
+                <label className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-[color:var(--fc-domain-workouts)] flex items-center justify-center border-2 border-[color:var(--fc-bg-deep)] shadow cursor-pointer">
+                  <Camera className="w-3.5 h-3.5 text-white" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
                 </label>
               )}
             </div>
-            <div className="text-center md:text-left flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h1 className="text-4xl font-bold tracking-tight fc-text-primary mb-2">{displayName}</h1>
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-                    <span className="flex items-center gap-2 text-sm fc-text-dim">
-                      <MailIcon className="w-4 h-4" />
-                      {formData.email || user?.email || '—'}
-                    </span>
-                    {joinedDate && (
-                      <span className="flex items-center gap-2 text-sm fc-glass-soft px-3 py-1 rounded-full border border-[color:var(--fc-glass-border)] font-mono fc-text-dim">
-                        <Calendar className="w-4 h-4" />
-                        {joinedDate}
-                      </span>
-                    )}
-                  </div>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h1 className="text-lg font-semibold text-white truncate">
+                    {[formData.first_name, formData.last_name].filter(Boolean).join(' ') ||
+                      displayEmail.split('@')[0] ||
+                      'Profile'}
+                  </h1>
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{displayEmail}</p>
+                  {memberSince && (
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 shrink-0" />
+                      Member since {memberSince}
+                    </p>
+                  )}
                 </div>
-                {!viewAsUserId && (
-                  <div className="flex gap-3 justify-center sm:justify-end">
-                    {editing ? (
-                      <>
-                        <Button variant="outline" onClick={handleCancel} className="fc-btn fc-btn-secondary">
-                          <X className="w-4 h-4 mr-2" />
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
-                          <Save className="w-4 h-4 mr-2" />
-                          {saving ? 'Saving...' : 'Save'}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </header>
 
-          {subscriptionCard && (
-            <ClientGlassCard className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center shrink-0">
-                  <CreditCard className="w-5 h-5 fc-text-subtle" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-sm font-bold uppercase tracking-widest fc-text-dim mb-1">
-                    My subscription
-                  </h2>
-                  <p className="font-semibold fc-text-primary">{subscriptionCard.headline}</p>
-                  <p className="text-sm fc-text-dim mt-1">{subscriptionCard.subline}</p>
-                </div>
-              </div>
-            </ClientGlassCard>
+          {/* 2. Subscription */}
+          {subscriptionLine && (
+            <div className="mb-6 pb-6 border-b border-white/5 flex items-center gap-2 text-xs text-gray-400">
+              <CreditCard className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+              <span className="leading-snug">{subscriptionLine}</span>
+            </div>
           )}
 
-          {/* Profile Mini Hub — Achievements, Goal History, Profile Information, Menu */}
-          <section>
-            <SectionHeader title="Profile Hub" />
-            <ClientGlassCard className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => { window.location.href = "/client/progress/achievements" }}>
-                <Award className="w-5 h-5 fc-text-warning" />
-                <div className="text-left">
-                  <span className="font-semibold">Achievements</span>
-                  <p className="text-xs fc-text-dim font-normal">All achievements across Training, Nutrition, Lifestyle</p>
-                </div>
-              </Button>
-              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => { window.location.href = "/client/goals/history" }}>
-                <Target className="w-5 h-5 fc-text-success" />
-                <div className="text-left">
-                  <span className="font-semibold">Goal History</span>
-                  <p className="text-xs fc-text-dim font-normal">Track goals across the app</p>
-                </div>
-              </Button>
+          {/* 3. Personal Info */}
+          <section className="mb-6 pb-6 border-b border-white/5">
+            <h2 className={sectionTitleClass}>Personal Info</h2>
+            <div className="space-y-3">
+              <div>
+                <Label className={labelClass}>First name</Label>
+                <Input
+                  className={inputClass}
+                  value={formData.first_name}
+                  onChange={(e) => setFormData((p) => ({ ...p, first_name: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>Last name</Label>
+                <Input
+                  className={inputClass}
+                  value={formData.last_name}
+                  onChange={(e) => setFormData((p) => ({ ...p, last_name: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>Phone</Label>
+                <Input
+                  type="tel"
+                  className={inputClass}
+                  value={formData.phone}
+                  onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>Date of birth</Label>
+                <Input
+                  type="date"
+                  className={inputClass}
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div>
+                <Label className={labelClass}>Sex</Label>
+                <select
+                  value={formData.sex}
+                  onChange={(e) => setFormData((p) => ({ ...p, sex: e.target.value }))}
+                  disabled={!canEdit}
+                  className={cn(
+                    inputClass,
+                    'w-full min-h-11 px-3 py-2 text-sm text-[color:var(--fc-text-primary)]',
+                    canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
+                  )}
+                  aria-label="Sex"
+                >
+                  <option value="">Select</option>
+                  {SEX_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </ClientGlassCard>
           </section>
 
-          <div className="grid grid-cols-1 gap-8">
-            {/* Preferences | Notifications — two columns */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <ClientGlassCard className="p-8">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-success)]/10 flex items-center justify-center border border-[color:var(--fc-status-success)]/20">
-                    <Settings className="w-5 h-5 fc-text-success" />
-                  </div>
-                  <h2 className="text-xl font-semibold fc-text-primary">Preferences</h2>
-                </div>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium fc-text-primary">Units</div>
-                      <div className="text-xs fc-text-subtle">Metric (kg) or Imperial (lbs)</div>
-                    </div>
-                    <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
-                      <button type="button" onClick={() => setAppSettings(prev => ({ ...prev, units: 'metric' }))} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${appSettings.units === 'metric' ? 'fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}>KG</button>
-                      <button type="button" onClick={() => setAppSettings(prev => ({ ...prev, units: 'imperial' }))} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${appSettings.units === 'imperial' ? 'fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}>LB</button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold fc-text-subtle uppercase tracking-widest">Language</Label>
-                    <Select value={appSettings.language} onValueChange={(v) => setAppSettings(prev => ({ ...prev, language: v }))}>
-                      <SelectTrigger className="fc-input rounded-xl py-3"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="es">Spanish</SelectItem>
-                        <SelectItem value="fr">French</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </ClientGlassCard>
-
-              <ClientGlassCard className="p-8">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-error)]/10 flex items-center justify-center border border-[color:var(--fc-status-error)]/20">
-                    <Bell className="w-5 h-5 fc-text-error" />
-                  </div>
-                  <h2 className="text-xl font-semibold fc-text-primary">Notifications</h2>
-                </div>
-                <div className="space-y-5">
-                  {[
-                    { key: 'workoutReminders', label: 'Workout reminders', icon: Dumbbell },
-                    { key: 'coachMessages', label: 'Coach messages', icon: MessageCircle },
-                    { key: 'progressUpdates', label: 'Progress updates', icon: BarChart3 },
-                    { key: 'motivationalTips', label: 'Motivational tips', icon: Star }
-                  ].map(({ key, label, icon: Icon }) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="fc-text-primary flex items-center gap-2"><Icon className="w-4 h-4 fc-text-subtle" />{label}</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" checked={(notifications as any)[key]} onChange={(e) => setNotifications(prev => ({ ...prev, [key]: e.target.checked }))} className="sr-only peer" />
-                        <div className="relative w-12 h-6 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] peer-checked:bg-[color:var(--fc-status-success)] peer-checked:border-[color:var(--fc-status-success)] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-[color:var(--fc-surface)] after:border after:border-[color:var(--fc-glass-border)] after:transition-transform peer-checked:after:translate-x-6" />
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </ClientGlassCard>
-            </div>
-
-            {/* Account & Privacy — toggles + action buttons */}
-            <ClientGlassCard className="p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-lg fc-glass-soft flex items-center justify-center border border-[color:var(--fc-glass-border)]">
-                  <Shield className="w-5 h-5 fc-text-subtle" />
-                </div>
-                <h2 className="text-xl font-semibold fc-text-primary">Account & Privacy</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2" onClick={() => setShowPasswordModal(true)}>
-                  <Lock className="w-4 h-4" />
-                  Password
-                </Button>
-                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2">
-                  <Globe className="w-4 h-4" />
-                  Export Data
-                </Button>
-                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2" onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </Button>
-                <Button variant="outline" className="h-12 rounded-xl justify-center gap-2 border-[color:var(--fc-status-error)] fc-text-error hover:bg-[color:var(--fc-status-error)]/10" onClick={() => setShowDeleteConfirm(true)}>
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </Button>
-              </div>
-            </ClientGlassCard>
-
-          {/* Goals & Preferences */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--fc-status-success)] rounded-2xl flex items-center justify-center">
-                  <TargetIcon className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Goals & Preferences</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Your fitness goals and workout preferences</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Preferred Workout Time</Label>
-                  <Select value={fitnessPreferences.timeOfDay} onValueChange={(value) => setFitnessPreferences(prev => ({ ...prev, timeOfDay: value }))}>
-                    <SelectTrigger className="fc-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="morning">Morning (6AM - 12PM)</SelectItem>
-                      <SelectItem value="afternoon">Afternoon (12PM - 6PM)</SelectItem>
-                      <SelectItem value="evening">Evening (6PM - 10PM)</SelectItem>
-                      <SelectItem value="flexible">Flexible</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Workout Duration</Label>
-                  <Select value={fitnessPreferences.workoutDuration} onValueChange={(value) => setFitnessPreferences(prev => ({ ...prev, workoutDuration: value }))}>
-                    <SelectTrigger className="fc-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="45">45 minutes</SelectItem>
-                      <SelectItem value="60">60 minutes</SelectItem>
-                      <SelectItem value="90">90+ minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Enhanced Fitness Information */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--fc-status-success)] rounded-2xl flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Fitness Information</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Your current fitness level and measurements</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="fitness_level" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Fitness Level</Label>
-                <Select 
-                  value={formData.fitness_level} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, fitness_level: value }))}
-                  disabled={!editing}
-                >
-                  <SelectTrigger className="fc-select">
-                    <SelectValue placeholder="Select fitness level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="height" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Height</Label>
-                  <Input
-                    id="height"
-                    value={formData.height}
-                    onChange={(e) => setFormData(prev => ({ ...prev, height: e.target.value }))}
-                    disabled={!editing}
-                    placeholder="e.g., 5'10 or 178cm"
-                    className="fc-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Weight</Label>
-                  <Input
-                    id="weight"
-                    value={formData.weight}
-                    onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value }))}
-                    disabled={!editing}
-                    placeholder="e.g., 150lbs or 68kg"
-                    className="fc-input"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Goals</Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.goals.map((goal, index) => (
-                    <Badge key={index} variant="outline" className="flex items-center gap-1">
-                      {goal}
-                      {editing && (
-                        <button
-                          onClick={() => removeGoal(goal)}
-                          className="ml-1 hover:opacity-70" style={{ color: "var(--fc-status-error)" }}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                {editing && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add a goal..."
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          addGoal(e.currentTarget.value)
-                          e.currentTarget.value = ''
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const input = document.querySelector('input[placeholder="Add a goal..."]') as HTMLInputElement
-                        if (input?.value) {
-                          addGoal(input.value)
-                          input.value = ''
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Health Information */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-[color:var(--fc-text-primary)]">
-                <Shield className="w-5 h-5" />
-                Health Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="emergency_contact" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Emergency Contact</Label>
+          {/* 4. Body stats */}
+          <section className="mb-6 pb-6 border-b border-white/5">
+            <h2 className={sectionTitleClass}>Body stats</h2>
+            <p className="text-xs text-gray-500 mb-3">
+              Updates your profile weight for your coach. Body metrics history lives under Progress.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <Label className={labelClass}>Height (cm)</Label>
                 <Input
-                  id="emergency_contact"
-                  value={formData.emergency_contact}
-                  onChange={(e) => setFormData(prev => ({ ...prev, emergency_contact: e.target.value }))}
-                  disabled={!editing}
-                  placeholder="Name and phone number"
-                  className="fc-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.1"
+                  className={inputClass}
+                  value={formData.height_cm}
+                  onChange={(e) => setFormData((p) => ({ ...p, height_cm: e.target.value }))}
+                  disabled={!canEdit}
                 />
               </div>
+              <div>
+                <Label className={labelClass}>Bodyweight (kg)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.1"
+                  className={inputClass}
+                  value={formData.bodyweight}
+                  onChange={(e) => setFormData((p) => ({ ...p, bodyweight: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+          </section>
 
-              <div className="space-y-2">
-                <Label htmlFor="medical_conditions" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Medical Conditions</Label>
+          {/* 5. Training */}
+          <section className="mb-6 pb-6 border-b border-white/5">
+            <h2 className={sectionTitleClass}>Training</h2>
+            <div className="space-y-3">
+              <div>
+                <Label className={labelClass}>Fitness level</Label>
+                <select
+                  value={formData.fitness_level}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, fitness_level: e.target.value }))
+                  }
+                  disabled={!canEdit}
+                  className={cn(
+                    inputClass,
+                    'w-full min-h-11 px-3 py-2 text-sm text-[color:var(--fc-text-primary)]',
+                    canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
+                  )}
+                  aria-label="Fitness level"
+                >
+                  <option value="">Select</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+              <div>
+                <Label className={labelClass}>Bio</Label>
                 <Textarea
-                  id="medical_conditions"
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Tell your coach a bit about yourself (optional)"
+                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
+                  value={formData.bio}
+                  onChange={(e) => setFormData((p) => ({ ...p, bio: e.target.value }))}
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* 6. Health */}
+          <section className="mb-6 pb-6 border-b border-white/5">
+            <h2 className={sectionTitleClass}>Health</h2>
+            <div className="space-y-3">
+              <div>
+                <Label className={labelClass}>Medical conditions</Label>
+                <Textarea
+                  rows={3}
+                  placeholder="Anything your coach should know about your health"
+                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
                   value={formData.medical_conditions}
-                  onChange={(e) => setFormData(prev => ({ ...prev, medical_conditions: e.target.value }))}
-                  disabled={!editing}
-                  rows={3}
-                  placeholder="List any medical conditions..."
-                  className="fc-textarea"
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, medical_conditions: e.target.value }))
+                  }
+                  disabled={!canEdit}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="injuries" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Injuries</Label>
+              <div>
+                <Label className={labelClass}>Injuries</Label>
                 <Textarea
-                  id="injuries"
-                  value={formData.injuries}
-                  onChange={(e) => setFormData(prev => ({ ...prev, injuries: e.target.value }))}
-                  disabled={!editing}
                   rows={3}
-                  placeholder="List any current or past injuries..."
-                  className="fc-textarea"
+                  placeholder="Past or current injuries"
+                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
+                  value={formData.injuries}
+                  onChange={(e) => setFormData((p) => ({ ...p, injuries: e.target.value }))}
+                  disabled={!canEdit}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          {/* Enhanced Account Information */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--fc-glass-border)] rounded-2xl flex items-center justify-center">
-                  <Settings className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Account Information</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Your account details and status</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-[color:var(--fc-text-primary)]">Member Since</div>
-                      <div className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                        {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
-                      </div>
-                    </div>
-                    <Badge className="fc-badge">Active</Badge>
-                  </div>
-                </div>
-                
-                <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-[color:var(--fc-text-primary)]">Account Role</div>
-                      <div className="text-sm text-[color:var(--fc-text-dim)] mt-1">Fitness Client</div>
-                    </div>
-                    <Badge className="fc-badge">Client</Badge>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* 7. Profile Hub */}
+          <section className="mb-6 pb-6 border-b border-white/5">
+            <h2 className={sectionTitleClass}>Profile Hub</h2>
+            <div className="divide-y divide-white/5 rounded-lg border border-white/5 overflow-hidden">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-white/5 transition-colors"
+                onClick={() => {
+                  window.location.href = '/client/progress/achievements'
+                }}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                  <Award className="w-4 h-4 text-amber-400/90 shrink-0" />
+                  Achievements
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-white/5 transition-colors"
+                onClick={() => {
+                  window.location.href = '/client/goals/history'
+                }}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                  <Target className="w-4 h-4 text-emerald-400/90 shrink-0" />
+                  Goal History
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+              </button>
+            </div>
+          </section>
 
-          </div>
+          {/* 8. Account */}
+          {canEdit && (
+            <section className="mb-6">
+              <h2 className={sectionTitleClass}>Account</h2>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 justify-start rounded-lg border-white/10 text-sm"
+                  onClick={() => setShowPasswordModal(true)}
+                >
+                  <Lock className="w-4 h-4 mr-2 shrink-0" />
+                  Change password
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 justify-start rounded-lg border-white/10 text-sm"
+                  onClick={() => void handleSignOut()}
+                >
+                  <LogOut className="w-4 h-4 mr-2 shrink-0" />
+                  Sign out
+                </Button>
+              </div>
+            </section>
+          )}
         </ClientPageShell>
 
-        {/* Password Change Modal */}
+        {isDirty && canEdit && (
+          <div
+            className="fixed left-0 right-0 z-[10060] p-3 sm:px-4 pointer-events-none bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-white/10"
+            style={{ bottom: '76px' }}
+          >
+            <div className="max-w-lg mx-auto w-full pointer-events-auto">
+              <LogSetButton
+                ready={!saving}
+                loading={saving}
+                label="Save profile"
+                onClick={() => {
+                  if (saving) return
+                  void handleSave()
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {showPasswordModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="fc-glass fc-card rounded-3xl p-6 w-full max-w-md">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">Change Password</h3>
+            <div className="fc-card-shell rounded-2xl p-5 w-full max-w-md border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white">Change password</h3>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-9 w-9 p-0"
                   onClick={() => {
                     setShowPasswordModal(false)
                     setPasswordData({ newPassword: '', confirmPassword: '' })
                     setPasswordError('')
                     setPasswordSuccess(false)
                   }}
-                  className="min-w-11 min-h-11"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -950,44 +883,52 @@ export default function ClientProfilePage() {
 
               {passwordSuccess ? (
                 <div className="text-center py-6">
-                  <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--fc-status-success)" }} />
-                  <p className="text-lg font-semibold" style={{ color: "var(--fc-status-success)" }}>Password changed successfully!</p>
+                  <CheckCircle className="w-14 h-14 mx-auto mb-3 text-emerald-400" />
+                  <p className="text-base font-semibold text-emerald-400">Password changed successfully!</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
-                    <Label htmlFor="newPassword">New Password</Label>
+                    <Label htmlFor="newPassword" className="text-xs text-gray-400">
+                      New password
+                    </Label>
                     <Input
                       id="newPassword"
                       type="password"
                       placeholder="Enter new password"
                       value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                      className="mt-1"
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                      }
+                      className="mt-1 h-11 rounded-lg"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Label htmlFor="confirmPassword" className="text-xs text-gray-400">
+                      Confirm password
+                    </Label>
                     <Input
                       id="confirmPassword"
                       type="password"
                       placeholder="Confirm new password"
                       value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      className="mt-1"
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                      }
+                      className="mt-1 h-11 rounded-lg"
                     />
                   </div>
 
                   {passwordError && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
+                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                       {passwordError}
                     </div>
                   )}
 
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex gap-2 pt-1">
                     <Button
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 h-11 rounded-lg"
                       onClick={() => {
                         setShowPasswordModal(false)
                         setPasswordData({ newPassword: '', confirmPassword: '' })
@@ -997,33 +938,15 @@ export default function ClientProfilePage() {
                       Cancel
                     </Button>
                     <Button
-                      className="flex-1"
-                      onClick={handlePasswordChange}
+                      className="flex-1 h-11 rounded-lg fc-btn fc-btn-primary"
+                      onClick={() => void handlePasswordChange()}
                       disabled={changingPassword}
                     >
-                      {changingPassword ? 'Changing...' : 'Change Password'}
+                      {changingPassword ? 'Changing…' : 'Change password'}
                     </Button>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Delete account confirmation */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="fc-glass fc-card rounded-2xl p-8 w-full max-w-sm border-[color:var(--fc-status-error)]/30">
-              <h3 className="text-xl font-bold fc-text-primary mb-4">Delete account?</h3>
-              <p className="text-sm fc-text-dim mb-6">This cannot be undone. Your data will be permanently removed.</p>
-              <div className="flex flex-col gap-3">
-                <Button className="fc-btn fc-btn-primary w-full" onClick={() => setShowDeleteConfirm(false)}>
-                  Keep account
-                </Button>
-                <Button variant="outline" className="w-full fc-text-error border-[color:var(--fc-status-error)] hover:bg-[color:var(--fc-status-error)]/10" onClick={() => setShowDeleteConfirm(false)}>
-                  Delete forever
-                </Button>
-              </div>
             </div>
           </div>
         )}

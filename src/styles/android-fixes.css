@@ -191,10 +191,15 @@
 }
 
 /* Android input fixes */
+/* Keep native <select> appearance so the system dropdown/picker opens reliably. */
 .android-device input,
-.android-device textarea,
-.android-device select {
+.android-device textarea {
   -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 0.5rem;
+}
+
+.android-device select {
   -webkit-tap-highlight-color: transparent;
   border-radius: 0.5rem;
 }

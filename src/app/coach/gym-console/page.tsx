@@ -182,7 +182,7 @@ function ClientCard({
     `${status.activeSession.currentBlock > 0 ? `Block ${status.activeSession.currentBlock}/${status.nextWorkout?.blockCount ?? "?"}` : ""} ${status.activeSession.currentExercise} · Set ${status.activeSession.currentSet}`.trim();
 
   return (
-    <GlassCard elevation={1} className="fc-glass fc-card p-4 flex flex-col min-h-[200px]">
+    <GlassCard elevation={1} className="fc-card-shell p-4 flex flex-col min-h-[200px]">
       <div className="flex items-start gap-2 mb-2">
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${getStatusDot(status.status)}`} />
         <div className="min-w-0 flex-1">
@@ -474,7 +474,7 @@ function QuickLogModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
       <div
-        className="fc-glass fc-card p-4 w-full max-w-md flex flex-col"
+        className="fc-card-shell p-4 w-full max-w-md flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -611,7 +611,7 @@ function AddClientModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
       <div
-        className="fc-glass fc-card p-4 w-full max-w-md max-h-[80vh] flex flex-col"
+        className="fc-card-shell p-4 w-full max-w-md max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -900,7 +900,7 @@ function GymConsoleContent() {
                     const status = statusByClientId.get(clientId);
                     if (!status) {
                       return (
-                        <GlassCard key={clientId} elevation={1} className="fc-glass fc-card p-4 min-h-[200px] flex items-center justify-center">
+                        <GlassCard key={clientId} elevation={1} className="fc-card-shell p-4 min-h-[200px] flex items-center justify-center">
                           <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
                         </GlassCard>
                       );

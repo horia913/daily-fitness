@@ -337,7 +337,7 @@ function ClientManagementContent() {
 
         <main className="px-4 py-6 sm:px-6">
           {loadError && !loading ? (
-            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+            <GlassCard elevation={2} className="fc-card-shell p-8 text-center">
               <p className="text-sm fc-text-error mb-4">{loadError}</p>
               <Button
                 className="fc-btn fc-btn-primary"
@@ -356,7 +356,7 @@ function ClientManagementContent() {
               <div className="fc-skeleton rounded-2xl" style={{ height: 200 }} />
             </div>
           ) : filteredClients.length === 0 ? (
-            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+            <GlassCard elevation={2} className="fc-card-shell p-12 text-center">
               <Users className="w-24 h-24 mx-auto mb-6 text-[color:var(--fc-text-subtle)]" />
               <h3 className="text-2xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
                 {searchQuery || statusFilter !== "all" || quickFilter !== "all"

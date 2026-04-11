@@ -93,6 +93,24 @@ export { MAX_RETRIES };
 
 const SYNC_TIMEOUT_MS = 10_000;
 
+/** Matches `pr_detected` from POST /api/log-set (for PRCelebrationModal). */
+export interface PrDetectedFromLogSet {
+  type: "weight" | "reps";
+  exercise_name: string;
+  new_value: number;
+  previous_value: number | null;
+  unit: string;
+  weight_kg?: number;
+  reps?: number;
+}
+
+export interface LogSetPrSummary {
+  any_weight_pr?: boolean;
+  any_volume_pr?: boolean;
+  message?: string | null;
+  warning?: string;
+}
+
 export async function syncEntry(
   entry: PendingSetEntry,
 ): Promise<{
@@ -101,6 +119,9 @@ export async function syncEntry(
   e1rm?: number;
   isNewPR?: boolean;
   deduplicated?: boolean;
+  pr_detected?: PrDetectedFromLogSet | null;
+  pr?: LogSetPrSummary;
+  new_achievements?: unknown[];
   error?: string;
 }> {
   const controller = new AbortController();
@@ -128,16 +149,22 @@ export async function syncEntry(
     }
 
     if (response.ok && parsed.success) {
+      const prObj = parsed.pr as LogSetPrSummary | undefined;
       return {
         success: true,
         set_log_id: parsed.set_log_id as string | undefined,
         e1rm: (parsed.e1rm as { stored?: number; calculated?: number } | undefined)?.stored
           ?? (parsed.e1rm as { stored?: number; calculated?: number } | undefined)?.calculated,
         isNewPR: !!(
-          (parsed.pr as Record<string, unknown> | undefined)?.any_weight_pr ||
-          (parsed.pr as Record<string, unknown> | undefined)?.any_volume_pr
+          prObj?.any_weight_pr ||
+          prObj?.any_volume_pr
         ),
         deduplicated: !!parsed.deduplicated,
+        pr_detected: (parsed.pr_detected as PrDetectedFromLogSet | null | undefined) ?? null,
+        pr: prObj,
+        new_achievements: Array.isArray(parsed.new_achievements)
+          ? parsed.new_achievements
+          : [],
       };
     }
 

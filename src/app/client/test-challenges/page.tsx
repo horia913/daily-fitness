@@ -179,7 +179,7 @@ function TestChallengesContent() {
         breadcrumbCurrentLabel="Challenges"
       >
         {displayedChallenges.length === 0 ? (
-          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+          <GlassCard elevation={2} className="fc-card-shell p-12 text-center">
             <Trophy className="w-20 h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
             <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
               No challenges
@@ -210,7 +210,7 @@ function TestChallengesContent() {
 
       {showJoinModal && selectedChallenge && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6">
+          <div className="w-full max-w-md fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6">
             <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
               Select Your Track
             </h2>

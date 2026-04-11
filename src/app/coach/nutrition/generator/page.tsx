@@ -635,7 +635,7 @@ export default function GeneratorPage() {
               STEP 1: TARGETS
           ================================================================ */}
           {step === 1 && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-4 space-y-3">
+            <GlassCard elevation={2} className="fc-card-shell p-4 space-y-3">
               <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Targets</h2>
 
               {/* Plan name */}
@@ -771,7 +771,7 @@ export default function GeneratorPage() {
           {step === 2 && (
             <div className="space-y-3">
               {/* Dietary restrictions */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-4 space-y-3">
+              <GlassCard elevation={2} className="fc-card-shell p-4 space-y-3">
                 <div>
                   <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Food rules</h2>
                   <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
@@ -830,7 +830,7 @@ export default function GeneratorPage() {
               </GlassCard>
 
               {/* Meal styles — optional per meal type */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-4">
+              <GlassCard elevation={2} className="fc-card-shell p-6 space-y-4">
                 <div>
                   <Label className="text-[color:var(--fc-text-primary)] font-semibold">Meal Styles</Label>
                   <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
@@ -892,7 +892,7 @@ export default function GeneratorPage() {
               </GlassCard>
 
               {/* Exclude specific foods — separate card so dropdown is never clipped */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-3">
+              <GlassCard elevation={2} className="fc-card-shell p-6 space-y-3">
                 <div>
                   <Label className="text-[color:var(--fc-text-primary)] font-semibold">Exclude Specific Foods</Label>
                   <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
@@ -922,7 +922,7 @@ export default function GeneratorPage() {
               </GlassCard>
 
               {/* Required foods — separate card */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-3">
+              <GlassCard elevation={2} className="fc-card-shell p-6 space-y-3">
                 <div>
                   <Label className="text-[color:var(--fc-text-primary)] font-semibold">Required Foods</Label>
                   <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
@@ -951,7 +951,7 @@ export default function GeneratorPage() {
                 )}
               </GlassCard>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex justify-between items-center">
+              <GlassCard elevation={2} className="fc-card-shell p-5 flex justify-between items-center">
                 <Button onClick={() => setStep(1)} className="fc-btn fc-btn-secondary">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
@@ -972,7 +972,7 @@ export default function GeneratorPage() {
 
               {/* Generating spinner */}
               {generating && (
-                <GlassCard elevation={2} className="fc-glass fc-card p-12 flex flex-col items-center justify-center gap-4">
+                <GlassCard elevation={2} className="fc-card-shell p-12 flex flex-col items-center justify-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-[color:var(--fc-aurora)]/20 flex items-center justify-center">
                     <Loader2 className="w-8 h-8 text-[color:var(--fc-accent)] animate-spin" />
                   </div>
@@ -988,7 +988,7 @@ export default function GeneratorPage() {
 
               {/* Generation error */}
               {!generating && generationError && (
-                <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <GlassCard elevation={2} className="fc-card-shell p-6">
                   <div className="flex items-start gap-3 text-[color:var(--fc-status-error)]">
                     <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -1017,7 +1017,7 @@ export default function GeneratorPage() {
               {!generating && result && (
                 <>
                   {/* Daily summary card */}
-                  <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-4">
+                  <GlassCard elevation={2} className="fc-card-shell p-6 space-y-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
@@ -1094,7 +1094,7 @@ export default function GeneratorPage() {
                     const currentOption = getOption(mealIdx, activeTab);
 
                     return (
-                      <GlassCard key={mealIdx} elevation={2} className="fc-glass fc-card overflow-hidden">
+                      <GlassCard key={mealIdx} elevation={2} className="fc-card-shell overflow-hidden">
                         {/* Meal header — click to expand */}
                         <button
                           onClick={() => setOpenMealIdx(isOpen ? -1 : mealIdx)}
@@ -1214,7 +1214,7 @@ export default function GeneratorPage() {
                   })}
 
                   {/* Bottom action bar */}
-                  <GlassCard elevation={2} className="fc-glass fc-card p-5 flex flex-wrap items-center justify-between gap-3">
+                  <GlassCard elevation={2} className="fc-card-shell p-5 flex flex-wrap items-center justify-between gap-3">
                     <Button onClick={() => setStep(2)} className="fc-btn fc-btn-secondary">
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Back to Rules
@@ -1241,7 +1241,7 @@ export default function GeneratorPage() {
         ================================================================ */}
         {swapModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <GlassCard elevation={3} className="fc-glass fc-card w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <GlassCard elevation={3} className="fc-card-shell w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between p-5 border-b border-[color:var(--fc-glass-border)]">
                 <div>
                   <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Swap Food</h3>

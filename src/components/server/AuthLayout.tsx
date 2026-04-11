@@ -123,7 +123,7 @@ export function AuthFormContainer({
   children: React.ReactNode 
 }) {
   return (
-    <Card className="fc-glass fc-card border-[color:var(--fc-glass-border)] rounded-3xl shadow-2xl">
+    <Card className="fc-card-shell border-[color:var(--fc-glass-border)] rounded-3xl shadow-2xl">
       <CardHeader className="text-center pb-8 pt-8">
         <div className="flex items-center justify-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(to bottom right, var(--fc-accent-indigo), var(--fc-accent-violet))" }}>

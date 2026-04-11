@@ -84,8 +84,8 @@ const mockSupabase = {
 };
 
 const mockProgramProgressionService = {
-  copyWorkoutToProgram: jest.fn(async () => true),
-  getProgressionRules: jest.fn(async () => ({
+  copyWorkoutToProgram: jest.fn(async (..._args: unknown[]) => true),
+  getProgressionRules: jest.fn(async (..._args: unknown[]) => ({
     rules: [],
     isPlaceholder: false,
   })),

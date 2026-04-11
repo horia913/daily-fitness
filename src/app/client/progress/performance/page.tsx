@@ -6,20 +6,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import {
-  ArrowLeft,
-  Timer,
-  TrendingUp,
-  Plus,
-  HeartPulse,
-} from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Timer, Plus, HeartPulse } from "lucide-react";
 import {
   getClientPerformanceTests,
   PerformanceTest,
 } from "@/lib/performanceTestService";
 import { LogPerformanceTestModal } from "@/components/client/LogPerformanceTestModal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ClientPageShell } from "@/components/client-ui";
 
 type TestType = "1km_run" | "step_test";
 
@@ -172,12 +166,12 @@ function PerformancePageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-12 fc-page max-w-4xl mx-auto">
-            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => { setLoadError(null); loadData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="fc-card-shell p-4 text-center">
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+              <button type="button" onClick={() => { setLoadError(null); loadData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-4 text-sm">Retry</button>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -188,16 +182,12 @@ function PerformancePageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-12 fc-page max-w-4xl mx-auto">
-            <div className="animate-pulse space-y-8">
-              <div className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-              </div>
-              <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -206,22 +196,25 @@ function PerformancePageContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 mx-auto w-full max-w-4xl px-4 pb-40 pt-6 sm:px-6 lg:px-12 fc-page">
-        {/* Header */}
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10 mb-10">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-              <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-            </Link>
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                <Timer className="w-6 h-6" />
+      <ClientPageShell className="max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden">
+        <div className="fc-card-shell p-4 mb-4">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/client/progress"; }}
+              className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
+            >
+              <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
+            </button>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                <Timer className="w-4 h-4" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
                   Performance Tests
                 </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
                   Benchmarks and aerobic tests
                 </p>
               </div>
@@ -229,73 +222,62 @@ function PerformancePageContent() {
           </div>
         </div>
 
-        <main className="space-y-8">
-          {/* Test type switcher */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <main className="space-y-4">
+          <section className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               onClick={() => setSelectedType("1km_run")}
-              className={`fc-surface p-6 rounded-2xl border text-left transition-all ${
+              className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
                 selectedType === "1km_run"
                   ? "border-[color:var(--fc-glass-border-strong)] bg-[color:var(--fc-glass-highlight)]"
-                  : "border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)]"
+                  : "border-[color:var(--fc-glass-border)] fc-surface hover:bg-[color:var(--fc-glass-highlight)]"
               }`}
             >
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
-                  <Timer className="w-6 h-6" />
-                </div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
+                  <Timer className="w-3.5 h-3.5 text-blue-400" />
+                  1km run
+                </span>
                 {runTrendPercent !== null && runTests.length >= 2 && (
-                  <div className="flex items-center gap-1 fc-text-success font-mono text-sm font-bold">
-                    <TrendingUp className="w-4 h-4" />
+                  <span className="fc-text-success font-mono text-[10px] font-bold">
                     {runTrendPercent > 0 ? "+" : ""}
                     {runTrendPercent}%
-                  </div>
+                  </span>
                 )}
               </div>
-              <h3 className="text-xl font-bold fc-text-primary mb-1">1km Run</h3>
-              <p className="text-sm fc-text-subtle">Aerobic capacity & speed</p>
-              <div className="mt-4 text-xs font-mono fc-text-subtle font-medium tracking-wider">
-                LAST: {runTests.length > 0 && runTests[0].time_seconds != null
-                  ? formatRunTime(runTests[0].time_seconds)
-                  : "—"}
-              </div>
+              <p className="text-[10px] fc-text-subtle truncate">Aerobic · last {runTests.length > 0 && runTests[0].time_seconds != null ? formatRunTime(runTests[0].time_seconds) : "—"}</p>
             </button>
 
             <button
               type="button"
               onClick={() => setSelectedType("step_test")}
-              className={`fc-surface p-6 rounded-2xl border text-left transition-all ${
+              className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
                 selectedType === "step_test"
                   ? "border-[color:var(--fc-glass-border-strong)] bg-[color:var(--fc-glass-highlight)]"
-                  : "border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)]"
+                  : "border-[color:var(--fc-glass-border)] fc-surface hover:bg-[color:var(--fc-glass-highlight)]"
               }`}
             >
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-red-500/10 rounded-2xl text-red-400">
-                  <HeartPulse className="w-6 h-6" />
-                </div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
+                  <HeartPulse className="w-3.5 h-3.5 text-red-400" />
+                  Step test
+                </span>
                 {stepTrendPercent !== null && stepTests.length >= 2 && (
-                  <div className="flex items-center gap-1 fc-text-success font-mono text-sm font-bold">
-                    <TrendingUp className="w-4 h-4" />
+                  <span className="fc-text-success font-mono text-[10px] font-bold">
                     {stepTrendPercent > 0 ? "+" : ""}
                     {stepTrendPercent}%
-                  </div>
+                  </span>
                 )}
               </div>
-              <h3 className="text-xl font-bold fc-text-primary mb-1">Step Test</h3>
-              <p className="text-sm fc-text-subtle">Recovery heart rate efficiency</p>
-              <div className="mt-4 text-xs font-mono fc-text-subtle font-medium tracking-wider">
-                LAST: {stepTests.length > 0 && stepTests[0].recovery_score != null
-                  ? `${stepTests[0].recovery_score} BPM`
-                  : "—"}
-              </div>
+              <p className="text-[10px] fc-text-subtle truncate">
+                Recovery · last {stepTests.length > 0 && stepTests[0].recovery_score != null ? `${stepTests[0].recovery_score} BPM` : "—"}
+              </p>
             </button>
           </section>
 
           {/* Main display */}
           <div
-            className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden p-6 md:p-8"
+            className="fc-card-shell overflow-hidden p-6 md:p-8"
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
               <div className="flex-1 min-w-0">
@@ -313,46 +295,46 @@ function PerformancePageContent() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold fc-text-primary mb-6">
+                <h2 className="text-lg font-bold fc-text-primary mb-3">
                   {selectedType === "1km_run" ? "1km Run" : "Step Test"}
                 </h2>
-                <div className="relative inline-block">
+                <div className="relative inline-block pr-10">
                   {latest ? (
                     selectedType === "1km_run" && latest.time_seconds != null ? (
                       <>
-                        <div className="text-5xl md:text-6xl font-bold font-mono tracking-tight fc-text-primary">
+                        <div className="text-3xl sm:text-4xl font-bold font-mono tracking-tight fc-text-primary">
                           {formatRunTime(latest.time_seconds)}
                         </div>
-                        <div className="absolute -right-14 bottom-2 text-lg font-mono fc-text-subtle">
-                          MIN
+                        <div className="absolute right-0 bottom-1 text-xs font-mono fc-text-subtle">
+                          min
                         </div>
                       </>
                     ) : selectedType === "step_test" && latest.recovery_score != null ? (
                       <>
-                        <div className="text-5xl md:text-6xl font-bold font-mono tracking-tight fc-text-primary">
+                        <div className="text-3xl sm:text-4xl font-bold font-mono tracking-tight fc-text-primary">
                           {latest.recovery_score}
                         </div>
-                        <div className="absolute -right-14 bottom-2 text-lg font-mono fc-text-subtle">
+                        <div className="absolute right-0 bottom-1 text-xs font-mono fc-text-subtle">
                           BPM
                         </div>
                       </>
                     ) : (
-                      <div className="text-4xl font-bold font-mono fc-text-subtle">—</div>
+                      <div className="text-2xl font-bold font-mono fc-text-subtle">—</div>
                     )
                   ) : (
-                    <div className="text-4xl font-bold font-mono fc-text-subtle">No result yet</div>
+                    <div className="text-lg font-bold font-mono fc-text-subtle">No result yet</div>
                   )}
                 </div>
               </div>
-              <div className="w-full md:w-64 space-y-4 flex-shrink-0">
-                <div className="flex items-center justify-between p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                  <span className="text-sm fc-text-subtle">Improvement</span>
+              <div className="w-full md:w-52 space-y-2 flex-shrink-0 text-xs">
+                <div className="flex items-center justify-between p-2.5 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                  <span className="fc-text-subtle">Improvement</span>
                   <span className="font-bold font-mono fc-text-success">
                     {improvement ?? "—"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                  <span className="text-sm fc-text-subtle">Percentile</span>
+                <div className="flex items-center justify-between p-2.5 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                  <span className="fc-text-subtle">Percentile</span>
                   <span className="font-bold font-mono fc-text-subtle">—</span>
                 </div>
               </div>
@@ -360,7 +342,7 @@ function PerformancePageContent() {
 
             {/* Mini sparkline */}
             {currentTests.length > 0 && (
-              <div className="mt-8 h-16 w-full flex items-end gap-1">
+              <div className="mt-4 h-12 w-full flex items-end gap-1 min-w-0 overflow-x-auto">
                 {currentTests.slice(0, 6).reverse().map((_, index, arr) => {
                   const i = arr.length - 1 - index;
                   const isLast = index === arr.length - 1;
@@ -385,11 +367,11 @@ function PerformancePageContent() {
           </div>
 
           {/* History table */}
-          <section className="space-y-4">
-            <h3 className="text-lg font-semibold fc-text-primary px-1">Historical logs</h3>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold fc-text-primary px-0.5">Historical logs</h3>
+            <div className="fc-card-shell overflow-hidden">
               {currentTests.length === 0 ? (
-                <div className="p-8">
+                <div className="p-4">
                   <EmptyState
                     icon={Timer}
                     title="No performance tests"
@@ -402,10 +384,10 @@ function PerformancePageContent() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-widest fc-text-subtle border-b border-[color:var(--fc-glass-border)]">
-                      <th className="p-4 md:p-6 font-bold">Date</th>
-                      <th className="p-4 md:p-6 font-bold">Result</th>
-                      <th className="p-4 md:p-6 font-bold">Trend</th>
-                      <th className="p-4 md:p-6 font-bold text-right">Notes</th>
+                      <th className="p-2 md:p-3 font-bold">Date</th>
+                      <th className="p-2 md:p-3 font-bold">Result</th>
+                      <th className="p-2 md:p-3 font-bold">Trend</th>
+                      <th className="p-2 md:p-3 font-bold text-right">Notes</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm font-mono">
@@ -437,8 +419,8 @@ function PerformancePageContent() {
                                 year: "numeric",
                               })}
                             </td>
-                            <td className="p-4 md:p-6 font-bold fc-text-primary">{result}</td>
-                            <td className="p-4 md:p-6">
+                            <td className="p-2 md:p-3 font-bold fc-text-primary text-xs">{result}</td>
+                            <td className="p-2 md:p-3 text-xs">
                               {trend === "—" ? (
                                 <span className="fc-text-subtle">—</span>
                               ) : (
@@ -469,12 +451,12 @@ function PerformancePageContent() {
         <button
           type="button"
           onClick={() => setShowLogModal(true)}
-          className="fixed bottom-24 right-6 z-40 w-16 h-16 rounded-2xl fc-btn fc-btn-primary flex items-center justify-center shadow-lg"
+          className="fixed bottom-24 right-4 z-40 w-12 h-12 rounded-xl fc-btn fc-btn-primary flex items-center justify-center shadow-lg"
           aria-label="Log new test result"
         >
-          <Plus className="w-8 h-8" />
+          <Plus className="w-6 h-6" />
         </button>
-      </div>
+      </ClientPageShell>
 
       {showLogModal && user && (
         <LogPerformanceTestModal

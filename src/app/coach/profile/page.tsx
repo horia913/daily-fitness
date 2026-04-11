@@ -437,7 +437,7 @@ export default function CoachProfilePage() {
             </nav>
 
             {/* Profile Picture Section */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -504,7 +504,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Personal Information */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardContent className="p-6 space-y-6">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-sm font-semibold uppercase tracking-wider fc-text-dim">Personal Details</span>
@@ -610,7 +610,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Notification Preferences */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
@@ -740,7 +740,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* App Preferences */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
@@ -794,7 +794,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Professional Information */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
@@ -1018,7 +1018,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Health Information */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
@@ -1076,7 +1076,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Account Information */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-500 to-zinc-600 flex items-center justify-center">
@@ -1128,7 +1128,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Privacy & Security */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
@@ -1214,7 +1214,7 @@ export default function CoachProfilePage() {
             </Card>
 
             {/* Logout Section */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
+            <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardContent className="p-6">
                 <Button
                   variant="outline"
@@ -1231,7 +1231,7 @@ export default function CoachProfilePage() {
         {/* Password Change Modal */}
         {showPasswordModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="fc-glass fc-card rounded-3xl p-6 w-full max-w-md">
+            <div className="fc-card-shell rounded-3xl p-6 w-full max-w-md">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">Change Password</h3>
                 <Button

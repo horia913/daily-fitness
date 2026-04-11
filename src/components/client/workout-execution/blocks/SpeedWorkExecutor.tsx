@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Zap } from "lucide-react";
+import { Hash, Route, Gauge, Timer, Weight } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 
@@ -51,8 +52,7 @@ export function SpeedWorkExecutor({
     ) ||
     block.block.speed_sets?.[0];
 
-  const totalIntervals =
-    speedRow?.intervals ?? block.block.total_sets ?? 1;
+  const totalIntervals = speedRow?.intervals ?? block.block.total_sets ?? 1;
   const distanceM = speedRow?.distance_meters ?? 0;
   const restSec = speedRow?.rest_seconds ?? block.block.rest_seconds ?? 120;
   const loadPctBw =
@@ -94,37 +94,64 @@ export function SpeedWorkExecutor({
   const nextIntervalNum = loggedSetsList.length + 1;
   const completed = loggedSetsList.length >= totalIntervals;
 
-  const blockDetails: BlockDetail[] = [];
-  blockDetails.push({
-    label: "TARGET",
-    value:
-      distanceM >= 1000
-        ? `${(distanceM / 1000).toFixed(1)} km / interval`
-        : distanceM > 0
-          ? `${Math.round(distanceM)} m`
-          : "—",
-  });
-  if (maxSpeedPct != null) {
-    blockDetails.push({ label: "INTENSITY", value: `${maxSpeedPct}% max speed` });
-  } else if (maxHrPct != null) {
-    blockDetails.push({ label: "INTENSITY", value: `${maxHrPct}% max HR` });
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Hash, label: "Intervals", value: totalIntervals },
+  ];
+  if (distanceM > 0) {
+    if (distanceM >= 1000) {
+      prescriptionItems.push({
+        icon: Route,
+        label: "Distance",
+        value: Number((distanceM / 1000).toFixed(1)),
+        unit: "km",
+      });
+    } else {
+      prescriptionItems.push({
+        icon: Route,
+        label: "Distance",
+        value: Math.round(distanceM),
+        unit: "m",
+      });
+    }
   }
-  if (loadPctBw != null) {
-    blockDetails.push({
-      label: "LOAD",
-      value: suggestedLoadKg != null ? `${loadPctBw}% BW (~${suggestedLoadKg} kg)` : `${loadPctBw}% BW`,
+  if (maxSpeedPct != null) {
+    prescriptionItems.push({
+      icon: Gauge,
+      label: "Target speed",
+      value: maxSpeedPct,
+      unit: "% max",
+    });
+  } else if (maxHrPct != null) {
+    prescriptionItems.push({
+      icon: Gauge,
+      label: "Target HR",
+      value: maxHrPct,
+      unit: "% max",
     });
   }
-  blockDetails.push({
-    label: "RECOVERY",
-    value: `${restSec}s between intervals`,
+  prescriptionItems.push({
+    icon: Timer,
+    label: "Recovery",
+    value: restSec,
+    unit: "s",
   });
+  if (loadPctBw != null) {
+    prescriptionItems.push({
+      icon: Weight,
+      label: "Load",
+      value: loadPctBw,
+      unit: "% BW",
+    });
+  }
 
   const instructions =
-    currentExercise?.notes || block.block.set_notes || speedRow?.notes || undefined;
+    currentExercise?.notes ||
+    block.block.set_notes ||
+    speedRow?.notes ||
+    undefined;
 
   const handleLog = async () => {
-    if (!currentExercise?.exercise_id || isLoggingSet) return;
+    if (!currentExercise?.exercise_id || isLoggingSet || completed) return;
     const t = parseInt(String(timeSec).trim(), 10);
     if (!Number.isFinite(t) || t <= 0) {
       addToast({
@@ -151,7 +178,12 @@ export function SpeedWorkExecutor({
       if (hrNum != null && Number.isFinite(hrNum)) {
         logData.actual_hr_avg = hrNum;
       }
-      if (rpeNum != null && !Number.isNaN(rpeNum) && rpeNum >= 1 && rpeNum <= 10) {
+      if (
+        rpeNum != null &&
+        !Number.isNaN(rpeNum) &&
+        rpeNum >= 1 &&
+        rpeNum <= 10
+      ) {
         logData.rpe = rpeNum;
       }
 
@@ -166,9 +198,7 @@ export function SpeedWorkExecutor({
           ...(hrNum != null && Number.isFinite(hrNum)
             ? { actual_hr_avg: hrNum }
             : {}),
-          ...(rpeNum != null && !Number.isNaN(rpeNum)
-            ? { rpe: rpeNum }
-            : {}),
+          ...(rpeNum != null && !Number.isNaN(rpeNum) ? { rpe: rpeNum } : {}),
           completed_at: new Date(),
         } as LoggedSet;
         onSetLogUpsert?.(block.block.id, loggedSet);
@@ -189,14 +219,21 @@ export function SpeedWorkExecutor({
     }
   };
 
-  const exerciseName =
-    currentExercise?.exercise?.name || "Speed work";
+  const exerciseName = currentExercise?.exercise?.name || "Speed work";
+
+  const tParsed = parseInt(String(timeSec).trim(), 10);
+  const speedLogReady =
+    !isLoggingSet &&
+    !completed &&
+    Number.isFinite(tParsed) &&
+    tParsed > 0;
 
   return (
     <BaseBlockExecutorLayout
       block={block}
       exerciseName={exerciseName}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
+      prescriptionGridMode="two-column-only"
       instructions={instructions}
       onVideoClick={onVideoClick}
       onAlternativesClick={onAlternativesClick}
@@ -217,7 +254,7 @@ export function SpeedWorkExecutor({
       formatTime={formatTimeProp}
       loggingInputs={
         <div className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-center">
             <p className="text-sm text-muted-foreground">Interval</p>
             <p className="text-2xl font-bold tabular-nums">
               {Math.min(nextIntervalNum, totalIntervals)} of {totalIntervals}
@@ -230,7 +267,9 @@ export function SpeedWorkExecutor({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">Time (seconds)</label>
+            <label className="mb-2 block text-sm font-medium">
+              Time (seconds)
+            </label>
             <LargeInput
               type="number"
               value={timeSec}
@@ -281,7 +320,9 @@ export function SpeedWorkExecutor({
                         {s.actual_time_seconds != null
                           ? `${s.actual_time_seconds}s`
                           : "—"}
-                        {s.actual_hr_avg != null ? ` · HR ${s.actual_hr_avg}` : ""}
+                        {s.actual_hr_avg != null
+                          ? ` · HR ${s.actual_hr_avg}`
+                          : ""}
                       </span>
                     </li>
                   ))}
@@ -291,25 +332,18 @@ export function SpeedWorkExecutor({
         </div>
       }
       logButton={
-        <Button
-          type="button"
-          variant="fc-primary"
-          className="h-12 w-full rounded-xl text-base font-bold uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isLoggingSet || completed}
+        <LogSetButton
           onClick={handleLog}
-        >
-          {completed ? (
-            "Completed"
-          ) : isLoggingSet ? (
-            "Saving…"
-          ) : (
-            <>
-              <Zap className="mr-2 h-5 w-5" />
-              Log interval {nextIntervalNum}
-            </>
-          )}
-        </Button>
+          ready={speedLogReady}
+          loading={isLoggingSet}
+          label={
+            completed
+              ? "Completed"
+              : `Log interval ${nextIntervalNum}`
+          }
+        />
       }
+      logSectionTitle={`LOG INTERVAL ${Math.min(nextIntervalNum, totalIntervals)}`}
       currentSet={Math.min(nextIntervalNum, totalIntervals)}
       totalSets={totalIntervals}
       progressLabel="Interval"

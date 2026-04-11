@@ -181,7 +181,7 @@ export default function MealPlanAssignmentModal({
                     ${
                       isSelected
                         ? "bg-[color:var(--fc-status-success)]/10 border-2 border-[color:var(--fc-status-success)]"
-                        : `${theme.card} fc-glass fc-card border-2 border-[color:var(--fc-surface-card-border)]`
+                        : `${theme.card} fc-card-shell border-2 border-[color:var(--fc-surface-card-border)]`
                     }
                   `}
                 >

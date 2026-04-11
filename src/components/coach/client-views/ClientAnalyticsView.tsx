@@ -86,18 +86,18 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 animate-pulse h-28" />
+            <div key={i} className="fc-card-shell p-5 animate-pulse h-28" />
           ))}
         </div>
-        <div className="animate-pulse h-64 fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]" />
-        <div className="animate-pulse h-48 fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]" />
+        <div className="animate-pulse h-64 fc-card-shell" />
+        <div className="animate-pulse h-48 fc-card-shell" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8">
+      <div className="fc-card-shell p-8">
         <EmptyState
           icon={BarChart3}
           title={error ? 'Could not load analytics' : 'No analytics yet'}
@@ -126,7 +126,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
         <h2 className="text-lg font-semibold fc-text-primary mb-4">Overview</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* Card 1: Overall Adherence */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Target className="w-5 h-5" />
             </div>
@@ -137,7 +137,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           </div>
 
           {/* Card 2: Training Volume */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Dumbbell className="w-5 h-5" />
             </div>
@@ -158,7 +158,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           </div>
 
           {/* Card 3: Check-In Streak */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Flame className="w-5 h-5" />
             </div>
@@ -168,7 +168,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           </div>
 
           {/* Card 4: Body Composition Trend */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Scale className="w-5 h-5" />
             </div>
@@ -177,7 +177,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           </div>
 
           {/* Card 5: Program Progress */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <BarChart3 className="w-5 h-5" />
             </div>
@@ -200,7 +200,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           </div>
 
           {/* Card 6: Days Active */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="fc-card-shell p-5 text-center">
             <div className="mx-auto mb-2 fc-icon-tile fc-icon-workouts flex justify-center">
               <Calendar className="w-5 h-5" />
             </div>

@@ -22,7 +22,7 @@ export default function CoachAdherencePage() {
         <div className="min-h-screen p-2 sm:p-4 md:p-6 pb-32">
           <div className="max-w-7xl mx-auto space-y-3 sm:space-y-8">
             <AnalyticsNav />
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-3 p-3 sm:p-6 rounded-2xl fc-glass fc-card border border-[color:var(--fc-glass-border)]">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-3 p-3 sm:p-6 rounded-2xl fc-card-shell border border-[color:var(--fc-glass-border)]">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex-shrink-0">
                   <Filter className="h-5 w-5 sm:h-6 sm:w-6" />

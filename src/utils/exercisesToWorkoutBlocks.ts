@@ -216,52 +216,9 @@ export function exercisesToWorkoutBlocks(
       cluster_sets: [],
       rest_pause_sets: [],
       time_protocols: [],
-      hr_sets: [],
       created_at: now,
       updated_at: now,
     };
-
-    if (blockType === "hr_sets") {
-      const hrExercises =
-        exercise.hr_set_exercises && Array.isArray(exercise.hr_set_exercises)
-          ? exercise.hr_set_exercises
-          : exercise.exercise_id
-            ? [exercise]
-            : [];
-
-      block.hr_sets = hrExercises
-        .filter((ex: any) => ex.exercise_id)
-        .map((ex: any, idx: number) => ({
-          id: ex.id || `temp-hr-${index}-${idx}`,
-          set_entry_id: block.id,
-          exercise_id: ex.exercise_id,
-          exercise_order: idx + 1,
-          hr_zone: ex.hr_zone ? parseInt(ex.hr_zone) : undefined,
-          hr_percentage_min: ex.hr_percentage_min
-            ? parseFloat(ex.hr_percentage_min)
-            : undefined,
-          hr_percentage_max: ex.hr_percentage_max
-            ? parseFloat(ex.hr_percentage_max)
-            : undefined,
-          is_intervals: ex.hr_is_intervals ?? false,
-          duration_seconds: ex.hr_duration_minutes
-            ? ex.hr_duration_minutes * 60
-            : undefined,
-          work_duration_seconds: ex.hr_work_duration_minutes
-            ? ex.hr_work_duration_minutes * 60
-            : undefined,
-          rest_duration_seconds: ex.hr_rest_duration_minutes
-            ? ex.hr_rest_duration_minutes * 60
-            : undefined,
-          target_rounds: ex.hr_target_rounds
-            ? parseInt(ex.hr_target_rounds)
-            : undefined,
-          distance_meters: ex.hr_distance_meters
-            ? parseFloat(ex.hr_distance_meters)
-            : undefined,
-          created_at: now,
-        }));
-    }
 
     return block;
   });

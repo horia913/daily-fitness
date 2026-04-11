@@ -54,7 +54,7 @@ export default function ResponsiveModal({
       {gradientFrame ? (
         <div className="rounded-3xl p-[1px] shadow-2xl" style={{ background: 'var(--fc-domain-workouts)' }}>
           <div 
-            className="fc-modal relative fc-glass fc-card shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
+            className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
             style={{
               animation: 'modalSlideIn 0.3s ease-out',
               maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -64,7 +64,7 @@ export default function ResponsiveModal({
           >
         {/* Header */}
         {showHeader && (
-          <div className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
+          <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 {icon && (
@@ -105,7 +105,7 @@ export default function ResponsiveModal({
 
         {/* Footer Actions */}
         {actions && (
-          <div className={`flex-shrink-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
+          <div className={`flex-shrink-0 ${theme.card} fc-card-shell border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
             {actions}
           </div>
         )}
@@ -113,7 +113,7 @@ export default function ResponsiveModal({
         </div>
       ) : (
         <div 
-          className="fc-modal relative fc-glass fc-card shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
+          className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
           style={{
             animation: 'modalSlideIn 0.3s ease-out',
             maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -123,7 +123,7 @@ export default function ResponsiveModal({
         >
           {/* Header */}
           {showHeader && (
-            <div className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
+            <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {icon && (
@@ -164,7 +164,7 @@ export default function ResponsiveModal({
 
           {/* Footer Actions */}
           {actions && (
-            <div className={`flex-shrink-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
+            <div className={`flex-shrink-0 ${theme.card} fc-card-shell border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
               {actions}
             </div>
           )}

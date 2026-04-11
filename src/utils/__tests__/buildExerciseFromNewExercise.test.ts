@@ -19,11 +19,12 @@ describe('buildExerciseFromNewExercise', () => {
       )
       expect(result.success).toBe(true)
       expect(result.exercise).toBeDefined()
-      expect(result.exercise.exercise_id).toBe('test-uuid-123')
-      expect(result.exercise.exercise_type).toBe('straight_set')
-      expect(typeof result.exercise.sets).toBe('string')
-      expect(typeof result.exercise.reps).toBe('string')
-      expect(typeof result.exercise.rest_seconds).toBe('string')
+      const ex0 = result.exercise!
+      expect(ex0.exercise_id).toBe('test-uuid-123')
+      expect(ex0.exercise_type).toBe('straight_set')
+      expect(typeof ex0.sets).toBe('string')
+      expect(typeof ex0.reps).toBe('string')
+      expect(typeof ex0.rest_seconds).toBe('string')
     })
 
     test('returns error when exercise_id is missing for straight set', () => {
@@ -109,8 +110,9 @@ describe('buildExerciseFromNewExercise', () => {
         null
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.exercise_id).toBe('uuid-1')
-      expect(result.exercise.superset_exercise_id).toBe('uuid-2')
+      const exSuperset = result.exercise!
+      expect(exSuperset.exercise_id).toBe('uuid-1')
+      expect(exSuperset.superset_exercise_id).toBe('uuid-2')
     })
   })
 
@@ -128,7 +130,7 @@ describe('buildExerciseFromNewExercise', () => {
     test('returns error when no valid exercise_id in giant set', () => {
       const newExercise = {
         exercise_type: 'giant_set',
-        giant_set_exercises: [{ exercise_id: '' }, {}],
+        giant_set_exercises: [{ exercise_id: '' }, {} as { exercise_id: string }],
       }
       const result = buildExerciseFromNewExercise(newExercise, [], [], null)
       expect(result.success).toBe(false)
@@ -159,8 +161,9 @@ describe('buildExerciseFromNewExercise', () => {
         null
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.exercise_id).toBe('uuid-1')
-      expect(result.exercise.giant_set_exercises).toHaveLength(3)
+      const ex2 = result.exercise!
+      expect(ex2.exercise_id).toBe('uuid-1')
+      expect(ex2.giant_set_exercises).toHaveLength(3)
     })
   })
 
@@ -204,7 +207,8 @@ describe('buildExerciseFromNewExercise', () => {
         null
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.exercise_id).toBe('uuid-1')
+      const ex3 = result.exercise!
+      expect(ex3.exercise_id).toBe('uuid-1')
     })
   })
 
@@ -225,7 +229,8 @@ describe('buildExerciseFromNewExercise', () => {
         editingId
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.id).toBe(editingId)
+      const exEdit = result.exercise!
+      expect(exEdit.id).toBe(editingId)
     })
 
     test('generates temp id when not in edit mode', () => {
@@ -242,7 +247,8 @@ describe('buildExerciseFromNewExercise', () => {
         null
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.id).toMatch(/^temp-/)
+      const ex5 = result.exercise!
+      expect(ex5.id).toMatch(/^temp-/)
     })
   })
 
@@ -265,7 +271,8 @@ describe('buildExerciseFromNewExercise', () => {
         null
       )
       expect(result.success).toBe(true)
-      expect(result.exercise.order_index).toBe(3)
+      const ex6 = result.exercise!
+      expect(ex6.order_index).toBe(3)
     })
   })
 })

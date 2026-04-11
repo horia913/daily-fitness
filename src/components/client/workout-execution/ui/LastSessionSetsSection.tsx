@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import type { LastSessionSetRow } from "@/lib/clientProgressionService";
+import { clientEffortLabelFromStoredRpe } from "@/lib/workoutEffortLabels";
 
 function formatWeightKg(kg: number | null): string {
   if (kg == null || Number.isNaN(Number(kg))) return "—";
@@ -19,6 +20,14 @@ export interface LastSessionWorkoutSummary {
 interface LastSessionSetsSectionProps {
   lastWorkout: LastSessionWorkoutSummary | null | undefined;
 }
+
+const tableClass =
+  "w-full table-fixed border-separate border-spacing-0 text-sm text-gray-300";
+
+const thClass =
+  "pb-1.5 pr-1 text-left text-[10px] font-normal uppercase tracking-wider text-gray-500 sm:text-xs sm:tracking-wider";
+
+const tdClass = "py-1.5 pr-1 align-middle tabular-nums";
 
 /**
  * Below the sticky LOG SET area: last time this exercise was logged (any session),
@@ -45,76 +54,129 @@ export function LastSessionSetsSection({ lastWorkout }: LastSessionSetsSectionPr
 
   return (
     <div className="px-4 pb-1">
-      <div className="mt-3 border-t border-white/5 pt-3">
-        <p className="mb-2 text-xs text-neutral-500 uppercase tracking-wide dark:text-neutral-400">
-          Last session
+      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <p className="mb-2 text-xs uppercase tracking-wider text-gray-500">
+          LAST SESSION
         </p>
 
         {!lastWorkout ? (
-          <p className="text-sm leading-6 text-neutral-400 dark:text-neutral-500">
-            No previous data for this exercise
-          </p>
+          <p className="text-xs text-gray-500 italic">No previous data</p>
         ) : hasRows ? (
           <>
-            <div className="mb-1 grid grid-cols-4 gap-1 px-1 text-xs text-neutral-500 uppercase tracking-wide dark:text-neutral-500">
-              <span>#</span>
-              <span>Weight</span>
-              <span>Reps</span>
-              <span>RPE</span>
+            <div className="w-full min-w-0 overflow-x-auto">
+              <table className={tableClass}>
+                <colgroup>
+                  <col className="w-[2.25rem] sm:w-8" />
+                  <col className="min-w-0" />
+                  <col className="min-w-0" />
+                  <col className="w-[4.75rem] sm:w-[5.25rem]" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" className={thClass}>
+                      #
+                    </th>
+                    <th scope="col" className={thClass}>
+                      Weight
+                    </th>
+                    <th scope="col" className={thClass}>
+                      Reps
+                    </th>
+                    <th scope="col" className={`${thClass} pr-0`}>
+                      Effort
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleSets.map((set, i) => (
+                    <tr
+                      key={`${set.set_number}-${i}`}
+                      className="border-b border-white/[0.06] last:border-b-0"
+                    >
+                      <td className={`${tdClass} text-gray-500`}>
+                        {set.set_number}
+                      </td>
+                      <td className={`${tdClass} text-gray-300`}>
+                        <span className="block min-w-0 break-words leading-tight">
+                          {formatWeightKg(set.weight_kg)} kg
+                        </span>
+                      </td>
+                      <td className={`${tdClass} text-gray-300`}>
+                        <span className="block min-w-0 break-words leading-tight">
+                          {set.reps_completed ?? "—"}
+                        </span>
+                      </td>
+                      <td className={`${tdClass} pr-0 text-gray-400`}>
+                        <span className="block text-[11px] leading-tight normal-case">
+                          {clientEffortLabelFromStoredRpe(set.rpe) ?? "—"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {visibleSets.map((set, i) => (
-              <div
-                key={`${set.set_number}-${i}`}
-                className="grid min-h-6 grid-cols-4 gap-1 border-b border-white/[0.06] px-1 py-1 text-sm last:border-b-0"
-              >
-                <span className="tabular-nums text-neutral-500 dark:text-neutral-400">
-                  {set.set_number}
-                </span>
-                <span className="fc-text-primary tabular-nums">
-                  {formatWeightKg(set.weight_kg)} kg
-                </span>
-                <span className="fc-text-primary tabular-nums">
-                  {set.reps_completed ?? "—"}
-                </span>
-                <span className="tabular-nums text-neutral-400 dark:text-neutral-500">
-                  {set.rpe != null && set.rpe > 0 ? set.rpe : "—"}
-                </span>
-              </div>
-            ))}
             {hasMore && (
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                className="mt-2 text-left text-xs font-medium transition-opacity hover:opacity-90"
-                style={{ color: "var(--fc-accent-cyan)" }}
+                className="mt-2 text-left text-xs font-medium text-cyan-400/90 transition-opacity hover:opacity-90"
               >
                 {showAll ? "Show less" : `Show all ${totalSets} sets`}
               </button>
             )}
           </>
         ) : (
-          <>
-            <div className="mb-1 grid grid-cols-4 gap-1 px-1 text-xs text-neutral-500 uppercase tracking-wide dark:text-neutral-500">
-              <span>#</span>
-              <span>Weight</span>
-              <span>Reps</span>
-              <span>RPE</span>
-            </div>
-            <div className="grid min-h-6 grid-cols-4 gap-1 border-b border-white/[0.06] px-1 py-1 text-sm">
-              <span className="text-neutral-500 dark:text-neutral-400">—</span>
-              <span className="fc-text-primary tabular-nums">
-                {formatWeightKg(lastWorkout.weight)} kg
-              </span>
-              <span className="fc-text-primary tabular-nums">
-                {lastWorkout.reps ?? "—"}
-              </span>
-              <span className="tabular-nums text-neutral-400 dark:text-neutral-500">
-                {lastWorkout.avgRpe != null && lastWorkout.avgRpe > 0
-                  ? lastWorkout.avgRpe
-                  : "—"}
-              </span>
-            </div>
-          </>
+          <div className="w-full min-w-0 overflow-x-auto">
+            <table className={tableClass}>
+              <colgroup>
+                <col className="w-[2.25rem] sm:w-8" />
+                <col className="min-w-0" />
+                <col className="min-w-0" />
+                <col className="w-[4.75rem] sm:w-[5.25rem]" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col" className={thClass}>
+                    #
+                  </th>
+                  <th scope="col" className={thClass}>
+                    Weight
+                  </th>
+                  <th scope="col" className={thClass}>
+                    Reps
+                  </th>
+                  <th scope="col" className={`${thClass} pr-0`}>
+                    Effort
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className={`${tdClass} text-gray-500`}>—</td>
+                  <td className={`${tdClass} text-gray-300`}>
+                    <span className="block min-w-0 break-words leading-tight">
+                      {formatWeightKg(lastWorkout.weight)} kg
+                    </span>
+                  </td>
+                  <td className={`${tdClass} text-gray-300`}>
+                    <span className="block min-w-0 break-words leading-tight">
+                      {lastWorkout.reps ?? "—"}
+                    </span>
+                  </td>
+                  <td className={`${tdClass} pr-0 text-gray-400`}>
+                    <span className="block text-[11px] leading-tight normal-case">
+                      {clientEffortLabelFromStoredRpe(
+                        lastWorkout.avgRpe != null && lastWorkout.avgRpe > 0
+                          ? Math.round(lastWorkout.avgRpe)
+                          : null,
+                      ) ?? "—"}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
       <div className="h-44 shrink-0" aria-hidden />

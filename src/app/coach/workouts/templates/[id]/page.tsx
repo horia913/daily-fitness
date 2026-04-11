@@ -260,7 +260,7 @@ export default function WorkoutTemplateDetailsPage() {
         <div className="relative z-10 p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="animate-pulse space-y-6">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="fc-card-shell p-6">
                 <div className="h-8 rounded mb-4 bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="h-4 rounded w-2/3 bg-[color:var(--fc-glass-highlight)]"></div>
               </div>

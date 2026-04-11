@@ -17,7 +17,7 @@ import {
 } from "@/lib/e1rmUtils";
 import { supabase } from "@/lib/supabase";
 import VideoPlayerModal from "@/components/VideoPlayerModal";
-import ExerciseAlternativesModal from "@/components/coach/ExerciseAlternativesModal";
+import ClientExerciseAlternativesModal from "@/components/client/workout-execution/ui/ClientExerciseAlternativesModal";
 import {
   RestTimerModal,
   type RestTimerLastSet,
@@ -45,7 +45,6 @@ import { AmrapExecutor } from "./workout-execution/blocks/AmrapExecutor";
 import { EmomExecutor } from "./workout-execution/blocks/EmomExecutor";
 import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
-import { HRSetExecutor } from "./workout-execution/blocks/HRSetExecutor";
 import { SpeedWorkExecutor } from "./workout-execution/blocks/SpeedWorkExecutor";
 import { EnduranceExecutor } from "./workout-execution/blocks/EnduranceExecutor";
 
@@ -127,6 +126,7 @@ interface LiveWorkoutBlockExecutorProps {
       nextTier: unknown;
       currentMetricValue: number;
     }>,
+    context?: { prDetectedThisSync: boolean },
   ) => void;
   /** Exit workout (confirm + navigate). Passed to block layout header back control. */
   onExitWorkout?: () => void;
@@ -186,8 +186,6 @@ export default function LiveWorkoutBlockExecutor({
   const [alternativesExerciseId, setAlternativesExerciseId] = useState<
     string | null
   >(null);
-  const [allExercises, setAllExercises] = useState<any[]>([]);
-  const [loadingExercises, setLoadingExercises] = useState(false);
 
   // Rest timer modal state
   const [showRestTimer, setShowRestTimer] = useState(false);
@@ -232,58 +230,6 @@ export default function LiveWorkoutBlockExecutor({
       setShowRestTimer(true);
     }
   }, [orchestrator.shouldOpenRestTimer]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Load all exercises for alternatives modal
-  useEffect(() => {
-    const loadExercises = async () => {
-      setLoadingExercises(true);
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Get the client's coach from clients table
-        const { data: clientData, error: clientError } = await supabase
-          .from("clients")
-          .select("coach_id")
-          .eq("client_id", user.id)
-          .eq("status", "active")
-          .maybeSingle();
-
-        if (clientError) {
-          console.error("Error fetching coach:", clientError);
-          setAllExercises([]);
-          return;
-        }
-
-        if (clientData?.coach_id) {
-          const { data: exercisesData, error: exercisesError } = await supabase
-            .from("exercises")
-            .select("*")
-            .eq("coach_id", clientData.coach_id)
-            .eq("is_active", true)
-            .order("name");
-
-          if (exercisesError) {
-            console.error("Error loading exercises:", exercisesError);
-            setAllExercises([]);
-          } else {
-            setAllExercises(exercisesData || []);
-          }
-        } else {
-          setAllExercises([]);
-        }
-      } catch (error) {
-        console.error("Error in loadExercises:", error);
-        setAllExercises([]);
-      } finally {
-        setLoadingExercises(false);
-      }
-    };
-
-    loadExercises();
-  }, []);
 
   // Open video modal
   const openVideoModal = (videoUrl: string, exerciseName?: string) => {
@@ -347,15 +293,51 @@ export default function LiveWorkoutBlockExecutor({
           onWeightLogged(result.entry.exerciseId, w);
         }
       }
-      // PR notification
-      if (result.isNewPR) {
+
+      const prShownThisSync = !!(result.pr_detected && onPRDetected);
+      if (prShownThisSync && result.pr_detected) {
+        onPRDetected!(result.pr_detected);
+      } else if (
+        result.pr?.any_weight_pr ||
+        result.pr?.any_volume_pr ||
+        result.isNewPR
+      ) {
         addToast({
           title: "🎉 New Personal Record!",
-          description: "New PR achieved!",
+          description: result.pr?.message || "New PR achieved!",
           variant: "success",
           duration: 4000,
         });
       }
+      if (result.pr?.warning) {
+        addToast({
+          title: "Set Logged",
+          description: result.pr.warning,
+          variant: "default",
+          duration: 3000,
+        });
+      }
+
+      const rawAch = result.new_achievements;
+      if (
+        Array.isArray(rawAch) &&
+        rawAch.length > 0 &&
+        onAchievementsUnlocked
+      ) {
+        onAchievementsUnlocked(
+          rawAch as Array<{
+            templateId: string;
+            templateName: string;
+            templateIcon: string;
+            tier: string | null;
+            description: string;
+            nextTier: unknown;
+            currentMetricValue: number;
+          }>,
+          { prDetectedThisSync: prShownThisSync },
+        );
+      }
+
       // Replace temp id with real set_log_id in the correct block's list (by blockId so it works after navigation)
       if (result.set_log_id && result.entry.blockId) {
         setLogIdResolvedByBlockIdRef.current.get(result.entry.blockId)?.(
@@ -363,7 +345,13 @@ export default function LiveWorkoutBlockExecutor({
         );
       }
     },
-    [onE1rmUpdate, onWeightLogged, addToast],
+    [
+      onE1rmUpdate,
+      onWeightLogged,
+      addToast,
+      onPRDetected,
+      onAchievementsUnlocked,
+    ],
   );
 
   // Wire the ref so the orchestrator can call our success handler
@@ -733,7 +721,9 @@ export default function LiveWorkoutBlockExecutor({
               result.new_achievements.length > 0 &&
               onAchievementsUnlocked
             ) {
-              onAchievementsUnlocked(result.new_achievements);
+              onAchievementsUnlocked(result.new_achievements, {
+                prDetectedThisSync: !!(result.pr_detected && onPRDetected),
+              });
             }
 
             return {
@@ -1070,8 +1060,6 @@ export default function LiveWorkoutBlockExecutor({
         return <TabataExecutor {...commonProps} />;
       case "for_time":
         return <ForTimeExecutor {...commonProps} />;
-      case "hr_sets":
-        return <HRSetExecutor {...commonProps} />;
       case "speed_work":
         return <SpeedWorkExecutor {...commonProps} />;
       case "endurance":
@@ -1097,7 +1085,7 @@ export default function LiveWorkoutBlockExecutor({
         />
       )}
 
-      {/* Exercise Alternatives Modal */}
+      {/* Exercise Alternatives Modal (client read-only) */}
       {showAlternativesModal &&
         alternativesExerciseId &&
         (() => {
@@ -1108,7 +1096,7 @@ export default function LiveWorkoutBlockExecutor({
           if (!exercise) return null;
 
           return (
-            <ExerciseAlternativesModal
+            <ClientExerciseAlternativesModal
               isOpen={showAlternativesModal}
               onClose={() => {
                 setShowAlternativesModal(false);
@@ -1117,10 +1105,13 @@ export default function LiveWorkoutBlockExecutor({
               exercise={{
                 id: alternativesExerciseId,
                 name: exercise.name || "",
-                description: exercise.description || "",
-                category: (exercise as any)?.category || "",
               }}
-              allExercises={allExercises}
+              onSelect={(altId, altName) => {
+                // TODO: hook up actual exercise swap for this set
+                console.log("Selected alternative:", altId, altName);
+                setShowAlternativesModal(false);
+                setAlternativesExerciseId(null);
+              }}
             />
           );
         })()}

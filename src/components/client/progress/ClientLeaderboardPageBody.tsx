@@ -182,7 +182,7 @@ export function ClientLeaderboardPageBody({
         className={cn(
           denseLayout
             ? "border-b border-white/5 pb-4"
-            : "fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-10"
+            : "fc-card-shell p-6 sm:p-10"
         )}
       >
         <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -232,7 +232,7 @@ export function ClientLeaderboardPageBody({
           className={cn(
             denseLayout
               ? "border-b border-white/5 pb-4"
-              : "fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6"
+              : "fc-card-shell p-6"
           )}
         >
           <div className={cn("flex items-center gap-2", denseLayout ? "mb-2" : "mb-4")}>
@@ -353,7 +353,7 @@ export function ClientLeaderboardPageBody({
             })()}
           </div>
         ) : (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6 border-l-4 border-l-[color:var(--fc-accent-blue)]">
+          <div className="fc-card-shell p-6 border-l-4 border-l-[color:var(--fc-accent-blue)]">
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-xl font-bold fc-text-primary mb-1">
@@ -825,7 +825,7 @@ export function ClientLeaderboardPageBody({
             </div>
           ) : (
             <>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4">
+              <div className="fc-card-shell p-4">
                 <div className="mb-4 flex items-center gap-3">
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full fc-text-warning"
@@ -908,7 +908,7 @@ export function ClientLeaderboardPageBody({
         </>
       ) : (
         <>
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+          <div className="fc-card-shell p-6">
             <div className="mb-6 flex items-center gap-3">
               <div
                 className="flex h-12 w-12 items-center justify-center rounded-full fc-text-warning"
@@ -1051,7 +1051,7 @@ export function ClientLeaderboardPageBody({
           </div>
 
           {!denseLayout && userRank != null && userRank > 3 ? (
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+            <div className="fc-card-shell p-6">
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
                   <Trophy className="h-8 w-8 text-white" />

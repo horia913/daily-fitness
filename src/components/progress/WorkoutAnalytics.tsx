@@ -768,7 +768,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
           ← Back to Overview
         </Button>
 
-        <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
           <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
@@ -831,7 +831,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
   return (
     <div className="space-y-6">
       {/* Dashboard Header */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
@@ -879,7 +879,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       </div>
 
       {/* 1. CONSISTENCY & ACTIVITY - "Show Up" Stats */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
@@ -966,7 +966,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       </div>
 
       {/* 2. PERFORMANCE & PERSONAL RECORDS - "Level Up" Stats */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
@@ -1070,7 +1070,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       </div>
 
       {/* 3. VOLUME & WORKLOAD - "How Much" Stats */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
@@ -1139,7 +1139,7 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       </div>
 
       {/* Achievements/Badges */}
-      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] mb-24">
+      <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] mb-24">
         <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center gap-3">
             <div className="fc-icon-tile fc-icon-workouts w-10 h-10">

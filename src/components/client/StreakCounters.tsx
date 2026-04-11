@@ -71,7 +71,7 @@ export default function StreakCounters() {
   }
 
   return (
-    <div className="fc-glass fc-card fc-accent-habits relative overflow-hidden">
+    <div className="fc-card-shell fc-accent-habits relative overflow-hidden">
       <div className="pb-4 relative z-10 px-4 sm:px-6 pt-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 fc-text-primary">

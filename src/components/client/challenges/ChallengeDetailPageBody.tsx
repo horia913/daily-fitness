@@ -19,7 +19,6 @@ import {
   Flame,
   TrendingUp,
 } from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -37,7 +36,7 @@ export interface ChallengeDetailPageBodyProps {
   scoringCategories: any[];
   userId: string | undefined;
   backHref?: string;
-  /** When set, back control is a button (e.g. test page) instead of a Link. */
+  /** When set, back control uses this handler instead of navigating to backHref. */
   onBackClick?: () => void;
   cornerBadge?: React.ReactNode;
   submitModalCategory: any;
@@ -81,40 +80,43 @@ export function ChallengeDetailPageBody({
     <button
       type="button"
       onClick={onBackClick}
-      className="inline-flex items-center gap-2 fc-text-subtle hover:fc-text-primary mb-6 text-sm font-medium"
+      className="inline-flex items-center gap-2 fc-text-subtle hover:fc-text-primary mb-4 text-xs font-medium"
     >
       <ArrowLeft className="w-5 h-5" />
       Back to Challenges
     </button>
   ) : (
-    <Link
-      href={backHref}
-      className="inline-flex items-center gap-2 fc-text-subtle hover:fc-text-primary mb-6 text-sm font-medium"
+    <button
+      type="button"
+      onClick={() => {
+        window.location.href = backHref;
+      }}
+      className="inline-flex items-center gap-2 fc-text-subtle hover:fc-text-primary mb-4 text-xs font-medium"
     >
-      <ArrowLeft className="w-5 h-5" />
+      <ArrowLeft className="w-4 h-4" />
       Back to Challenges
-    </Link>
+    </button>
   );
 
   return (
-    <div className="relative z-10 mx-auto w-full max-w-4xl px-4 pb-32 pt-8 sm:px-6 lg:px-12 fc-page space-y-8">
+    <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-32 pt-6 fc-page space-y-4 overflow-x-hidden">
       {cornerBadge ? (
         <div className="fixed right-3 top-3 z-[60] sm:right-6 sm:top-4">
           {cornerBadge}
         </div>
       ) : null}
 
-      <header className="mb-8">
+      <header className="mb-4">
         {backControl}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight fc-text-primary mb-1.5 break-words">
               {challenge.name}
             </h1>
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] flex items-center gap-2">
-                <Calendar className="w-4 h-4 fc-text-warning" />
-                <span className="font-mono text-sm font-bold fc-text-primary">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="fc-glass-soft px-2.5 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)] flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 fc-text-warning shrink-0" />
+                <span className="font-mono text-xs font-bold fc-text-primary">
                   {new Date(challenge.end_date) > new Date()
                     ? "Ends " + new Date(challenge.end_date).toLocaleDateString()
                     : "Ended " +
@@ -131,7 +133,7 @@ export function ChallengeDetailPageBody({
           </div>
           <button
             type="button"
-            className="fc-glass fc-card w-12 h-12 flex items-center justify-center rounded-2xl border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-soft)] transition-colors shrink-0"
+            className="fc-card-shell w-12 h-12 flex items-center justify-center rounded-2xl border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-soft)] transition-colors shrink-0"
             aria-label="Share challenge"
             onClick={() => {
               if (typeof navigator !== "undefined" && navigator.share) {
@@ -158,7 +160,7 @@ export function ChallengeDetailPageBody({
           <GlassCard
             elevation={2}
             className={cn(
-              "fc-glass fc-card p-6 sm:p-8 rounded-2xl text-center",
+              "fc-card-shell p-6 sm:p-8 rounded-2xl text-center",
               isWinner
                 ? "border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-transparent"
                 : ""
@@ -207,7 +209,7 @@ export function ChallengeDetailPageBody({
         return userEntry ? (
           <GlassCard
             elevation={2}
-            className="fc-glass fc-card p-6 sm:p-8 rounded-2xl border-l-4 border-l-[color:var(--fc-accent-blue)]"
+            className="fc-card-shell p-6 sm:p-8 rounded-2xl border-l-4 border-l-[color:var(--fc-accent-blue)]"
           >
             <p className="text-sm font-bold uppercase tracking-widest fc-text-workouts mb-2">
               Your performance
@@ -250,7 +252,7 @@ export function ChallengeDetailPageBody({
           challenge.status === "active";
         if (!canSubmit) return null;
         return (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
             <h2 className="text-xl font-semibold fc-text-primary mb-4 flex items-center gap-2">
               <Video className="w-5 h-5" />
               Submit proof
@@ -322,7 +324,7 @@ export function ChallengeDetailPageBody({
       {challenge.description && (
         <GlassCard
           elevation={2}
-          className="fc-glass fc-card rounded-2xl overflow-hidden"
+          className="fc-card-shell overflow-hidden"
         >
           <details className="group">
             <summary className="flex justify-between items-center p-6 cursor-pointer list-none hover:bg-[color:var(--fc-glass-highlight)] transition-colors">
@@ -363,7 +365,7 @@ export function ChallengeDetailPageBody({
         const isEndingSoon = daysLeft <= 3;
 
         return (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase tracking-widest fc-text-dim flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
@@ -424,7 +426,7 @@ export function ChallengeDetailPageBody({
           <Trophy className="w-6 h-6 fc-text-workouts" />
           Leaderboard
         </h2>
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+        <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
           {leaderboard.length > 0 && (
             <p className="text-sm fc-text-subtle mb-4">
               {leaderboard.length} participants
@@ -540,7 +542,7 @@ export function ChallengeDetailPageBody({
         open={!!submitModalCategory}
         onOpenChange={(open) => !open && setSubmitModalCategory(null)}
       >
-        <DialogContent className="fc-glass fc-card border border-[color:var(--fc-glass-border)] max-w-md">
+        <DialogContent className="fc-card-shell border border-[color:var(--fc-glass-border)] max-w-md">
           <DialogHeader>
             <DialogTitle>
               Submit proof — {submitModalCategory?.category_name}

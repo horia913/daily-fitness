@@ -84,7 +84,6 @@ export interface ProgramProgressionRule {
   time_cap_minutes?: number | null
   rest_after_exercise?: number | null
   
-  // HR-specific fields (for hr_sets block type)
   hr_zone?: number | null
   hr_percentage_min?: number | null
   hr_percentage_max?: number | null
@@ -607,7 +606,6 @@ export class ProgramProgressionService {
     const dropSetBlockIds: string[] = []
     const clusterSetBlockIds: string[] = []
     const restPauseBlockIds: string[] = []
-    const hrSetBlockIds: string[] = []
     const speedSetBlockIds: string[] = []
     const enduranceSetBlockIds: string[] = []
     
@@ -627,9 +625,6 @@ export class ProgramProgressionService {
           if (firstRule.set_type === 'rest_pause') {
             restPauseBlockIds.push(firstRule.set_entry_id)
           }
-          if (firstRule.set_type === 'hr_sets') {
-            hrSetBlockIds.push(firstRule.set_entry_id)
-          }
           if (firstRule.set_type === 'speed_work') {
             speedSetBlockIds.push(firstRule.set_entry_id)
           }
@@ -646,7 +641,6 @@ export class ProgramProgressionService {
     const dropSetsByBlock = new Map<string, any[]>()
     const clusterSetsByBlock = new Map<string, any[]>()
     const restPauseSetsByBlock = new Map<string, any[]>()
-    const hrSetsByBlock = new Map<string, any[]>()
     const speedSetsByBlock = new Map<string, any[]>()
     const enduranceSetsByBlock = new Map<string, any[]>()
 
@@ -733,23 +727,6 @@ export class ProgramProgressionService {
       )
     }
 
-    if (hrSetBlockIds.length > 0) {
-      queryPromises.push(
-        safeQuery(
-          supabase
-            .from('workout_hr_sets')
-            .select(
-              'id, set_entry_id, exercise_id, exercise_order, hr_zone, hr_percentage_min, hr_percentage_max, is_intervals, duration_seconds, work_duration_seconds, rest_duration_seconds, target_rounds, distance_meters'
-            )
-            .in('set_entry_id', hrSetBlockIds)
-        ).then(data => {
-          data.forEach((hr: any) => {
-            if (!hrSetsByBlock.has(hr.set_entry_id)) hrSetsByBlock.set(hr.set_entry_id, [])
-            hrSetsByBlock.get(hr.set_entry_id)!.push(hr)
-          })
-        })
-      )
-    }
 
     if (speedSetBlockIds.length > 0) {
       queryPromises.push(
@@ -824,9 +801,6 @@ export class ProgramProgressionService {
       const blockRestPauseSets = firstRule.set_entry_id
         ? restPauseSetsByBlock.get(firstRule.set_entry_id) || []
         : []
-      const blockHrSets = firstRule.set_entry_id
-        ? hrSetsByBlock.get(firstRule.set_entry_id) || []
-        : []
       const blockSpeedSets = firstRule.set_entry_id
         ? speedSetsByBlock.get(firstRule.set_entry_id) || []
         : []
@@ -853,13 +827,6 @@ export class ProgramProgressionService {
           )
           const exerciseRestPauseSets = blockRestPauseSets.filter((rp: any) =>
             ProgramProgressionService.specialTableRowMatchesProgressionRule(rp, rule)
-          )
-
-          const matchedHr = blockHrSets.filter((hr: any) =>
-            ProgramProgressionService.specialTableRowMatchesProgressionRule(hr, rule)
-          )
-          let exerciseHrSets = matchedHr.map((row: any) =>
-            ProgramProgressionService.mergeHrRowWithRule(row, rule)
           )
 
           const matchedSpeed = blockSpeedSets.filter((sp: any) =>
@@ -906,7 +873,6 @@ export class ProgramProgressionService {
             drop_sets: exerciseDropSets,
             cluster_sets: exerciseClusterSets,
             rest_pause_sets: exerciseRestPauseSets,
-            hr_sets: exerciseHrSets,
             speed_sets: exerciseSpeedSets,
             endurance_sets: exerciseEnduranceSets,
             exercise: exercise ? {
@@ -954,7 +920,6 @@ export class ProgramProgressionService {
         drop_sets: blockDropSets,
         cluster_sets: blockClusterSets,
         rest_pause_sets: blockRestPauseSets,
-        hr_sets: blockExercises.flatMap((ex) => (ex as any).hr_sets ?? []),
         speed_sets: blockExercises.flatMap((ex) => (ex as any).speed_sets ?? []),
         endurance_sets: blockExercises.flatMap((ex) => (ex as any).endurance_sets ?? []),
         exercises: blockExercises.map(ex => ({
@@ -1363,26 +1328,6 @@ export class ProgramProgressionService {
               notes: exercise.notes || undefined,
             })
           }
-        }
-        break
-
-      case 'hr_sets':
-        for (const exercise of block.exercises) {
-          const hr = (exercise as any).hr_sets?.[0]
-          rules.push({
-            ...baseRule,
-            exercise_id: exercise.exercise_id,
-            exercise_order: exercise.exercise_order,
-            hr_zone: hr?.hr_zone ?? undefined,
-            hr_percentage_min: hr?.hr_percentage_min ?? undefined,
-            hr_percentage_max: hr?.hr_percentage_max ?? undefined,
-            hr_duration_seconds: hr?.duration_seconds ?? undefined,
-            hr_work_duration_seconds: hr?.work_duration_seconds ?? undefined,
-            hr_rest_duration_seconds: hr?.rest_duration_seconds ?? undefined,
-            hr_target_rounds: hr?.target_rounds ?? undefined,
-            hr_distance_meters: hr?.distance_meters ?? undefined,
-            notes: exercise.notes || undefined,
-          })
         }
         break
 

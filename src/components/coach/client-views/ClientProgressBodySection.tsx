@@ -304,7 +304,7 @@ export default function ClientProgressBodySection({
         )}
 
       {weightSparkData.length >= 2 && (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <div className="fc-card-shell p-6">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Weight trend (last 12 weeks)</h3>
           <div className="flex items-end gap-0.5 h-12">
             {weightSparkData.map((m) => {

@@ -97,7 +97,7 @@ export function CheckInConfigEditor({ coachId, clientId, onSaved }: CheckInConfi
   }
 
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+    <div className="fc-card-shell p-6">
       <h3 className="text-lg font-semibold fc-text-primary mb-4">Scheduled Check-In settings</h3>
       <div className="space-y-4">
         <div>

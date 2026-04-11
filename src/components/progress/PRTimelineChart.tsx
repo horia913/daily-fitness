@@ -112,7 +112,7 @@ export function PRTimelineChart({
     return (
       <div
         className={cn(
-          "fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6",
+          "fc-card-shell p-6",
           className
         )}
       >

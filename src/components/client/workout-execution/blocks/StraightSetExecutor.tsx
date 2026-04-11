@@ -6,17 +6,26 @@ import {
   CheckCircle,
   MoreVertical,
   Pencil,
-  Calculator,
+  Target,
+  Repeat2,
+  Timer,
+  Weight,
+  Gauge,
+  Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
 import {
   BaseBlockExecutorLayout,
   formatLoadPercentage,
   calculateSuggestedWeightUtil,
+  formatRestSeconds,
 } from "../BaseBlockExecutor";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
+import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LoggedSet } from "@/types/workoutBlocks";
 import {
   getWeightDefaultAndSuggestion,
@@ -85,7 +94,9 @@ export function StraightSetExecutor({
   /** Visual feedback: green flash on Log Set button */
   const [showLogSuccessFlash, setShowLogSuccessFlash] = useState(false);
   /** Track newly logged set IDs for slide-in animation */
-  const [newlyLoggedSetIds, setNewlyLoggedSetIds] = useState<Set<string>>(new Set());
+  const [newlyLoggedSetIds, setNewlyLoggedSetIds] = useState<Set<string>>(
+    new Set(),
+  );
   // Use exercise.sets if available, otherwise fall back to block.total_sets, then default to 1
   const totalSets =
     currentExercise?.sets !== null && currentExercise?.sets !== undefined
@@ -156,6 +167,11 @@ export function StraightSetExecutor({
     setIsWeightPristine(true);
   }, [completedSets, currentExerciseIndex, exerciseId]);
 
+  const prescribedRepsRaw =
+    currentExercise?.reps ?? block.block.reps_per_set ?? null;
+  const { numericDefault: prescribedRepsDefault, displayHint: repsRangeHint } =
+    parseRepsTarget(prescribedRepsRaw);
+
   useEffect(() => {
     if (viewingSetIndex >= 1) return; // don't overwrite when viewing a previous set
     if (!isWeightPristine) return;
@@ -164,11 +180,14 @@ export function StraightSetExecutor({
     } else {
       setWeight("");
     }
-    setReps("");
+    setReps(
+      prescribedRepsDefault > 0 ? String(prescribedRepsDefault) : "",
+    );
   }, [
     viewingSetIndex,
     isWeightPristine,
     default_weight,
+    prescribedRepsDefault,
     completedSets,
     currentExerciseIndex,
     exerciseId,
@@ -357,24 +376,22 @@ export function StraightSetExecutor({
     }
   };
 
-  // Get block details for display
-  const blockDetails: BlockDetail[] = [
+  const restSec =
+    currentExercise?.rest_seconds ?? block.block.rest_seconds ?? 60;
+  const repsDisplay =
+    currentExercise?.reps ?? block.block.reps_per_set ?? "—";
+
+  const prescriptionItems: PrescriptionItem[] = [
+    { icon: Target, label: "Sets", value: totalSets },
+    { icon: Repeat2, label: "Reps", value: repsDisplay },
     {
-      label: "SETS",
-      value: totalSets,
-    },
-    {
-      label: "REPS",
-      value: currentExercise?.reps || block.block.reps_per_set || "-",
-    },
-    {
-      label: "REST",
-      value: currentExercise?.rest_seconds || block.block.rest_seconds || 60,
+      icon: Timer,
+      label: "Rest",
+      value: formatRestSeconds(restSec),
       unit: "s",
     },
   ];
 
-  // Add LOAD if available (display only; suggestion chip shown separately when default_weight is null)
   const loadPercentageDisplay = currentExercise?.load_percentage;
   if (
     loadPercentageDisplay !== null &&
@@ -388,24 +405,25 @@ export function StraightSetExecutor({
       suggestedForDisplay,
     );
     if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD",
+      prescriptionItems.push({
+        icon: Weight,
+        label: "Load",
         value: loadDisplay,
       });
     }
   }
 
-  // Add TEMPO if available
   if (currentExercise?.tempo) {
-    blockDetails.push({
-      label: "TEMPO",
+    prescriptionItems.push({
+      icon: Gauge,
+      label: "Tempo",
       value: currentExercise.tempo,
     });
   }
 
-  // Prescribed difficulty: DB column `rir` holds RPE (1–10)
   if (currentExercise?.rir !== null && currentExercise?.rir !== undefined) {
-    blockDetails.push({
+    prescriptionItems.push({
+      icon: Flame,
       label: "RPE",
       value:
         formatPrescribedRpeLabel(currentExercise.rir) ??
@@ -770,66 +788,54 @@ export function StraightSetExecutor({
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <div className="relative">
-              <LargeInput
-                label="Weight"
-                value={editDraft ? editDraft.weight : weight}
-                onChange={(val) => {
-                  if (editDraft) {
-                    setEditDraft((d) => (d ? { ...d, weight: val } : null));
-                  } else {
-                    setIsWeightPristine(false);
-                    setWeight(val);
-                  }
-                }}
-                placeholder="0"
-                step="0.5"
-                unit="kg"
-                showStepper
-                stepAmount={2.5}
-              />
-              {onPlateCalculatorClick && (
-                <button
-                  type="button"
-                  onClick={() => onPlateCalculatorClick()}
-                  className="absolute right-2 top-[1.75rem] p-1.5 rounded-lg transition-colors hover:bg-white/10 focus:outline-none focus:ring-2"
-                  style={{ color: "var(--fc-domain-workouts)" }}
-                  title="Plate Calculator"
-                  aria-label="Open plate calculator"
-                >
-                  <Calculator className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {!editDraft &&
-              coachSuggestedWeight != null &&
-              coachSuggestedWeight > 0 && (
-                <ApplySuggestedWeightButton
-                  suggestedKg={coachSuggestedWeight}
-                  onApply={() => {
-                    setWeight(String(coachSuggestedWeight));
-                    setIsWeightPristine(false);
-                  }}
-                />
-              )}
-          </div>
+        <div className="space-y-2">
           <LargeInput
-            label="Reps"
-            value={editDraft ? editDraft.reps : reps}
+            label="Weight"
+            value={editDraft ? editDraft.weight : weight}
             onChange={(val) => {
               if (editDraft) {
-                setEditDraft((d) => (d ? { ...d, reps: val } : null));
+                setEditDraft((d) => (d ? { ...d, weight: val } : null));
               } else {
-                setReps(val);
+                setIsWeightPristine(false);
+                setWeight(val);
               }
             }}
             placeholder="0"
-            step="1"
+            step="0.5"
+            unit="kg"
             showStepper
-            stepAmount={1}
+            stepAmount={2.5}
+            plateCalculatorEnabled
           />
+          {!editDraft &&
+            coachSuggestedWeight != null &&
+            coachSuggestedWeight > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedWeight}
+                onApply={() => {
+                  setWeight(String(coachSuggestedWeight));
+                  setIsWeightPristine(false);
+                }}
+              />
+            )}
         </div>
+        <LargeInput
+          label="Reps"
+          hint={!editDraft ? repsRangeHint ?? undefined : undefined}
+          value={editDraft ? editDraft.reps : reps}
+          onChange={(val) => {
+            if (editDraft) {
+              setEditDraft((d) => (d ? { ...d, reps: val } : null));
+            } else {
+              setReps(val);
+            }
+          }}
+          placeholder="0"
+          step="1"
+          showStepper
+          stepAmount={1}
+        />
+      </div>
     </div>
   );
 
@@ -839,6 +845,16 @@ export function StraightSetExecutor({
 
   // Edit mode: Save edits + Cancel (non-destructive until Save)
   const isEditMode = !!editingSetId && !!editDraft;
+  const logInputsReady =
+    !isLoggingSet &&
+    completedSets < totalSets &&
+    weight.trim() !== "" &&
+    !isNaN(parseFloat(weight)) &&
+    parseFloat(weight) > 0 &&
+    reps.trim() !== "" &&
+    !isNaN(parseInt(reps, 10)) &&
+    parseInt(reps, 10) > 0;
+
   const logButton = isEditMode ? (
     <div className="flex gap-2 w-full">
       <Button
@@ -876,26 +892,12 @@ export function StraightSetExecutor({
       Edit this set
     </Button>
   ) : (
-    <Button
+    <LogSetButton
       onClick={handleLog}
-      disabled={
-        isLoggingSet ||
-        completedSets >= totalSets ||
-        !weight ||
-        weight.trim() === "" ||
-        isNaN(parseFloat(weight)) ||
-        parseFloat(weight) < 0 ||
-        !reps ||
-        reps.trim() === "" ||
-        isNaN(parseInt(reps)) ||
-        parseInt(reps) <= 0
-      }
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
-    >
-      <CheckCircle className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG SET"}
-    </Button>
+      ready={logInputsReady}
+      loading={isLoggingSet}
+      label="Log set"
+    />
   );
 
   return (
@@ -925,13 +927,14 @@ export function StraightSetExecutor({
           previousPerformanceMap,
         }}
         exerciseName={currentExercise?.exercise?.name || "Exercise"}
-        blockDetails={blockDetails}
+        prescriptionItems={prescriptionItems}
         instructions={instructions}
         currentSet={displaySetNumber}
         totalSets={totalSets}
         progressLabel="Set"
         loggingInputs={loggingInputs}
         logButton={logButton}
+        logSectionTitle={`LOG SET ${displaySetNumber}`}
         showNavigation={true}
         currentExercise={currentExercise}
         showRestTimer={
@@ -939,7 +942,10 @@ export function StraightSetExecutor({
         }
         progressionSuggestion={progressionSuggestion}
         onApplySuggestion={(w, r) => {
-          if (w != null) { setWeight(String(w)); setIsWeightPristine(false); }
+          if (w != null) {
+            setWeight(String(w));
+            setIsWeightPristine(false);
+          }
           if (r != null) setReps(String(r));
         }}
         onWorkoutBack={onWorkoutBack}

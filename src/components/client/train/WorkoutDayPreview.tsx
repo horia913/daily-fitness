@@ -31,7 +31,6 @@ const SET_TYPE_LABELS: Record<string, string> = {
   emom: "EMOM",
   tabata: "Tabata",
   for_time: "For Time",
-  hr_sets: "HR Sets",
   speed_work: "Speed Work",
   endurance: "Endurance",
 };

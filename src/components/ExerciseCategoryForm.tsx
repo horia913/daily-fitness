@@ -155,7 +155,7 @@ export default function ExerciseCategoryForm({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div 
-        className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+        className={`relative ${theme.card} fc-card-shell shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
         style={{
           maxWidth: 'min(95vw, 40rem)',
           height: 'min(88vh, calc(100vh - 4rem))',

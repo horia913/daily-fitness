@@ -115,7 +115,7 @@ export default function ExerciseSetForm({ isOpen, onClose, onSuccess, exercise, 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-start p-4">
       <div className="w-full max-w-sm" style={{maxWidth: '400px'}}>
-        <Card className="fc-glass fc-card border border-slate-200 dark:border-slate-700 w-full h-screen overflow-y-auto rounded-lg">
+        <Card className="fc-card-shell border border-slate-200 dark:border-slate-700 w-full h-screen overflow-y-auto rounded-lg">
           <CardHeader className="p-4">
             <div className="flex items-center justify-between">
               <div>

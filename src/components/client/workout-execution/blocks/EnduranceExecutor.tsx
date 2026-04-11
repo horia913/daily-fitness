@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Footprints } from "lucide-react";
+import { Route, Activity, Heart, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { BlockDetail, BaseBlockExecutorProps } from "../types";
+import { BaseBlockExecutorProps } from "../types";
+import type { PrescriptionItem } from "../ui/PrescriptionCard";
+import { LogSetButton } from "../ui/LogSetButton";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
@@ -74,7 +75,9 @@ export function EnduranceExecutor({
   const targetPaceSec = endRow?.target_pace_seconds_per_km ?? null;
   const hrZone = endRow?.hr_zone ?? null;
   const hrPct =
-    endRow?.target_hr_pct ?? (endRow as { hr_percentage?: number | null })?.hr_percentage ?? null;
+    endRow?.target_hr_pct ??
+    (endRow as { hr_percentage?: number | null })?.hr_percentage ??
+    null;
 
   const [distanceKmStr, setDistanceKmStr] = useState("");
   const [timeMmss, setTimeMmss] = useState("");
@@ -103,6 +106,16 @@ export function EnduranceExecutor({
 
   const completed = loggedSetsList.length >= 1;
 
+  useEffect(() => {
+    if (completed) return;
+    if (targetDistM > 0) {
+      setDistanceKmStr(String(Number((targetDistM / 1000).toFixed(2))));
+    }
+    if (targetTimeSec != null && targetTimeSec > 0) {
+      setTimeMmss(formatTimeProp(targetTimeSec));
+    }
+  }, [completed, targetDistM, targetTimeSec, formatTimeProp]);
+
   const actualPaceSec = useMemo(() => {
     const km = parseFloat(distanceKmStr);
     const t = parseMmssToSeconds(timeMmss);
@@ -110,33 +123,59 @@ export function EnduranceExecutor({
     return t / km;
   }, [distanceKmStr, timeMmss]);
 
-  const blockDetails: BlockDetail[] = [];
+  const prescriptionItems: PrescriptionItem[] = [];
   if (targetDistM > 0) {
-    blockDetails.push({
-      label: "DISTANCE",
-      value: `${(targetDistM / 1000).toFixed(2)} km`,
-    });
-  }
-  if (targetTimeSec != null && targetTimeSec > 0) {
-    blockDetails.push({
-      label: "TARGET TIME",
-      value: formatTimeProp(targetTimeSec),
+    prescriptionItems.push({
+      icon: Route,
+      label: "Distance",
+      value: Number((targetDistM / 1000).toFixed(2)),
+      unit: "km",
     });
   }
   if (targetPaceSec != null && targetPaceSec > 0) {
-    blockDetails.push({
-      label: "TARGET PACE",
+    prescriptionItems.push({
+      icon: Activity,
+      label: "Pace",
       value: formatPaceMinSecPerKm(targetPaceSec),
     });
   }
   if (hrZone != null) {
-    blockDetails.push({ label: "HR ZONE", value: `Zone ${hrZone}` });
+    prescriptionItems.push({
+      icon: Heart,
+      label: "Zone",
+      value: `Zone ${hrZone}`,
+    });
   } else if (hrPct != null) {
-    blockDetails.push({ label: "HR", value: `${hrPct}% max` });
+    prescriptionItems.push({
+      icon: Heart,
+      label: "HR",
+      value: hrPct,
+      unit: "% max",
+    });
+  }
+  if (targetTimeSec != null && targetTimeSec > 0) {
+    prescriptionItems.push({
+      icon: Clock,
+      label: "Target time",
+      value: formatTimeProp(targetTimeSec),
+    });
   }
 
   const instructions =
-    currentExercise?.notes || block.block.set_notes || endRow?.notes || undefined;
+    currentExercise?.notes ||
+    block.block.set_notes ||
+    endRow?.notes ||
+    undefined;
+
+  const kmPreview = parseFloat(distanceKmStr);
+  const tPreview = parseMmssToSeconds(timeMmss);
+  const enduranceLogReady =
+    !isLoggingSet &&
+    !completed &&
+    Number.isFinite(kmPreview) &&
+    kmPreview > 0 &&
+    tPreview != null &&
+    tPreview > 0;
 
   const handleLog = async () => {
     if (!currentExercise?.exercise_id || isLoggingSet || completed) return;
@@ -179,7 +218,12 @@ export function EnduranceExecutor({
       if (hrNum != null && Number.isFinite(hrNum)) {
         logData.actual_hr_avg = hrNum;
       }
-      if (rpeNum != null && !Number.isNaN(rpeNum) && rpeNum >= 1 && rpeNum <= 10) {
+      if (
+        rpeNum != null &&
+        !Number.isNaN(rpeNum) &&
+        rpeNum >= 1 &&
+        rpeNum <= 10
+      ) {
         logData.rpe = rpeNum;
       }
 
@@ -196,9 +240,7 @@ export function EnduranceExecutor({
           ...(hrNum != null && Number.isFinite(hrNum)
             ? { actual_hr_avg: hrNum }
             : {}),
-          ...(rpeNum != null && !Number.isNaN(rpeNum)
-            ? { rpe: rpeNum }
-            : {}),
+          ...(rpeNum != null && !Number.isNaN(rpeNum) ? { rpe: rpeNum } : {}),
           completed_at: new Date(),
         } as LoggedSet;
         onSetLogUpsert?.(block.block.id, loggedSet);
@@ -211,14 +253,13 @@ export function EnduranceExecutor({
     }
   };
 
-  const exerciseName =
-    currentExercise?.exercise?.name || "Endurance";
+  const exerciseName = currentExercise?.exercise?.name || "Endurance";
 
   return (
     <BaseBlockExecutorLayout
       block={block}
       exerciseName={exerciseName}
-      blockDetails={blockDetails}
+      prescriptionItems={prescriptionItems}
       instructions={instructions}
       onVideoClick={onVideoClick}
       onAlternativesClick={onAlternativesClick}
@@ -240,13 +281,14 @@ export function EnduranceExecutor({
       loggingInputs={
         <div className="space-y-4">
           {completed && loggedSetsList[0] && (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm">
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-sm">
               <p className="font-medium">Last effort</p>
               <p className="tabular-nums text-muted-foreground">
                 {(
                   (loggedSetsList[0].actual_distance_meters ?? 0) / 1000
                 ).toFixed(2)}{" "}
-                km · {formatTimeProp(loggedSetsList[0].actual_time_seconds ?? 0)}
+                km ·{" "}
+                {formatTimeProp(loggedSetsList[0].actual_time_seconds ?? 0)}
                 {loggedSetsList[0].actual_speed_kmh != null
                   ? ` · ${loggedSetsList[0].actual_speed_kmh.toFixed(2)} km/h`
                   : ""}
@@ -313,25 +355,14 @@ export function EnduranceExecutor({
         </div>
       }
       logButton={
-        <Button
-          type="button"
-          variant="fc-primary"
-          className="h-12 w-full rounded-xl text-base font-bold uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isLoggingSet || completed}
+        <LogSetButton
           onClick={handleLog}
-        >
-          {completed ? (
-            "Logged"
-          ) : isLoggingSet ? (
-            "Saving…"
-          ) : (
-            <>
-              <Footprints className="mr-2 h-5 w-5" />
-              Log effort
-            </>
-          )}
-        </Button>
+          ready={enduranceLogReady}
+          loading={isLoggingSet}
+          label={completed ? "Logged" : "Log effort"}
+        />
       }
+      logSectionTitle="LOG YOUR EFFORT"
       currentSet={1}
       totalSets={1}
       currentExercise={currentExercise as any}

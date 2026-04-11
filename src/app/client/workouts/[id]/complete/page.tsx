@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import {
@@ -128,7 +128,6 @@ interface BlockGroup {
 
 function WorkoutCompleteContent() {
   const params = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const assignmentId = params.id as string;
   const { addToast } = useToast();
@@ -884,7 +883,7 @@ function WorkoutCompleteContent() {
     // Idempotent: if assignment is already completed, just navigate
     if (assignment.status === "completed") {
       console.log("[COMPLETE-FLOW] navigating after completion (already completed)");
-      router.push("/client/train");
+      window.location.href = "/client/train";
       return;
     }
 
@@ -925,7 +924,7 @@ function WorkoutCompleteContent() {
 
       console.log("[COMPLETE-FLOW] API response", { status: "success" });
       console.log("[COMPLETE-FLOW] navigating after completion");
-      router.push("/client/train");
+      window.location.href = "/client/train";
     } catch (error) {
       console.log("[COMPLETE-FLOW] API response", { status: "error", error: (error as Error)?.message });
       console.error("❌ Error completing workout:", error);
@@ -1211,19 +1210,6 @@ function WorkoutCompleteContent() {
                 (duration: {Math.floor(set.tabata_total_duration_sec / 60)}:{(set.tabata_total_duration_sec % 60).toString().padStart(2, '0')})
               </span>
             )}
-          </div>
-        );
-
-      case "hr_sets":
-        const hrExerciseName = set.exercise_id
-          ? exerciseNames.get(set.exercise_id) || "Exercise"
-          : "Exercise";
-        return (
-          <div className="text-sm">
-            <span className="font-semibold">
-              • {hrExerciseName} - Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
-              {set.reps || 0} reps
-            </span>
           </div>
         );
 
@@ -1563,7 +1549,7 @@ function WorkoutCompleteContent() {
                 </PrimaryButton>
                 <SecondaryButton
                   className="w-auto"
-                  onClick={() => router.push("/client/train")}
+                  onClick={() => { window.location.href = "/client/train"; }}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Workouts
@@ -1591,7 +1577,7 @@ function WorkoutCompleteContent() {
               <div className="mt-6 flex justify-center">
                 <SecondaryButton
                   className="w-auto"
-                  onClick={() => router.push("/client/train")}
+                  onClick={() => { window.location.href = "/client/train"; }}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Workouts
@@ -2054,7 +2040,7 @@ function WorkoutCompleteContent() {
             <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
               <div className="max-w-2xl mx-auto">
                 <PrimaryButton
-                  onClick={() => router.push("/client")}
+                  onClick={() => { window.location.href = "/client"; }}
                   disabled={completing}
                   className="h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
                 >

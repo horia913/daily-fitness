@@ -29,7 +29,7 @@ export default function ClientProgressMergedPage() {
 
   return (
     <div className="space-y-6">
-      <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-6 lg:p-10">
+      <GlassCard elevation={2} className="fc-card-shell p-4 sm:p-6 lg:p-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="flex gap-3 min-w-0 flex-1">
             <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">

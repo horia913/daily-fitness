@@ -722,7 +722,7 @@ function NutritionDashboardContent() {
         {loadingMeals ? (
           <div className="space-y-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="fc-surface rounded-2xl p-6 animate-pulse">
+              <div key={i} className="fc-card-shell p-6 animate-pulse">
                 <div className="h-4 rounded w-1/2 mb-4" style={{ background: "var(--fc-surface-sunken)" }} />
                 <div className="h-24 rounded" style={{ background: "var(--fc-surface-sunken)" }} />
               </div>
@@ -1051,7 +1051,7 @@ function NutritionDashboardContent() {
               <button
                 type="button"
                 onClick={() => setNutritionTrendsOpen((o) => !o)}
-                className="w-full fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4 flex items-center justify-between gap-3 text-left"
+                className="w-full fc-card-shell backdrop-blur-[8px] p-4 flex items-center justify-between gap-3 text-left"
               >
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />

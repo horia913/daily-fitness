@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-type CardVariant = "default" | "fc"
+type CardVariant = "default" | "fc" | "shell"
 
 function Card({
   className,
@@ -11,8 +11,10 @@ function Card({
 }: React.ComponentProps<"div"> & { variant?: CardVariant }) {
   const baseClass =
     variant === "fc"
-      ? "fc-glass fc-card text-white"
-      : "bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border py-6 shadow-sm"
+      ? "fc-card-shell text-[color:var(--fc-text-primary)]"
+      : variant === "shell"
+        ? "fc-card-shell text-[color:var(--fc-text-primary)] flex flex-col gap-6 py-6"
+        : "bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border py-6 shadow-sm"
 
   return (
     <div

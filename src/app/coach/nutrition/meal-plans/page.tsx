@@ -139,7 +139,7 @@ export default function MealPlansPage() {
               Back to Nutrition
             </Link>
 
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+            <div className="fc-card-shell p-6 sm:p-10">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex items-start gap-4">
                   <div
@@ -186,7 +186,7 @@ export default function MealPlansPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              <div className="sticky top-0 z-10 flex-1 fc-glass fc-card p-2 rounded-xl border border-[color:var(--fc-glass-border)]">
+              <div className="sticky top-0 z-10 flex-1 fc-card-shell p-2 rounded-xl border border-[color:var(--fc-glass-border)]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 fc-text-dim" />
                   <Input

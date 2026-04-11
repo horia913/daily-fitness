@@ -83,7 +83,7 @@ export default function CoachDashboardHeader() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Active Clients */}
-          <div className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)]">
+          <div className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-4">
               <div className="fc-icon-tile fc-icon-workouts">
                 <Users className="w-6 h-6" />
@@ -100,7 +100,7 @@ export default function CoachDashboardHeader() {
           </div>
 
           {/* Today's Sessions */}
-          <div className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)]">
+          <div className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-4">
               <div className="fc-icon-tile fc-icon-workouts">
                 <Calendar className="w-6 h-6" />
@@ -117,7 +117,7 @@ export default function CoachDashboardHeader() {
           </div>
 
           {/* Workouts Created */}
-          <div className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)]">
+          <div className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-4">
               <div className="fc-icon-tile fc-icon-workouts">
                 <TrendingUp className="w-6 h-6" />

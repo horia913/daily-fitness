@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 const createMockQueryBuilder = (initialData: any = null) => {
   let data = initialData;
 
-  const builder = {
+  const builder: any = {
     select: jest.fn(() => builder),
     insert: jest.fn((insertData: any) => {
       data = Array.isArray(insertData) ? insertData[0] : insertData;

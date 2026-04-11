@@ -1,0 +1,40 @@
+/* BiggestWinCard — calm, visible breathing glow */
+
+.bwiBreatheAmber {
+  will-change: box-shadow;
+  animation: bwiBreatheAmberKF 6s ease-in-out infinite alternate;
+}
+
+@keyframes bwiBreatheAmberKF {
+  from {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.18);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%);
+  }
+  to {
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.32);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, transparent 100%);
+  }
+}
+
+.bwiBreatheCyan {
+  will-change: box-shadow;
+  animation: bwiBreatheCyanKF 6s ease-in-out infinite alternate;
+}
+
+@keyframes bwiBreatheCyanKF {
+  from {
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.15);
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.06) 0%, transparent 100%);
+  }
+  to {
+    box-shadow: 0 0 35px rgba(34, 211, 238, 0.28);
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.12) 0%, transparent 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bwiBreatheAmber,
+  .bwiBreatheCyan {
+    animation: none !important;
+  }
+}

@@ -3,6 +3,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+export type AppCardShellTone = "neutral" | "success" | "error" | "warning" | "info";
+
+const toneModifier: Record<Exclude<AppCardShellTone, "neutral">, string> = {
+  success: "fc-card-shell--success",
+  error: "fc-card-shell--error",
+  warning: "fc-card-shell--warning",
+  info: "fc-card-shell--info",
+};
+
 export interface AppCardProps {
   /** Small label above title: category, type, or status. Max ~5 words. */
   eyebrow?: string;
@@ -19,12 +28,24 @@ export interface AppCardProps {
   /** Makes the whole card clickable and adds hover rise. */
   onClick?: () => void;
   className?: string;
-  /** Optional status for future styling (e.g. inactive, logged). */
+  /** Optional status for styling (maps to shell tone when `shellTone` omitted). */
   status?: "active" | "completed" | "inactive" | "logged" | "not_logged";
-  /** Coach = glass surface; client = solid surface. */
+  /** Coach / client kept for footer divider tokens; both use the same shell chrome. */
   variant?: "coach" | "client";
-  /** CSS color for 3px left accent bar (e.g. "var(--fc-accent-cyan)"). */
+  /** Overrides left accent color (4px bar); wins over semantic tone border. */
   accentColor?: string;
+  /** Explicit shell tint; overrides status-derived tone when set. */
+  shellTone?: AppCardShellTone;
+}
+
+function statusToShellTone(
+  status: AppCardProps["status"]
+): AppCardShellTone | undefined {
+  if (!status) return undefined;
+  if (status === "completed" || status === "logged") return "success";
+  if (status === "inactive") return "warning";
+  if (status === "not_logged") return "error";
+  return "neutral";
 }
 
 export function AppCard({
@@ -38,11 +59,12 @@ export function AppCard({
   className,
   variant = "coach",
   accentColor,
+  shellTone,
+  status,
 }: AppCardProps) {
-  const surfaceClass =
-    variant === "coach"
-      ? "fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]"
-      : "fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)]";
+  const resolvedTone = shellTone ?? statusToShellTone(status) ?? "neutral";
+  const shellToneClass =
+    resolvedTone !== "neutral" ? toneModifier[resolvedTone] : undefined;
 
   const isInteractive = typeof onClick === "function";
 
@@ -62,11 +84,10 @@ export function AppCard({
           : undefined
       }
       className={cn(
-        surfaceClass,
-        "overflow-hidden transition-all duration-200",
+        "fc-card-shell overflow-hidden transition-all duration-200",
+        shellToneClass,
         isInteractive && "cursor-pointer fc-hover-rise",
-        "hover:border-[color:var(--fc-glass-border-strong)] hover:shadow-[var(--fc-shadow-card)]",
-        accentColor && "border-l-[3px]",
+        "hover:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]",
         className
       )}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}

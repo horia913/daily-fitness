@@ -117,10 +117,15 @@
   -webkit-touch-callout: none;
 }
 
+/* Do not set -webkit-appearance: none on native <select>: iOS Safari often
+   fails to open the picker (tap appears to do nothing). Inputs/textareas OK. */
 .ios-device input,
-.ios-device textarea,
-.ios-device select {
+.ios-device textarea {
   -webkit-appearance: none;
+  border-radius: 0.875rem;
+}
+
+.ios-device select {
   border-radius: 0.875rem;
 }
 

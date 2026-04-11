@@ -26,6 +26,8 @@ import {
   persistToStorage,
   rehydrateFromStorage,
   clearStorageKey,
+  type PrDetectedFromLogSet,
+  type LogSetPrSummary,
 } from "@/lib/setLogging/goldenLogSet";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +102,9 @@ export interface SyncSuccessResult {
   e1rm?: number;
   isNewPR?: boolean;
   deduplicated?: boolean;
+  pr_detected?: PrDetectedFromLogSet | null;
+  pr?: LogSetPrSummary;
+  new_achievements?: unknown[];
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +204,9 @@ export function useSetLoggingOrchestrator(
             e1rm: result.e1rm,
             isNewPR: result.isNewPR,
             deduplicated: result.deduplicated,
+            pr_detected: result.pr_detected,
+            pr: result.pr,
+            new_achievements: result.new_achievements,
           });
 
           // Remove from pending + storage

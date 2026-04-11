@@ -107,13 +107,13 @@ export function ScoreBreakdown({
       <div
         className="overflow-hidden transition-all duration-300 ease-in-out"
         style={{
-          maxHeight: isExpanded ? "420px" : "0",
+          maxHeight: isExpanded ? "480px" : "0",
           opacity: isExpanded ? 1 : 0,
         }}
       >
-        <div className="divide-y divide-white/5 pt-2">
+        <div className="divide-y divide-white/5 pt-4 pb-2 mt-1">
           {items.map((item) => (
-            <div key={item.key} className="space-y-1 py-2.5 first:pt-0 last:pb-0">
+            <div key={item.key} className="space-y-2 py-3.5 first:pt-2 last:pb-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium fc-text-primary">{item.label}</span>
                 <span

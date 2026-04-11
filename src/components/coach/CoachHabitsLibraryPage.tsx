@@ -988,7 +988,7 @@ export function CoachHabitsLibraryPage() {
         <div className="min-h-screen">
         <div className="relative px-4 sm:px-6 pb-32 pt-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
+            <GlassCard elevation={2} className="fc-card-shell p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">

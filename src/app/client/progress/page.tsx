@@ -25,7 +25,6 @@ import {
   AlertTriangle,
   Apple,
 } from "lucide-react";
-import Link from "next/link";
 import { getProgressStats, ProgressStats, getMonthlyProgressSummary, getMonthlyNarrativeData, type MonthlyProgressSummary, type MonthlyNarrativeData } from "@/lib/progressStatsService";
 import { withTimeout } from "@/lib/withTimeout";
 const HUB_NAV_ITEMS: {
@@ -158,7 +157,7 @@ function ProgressHubContent() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32 px-4">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-8 text-center">
+          <div className="fc-card-shell backdrop-blur-[8px] p-8 text-center">
             <AlertTriangle className="w-8 h-8 mx-auto mb-3" style={{ color: "var(--fc-status-warning)" }} />
             <p className="text-base font-semibold fc-text-primary mb-1">Something went wrong</p>
             <p className="text-sm fc-text-dim mb-4">{loadError}</p>
@@ -363,7 +362,12 @@ function ProgressHubContent() {
             const Icon = item.icon;
             const badge = item.getBadge?.(stats) ?? null;
             return (
-              <Link key={item.href} href={item.href} className="block">
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => { window.location.href = item.href; }}
+                className="block w-full text-left"
+              >
                 <div className="flex min-h-[52px] cursor-pointer items-center gap-3 border-b border-white/5 py-3 transition-colors hover:bg-white/[0.02]">
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.iconClass}`}
@@ -383,7 +387,7 @@ function ProgressHubContent() {
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 fc-text-subtle" />
                 </div>
-              </Link>
+              </button>
             );
           })}
           <div className="flex min-h-[52px] items-center gap-3 py-3 opacity-80">

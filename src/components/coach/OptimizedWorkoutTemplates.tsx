@@ -378,7 +378,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+              <div className="fc-card-shell p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -448,7 +448,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -462,7 +462,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -478,7 +478,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -494,7 +494,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -522,7 +522,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {/* Search Bar */}
@@ -676,7 +676,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 return (
                   <Card 
                     key={template.id} 
-                    className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer group ${
+                    className={`fc-card-shell transition-all duration-300 cursor-pointer group ${
                       isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)] scale-105' : 'hover:border-[color:var(--fc-glass-border-strong)] hover:scale-105'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
@@ -818,7 +818,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 return (
                   <Card 
                     key={template.id} 
-                    className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer group ${
+                    className={`fc-card-shell transition-all duration-300 cursor-pointer group ${
                       isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' : 'hover:border-[color:var(--fc-glass-border-strong)]'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
@@ -959,7 +959,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
           {/* Empty State */}
           {filteredAndSortedTemplates.length === 0 && (
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
                   <Dumbbell className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />

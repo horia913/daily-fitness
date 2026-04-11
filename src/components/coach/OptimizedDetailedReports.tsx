@@ -391,7 +391,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-3 sm:p-4 md:p-6">
+              <div className="fc-card-shell p-3 sm:p-4 md:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -419,7 +419,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
           </div>
 
           <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-glass fc-card rounded-2xl sm:rounded-3xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell sm:rounded-3xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -477,7 +477,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             {/* Report Configuration — reduced nesting: Card padding only on content */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6 md:space-y-8">
               {/* Client Selection */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -535,7 +535,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Report Templates */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -601,7 +601,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Report Customization */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -722,7 +722,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             {/* Report Preview & Actions */}
             <div className="space-y-4 sm:space-y-6 md:space-y-8">
               {/* Report Summary */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -782,7 +782,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Export Options */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
@@ -822,7 +822,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Share Options */}
-              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <Card className="fc-card-shell">
                 <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
                     <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">

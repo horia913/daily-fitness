@@ -116,7 +116,7 @@ export default function WorkoutTemplateCard({
     return (
       <div 
         className={cn(
-          'fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
+          'fc-card-shell fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
           accent.border,
           isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
         )}
@@ -265,7 +265,7 @@ export default function WorkoutTemplateCard({
   return (
     <div 
       className={cn(
-        'fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
+        'fc-card-shell fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 transition-all duration-300 cursor-pointer',
         accent.border,
         isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
       )}

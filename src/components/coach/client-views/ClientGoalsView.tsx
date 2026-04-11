@@ -147,7 +147,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center fc-text-dim">
+        <div className="fc-card-shell p-8 text-center fc-text-dim">
           Loading goals…
         </div>
       </div>
@@ -157,7 +157,7 @@ export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
   if (goals.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8">
+        <div className="fc-card-shell p-8">
           <EmptyState
             icon={Target}
             title="No goals set for this client"

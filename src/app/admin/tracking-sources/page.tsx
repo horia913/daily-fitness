@@ -119,7 +119,7 @@ export default function TrackingSourcesPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-32">
       {/* Header */}
-      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+      <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
             <Database className="w-6 h-6" />

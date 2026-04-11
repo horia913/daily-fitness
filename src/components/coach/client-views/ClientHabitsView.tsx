@@ -162,7 +162,7 @@ export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
 
   if (habits.length === 0) {
     return (
-      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+      <div className="fc-card-shell p-8 text-center">
         <div className="mx-auto mb-4 fc-icon-tile fc-icon-habits w-14 h-14">
           <Flame className="w-6 h-6" />
         </div>

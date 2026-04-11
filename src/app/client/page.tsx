@@ -19,13 +19,12 @@ import {
   ScoreBreakdown,
   type ScoreBreakdownProps,
 } from "@/components/client-ui/ScoreBreakdown";
+import { BiggestWinCard } from "@/components/client/BiggestWinCard";
 import { ATHLETE_TIERS, AthleteScore } from "@/types/athleteScore";
 import {
   Dumbbell,
-  BarChart3,
   CheckCircle,
   ChevronRight,
-  Loader2,
   Pencil,
   Trophy,
   Coffee,
@@ -69,7 +68,6 @@ interface DashboardData {
 interface DashboardPageData {
   dashboard: DashboardData | null;
   athleteScore: AthleteScore | null;
-  scoreHistory: { date: string; score: number }[];
   hasCheckInToday: boolean | null;
   todayWellnessLog: DailyWellnessLog | null;
   checkinStreak: number;
@@ -209,7 +207,6 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
     return {
       dashboard: null,
       athleteScore: null,
-      scoreHistory: [],
       hasCheckInToday: null,
       todayWellnessLog: null,
       checkinStreak: 0,
@@ -232,11 +229,6 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
   const athleteScore: AthleteScore | null =
     rawScore && typeof rawScore.score === "number" ? (rawScore as unknown as AthleteScore) : null;
 
-  const rawHistory = rpc.scoreHistory;
-  const scoreHistory: { date: string; score: number }[] = Array.isArray(rawHistory)
-    ? (rawHistory as { date: string; score: number }[])
-    : [];
-
   const todayWellnessLog = (rpc.todayWellnessLog as DailyWellnessLog | null) ?? null;
   const hasCheckInToday = todayWellnessLog != null;
   const checkinStreak = Number(rpc.checkinStreak) ?? 0;
@@ -244,7 +236,6 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
   return {
     dashboard,
     athleteScore,
-    scoreHistory,
     hasCheckInToday,
     todayWellnessLog,
     checkinStreak,
@@ -280,7 +271,6 @@ export default function ClientDashboard() {
       return {
         dashboard: null,
         athleteScore: null,
-        scoreHistory: [],
         hasCheckInToday: null,
         todayWellnessLog: null,
         checkinStreak: 0,
@@ -294,7 +284,6 @@ export default function ClientDashboard() {
 
   const dashboardData = pageData?.dashboard ?? null;
   const athleteScore = pageData?.athleteScore ?? null;
-  const scoreHistory = pageData?.scoreHistory ?? [];
   const hasCheckInToday = pageData?.hasCheckInToday ?? null;
   const todayWellnessLog = pageData?.todayWellnessLog ?? null;
   const checkinStreak = pageData?.checkinStreak ?? 0;
@@ -366,6 +355,33 @@ export default function ClientDashboard() {
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "User"}`;
   };
 
+  if (error) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <ClientPageShell>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h2 className="text-lg font-semibold text-white mb-2">
+                Couldn't load this page
+              </h2>
+              <p className="text-sm text-gray-400 mb-4">
+                Something went wrong. Please try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-cyan-500 text-white rounded-lg font-medium hover:bg-cyan-400 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </ClientPageShell>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -381,16 +397,16 @@ export default function ClientDashboard() {
                 <Skeleton variant="circular" className="w-10 h-10 flex-shrink-0" />
               </header>
 
-              <section className="mb-8 flex flex-col items-center py-2 sm:py-4">
-                <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex justify-center">
+              <section className="mb-4 flex flex-col items-center py-2 sm:py-4">
+                <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex justify-center mb-4">
                   <AthleteScoreRing score={null} tier={null} animated={false} size={200} />
                 </div>
               </section>
 
-              <section className="mb-6">
+              <section className="mb-4">
                 <SkeletonCard />
               </section>
-              <section className="mb-6">
+              <section className="mb-4">
                 <SkeletonCard />
               </section>
             </>
@@ -429,8 +445,8 @@ export default function ClientDashboard() {
           </header>
 
           {/* Section 2: Athlete Score Ring (HERO) — same AthleteScoreRing as /client/test-athlete-score; overflow visible for tier glows */}
-          <section className="mb-8 flex flex-col items-center py-2 sm:py-4">
-            <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex flex-col items-center min-w-0">
+          <section className="mb-4 flex flex-col items-center py-2 sm:py-4">
+            <div className="w-full max-w-[min(100%,20rem)] overflow-visible px-1 sm:px-2 flex flex-col items-center min-w-0 mb-4">
             {scoreError ? (
               <div className="flex flex-col items-center w-full">
                 <div className="flex justify-center overflow-visible w-full">
@@ -456,7 +472,7 @@ export default function ClientDashboard() {
                 </div>
 
                 {athleteScore && (
-                  <div className="mt-5 w-full min-w-0">
+                  <div className="w-full min-w-0 mt-6">
                     <ScoreBreakdown
                       programCompletion={athleteScore.workout_completion_score}
                       dailyCheckins={athleteScore.checkin_completion_score}
@@ -466,54 +482,10 @@ export default function ClientDashboard() {
                     />
                   </div>
                 )}
-
-                <div className="mt-4 w-full min-w-0 px-0.5">
-                  {scoreHistory.length >= 2 ? (
-                    <>
-                      <div className="h-10 w-full flex items-end justify-between gap-0.5" aria-hidden>
-                        {scoreHistory.map((point, i) => {
-                          const minS = Math.min(...scoreHistory.map((p) => p.score));
-                          const maxS = Math.max(...scoreHistory.map((p) => p.score));
-                          const range = maxS - minS || 1;
-                          const pct = ((point.score - minS) / range) * 100;
-                          return (
-                            <div
-                              key={point.date}
-                              className="flex-1 min-w-0 rounded-t bg-cyan-500/60 transition-all"
-                              style={{ height: `${Math.max(pct, 8)}%` }}
-                            />
-                          );
-                        })}
-                      </div>
-                      {scoreHistory.length >= 2 && (() => {
-                        const first = scoreHistory[0].score;
-                        const last = scoreHistory[scoreHistory.length - 1].score;
-                        const diff = last - first;
-                        if (diff > 0) {
-                          return (
-                            <p className="text-xs fc-text-success mt-1 text-center">
-                              Up {diff} point{diff !== 1 ? "s" : ""} from 12 weeks ago
-                            </p>
-                          );
-                        }
-                        if (diff < 0) {
-                          return (
-                            <p className="text-xs fc-text-dim mt-1 text-center">
-                              {Math.abs(diff)} point{Math.abs(diff) !== 1 ? "s" : ""} from 12 weeks ago
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </>
-                  ) : (
-                    <p className="text-xs fc-text-dim text-center py-2">
-                      Score tracking started — trend will appear after 2 weeks.
-                    </p>
-                  )}
-                </div>
               </>
             )}
+
+            <BiggestWinCard clientId={user?.id ?? null} />
             </div>
 
             {/* Hero: workout streak + program week X/Y + program progress */}
@@ -523,67 +495,67 @@ export default function ClientDashboard() {
                   tierKey: "starting" as const,
                   label: "Starting",
                   flames: "🔥",
-                  flameClass: "text-zinc-400 opacity-50 text-sm",
-                  accentClass: "text-zinc-400",
-                  cardBorderClass: "border-l-zinc-500",
-                  cardBgClass: "bg-zinc-500/10 dark:bg-zinc-900/20",
+                  flameClass: "text-amber-500/60 text-sm",
+                  accentClass: "text-amber-500/80",
+                  cardBorderClass: "border-l-amber-500/45",
+                  cardBgClass: "bg-amber-500/5 dark:bg-amber-950/20",
                   pulseClass: "",
                 };
               return (
-                <section className="mb-6 w-full max-w-sm mx-auto">
-                  <div className="flex gap-3">
+                <section className="mb-4 w-full max-w-sm mx-auto">
+                  <div className="flex gap-2">
                     <div
                       className="flex-1 min-w-0"
                       role="group"
                       aria-label={`${streak} day workout streak, ${streakDisp.label}`}
                     >
                     <ClientGlassCard
-                      className={`p-3 text-center border-l-4 h-full ${streakDisp.cardBorderClass} ${streakDisp.cardBgClass}`}
+                      className={`py-2.5 px-1.5 text-center border-l-4 h-full ${streakDisp.cardBorderClass} ${streakDisp.cardBgClass}`}
                     >
                       <div
-                        className={`flex items-center justify-center gap-1 mb-1 ${streakDisp.pulseClass}`}
+                        className={`flex items-center justify-center gap-0.5 mb-0.5 ${streakDisp.pulseClass}`}
                       >
                         <span className={streakDisp.flameClass} aria-hidden>
                           {streakDisp.flames}
                         </span>
                         <span
-                          className={`text-lg font-bold tabular-nums ${streakDisp.accentClass}`}
+                          className={`text-base font-extrabold tabular-nums leading-none ${streakDisp.accentClass}`}
                         >
                           {streak}
                         </span>
                       </div>
-                      <p className="text-[10px] font-semibold fc-text-primary">
+                      <p className="text-[9px] font-semibold fc-text-primary leading-tight">
                         {streakDisp.label}
                       </p>
-                      <p className="text-xs fc-text-dim">day streak</p>
+                      <p className="text-[10px] fc-text-dim leading-tight mt-0.5">day streak</p>
                     </ClientGlassCard>
                     </div>
 
-                    <ClientGlassCard className="flex-1 min-w-0 p-3 text-center border-l-4 border-cyan-500/40 bg-cyan-950/20 dark:bg-cyan-950/30">
-                      <div className="flex items-center justify-center gap-1.5 mb-1">
-                        <Dumbbell className="w-4 h-4 text-cyan-400" />
-                        <span className="text-lg font-bold text-cyan-400 tabular-nums">
+                    <ClientGlassCard className="flex-1 min-w-0 py-2.5 px-1.5 text-center border-l-4 border-cyan-500/40 bg-cyan-950/20 dark:bg-cyan-950/30">
+                      <div className="flex items-center justify-center gap-1 mb-0.5">
+                        <Dumbbell className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span className="text-base font-extrabold text-cyan-400 tabular-nums leading-none">
                           {weeklyProgress.current}/{weeklyProgress.goal || 0}
                         </span>
                       </div>
-                      <p className="text-xs fc-text-dim">this program week</p>
+                      <p className="text-[10px] fc-text-dim leading-tight">this program week</p>
                     </ClientGlassCard>
 
                     {programProgressData && programProgressData.totalSlots > 0 && (
-                      <ClientGlassCard className="flex-1 p-3 text-center min-w-0">
-                        <div className="flex items-center justify-center mb-1">
-                          <div className="relative w-12 h-12">
-                            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                      <ClientGlassCard className="flex-1 min-w-0 py-2.5 px-1.5 text-center border-l-4 border-teal-500/45 bg-teal-950/20 dark:bg-teal-950/30">
+                        <div className="flex items-center justify-center mb-0.5">
+                          <div className="relative w-10 h-10">
+                            <svg className="w-10 h-10 -rotate-90" viewBox="0 0 48 48">
                               <circle cx="24" cy="24" r="19" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3.5" />
-                              <circle cx="24" cy="24" r="19" fill="none" stroke="#06b6d4" strokeWidth="3.5" strokeLinecap="round"
+                              <circle cx="24" cy="24" r="19" fill="none" stroke="#14b8a6" strokeWidth="3.5" strokeLinecap="round"
                                 strokeDasharray={`${Math.min(100, programProgressData.percent) * 1.194} 999`} />
                             </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black fc-text-primary">
+                            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black fc-text-primary tabular-nums">
                               {programProgressData.percent}%
                             </span>
                           </div>
                         </div>
-                        <p className="text-xs fc-text-dim">
+                        <p className="text-[10px] fc-text-dim leading-tight">
                           Week {programProgressData.currentWeek}/{programProgressData.totalWeeks}
                         </p>
                       </ClientGlassCard>
@@ -595,7 +567,7 @@ export default function ClientDashboard() {
           </section>
 
           {/* Section 4: Today — flat row */}
-          <section className="mb-6 border-b border-white/5 pb-4">
+          <section className="mb-4 border-b border-white/5 pb-4">
               {todaysWorkout?.hasWorkout ? (
                 <div className="flex min-h-[48px] items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -634,8 +606,8 @@ export default function ClientDashboard() {
 
           {/* Section 5: Daily Check-in Card */}
           {hasCheckInToday === false && (
-            <section className="mb-6">
-              <ClientGlassCard className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20">
+            <section className="mb-4">
+              <ClientGlassCard className="p-4 border-l-4 border-amber-500/50 bg-amber-950/10 dark:bg-amber-950/25">
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm font-medium fc-text-primary">
@@ -664,8 +636,8 @@ export default function ClientDashboard() {
           )}
 
           {hasCheckInToday === true && todayWellnessLog && (
-            <section className="mb-6">
-              <ClientGlassCard className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20">
+            <section className="mb-4">
+              <ClientGlassCard className="p-4 border-l-4 border-amber-500/50 bg-amber-950/10 dark:bg-amber-950/25">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

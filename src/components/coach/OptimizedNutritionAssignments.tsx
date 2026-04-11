@@ -398,7 +398,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+              <div className="fc-card-shell p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -418,7 +418,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
       {/* Enhanced Header */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-5 sm:p-6 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-start gap-3 sm:gap-4">
@@ -464,7 +464,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
 
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -478,7 +478,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -494,7 +494,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -513,7 +513,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
               </CardContent>
             </Card>
 
-            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
@@ -538,7 +538,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <Card className="fc-card-shell">
             <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
               {/* Search Bar */}
               <div className="relative">
@@ -649,7 +649,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 return (
                   <div 
                     key={assignment.id} 
-                    className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-200"
+                    className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-200"
                   >
                       {/* Header with Client Info */}
                       <div className="flex items-start justify-between mb-4">
@@ -755,7 +755,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 return (
                   <div 
                     key={assignment.id}
-                    className="fc-glass fc-card rounded-2xl p-6 border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-200"
+                    className="fc-card-shell p-6 border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-200"
                   >
                     <div className="flex items-center gap-4">
                       {/* Client Avatar */}
@@ -859,7 +859,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
 
           {/* Empty State */}
           {filteredAndSortedAssignments.length === 0 && (
-            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+            <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
                   <Users className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />

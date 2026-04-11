@@ -75,6 +75,20 @@
   --fc-surface-elevated: rgba(255, 255, 255, 0.7);
   --fc-surface-sunken: rgba(82, 74, 66, 0.04);
 
+  /* Prescription-style card shell (neutral + semantic); matches Tailwind cyan-950/60 + cyan-500/40 */
+  --fc-card-shell-radius: 12px;
+  --fc-card-shell-bg: color-mix(in srgb, rgb(8, 51, 68) 60%, transparent);
+  --fc-card-shell-border-l: color-mix(in srgb, rgb(6, 182, 212) 40%, transparent);
+  /* Semantic shells (light): tinted fills + strong left edge — preserves quick scan cues */
+  --fc-card-shell-success-bg: color-mix(in srgb, rgb(236, 253, 245) 94%, transparent);
+  --fc-card-shell-success-border-l: color-mix(in srgb, rgb(5, 150, 105) 45%, transparent);
+  --fc-card-shell-error-bg: color-mix(in srgb, rgb(254, 242, 242) 94%, transparent);
+  --fc-card-shell-error-border-l: color-mix(in srgb, rgb(220, 38, 38) 45%, transparent);
+  --fc-card-shell-warning-bg: color-mix(in srgb, rgb(255, 251, 235) 94%, transparent);
+  --fc-card-shell-warning-border-l: color-mix(in srgb, rgb(217, 119, 6) 50%, transparent);
+  --fc-card-shell-info-bg: color-mix(in srgb, rgb(239, 246, 255) 94%, transparent);
+  --fc-card-shell-info-border-l: color-mix(in srgb, rgb(37, 99, 235) 40%, transparent);
+
   /* Density: STANDARD (mode-independent) */
   --fc-page-px: 16px;
   --fc-page-px-md: 24px;
@@ -138,6 +152,18 @@
   --fc-surface-card-border: rgba(255, 255, 255, 0.08);
   --fc-surface-elevated: #232d3f;
   --fc-surface-sunken: rgba(255, 255, 255, 0.04);
+
+  /* Card shell (dark): same geometry; semantic tints align with emerald/red panels on workout flow */
+  --fc-card-shell-bg: color-mix(in srgb, rgb(8, 51, 68) 60%, transparent);
+  --fc-card-shell-border-l: color-mix(in srgb, rgb(6, 182, 212) 40%, transparent);
+  --fc-card-shell-success-bg: color-mix(in srgb, rgb(6, 78, 59) 32%, transparent);
+  --fc-card-shell-success-border-l: color-mix(in srgb, rgb(52, 211, 153) 55%, transparent);
+  --fc-card-shell-error-bg: color-mix(in srgb, rgb(127, 29, 29) 30%, transparent);
+  --fc-card-shell-error-border-l: color-mix(in srgb, rgb(248, 113, 113) 50%, transparent);
+  --fc-card-shell-warning-bg: color-mix(in srgb, rgb(120, 53, 15) 28%, transparent);
+  --fc-card-shell-warning-border-l: color-mix(in srgb, rgb(251, 191, 36) 55%, transparent);
+  --fc-card-shell-info-bg: color-mix(in srgb, rgb(30, 58, 138) 26%, transparent);
+  --fc-card-shell-info-border-l: color-mix(in srgb, rgb(96, 165, 250) 48%, transparent);
 }
 
 /* Page shell: STANDARD density (use on main content wrapper) */
@@ -1014,6 +1040,45 @@
   box-shadow: var(--fc-shadow-card);
   position: relative;
   overflow: hidden;
+}
+
+/* --- Card shell (prescription geometry: left accent, no full perimeter border) --- */
+.fc-card-shell {
+  border-radius: var(--fc-card-shell-radius);
+  border: none;
+  border-left: 4px solid var(--fc-card-shell-border-l);
+  background: var(--fc-card-shell-bg);
+  box-shadow: var(--fc-shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.fc-card-shell--success {
+  background: var(--fc-card-shell-success-bg);
+  border-left-color: var(--fc-card-shell-success-border-l);
+}
+
+.fc-card-shell--error {
+  background: var(--fc-card-shell-error-bg);
+  border-left-color: var(--fc-card-shell-error-border-l);
+}
+
+.fc-card-shell--warning {
+  background: var(--fc-card-shell-warning-bg);
+  border-left-color: var(--fc-card-shell-warning-border-l);
+}
+
+.fc-card-shell--info {
+  background: var(--fc-card-shell-info-bg);
+  border-left-color: var(--fc-card-shell-info-border-l);
+}
+
+/** Left accent + radius only; pair with Tailwind `bg-*` when overriding fill */
+.fc-card-shell-outline {
+  border-radius: var(--fc-card-shell-radius);
+  border: none;
+  border-left: 4px solid var(--fc-card-shell-border-l);
+  box-shadow: var(--fc-shadow-card);
 }
 
 /* --- Metric Gauge Styles --- */

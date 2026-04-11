@@ -400,7 +400,7 @@ export default function AddClient() {
             </Button>
           </div>
 
-          <div className="fc-glass fc-card rounded-xl border border-[color:var(--fc-glass-border)] p-4">
+          <div className="fc-card-shell rounded-xl border border-[color:var(--fc-glass-border)] p-4">
             <ProgressIndicator steps={steps} currentStep={currentStep} />
             <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
               <h2 className="text-sm font-semibold fc-text-primary">{steps[currentStep - 1]?.title}</h2>

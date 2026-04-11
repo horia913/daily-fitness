@@ -9,13 +9,11 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { CheckInHistory } from "@/components/client/CheckInHistory";
 import { WeeklyComparison } from "@/components/client/WeeklyComparison";
 import { WellnessTrendsCard } from "@/components/client/WellnessTrendsCard";
-import Link from "next/link";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getLogRange, DailyWellnessLog, MonthlyStats } from "@/lib/wellnessService";
 import { getClientMeasurements } from "@/lib/measurementService";
 import { usePageData } from "@/hooks/usePageData";
@@ -40,7 +38,6 @@ interface HistoryPageData {
 export default function CheckInsHistoryPage() {
   const { performanceSettings } = useTheme();
   const { user } = useAuth();
-  const router = useRouter();
   const [pillarGoals, setPillarGoals] = useState<
     Array<{
       id: string;
@@ -208,8 +205,8 @@ export default function CheckInsHistoryPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-4xl px-4 sm:px-6 pb-40">
-          <header className="flex items-center gap-2 mb-6">
+        <ClientPageShell className="max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4 overflow-x-hidden">
+          <header className="flex items-center gap-2 mb-4">
             <button
               type="button"
               onClick={() => {
@@ -220,15 +217,15 @@ export default function CheckInsHistoryPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Check-in History</h1>
-              <p className="text-sm fc-text-dim mt-0.5">Calendar, goals, and body trends</p>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">Check-in History</h1>
+              <p className="text-xs fc-text-dim mt-0.5">Calendar, goals, and body trends</p>
             </div>
           </header>
 
           {user?.id && !dataLoading && (
             <>
-              <section className="mb-8">
+              <section className="mb-4 min-w-0 overflow-x-auto">
                 <CheckInHistory
                   clientId={user.id}
                   initialLogRange={logRange}
@@ -238,7 +235,7 @@ export default function CheckInsHistoryPage() {
                 />
               </section>
 
-              <section className="mb-8">
+              <section className="mb-4 min-w-0 overflow-x-auto">
                 <WellnessTrendsCard
                   logRange={logRange}
                   weekStart={weekStart}
@@ -248,7 +245,7 @@ export default function CheckInsHistoryPage() {
                 />
               </section>
 
-              <section className="mb-8">
+              <section className="mb-4 min-w-0 overflow-x-auto">
                 <WeeklyComparison
                   current={currentBody}
                   previous={previousBody}
@@ -257,24 +254,16 @@ export default function CheckInsHistoryPage() {
                 />
               </section>
 
-              <section className="mb-8">
-                <Link
-                  href="/client/progress/body-metrics"
-                  className="block rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 fc-hover-rise transition-all hover:border-[color:var(--fc-glass-border-strong)]"
+              <section className="mb-4 border-b border-white/5 pb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/client/progress/body-metrics";
+                  }}
+                  className="text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-white/[0.04] px-1 -ml-1 w-full transition-colors bg-transparent border-0 cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ background: "color-mix(in srgb, var(--fc-domain-workouts) 12%, transparent)" }}
-                    >
-                      <BarChart3 className="w-5 h-5" style={{ color: "var(--fc-domain-workouts)" }} />
-                    </div>
-                    <div>
-                      <p className="font-semibold fc-text-primary text-sm">Full body metrics history</p>
-                      <p className="text-xs fc-text-dim">Charts and all measurements</p>
-                    </div>
-                  </div>
-                </Link>
+                  Full body metrics history →
+                </button>
               </section>
             </>
           )}
@@ -287,9 +276,9 @@ export default function CheckInsHistoryPage() {
                   : "Check-in Goals"
               }
             />
-            <ClientGlassCard className="p-5">
+            <ClientGlassCard className="p-3 sm:p-4">
               {pillarGoals.length > 0 ? (
-                <div className="space-y-3 mb-4">
+                <div className="space-y-2 mb-3">
                   {pillarGoals.map((g) => (
                     <CompactGoalCard
                       key={g.id}
@@ -314,7 +303,7 @@ export default function CheckInsHistoryPage() {
                 <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>
                   + Add Check-in Goal
                 </PrimaryButton>
-                <SecondaryButton className="w-full sm:w-auto" onClick={() => router.push("/client/goals")}>
+                <SecondaryButton className="w-full sm:w-auto" onClick={() => { window.location.href = "/client/goals"; }}>
                   Manage all goals
                 </SecondaryButton>
               </div>

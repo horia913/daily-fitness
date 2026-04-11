@@ -196,7 +196,7 @@ export default function CategoryForm({ isOpen, onClose, onSuccess, category, col
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
+        className={`relative ${theme.card} fc-card-shell shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
         style={{
           maxWidth: 'min(95vw, 40rem)',
           height: 'min(88vh, calc(100vh - 4rem))',

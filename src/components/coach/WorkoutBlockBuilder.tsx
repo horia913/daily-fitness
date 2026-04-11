@@ -202,7 +202,7 @@ export default function WorkoutBlockBuilder({
 
       {/* Add Block Modal */}
       {showAddBlock && (
-        <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+        <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
           <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center justify-between">
               <div className="text-lg font-semibold fc-text-primary">
@@ -281,7 +281,7 @@ export default function WorkoutBlockBuilder({
           return (
             <div
               key={block.id}
-              className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl"
+              className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl"
             >
               <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center justify-between">
@@ -460,7 +460,7 @@ export default function WorkoutBlockBuilder({
 
       {/* Empty State */}
       {blocks.length === 0 && (
-        <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+        <div className="fc-card-shell border border-[color:var(--fc-glass-border)] rounded-2xl">
           <EmptyState
             icon={Dumbbell}
             title="No set entries yet"

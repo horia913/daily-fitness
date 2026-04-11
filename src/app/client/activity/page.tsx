@@ -22,7 +22,6 @@ import {
   TrendingUp,
   Calendar,
 } from "lucide-react";
-import Link from "next/link";
 import {
   logActivity,
   updateActivity,
@@ -140,12 +139,13 @@ function ActivityHubContent() {
         <ClientPageShell className="max-w-3xl flex flex-col gap-5 pb-32">
           {/* Header */}
           <div className="flex items-center gap-4">
-            <Link
-              href="/client/me"
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/client/me"; }}
               className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity"
             >
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
-            </Link>
+            </button>
             <div className="flex-1">
               <h1 className="text-xl font-bold fc-text-primary">
                 Activity Log

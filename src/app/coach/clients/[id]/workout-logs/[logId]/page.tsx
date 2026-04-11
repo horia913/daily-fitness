@@ -264,7 +264,7 @@ export default function CoachClientWorkoutLogDetailPage() {
       ) : error || !payload || !log ? (
         <p className="text-sm fc-text-error py-4">{error || "Not found"}</p>
       ) : (
-        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 sm:p-8 space-y-6">
+        <div className="fc-card-shell p-6 sm:p-8 space-y-6">
           <div className="flex items-start gap-3">
             <div className="fc-icon-tile fc-icon-workouts shrink-0">
               <Dumbbell className="w-6 h-6" />

@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSearchParams } from "next/navigation";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { ClientPageShell } from "@/components/client-ui";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,6 @@ import {
   Timer,
   Activity,
 } from "lucide-react";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import {
@@ -611,37 +611,40 @@ function AnalyticsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6 sm:p-10 mb-10">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href="/client/progress" className="fc-surface w-11 h-11 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </Link>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)] shrink-0">
-                    <BarChart3 className="w-6 h-6" />
+      <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        <div className="fc-card-shell backdrop-blur-[8px] p-4 mb-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/progress"; }}
+                  className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
+                >
+                  <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
+                </button>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)] shrink-0">
+                    <BarChart3 className="w-4 h-4" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-[color:var(--fc-domain-workouts)] mb-1">
-                      <BarChart3 className="w-4 h-4" />
-                      <span className="text-xs font-bold tracking-[0.2em] uppercase">Performance</span>
-                    </div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-[color:var(--fc-domain-workouts)] block mb-0.5">
+                      Performance
+                    </span>
+                    <h1 className="text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
                       Analytics <span className="text-[color:var(--fc-text-dim)]">Overview</span>
                     </h1>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex bg-[color:var(--fc-glass-highlight)] p-1 rounded-2xl border border-[color:var(--fc-glass-border)] overflow-x-auto">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <div className="flex bg-[color:var(--fc-glass-highlight)] p-0.5 rounded-xl border border-[color:var(--fc-glass-border)] overflow-x-auto max-w-full">
                   {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((range) => (
                     <button
                       key={range}
                       type="button"
                       onClick={() => setTimeRange(range)}
-                      className={`px-4 sm:px-6 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all whitespace-nowrap ${
                         timeRange === range
                           ? "fc-surface fc-text-primary shadow-sm"
                           : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
@@ -651,30 +654,31 @@ function AnalyticsPageContent() {
                     </button>
                   ))}
                 </div>
-                <a href="#strength-exercises" className="fc-btn fc-btn-primary shrink-0 inline-flex items-center">
-                  <Search className="mr-2 h-4 w-4" />
-                  All Exercises
+                <a href="#strength-exercises" className="fc-btn fc-btn-primary shrink-0 inline-flex items-center h-8 text-xs px-3">
+                  <Search className="mr-1 h-3.5 w-3.5" />
+                  Exercises
                 </a>
-                <Link
-                  href="/client/progress/personal-records"
-                  className="fc-btn fc-btn-ghost shrink-0 inline-flex items-center"
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/progress/personal-records"; }}
+                  className="fc-btn fc-btn-ghost shrink-0 inline-flex items-center h-8 text-xs px-2"
                 >
-                  View all PRs
-                </Link>
+                  PRs
+                </button>
               </div>
             </div>
           </div>
         </div>
 
         {loadError && !loading ? (
-          <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-glass-border)] text-center">
-            <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-            <Button variant="secondary" onClick={() => { setLoadError(null); loadAnalyticsData(); }} className="h-11 px-6">
+          <div className="fc-card-shell p-4 text-center">
+            <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+            <Button variant="secondary" onClick={() => { setLoadError(null); loadAnalyticsData(); }} className="h-10 px-4 text-sm">
               Retry
             </Button>
           </div>
         ) : loading ? (
-          <div className="animate-pulse space-y-4 p-4 pb-32">
+          <div className="animate-pulse space-y-3 p-2 pb-32">
             <div className="h-6 w-32 rounded-full bg-[color:var(--fc-glass-highlight)]" />
             <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
             <div className="grid grid-cols-2 gap-3">
@@ -686,69 +690,69 @@ function AnalyticsPageContent() {
             <div className="h-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
+          <div className="space-y-4">
+            <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
                 <div className="flex items-center justify-between">
                   <Calendar className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                     5 Weeks
                   </span>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="mt-2 text-lg font-semibold text-[color:var(--fc-text-primary)] tabular-nums">
                   {recentWorkoutTotal}
                 </p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
                   Workouts logged
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
+              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
                 <div className="flex items-center justify-between">
                   <Target className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                     Goals
                   </span>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="mt-2 text-lg font-semibold text-[color:var(--fc-text-primary)] tabular-nums">
                   {completionPercentage}%
                 </p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
                   {goalCompletion.completed} of {goalCompletion.total} completed
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
+              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
                 <div className="flex items-center justify-between">
                   <Scale className="h-5 w-5 text-[color:var(--fc-domain-meals)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                     Latest
                   </span>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="mt-2 text-lg font-semibold text-[color:var(--fc-text-primary)] tabular-nums">
                   {latestBodyWeight !== null ? `${latestBodyWeight} kg` : "—"}
                 </p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
                   {latestBodyFat !== null
                     ? `${latestBodyFat}% body fat`
                     : "Body composition"}
                 </p>
               </div>
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4">
+              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
                 <div className="flex items-center justify-between">
                   <Dumbbell className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                     Strength
                   </span>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                <p className="mt-2 text-lg font-semibold text-[color:var(--fc-text-primary)] tabular-nums">
                   {trainedExercises.length}
                 </p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
                   Exercises tracked
                 </p>
               </div>
             </div>
             {/* Workout Frequency Chart */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Calendar className="h-6 w-6 text-white" />
@@ -806,7 +810,7 @@ function AnalyticsPageContent() {
 
             {/* Workout Duration Trend */}
             {durationTrend && durationTrend.weeklyData.length > 0 && (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+              <div className="fc-card-shell backdrop-blur-[8px] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/80">
                     <Timer className="h-6 w-6 text-white" />
@@ -889,7 +893,7 @@ function AnalyticsPageContent() {
                 )}
 
                 {compoundProgressions.length > 0 && (
-                  <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-4 sm:p-6">
+                  <div className="fc-card-shell backdrop-blur-[8px] p-4 sm:p-6">
                     <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
                       Estimated 1RM — Compound Lifts
                     </h3>
@@ -939,7 +943,7 @@ function AnalyticsPageContent() {
                         return (
                           <div
                             key={ex.id}
-                            className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] overflow-hidden"
+                            className="fc-card-shell backdrop-blur-[8px] overflow-hidden"
                           >
                             <button
                               type="button"
@@ -1011,7 +1015,7 @@ function AnalyticsPageContent() {
             )}
 
             {/* Recovery Insight Card — last 4 weeks volume vs soreness */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-6">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-domain-habits)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-domain-habits)_25%,transparent)]">
                   <Dumbbell className="h-6 w-6 text-white" />
@@ -1134,7 +1138,7 @@ function AnalyticsPageContent() {
             </div>
 
             {/* Sleep vs Performance Insight Card */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-6">
               <div className="mb-2 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <BarChart3 className="h-6 w-6 text-white" />
@@ -1155,7 +1159,7 @@ function AnalyticsPageContent() {
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+              <div className="fc-card-shell backdrop-blur-[8px] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -1229,7 +1233,7 @@ function AnalyticsPageContent() {
                 )}
               </div>
             ) : (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+              <div className="fc-card-shell backdrop-blur-[8px] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -1251,7 +1255,7 @@ function AnalyticsPageContent() {
             )}
 
             {/* Goal Completion */}
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <Target className="h-6 w-6 text-white" />
@@ -1291,7 +1295,7 @@ function AnalyticsPageContent() {
         {/* Extra Activities Summary */}
         {!loading && recentActivities.length > 0 && (
           <div className="space-y-6" style={{ animation: "fadeInUp 0.8s ease-out 0.6s both" }}>
-            <div className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] backdrop-blur-[8px] shadow-[var(--fc-shadow-card)] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Activity className="h-6 w-6 text-white" />
@@ -1426,7 +1430,7 @@ function AnalyticsPageContent() {
             </div>
           </div>
         )}
-      </div>
+      </ClientPageShell>
 
       <style jsx>{`
         @keyframes fadeInUp {
@@ -1460,12 +1464,12 @@ export default function AnalyticsPage() {
       <Suspense
         fallback={
           <AnimatedBackground>
-            <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 lg:px-10">
+            <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6">
               <div className="animate-pulse space-y-3">
                 <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
                 <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
               </div>
-            </div>
+            </ClientPageShell>
           </AnimatedBackground>
         }
       >

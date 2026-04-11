@@ -16,7 +16,6 @@ const SET_TYPE_MAP: Record<string, string> = {
   for_time: 'for_time',
   fortime: 'for_time',
   tabata: 'tabata',
-  hr_sets: 'hr_sets',
   speedwork: 'speed_work',
   speed_work: 'speed_work',
   endurance: 'endurance',
@@ -35,7 +34,6 @@ export const SET_TYPE_DISPLAY: Record<string, string> = {
   emom: 'EMOM',
   tabata: 'Tabata',
   for_time: 'For Time',
-  hr_sets: 'HR Sets',
   speed_work: 'Speed Work',
   endurance: 'Endurance',
 };
