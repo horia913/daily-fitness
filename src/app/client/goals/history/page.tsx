@@ -11,9 +11,8 @@ import {
   ClientGlassCard,
   SectionHeader,
   SecondaryButton,
-  Pill,
 } from "@/components/client-ui";
-import { Target, ArrowLeft, Filter } from "lucide-react";
+import { ArrowLeft, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type CategoryFilter = "all" | "training" | "nutrition" | "lifestyle";
@@ -46,6 +45,32 @@ function inferCategory(title: string, category: string): CategoryFilter {
     if (keywords.some((k) => t.includes(k))) return key as CategoryFilter;
   }
   return "all";
+}
+
+function categoryLabel(cat: string): string {
+  return cat.charAt(0).toUpperCase() + cat.slice(1);
+}
+
+function statusPillClasses(status: string): string {
+  const s = (status || "").toLowerCase();
+  if (s === "active") {
+    return "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+  }
+  if (s === "completed" || s === "complete") {
+    return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+  }
+  if (s === "abandoned") {
+    return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+  }
+  return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+}
+
+function formatStatusLabel(status: string): string {
+  const s = (status || "").toLowerCase();
+  if (s === "active") return "Active";
+  if (s === "completed" || s === "complete") return "Completed";
+  if (s === "abandoned") return "Abandoned";
+  return s ? s.replace(/_/g, " ") : "—";
 }
 
 export default function GoalHistoryPage() {
@@ -103,8 +128,8 @@ export default function GoalHistoryPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-3xl flex flex-col gap-6">
-          <div className="flex items-center gap-4">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <div className="flex items-center gap-4 mb-4">
             <button
               type="button"
               onClick={() => { window.location.href = "/client/goals"; }}
@@ -113,21 +138,24 @@ export default function GoalHistoryPage() {
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
             </button>
             <div>
-              <h1 className="text-xl font-bold fc-text-primary">Goal History</h1>
+              <h1 className="text-xl font-bold fc-text-primary mb-4">Goal History</h1>
               <p className="text-sm fc-text-dim">All goals across Training, Nutrition, Lifestyle</p>
             </div>
           </div>
 
-          <ClientGlassCard className="p-4">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 fc-text-dim" />
-              <span className="text-sm fc-text-dim">Filter:</span>
+          <ClientGlassCard className="p-4 mb-4">
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              <Filter className="w-4 h-4 fc-text-dim shrink-0" />
+              <span className="text-sm fc-text-dim shrink-0">Filter:</span>
               {(["all", "training", "nutrition", "lifestyle"] as const).map((c) => (
                 <button
                   key={c}
+                  type="button"
                   onClick={() => setCategoryFilter(c)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    categoryFilter === c ? "fc-glass border border-[color:var(--fc-glass-border)] fc-text-primary" : "fc-text-dim hover:fc-text-primary"
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider border transition-colors ${
+                    categoryFilter === c
+                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
+                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
                   }`}
                 >
                   {c === "all" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
@@ -145,58 +173,133 @@ export default function GoalHistoryPage() {
           </ClientGlassCard>
 
           {loading ? (
-            <div className="space-y-4">
+            <div className="space-y-3 mb-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-24 rounded-2xl animate-pulse bg-[color:var(--fc-surface-sunken)]" />
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <ClientGlassCard className="p-12 text-center">
-              <Target className="w-12 h-12 fc-text-dim mx-auto mb-4 opacity-50" />
-              <p className="fc-text-primary font-medium mb-2">No goals found</p>
-              <p className="text-sm fc-text-dim mb-6">Create goals from the Goals page to see them here.</p>
-              <SecondaryButton onClick={() => { window.location.href = "/client/goals"; }}>
+            <div className="py-8 px-4 text-center">
+              <p className="text-sm text-gray-400 mb-2">No goals found</p>
+              <p className="text-sm text-gray-400 mb-6">Create goals from the Goals page to see them here.</p>
+              <SecondaryButton
+                type="button"
+                onClick={() => { window.location.href = "/client/goals"; }}
+              >
                 Open Goals
               </SecondaryButton>
-            </ClientGlassCard>
+            </div>
           ) : (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col">
               {orderedCategories.map((cat) => (
-                <section key={cat}>
-                  <SectionHeader title={cat.charAt(0).toUpperCase() + cat.slice(1)} />
-                  <div className="space-y-3">
-                    {byCategory[cat].map((g) => (
-                      <ClientGlassCard key={g.id} className="p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-bold fc-text-primary">{g.title}</h3>
-                            {g.description && (
-                              <p className="text-sm fc-text-dim mt-0.5 line-clamp-2">{g.description}</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-2">
-                              <Pill>{g.status === "active" ? "Active" : "Inactive"}</Pill>
-                              <span className="text-xs fc-text-dim">
-                                {new Date(g.created_at).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
-                              </span>
-                            </div>
+                <section key={cat} className="mb-6 last:mb-0">
+                  <SectionHeader title={categoryLabel(cat)} />
+                  <div className="mt-2 space-y-3">
+                    {byCategory[cat].map((g) => {
+                      const dateStr = new Date(g.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+                      const targetNum = (() => {
+                        const v = g.target_value;
+                        if (v == null) return null;
+                        const n = typeof v === "number" ? v : Number(v);
+                        return Number.isFinite(n) ? n : null;
+                      })();
+                      const currentNum = (() => {
+                        const v = g.current_value;
+                        if (v == null) return null;
+                        const n = typeof v === "number" ? v : Number(v);
+                        return Number.isFinite(n) ? n : null;
+                      })();
+                      const showProgressBar =
+                        targetNum != null && targetNum > 0 && currentNum != null;
+                      const progressPct = showProgressBar
+                        ? Math.min(100, Math.max(0, (currentNum / targetNum) * 100))
+                        : 0;
+                      const targetDisplay =
+                        g.target_value != null
+                          ? `${String(g.target_value)}${g.target_unit ?? ""}`
+                          : null;
+                      const currentDisplay =
+                        g.current_value != null ? String(g.current_value) : null;
+
+                      return (
+                        <div
+                          key={g.id}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left"
+                        >
+                          <div className="mb-1 flex items-start justify-between gap-2">
+                            <h3 className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight text-white">
+                              {g.title}
+                            </h3>
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${statusPillClasses(g.status)}`}
+                            >
+                              {formatStatusLabel(g.status)}
+                            </span>
                           </div>
-                          <div className="text-right text-sm">
-                            {g.target_value != null && (
-                              <div className="font-mono fc-text-dim">
-                                Target: {String(g.target_value)}{g.target_unit ?? ""}
+                          {g.description ? (
+                            <p className="mb-2 mt-1 text-sm leading-relaxed text-gray-400 line-clamp-2">
+                              {g.description}
+                            </p>
+                          ) : null}
+                          <div
+                            className={`flex flex-wrap items-baseline gap-x-1 text-xs text-gray-500 mb-0 ${g.description ? "" : "mt-2"}`}
+                          >
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-300/70">
+                              {categoryLabel(cat)}
+                            </span>
+                            <span className="text-gray-600" aria-hidden>
+                              ·
+                            </span>
+                            <span className="tabular-nums">{dateStr}</span>
+                            {!showProgressBar && targetDisplay != null ? (
+                              <>
+                                <span className="text-gray-600" aria-hidden>
+                                  ·
+                                </span>
+                                <span>
+                                  Target{" "}
+                                  <span className="tabular-nums">{targetDisplay}</span>
+                                </span>
+                              </>
+                            ) : null}
+                            {!showProgressBar && currentDisplay != null ? (
+                              <>
+                                <span className="text-gray-600" aria-hidden>
+                                  ·
+                                </span>
+                                <span>
+                                  Current{" "}
+                                  <span className="tabular-nums">{currentDisplay}</span>
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+                          {showProgressBar && currentNum != null && targetNum != null ? (
+                            <div className="mt-3">
+                              <div className="mb-1 flex items-baseline justify-between gap-2">
+                                <span className="text-sm font-semibold tabular-nums text-white">
+                                  {String(currentNum)}
+                                </span>
+                                <span className="text-xs tabular-nums text-gray-500">
+                                  / {String(targetNum)}
+                                  {g.target_unit ?? ""}
+                                </span>
                               </div>
-                            )}
-                            {g.current_value != null && (
-                              <div className="font-mono fc-text-dim">Current: {String(g.current_value)}</div>
-                            )}
-                          </div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                      </ClientGlassCard>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               ))}

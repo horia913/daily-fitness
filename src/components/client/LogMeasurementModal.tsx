@@ -15,6 +15,8 @@ interface LogMeasurementModalProps {
   lastMeasurement?: BodyMeasurement | null;
   /** Called with newly unlocked achievements after save (e.g. weight_goal); parent can show AchievementUnlockModal */
   onAchievementsUnlocked?: (achievements: NewlyUnlockedAchievement[]) => void;
+  /** Tighter layout for narrow mobile shells (e.g. body-metrics); default keeps legacy styling for other callers */
+  compactForm?: boolean;
 }
 
 export function LogMeasurementModal({
@@ -23,6 +25,7 @@ export function LogMeasurementModal({
   onSuccess,
   lastMeasurement,
   onAchievementsUnlocked,
+  compactForm = false,
 }: LogMeasurementModalProps) {
   const [showFullMeasurements, setShowFullMeasurements] = useState(false);
   
@@ -130,22 +133,53 @@ export function LogMeasurementModal({
     }
   };
 
+  const labelClass = compactForm
+    ? "block text-xs uppercase tracking-wider text-gray-400 mb-1"
+    : "block text-base font-semibold mb-2 fc-text-primary";
+  const labelClassSmall = compactForm
+    ? "block text-xs uppercase tracking-wider text-gray-400 mb-1"
+    : "block text-sm font-medium mb-2 fc-text-primary";
+  const inputClass = compactForm
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
+    : "w-full px-4 py-4 rounded-xl text-lg font-medium fc-glass-soft fc-text-primary border-2 border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] focus:border-[color:var(--fc-accent-cyan)]";
+  const inputClassSecondary = compactForm
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
+    : "w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]";
+  const inputClassGrid = compactForm
+    ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40"
+    : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]";
+  const gridLabelClass = compactForm
+    ? "block text-xs uppercase tracking-wider text-gray-400 mb-1"
+    : "block text-xs font-medium mb-1.5 fc-text-subtle";
+
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
       <div
-        className="w-full max-w-[500px] max-h-[88vh] fc-modal fc-card overflow-hidden flex flex-col"
+        className={
+          compactForm
+            ? "w-[min(95vw,32rem)] max-w-full max-h-[88vh] fc-modal fc-card overflow-hidden flex flex-col rounded-xl border border-white/10 bg-[color:var(--fc-surface)] shadow-xl"
+            : "w-full max-w-[500px] max-h-[88vh] fc-modal fc-card overflow-hidden flex flex-col"
+        }
       >
         {/* Header */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-5 border-b border-[color:var(--fc-glass-border)]"
+          className={`sticky top-0 z-10 flex items-center justify-between border-b border-[color:var(--fc-glass-border)] ${compactForm ? "px-4 py-4" : "px-6 py-5"}`}
         >
           <div>
-            <span className="fc-pill fc-pill-glass fc-text-habits">
-              Body metrics
-            </span>
-            <h2 className="text-2xl font-bold fc-text-primary mt-2">
+            {!compactForm && (
+              <span className="fc-pill fc-pill-glass fc-text-habits">
+                Body metrics
+              </span>
+            )}
+            <h2
+              className={
+                compactForm
+                  ? "text-lg font-semibold text-white mt-0"
+                  : "text-2xl font-bold fc-text-primary mt-2"
+              }
+            >
               Log measurement
             </h2>
           </div>
@@ -159,14 +193,14 @@ export function LogMeasurementModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+        <div className={`flex-1 overflow-y-auto ${compactForm ? "px-4 pb-4" : "px-6 pb-6"}`}>
+          <form onSubmit={handleSubmit} className={`${compactForm ? "space-y-4 mt-4" : "space-y-6 mt-6"}`}>
             {/* Quick Log Section */}
-            <div className="space-y-4">
+            <div className={compactForm ? "space-y-3" : "space-y-4"}>
               {/* Weight - Large, prominent */}
               <div>
-                <label className="block text-base font-semibold mb-2 fc-text-primary">
-                  Weight (kg) <span className="fc-text-error">*</span>
+                <label className={labelClass}>
+                  Weight (kg) <span className={compactForm ? "text-red-400" : "fc-text-error"}>*</span>
                 </label>
                 <input
                   type="number"
@@ -174,7 +208,7 @@ export function LogMeasurementModal({
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
                   placeholder="Enter weight in kg"
-                  className="w-full px-4 py-4 rounded-xl text-lg font-medium fc-glass-soft fc-text-primary border-2 border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] focus:border-[color:var(--fc-accent-cyan)]"
+                  className={inputClass}
                   required
                   autoFocus
                 />
@@ -182,7 +216,7 @@ export function LogMeasurementModal({
 
               {/* Body Fat - Optional, smaller */}
               <div>
-                <label className="block text-sm font-medium mb-2 fc-text-primary">
+                <label className={compactForm ? labelClass : labelClassSmall}>
                   Body Fat (%)
                 </label>
                 <input
@@ -191,7 +225,7 @@ export function LogMeasurementModal({
                   value={bodyFat}
                   onChange={(e) => setBodyFat(e.target.value)}
                   placeholder="Optional"
-                  className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
+                  className={inputClassSecondary}
                 />
               </div>
             </div>
@@ -201,7 +235,7 @@ export function LogMeasurementModal({
               <button
                 type="button"
                 onClick={() => setShowFullMeasurements(!showFullMeasurements)}
-                className="w-full flex items-center justify-between py-2 text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors"
+                className={`w-full flex items-center justify-between py-2 text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors ${compactForm ? "text-gray-400 hover:text-white" : ""}`}
               >
                 <span>Add more measurements</span>
                 {showFullMeasurements ? (
@@ -215,105 +249,105 @@ export function LogMeasurementModal({
                 <div className="mt-4 space-y-6 animate-in fade-in slide-in-from-top-2 duration-200">
                   {/* Circumferences Section */}
                   <div>
-                    <h3 className="text-sm font-semibold fc-text-primary mb-3">Circumferences (cm)</h3>
+                    <h3 className={`text-sm font-semibold mb-3 ${compactForm ? "text-white" : "fc-text-primary"}`}>Circumferences (cm)</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Waist</label>
+                        <label className={gridLabelClass}>Waist</label>
                         <input
                           type="number"
                           step="0.1"
                           value={waist}
                           onChange={(e) => setWaist(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Hips</label>
+                        <label className={gridLabelClass}>Hips</label>
                         <input
                           type="number"
                           step="0.1"
                           value={hips}
                           onChange={(e) => setHips(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Chest/Torso</label>
+                        <label className={gridLabelClass}>Chest/Torso</label>
                         <input
                           type="number"
                           step="0.1"
                           value={torso}
                           onChange={(e) => setTorso(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Left Arm</label>
+                        <label className={gridLabelClass}>Left Arm</label>
                         <input
                           type="number"
                           step="0.1"
                           value={leftArm}
                           onChange={(e) => setLeftArm(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Right Arm</label>
+                        <label className={gridLabelClass}>Right Arm</label>
                         <input
                           type="number"
                           step="0.1"
                           value={rightArm}
                           onChange={(e) => setRightArm(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Left Thigh</label>
+                        <label className={gridLabelClass}>Left Thigh</label>
                         <input
                           type="number"
                           step="0.1"
                           value={leftThigh}
                           onChange={(e) => setLeftThigh(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Right Thigh</label>
+                        <label className={gridLabelClass}>Right Thigh</label>
                         <input
                           type="number"
                           step="0.1"
                           value={rightThigh}
                           onChange={(e) => setRightThigh(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Left Calf</label>
+                        <label className={gridLabelClass}>Left Calf</label>
                         <input
                           type="number"
                           step="0.1"
                           value={leftCalf}
                           onChange={(e) => setLeftCalf(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Right Calf</label>
+                        <label className={gridLabelClass}>Right Calf</label>
                         <input
                           type="number"
                           step="0.1"
                           value={rightCalf}
                           onChange={(e) => setRightCalf(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                     </div>
@@ -321,21 +355,21 @@ export function LogMeasurementModal({
 
                   {/* Composition Section */}
                   <div>
-                    <h3 className="text-sm font-semibold fc-text-primary mb-3">Body Composition</h3>
+                    <h3 className={`text-sm font-semibold mb-3 ${compactForm ? "text-white" : "fc-text-primary"}`}>Body Composition</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Muscle Mass (kg)</label>
+                        <label className={gridLabelClass}>Muscle Mass (kg)</label>
                         <input
                           type="number"
                           step="0.1"
                           value={muscleMass}
                           onChange={(e) => setMuscleMass(e.target.value)}
                           placeholder="Optional"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Visceral Fat Level</label>
+                        <label className={gridLabelClass}>Visceral Fat Level</label>
                         <input
                           type="number"
                           step="1"
@@ -344,7 +378,7 @@ export function LogMeasurementModal({
                           value={visceralFat}
                           onChange={(e) => setVisceralFat(e.target.value)}
                           placeholder="0-25"
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)]"
+                          className={inputClassGrid}
                         />
                       </div>
                     </div>
@@ -352,14 +386,18 @@ export function LogMeasurementModal({
 
                   {/* Details Section */}
                   <div>
-                    <h3 className="text-sm font-semibold fc-text-primary mb-3">Details</h3>
+                    <h3 className={`text-sm font-semibold mb-3 ${compactForm ? "text-white" : "fc-text-primary"}`}>Details</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Measurement Method</label>
+                        <label className={gridLabelClass}>Measurement Method</label>
                         <select
                           value={measurementMethod}
                           onChange={(e) => setMeasurementMethod(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-glass-soft)]"
+                          className={
+                            compactForm
+                              ? "w-full h-11 px-3 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-glass-soft)]"
+                          }
                         >
                           <option value="">Select method</option>
                           <option value="Scale">Scale</option>
@@ -370,13 +408,17 @@ export function LogMeasurementModal({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium mb-1.5 fc-text-subtle">Notes</label>
+                        <label className={gridLabelClass}>Notes</label>
                         <textarea
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder="Optional notes"
                           rows={3}
-                          className="w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+                          className={
+                            compactForm
+                              ? "w-full min-h-[5.5rem] px-3 py-2 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-none"
+                              : "w-full px-3 py-2 rounded-lg text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-1 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+                          }
                         />
                       </div>
                     </div>
@@ -396,28 +438,62 @@ export function LogMeasurementModal({
 
         {/* Footer - sticky so Save/Cancel always visible on mobile */}
         <div
-          className="flex-shrink-0 px-6 py-4 flex gap-3 border-t border-[color:var(--fc-glass-border)]"
+          className={`flex-shrink-0 border-t border-[color:var(--fc-glass-border)] ${
+            compactForm ? "px-4 py-4 flex flex-col gap-2" : "px-6 py-4 flex gap-3"
+          }`}
         >
-          <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost min-h-[44px]">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="flex-1 fc-btn fc-btn-primary fc-press min-h-[44px]"
-          >
-            {saving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Save Measurement
-              </>
-            )}
-          </Button>
+          {compactForm ? (
+            <>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={saving}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 ring-1 ring-cyan-400/30 ring-inset transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save measurement
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-11 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-sm font-semibold text-gray-300 transition-colors hover:bg-white/[0.1]"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost min-h-[44px]">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="flex-1 fc-btn fc-btn-primary fc-press min-h-[44px]"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Measurement
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

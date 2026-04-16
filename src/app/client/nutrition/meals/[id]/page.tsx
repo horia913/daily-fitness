@@ -219,7 +219,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
-            <div className="fc-card-shell p-8 text-center max-w-md">
+            <div className="fc-card-shell p-4 text-center max-w-md text-sm">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadMeal(); }} className="fc-btn fc-btn-primary">Retry</Button>
@@ -244,7 +244,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
             <div className="animate-pulse space-y-3">
               <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
@@ -261,12 +261,12 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 text-center">
-            <div className="fc-card-shell p-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 text-center">
+            <div className="fc-card-shell p-4 text-sm">
               <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                 Meal not found
               </h2>
-              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+              <p className="mt-2 text-[color:var(--fc-text-dim)]">
                 This meal is not available or has been removed.
               </p>
               <div className="mt-4 flex justify-center">
@@ -531,7 +531,7 @@ export default function MealDetailPage() {
                   </div>
                 </section>
 
-                <div className="fc-card-shell p-6">
+                <div className="fc-card-shell p-4">
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
@@ -630,7 +630,7 @@ export default function MealDetailPage() {
             )}
 
             {meal.notes && (
-              <div className="fc-card-shell p-6">
+              <div className="fc-card-shell p-4">
                 <h3 className="text-lg font-semibold fc-text-primary">Notes</h3>
                 <p className="mt-2 text-sm fc-text-dim leading-relaxed">{meal.notes}</p>
               </div>

@@ -40,6 +40,9 @@ export function ChallengeCard({
   const daysRemaining = getDaysRemaining(challenge.end_date);
   const progress = getChallengeProgress(challenge.start_date, challenge.end_date);
   const isEnding = daysRemaining <= 3 && challenge.status === "active";
+  const challengeAsk = challenge.description?.trim()
+    ? challenge.description
+    : "Complete the required tasks shown in challenge details.";
 
   const getStatusColor = () => {
     if (challenge.status === "active") return "fc-text-success";
@@ -55,22 +58,22 @@ export function ChallengeCard({
 
   const getCardStatusClasses = () => {
     if (challenge.status === "completed") {
-      return "border-l-4 border-gray-400 dark:border-gray-500 bg-gray-50/30 dark:bg-gray-800/10 opacity-80";
+      return "border-white/10 border-l-4 border-l-gray-400/80 opacity-90";
     }
     if (isParticipating) {
-      return "border-l-4 border-amber-500 bg-amber-50/30 dark:bg-amber-900/10";
+      return "border-white/10 border-l-4 border-l-amber-400/70";
     }
     if (challenge.status === "active") {
-      return "border-l-4 border-green-500 bg-green-50/30 dark:bg-green-900/10";
+      return "border-white/10 border-l-4 border-l-emerald-400/70";
     }
-    return "border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10";
+    return "border-white/10 border-l-4 border-l-sky-400/70";
   };
 
   const getTypeBadgeClasses = () => {
     if (challenge.challenge_type === "coach_challenge") {
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      return "border border-white/10 bg-white/[0.06] text-gray-200";
     }
-    return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400";
+    return "border border-white/10 bg-white/[0.06] text-gray-300";
   };
 
   if (dense) {
@@ -120,16 +123,18 @@ export function ChallengeCard({
   }
 
   return (
-    <div className={`p-6 fc-card fc-accent-challenges fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] ${getCardStatusClasses()}`}>
+    <div
+      className={`p-4 rounded-xl border bg-white/[0.04] backdrop-blur-[6px] transition-colors ${getCardStatusClasses()}`}
+    >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="fc-icon-tile fc-icon-challenges">
-            <Trophy className="w-6 h-6" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05]">
+            <Trophy className="w-5 h-5 text-gray-200" />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`fc-pill px-2.5 py-0.5 rounded text-xs font-semibold ${getTypeBadgeClasses()}`}>
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold ${getTypeBadgeClasses()}`}>
                 {getChallengeTypeLabel()}
               </span>
               {isEnding && challenge.status === "active" && (
@@ -139,13 +144,9 @@ export function ChallengeCard({
                 </span>
               )}
             </div>
-            <h3 className="text-lg font-bold fc-text-primary">
+            <h3 className="text-base font-semibold text-white tracking-tight">
               {challenge.name}
             </h3>
-            <p className="text-xs fc-text-subtle">
-              {new Date(challenge.start_date).toLocaleDateString()} -{" "}
-              {new Date(challenge.end_date).toLocaleDateString()}
-            </p>
           </div>
         </div>
         <span className={`fc-pill fc-pill-glass uppercase ${getStatusColor()}`}>
@@ -153,12 +154,40 @@ export function ChallengeCard({
         </span>
       </div>
 
-      {/* Description */}
-      {challenge.description && (
-        <p className="text-sm mb-4 line-clamp-2 fc-text-dim">
-          {challenge.description}
-        </p>
-      )}
+      {/* At-a-glance details */}
+      <div className="space-y-2 mb-4">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+            Challenge asks
+          </p>
+          <p className="text-sm text-gray-200 line-clamp-2">{challengeAsk}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              Prize
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Gift className="w-3.5 h-3.5 text-amber-400" />
+              <p className="text-xs text-gray-200 truncate">
+                {challenge.reward_description || "No prize specified"}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              Start / End
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <p className="text-xs text-gray-200">
+                {new Date(challenge.start_date).toLocaleDateString()} -{" "}
+                {new Date(challenge.end_date).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Progress Bar (active challenges only) */}
       {challenge.status === "active" && (
@@ -182,7 +211,7 @@ export function ChallengeCard({
       )}
 
       {/* Info Row */}
-      <div className="flex flex-wrap items-center gap-4 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         {challenge.status === "active" && (
           <div className="flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 fc-text-subtle" />
@@ -201,14 +230,6 @@ export function ChallengeCard({
           <span className="text-xs fc-text-subtle">
             Max {challenge.max_participants}
           </span>
-        )}
-        {challenge.reward_description && (
-          <div className="flex items-center gap-1.5">
-            <Gift className="w-3.5 h-3.5 fc-text-warning" />
-            <span className="text-xs font-medium fc-text-warning truncate max-w-[140px]">
-              {challenge.reward_description}
-            </span>
-          </div>
         )}
       </div>
 

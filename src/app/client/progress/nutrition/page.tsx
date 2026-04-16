@@ -434,7 +434,7 @@ export default function NutritionPage() {
   };
 
   const renderDailySummary = () => (
-    <div className="fc-card-shell p-6">
+    <div className="fc-card-shell p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -448,7 +448,7 @@ export default function NutritionPage() {
           {formatNumber(dailyTotals.calories, 0)} kcal total
         </span>
       </div>
-      <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <SummaryItem label="Calories" value={`${formatNumber(dailyTotals.calories, 0)} kcal`} />
         <SummaryItem label="Protein" value={`${formatNumber(dailyTotals.protein, 0)} g`} />
         <SummaryItem label="Carbs" value={`${formatNumber(dailyTotals.carbs, 0)} g`} />
@@ -460,15 +460,15 @@ export default function NutritionPage() {
   const renderMeals = () => {
     if (!assignment) {
       return (
-        <div className="fc-card-shell p-8 text-center">
+        <div className="fc-card-shell py-6 px-4 text-sm text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
               <ShieldAlert className="h-6 w-6" />
             </div>
-            <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+            <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
               No active meal plan assigned.
             </p>
-            <p className="text-sm text-[color:var(--fc-text-dim)]">
+            <p className="text-[color:var(--fc-text-dim)]">
               Contact your coach to get a plan scheduled.
             </p>
           </div>
@@ -478,11 +478,11 @@ export default function NutritionPage() {
 
     if (meals.length === 0) {
       return (
-        <div className="fc-card-shell p-8 text-center">
-          <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+        <div className="fc-card-shell py-6 px-4 text-sm text-center">
+          <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
             This meal plan has no meals assigned.
           </p>
-          <p className="text-sm text-[color:var(--fc-text-dim)]">
+          <p className="text-[color:var(--fc-text-dim)]">
             Ask your coach to add meals to your plan.
           </p>
         </div>
@@ -490,13 +490,13 @@ export default function NutritionPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {meals.map((meal) => {
           const isLogged = !!meal.completion;
           return (
             <div
               key={meal.id}
-              className="fc-card-shell p-5 flex flex-col gap-4"
+              className="fc-card-shell p-4 flex flex-col gap-3"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -633,7 +633,7 @@ export default function NutritionPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-card-shell p-6">
+            <div className="fc-card-shell p-4">
               <div className="animate-pulse space-y-3">
                 <div className="h-6 rounded bg-[color:var(--fc-glass-highlight)] w-1/3" />
                 <div className="h-4 rounded bg-[color:var(--fc-glass-highlight)] w-1/2" />

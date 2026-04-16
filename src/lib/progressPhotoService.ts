@@ -2,7 +2,7 @@
  * Progress Photos Service
  * Client progress-photos timeline: upload by (client_id, photo_date, photo_type).
  * Writes to table progress_photos and Storage path {clientId}/{dateStr}/{type}.jpg.
- * Used by: weekly check-in flow, client progress/photos page, coach progress hub (photos section).
+ * Used by: weekly check-in flow, client body-metrics (Photos tab), coach progress hub (photos section).
  */
 
 import { supabase } from "./supabase";

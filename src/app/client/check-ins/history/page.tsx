@@ -313,7 +313,7 @@ export default function CheckInsHistoryPage() {
           <AddGoalModal
             open={showAddGoalModal}
             onClose={() => setShowAddGoalModal(false)}
-            pillar="checkins"
+            defaultPillar="checkins"
             onSuccess={fetchPillarGoals}
           />
         </ClientPageShell>

@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import {
   ArrowLeft,
   Scale,
@@ -17,20 +16,34 @@ import {
   Target,
   ListFilter,
   Camera,
+  Ruler,
+  GitCompare,
+  X,
+  Save,
+  ChevronRight,
+  Trash2,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { isFromCheckIns, progressBackHref, withFromCheckIns } from "@/lib/clientProgressNav";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { isFromCheckIns, progressBackHref } from "@/lib/clientProgressNav";
+import { useToast } from "@/components/ui/toast-provider";
 import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BodyMeasurement } from "@/lib/measurementService";
 import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { ClientPageShell } from "@/components/client-ui";
-import { getPhotosForDate } from "@/lib/progressPhotoService";
+import { cn } from "@/lib/utils";
+import {
+  getPhotosForDate,
+  uploadPhoto,
+  getPhotoTimeline,
+  getComparisonPhotos,
+  getLatestWeightForPhoto,
+  deletePhoto,
+  type ProgressPhoto,
+} from "@/lib/progressPhotoService";
 import { getNutritionComplianceTrend, parseNutritionGoalsFromRows } from "@/lib/nutritionLogService";
 
 interface BodyMetric {
@@ -52,8 +65,48 @@ function formatTimeAgo(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+type PhotoType = "front" | "side" | "back";
+type BodyMetricsTabId = "overview" | "weight-bf" | "measurements" | "photos" | "history";
+
+function formatPhotoDateLong(dateStr: string): string {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function normalizeBodyMetricsTab(
+  raw: string | null,
+  hasCircumference: boolean
+): BodyMetricsTabId {
+  if (!raw) return "overview";
+  if (raw === "measurements" && !hasCircumference) return "overview";
+  if (
+    raw === "overview" ||
+    raw === "weight-bf" ||
+    raw === "measurements" ||
+    raw === "photos" ||
+    raw === "history"
+  ) {
+    return raw;
+  }
+  return "overview";
+}
+
+interface PhotoSlot {
+  type: PhotoType;
+  label: string;
+  file: File | null;
+  preview: string | null;
+  existingPhoto: ProgressPhoto | null;
+}
+
 function BodyMetricsPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { addToast } = useToast();
   const fromCheckIns = isFromCheckIns(searchParams);
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
@@ -65,7 +118,7 @@ function BodyMetricsPageContent() {
   const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [chartRange, setChartRange] = useState<"12M" | "6M" | "1M">("12M");
-  const [activeTab, setActiveTab] = useState<"weight-bf" | "measurements">("weight-bf");
+  const [activeTab, setActiveTab] = useState<BodyMetricsTabId>("overview");
   const [latestDatePhotos, setLatestDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [previousDatePhotos, setPreviousDatePhotos] = useState<{ url: string; type: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -74,6 +127,31 @@ function BodyMetricsPageContent() {
   const [hasNutritionGoals, setHasNutritionGoals] = useState(false);
   const [nutritionAdherence30, setNutritionAdherence30] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const todayPhoto = new Date().toISOString().split("T")[0];
+  const [photoTimeline, setPhotoTimeline] = useState<
+    { date: string; types: string[]; weight_kg?: number | null }[]
+  >([]);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoTimelineSelectedDate, setPhotoTimelineSelectedDate] = useState<string | null>(null);
+  const [photoTimelineSelectedPhotos, setPhotoTimelineSelectedPhotos] = useState<ProgressPhoto[]>([]);
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [comparisonDate1, setComparisonDate1] = useState<string | null>(null);
+  const [comparisonDate2, setComparisonDate2] = useState<string | null>(null);
+  const [comparisonPhotos, setComparisonPhotos] = useState<{
+    before: ProgressPhoto[];
+    after: ProgressPhoto[];
+  } | null>(null);
+  const [fullscreenPhotoUrl, setFullscreenPhotoUrl] = useState<string | null>(null);
+  const [photoUploadWeight, setPhotoUploadWeight] = useState("");
+  const [photoUploadNotes, setPhotoUploadNotes] = useState("");
+  const [photoSlots, setPhotoSlots] = useState<PhotoSlot[]>([
+    { type: "front", label: "Front", file: null, preview: null, existingPhoto: null },
+    { type: "side", label: "Side", file: null, preview: null, existingPhoto: null },
+    { type: "back", label: "Back", file: null, preview: null, existingPhoto: null },
+  ]);
+  const [photoStripNonce, setPhotoStripNonce] = useState(0);
+  const [photoTimelineLoading, setPhotoTimelineLoading] = useState(false);
 
   const loadMetricsData = useCallback(async () => {
     if (!user?.id) return;
@@ -172,6 +250,56 @@ function BodyMetricsPageContent() {
     }
   }, [user]);
 
+  const loadPhotoTimelineOnly = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await getPhotoTimeline(user.id);
+      setPhotoTimeline(data);
+    } catch (e) {
+      console.error("Error loading photo timeline:", e);
+    }
+  }, [user?.id]);
+
+  const loadTodayPhotoSlots = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const photos = await getPhotosForDate(user.id, todayPhoto);
+      setPhotoSlots((slots) =>
+        slots.map((slot) => {
+          const existing = photos.find((p) => p.photo_type === slot.type);
+          return {
+            ...slot,
+            existingPhoto: existing || null,
+            preview: existing?.photo_url || null,
+            file: null,
+          };
+        })
+      );
+    } catch (e) {
+      console.error("Error loading today's photos:", e);
+    }
+  }, [user?.id, todayPhoto]);
+
+  const loadLatestWeightForPhotoSlots = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const w = await getLatestWeightForPhoto(user.id);
+      if (w != null) setPhotoUploadWeight(String(w));
+    } catch (e) {
+      console.error("Error loading latest weight for photos:", e);
+    }
+  }, [user?.id]);
+
+  const refreshPhotoData = useCallback(async () => {
+    await Promise.all([loadPhotoTimelineOnly(), loadTodayPhotoSlots()]);
+  }, [loadPhotoTimelineOnly, loadTodayPhotoSlots]);
+
+  useEffect(() => {
+    if (!user?.id || authLoading) return;
+    void refreshPhotoData();
+    void loadLatestWeightForPhotoSlots();
+  }, [user?.id, authLoading, refreshPhotoData, loadLatestWeightForPhotoSlots]);
+
   useEffect(() => {
     if (!user || authLoading) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -220,7 +348,7 @@ function BodyMetricsPageContent() {
         setLatestDatePhotos(photos.map((p) => ({ url: p.photo_url, type: p.photo_type })));
     });
     return () => { cancelled = true; };
-  }, [user?.id, latest?.measured_date]);
+  }, [user?.id, latest?.measured_date, photoStripNonce]);
   useEffect(() => {
     if (!user?.id || !previous?.measured_date) {
       setPreviousDatePhotos([]);
@@ -232,7 +360,7 @@ function BodyMetricsPageContent() {
         setPreviousDatePhotos(photos.map((p) => ({ url: p.photo_url, type: p.photo_type })));
     });
     return () => { cancelled = true; };
-  }, [user?.id, previous?.measured_date]);
+  }, [user?.id, previous?.measured_date, photoStripNonce]);
 
   const { current, previous: previousMetric } = useMemo(() => {
     if (metrics.length === 0) return { current: null, previous: null };
@@ -326,14 +454,178 @@ function BodyMetricsPageContent() {
     );
   }, [fullMeasurements]);
 
+  const setTab = useCallback(
+    (tab: BodyMetricsTabId) => {
+      const effective =
+        tab === "measurements" && !hasCircumferenceData ? "overview" : tab;
+      setActiveTab(effective);
+      const p = new URLSearchParams(searchParams.toString());
+      if (effective === "overview") {
+        p.delete("tab");
+      } else {
+        p.set("tab", effective);
+      }
+      const q = p.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    },
+    [hasCircumferenceData, pathname, router, searchParams]
+  );
+
+  useEffect(() => {
+    if (loading) return;
+    const normalized = normalizeBodyMetricsTab(
+      searchParams.get("tab"),
+      hasCircumferenceData
+    );
+    setActiveTab(normalized);
+    const raw = searchParams.get("tab");
+    if (raw && normalized !== raw) {
+      const p = new URLSearchParams(searchParams.toString());
+      if (normalized === "overview") p.delete("tab");
+      else p.set("tab", normalized);
+      const q = p.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
+  }, [loading, searchParams, hasCircumferenceData, pathname, router]);
+
+  const loadComparison = useCallback(async () => {
+    if (!comparisonDate1 || !comparisonDate2 || !user?.id) return;
+    try {
+      const photos = await getComparisonPhotos(
+        user.id,
+        comparisonDate1,
+        comparisonDate2
+      );
+      setComparisonPhotos(photos);
+    } catch (e) {
+      console.error("Error loading comparison:", e);
+    }
+  }, [comparisonDate1, comparisonDate2, user?.id]);
+
+  useEffect(() => {
+    if (comparisonMode && comparisonDate1 && comparisonDate2 && user?.id) {
+      void loadComparison();
+    }
+  }, [comparisonMode, comparisonDate1, comparisonDate2, user?.id, loadComparison]);
+
+  const loadPhotoDatePhotos = async (date: string) => {
+    if (!user?.id) return;
+    setPhotoTimelineLoading(true);
+    try {
+      const photos = await getPhotosForDate(user.id, date);
+      setPhotoTimelineSelectedPhotos(photos);
+      setPhotoTimelineSelectedDate(date);
+    } catch (e) {
+      console.error("Error loading date photos:", e);
+    } finally {
+      setPhotoTimelineLoading(false);
+    }
+  };
+
+  const handlePhotoSlotSelect = (
+    type: PhotoType,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      addToast({ title: "Please select an image file", variant: "warning" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoSlots((slots) =>
+        slots.map((slot) =>
+          slot.type === type
+            ? {
+                ...slot,
+                file,
+                preview: reader.result as string,
+                existingPhoto: null,
+              }
+            : slot
+        )
+      );
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearPhotoSlot = (type: PhotoType) => {
+    setPhotoSlots((slots) =>
+      slots.map((slot) =>
+        slot.type === type
+          ? { ...slot, file: null, preview: null, existingPhoto: null }
+          : slot
+      )
+    );
+  };
+
+  const handleSavePhotos = async () => {
+    if (!user?.id) return;
+    const hasAny = photoSlots.some((s) => s.file || s.existingPhoto);
+    if (!hasAny) {
+      addToast({ title: "Please take at least one photo", variant: "warning" });
+      return;
+    }
+    setPhotoSaving(true);
+    try {
+      const uploadPromises = photoSlots
+        .filter((slot) => slot.file !== null)
+        .map((slot) =>
+          uploadPhoto(user.id, {
+            photo_date: todayPhoto,
+            photo_type: slot.type,
+            file: slot.file!,
+            weight_kg: photoUploadWeight ? parseFloat(photoUploadWeight) : undefined,
+            notes: photoUploadNotes.trim() || undefined,
+          })
+        );
+      await Promise.all(uploadPromises);
+      await refreshPhotoData();
+      setPhotoUploadNotes("");
+      setPhotoStripNonce((n) => n + 1);
+    } catch (e) {
+      console.error("Error saving photos:", e);
+      addToast({ title: "Failed to save photos. Please try again.", variant: "destructive" });
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
+
+  const handleDeleteProgressPhoto = async (photoId: string) => {
+    if (!user?.id || !confirm("Delete this photo?")) return;
+    try {
+      await deletePhoto(photoId, user.id);
+      await refreshPhotoData();
+      setPhotoStripNonce((n) => n + 1);
+      if (photoTimelineSelectedDate) {
+        await loadPhotoDatePhotos(photoTimelineSelectedDate);
+      }
+      await loadTodayPhotoSlots();
+    } catch (e) {
+      console.error("Error deleting photo:", e);
+      addToast({ title: "Failed to delete photo", variant: "destructive" });
+    }
+  };
+
+  const startPhotoComparison = () => {
+    if (photoTimeline.length < 2) {
+      addToast({ title: "Need at least 2 photo dates to compare", variant: "warning" });
+      return;
+    }
+    setComparisonMode(true);
+    setComparisonDate1(photoTimeline[photoTimeline.length - 1].date);
+    setComparisonDate2(photoTimeline[0].date);
+  };
+
   if (loadError && !loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
             <div className="py-6 text-center">
-              <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
+              <p className="mb-3 text-sm text-gray-400">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </ClientPageShell>
@@ -347,7 +639,7 @@ function BodyMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
             <div className="animate-pulse space-y-3">
               <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
@@ -359,46 +651,99 @@ function BodyMetricsPageContent() {
     );
   }
 
+  const tabChipBase =
+    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
+  const tabChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+  const tabChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-4 sm:px-6 lg:px-8 fc-page">
-        {/* Header — compact */}
-        <div className="mb-3 flex items-center gap-3">
+      <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        {/* Header */}
+        <div className="mb-4 flex items-center gap-3">
           <button
             type="button"
             onClick={() => {
               window.location.href = progressBackHref(fromCheckIns);
             }}
-            className="fc-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]"
             aria-label="Go back"
           >
-            <ArrowLeft className="h-4 w-4 text-[color:var(--fc-text-primary)]" />
+            <ArrowLeft className="h-4 w-4 text-white" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Body Metrics</h1>
-            <p className="text-sm text-[color:var(--fc-text-dim)]">
+            <h1 className="text-xl font-bold text-white tracking-tight">Body Metrics</h1>
+            <p className="text-sm text-gray-500">
               {latestDate ? (
                 <>Updated {formatTimeAgo(latestDate)}</>
               ) : (
-                <>Weight and measurements over time</>
+                <>Weight, measurements, and progress photos</>
               )}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = withFromCheckIns("/client/progress/photos", fromCheckIns);
-            }}
-            className="fc-glass-soft flex shrink-0 items-center gap-1.5 rounded-lg border border-[color:var(--fc-glass-border)] px-3 py-1.5 text-sm font-medium fc-text-primary"
-          >
-            <Camera className="h-3.5 w-3.5" />
-            Photos
-          </button>
         </div>
 
-        {/* Goal Progress (check-in goals with body-metric targets) */}
-        {checkInGoals.length > 0 && (() => {
+        {/* Tab chips */}
+        <div className="-mx-4 px-4 mb-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex flex-wrap gap-2 min-w-min">
+            <button
+              type="button"
+              onClick={() => setTab("overview")}
+              className={cn(tabChipBase, activeTab === "overview" ? tabChipActive : tabChipInactive)}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("weight-bf")}
+              className={cn(tabChipBase, activeTab === "weight-bf" ? tabChipActive : tabChipInactive)}
+            >
+              Weight & BF
+            </button>
+            {hasCircumferenceData && (
+              <button
+                type="button"
+                onClick={() => setTab("measurements")}
+                className={cn(tabChipBase, activeTab === "measurements" ? tabChipActive : tabChipInactive)}
+              >
+                Measurements
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setTab("photos")}
+              className={cn(tabChipBase, activeTab === "photos" ? tabChipActive : tabChipInactive)}
+            >
+              Photos
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("history")}
+              className={cn(tabChipBase, activeTab === "history" ? tabChipActive : tabChipInactive)}
+            >
+              History
+            </button>
+          </div>
+        </div>
+
+        {(activeTab === "weight-bf" || activeTab === "measurements") && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {(["12M", "6M", "1M"] as const).map((range) => (
+              <button
+                key={range}
+                type="button"
+                onClick={() => setChartRange(range)}
+                className={cn(tabChipBase, chartRange === range ? tabChipActive : tabChipInactive)}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Goal Progress (check-in goals with body-metric targets) — overview only */}
+        {activeTab === "overview" && checkInGoals.length > 0 && (() => {
           const goalCards: React.ReactNode[] = [];
           for (const goal of checkInGoals) {
             const unit = (goal.target_unit || "").toLowerCase();
@@ -427,29 +772,32 @@ function BodyMetricsPageContent() {
               ? (lowerIsBetter ? (current - target).toFixed(1) : (target - current).toFixed(1))
               : null;
             goalCards.push(
-              <div key={goal.id} className="border-b border-[color:var(--fc-glass-border)]/80 py-3 last:border-0 last:pb-0 first:pt-0">
+              <div
+                key={goal.id}
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-2 last:mb-0"
+              >
                 <div className="mb-2 flex items-center gap-2">
-                  <Target className="w-4 h-4 fc-text-subtle" />
-                  <span className="font-semibold fc-text-primary">{goal.title}</span>
+                  <Target className="w-4 h-4 text-gray-500" />
+                  <span className="font-semibold text-white">{goal.title}</span>
                 </div>
                 {latest == null ? (
-                  <p className="text-sm fc-text-dim">Log your first measurement to track progress toward your goal.</p>
+                  <p className="text-sm text-gray-500">Log your first measurement to track progress toward your goal.</p>
                 ) : (
                   <>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="fc-text-subtle">Current {label}</span>
-                      <span className="font-mono fc-text-primary">{current != null ? (label === "Body fat" ? `${current.toFixed(1)}%` : `${current.toFixed(1)} ${label === "Weight" ? "kg" : "cm"}`) : "—"}</span>
+                      <span className="text-gray-500">Current {label}</span>
+                      <span className="tabular-nums font-semibold text-white">{current != null ? (label === "Body fat" ? `${current.toFixed(1)}%` : `${current.toFixed(1)} ${label === "Weight" ? "kg" : "cm"}`) : "—"}</span>
                     </div>
-                    <div className="h-2 rounded-full bg-[color:var(--fc-glass-border)] overflow-hidden">
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-[color:var(--fc-status-success)] transition-all"
+                        className="h-full rounded-full bg-emerald-500/80 transition-all"
                         style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
                       />
                     </div>
                     {reached ? (
-                      <p className="text-sm font-medium fc-text-success mt-2">Goal reached!</p>
+                      <p className="text-sm font-medium text-emerald-300 mt-2">Goal reached!</p>
                     ) : remaining != null ? (
-                      <p className="text-sm fc-text-dim mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
+                      <p className="text-sm text-gray-500 mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
                     ) : null}
                   </>
                 )}
@@ -457,68 +805,74 @@ function BodyMetricsPageContent() {
             );
           }
           return goalCards.length > 0 ? (
-            <section className="mb-3 space-y-2">
-              <h2 className="text-base font-semibold fc-text-primary">Goal progress</h2>
+            <section className="mb-4 space-y-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-2">Goal progress</h2>
               <div>{goalCards}</div>
             </section>
           ) : null;
         })()}
 
         {/* Nutrition vs Body Composition insight — only if nutrition goals + ≥2 body metrics in 30d */}
-        {nutritionVsBodyInsight && (
-          <section className="mb-3 space-y-2 border-t border-[color:var(--fc-glass-border)] pt-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-[color:var(--fc-accent)]" />
-              <h2 className="text-base font-semibold fc-text-primary">Nutrition &amp; body composition</h2>
-              <span className="text-xs fc-text-dim">Last 30 days</span>
+        {activeTab === "overview" && nutritionVsBodyInsight && (
+          <section className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Activity className="h-4 w-4 text-cyan-400" />
+              <h2 className="text-sm font-semibold text-white">Nutrition &amp; body composition</h2>
+              <span className="text-xs text-gray-500">Last 30 days</span>
             </div>
-            <p className="text-sm fc-text-primary">{nutritionVsBodyInsight.message}</p>
+            <p className="text-sm text-gray-300">{nutritionVsBodyInsight.message}</p>
           </section>
         )}
 
-        {metrics.length === 0 ? (
-          <div className="py-6">
-            <EmptyState
-              icon={Scale}
-              title="No measurements yet"
-              description="Log your first measurement to start tracking"
-              action={{ label: "Log Measurement", onClick: () => setShowLogModal(true) }}
-            />
+        {activeTab === "overview" && metrics.length === 0 && (
+          <div className="py-8 px-4 text-center">
+            <Scale className="mx-auto mb-3 h-10 w-10 text-gray-600" aria-hidden />
+            <p className="text-sm text-gray-400">No measurements yet</p>
+            <p className="mt-1 text-xs text-gray-500">Log your first measurement to start tracking</p>
+            <button
+              type="button"
+              onClick={() => setShowLogModal(true)}
+              className="mt-4 flex h-11 w-full max-w-xs mx-auto items-center justify-center rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25"
+            >
+              Log today
+            </button>
           </div>
-        ) : (
-          <main className="space-y-3">
+        )}
+
+        {activeTab === "overview" && metrics.length > 0 && (
+          <main className="space-y-4">
             {/* Last vs current comparison */}
-            <section className="space-y-3">
-              <h2 className="text-base font-semibold fc-text-primary">Body check-in</h2>
+            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Body check-in</h2>
               {previous && daysSincePrevious != null && (
-                <p className="text-sm fc-text-dim mb-2">
+                <p className="text-xs text-gray-500 mb-2">
                   Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
                 </p>
               )}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[280px] border-collapse">
+                <table className="w-full min-w-[280px] border-collapse text-white">
                   <thead>
-                    <tr className="border-b border-[color:var(--fc-glass-border)]">
-                      <th className="py-2 pr-3 text-left text-xs font-semibold uppercase fc-text-subtle"></th>
+                    <tr className="border-b border-white/10">
+                      <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
                       {previous && (
                         <>
-                          <th className="px-2 py-2 text-right text-xs font-semibold fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
-                          <th className="px-2 py-2 text-right text-xs font-semibold fc-text-primary">Current</th>
-                          <th className="py-2 pl-2 text-right text-xs font-semibold fc-text-subtle">Change</th>
+                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
+                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>
+                          <th className="py-2 pl-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Change</th>
                         </>
                       )}
-                      {!previous && <th className="px-2 py-2 text-right text-xs font-semibold fc-text-primary">Current</th>}
+                      {!previous && <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>}
                     </tr>
                   </thead>
-                  <tbody className="fc-text-primary">
-                    <tr className="border-b border-[color:var(--fc-glass-border)]">
-                      <td className="py-2 pr-3 text-sm font-medium">Weight</td>
-                      {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
-                      <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
+                  <tbody>
+                    <tr className="border-b border-white/10">
+                      <td className="py-2 pr-3 text-sm font-medium text-gray-200">Weight</td>
+                      {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
+                      <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
                       {previous && (
                         <td className="py-2 pl-2 text-right">
                           {weightChange !== 0 ? (
-                            <span className={`text-sm font-bold ${weightChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                            <span className={`text-sm font-bold ${weightChange < 0 ? "text-emerald-300" : "text-amber-300"}`}>
                               {weightChange < 0 ? "▼" : "▲"} {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
                             </span>
                           ) : "—"}
@@ -526,14 +880,14 @@ function BodyMetricsPageContent() {
                       )}
                     </tr>
                     {(latest?.body_fat_percentage != null || previous?.body_fat_percentage != null) && (
-                      <tr className="border-b border-[color:var(--fc-glass-border)]">
-                        <td className="py-2 pr-3 text-sm font-medium">Body fat</td>
-                        {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.body_fat_percentage ?? "—")}%</td>}
-                        <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.body_fat_percentage ?? "—")}%</td>
+                      <tr className="border-b border-white/10">
+                        <td className="py-2 pr-3 text-sm font-medium text-gray-200">Body fat</td>
+                        {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.body_fat_percentage ?? "—")}%</td>}
+                        <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.body_fat_percentage ?? "—")}%</td>
                         {previous && (
                           <td className="py-2 pl-2 text-right">
                             {bodyFatChange != null && bodyFatChange !== 0 ? (
-                              <span className={`text-sm font-bold ${bodyFatChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                              <span className={`text-sm font-bold ${bodyFatChange < 0 ? "text-emerald-300" : "text-amber-300"}`}>
                                 {bodyFatChange < 0 ? "▼" : "▲"} {bodyFatChange > 0 ? "+" : ""}{bodyFatChange.toFixed(1)}%
                               </span>
                             ) : "—"}
@@ -542,14 +896,14 @@ function BodyMetricsPageContent() {
                       </tr>
                     )}
                     {(latest?.muscle_mass_kg != null || previous?.muscle_mass_kg != null) && (
-                      <tr className="border-b border-[color:var(--fc-glass-border)]">
-                        <td className="py-2 pr-3 text-sm font-medium">Muscle mass</td>
-                        {previous && <td className="px-2 py-2 text-right font-mono text-sm">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
-                        <td className="px-2 py-2 text-right font-mono text-sm">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
+                      <tr className="border-b border-white/10">
+                        <td className="py-2 pr-3 text-sm font-medium text-gray-200">Muscle mass</td>
+                        {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
+                        <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
                         {previous && (
                           <td className="py-2 pl-2 text-right">
                             {muscleChange != null && muscleChange !== 0 ? (
-                              <span className={`text-sm font-bold ${muscleChange > 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                              <span className={`text-sm font-bold ${muscleChange > 0 ? "text-emerald-300" : "text-amber-300"}`}>
                                 {muscleChange > 0 ? "▲" : "▼"} {muscleChange > 0 ? "+" : ""}{muscleChange.toFixed(1)} kg
                               </span>
                             ) : "—"}
@@ -568,22 +922,22 @@ function BodyMetricsPageContent() {
                 const maxW = Math.max(...sparkData.map((x) => x.weight));
                 const range = maxW - minW || 1;
                 return (
-                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Weight trend (last 3 months)</p>
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Weight trend (last 3 months)</p>
                     <div className="flex h-10 items-end gap-0.5">
                       {sparkData.map((m, i) => {
                         const h = ((m.weight - minW) / range) * 100;
                         return (
                           <div
                             key={`${m.date}-${i}`}
-                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent)]/60"
+                            className="flex-1 min-w-[4px] rounded-t bg-cyan-500/50"
                             style={{ height: `${Math.max(h, 4)}%` }}
                             title={`${m.weight.toFixed(1)} kg · ${new Date(m.date).toLocaleDateString()}`}
                           />
                         );
                       })}
                     </div>
-                    <div className="flex justify-between mt-1 text-[10px] fc-text-subtle font-mono">
+                    <div className="flex justify-between mt-1 text-[10px] text-gray-500 tabular-nums">
                       <span>{sparkData[0]?.weight.toFixed(1)} kg</span>
                       <span>{sparkData[sparkData.length - 1]?.weight.toFixed(1)} kg</span>
                     </div>
@@ -591,7 +945,7 @@ function BodyMetricsPageContent() {
                       <p className="mt-2 text-sm">
                         <button
                           type="button"
-                          className="text-[color:var(--fc-accent)] hover:underline"
+                          className="text-cyan-400 hover:underline"
                           onClick={() => {
                             window.location.href = "/client/nutrition";
                           }}
@@ -617,29 +971,29 @@ function BodyMetricsPageContent() {
                 ].filter((r) => r.prev != null || r.curr != null);
                 if (rows.length === 0) return null;
                 return (
-                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Measurements</p>
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Measurements</p>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[240px] text-sm">
+                      <table className="w-full min-w-[240px] text-sm text-white">
                         <thead>
-                          <tr className="border-b border-[color:var(--fc-glass-border)]">
-                            <th className="text-left py-2 pr-2 fc-text-subtle font-medium"></th>
-                            {previous && <th className="text-right py-2 px-2 fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>}
-                            <th className="text-right py-2 px-2 fc-text-subtle">Current</th>
-                            <th className="text-right py-2 pl-2 fc-text-subtle">Change</th>
+                          <tr className="border-b border-white/10">
+                            <th className="text-left py-2 pr-2 text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
+                            {previous && <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>}
+                            <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>
+                            <th className="text-right py-2 pl-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Change</th>
                           </tr>
                         </thead>
                         <tbody>
                           {rows.map((r) => {
                             const change = r.prev != null && r.curr != null ? r.curr - r.prev : null;
                             return (
-                              <tr key={r.label} className="border-b border-[color:var(--fc-glass-border)]/50">
-                                <td className="py-2 pr-2 fc-text-primary">{r.label}</td>
-                                <td className="text-right py-2 px-2 font-mono">{r.prev != null ? `${r.prev} cm` : "—"}</td>
-                                <td className="text-right py-2 px-2 font-mono">{r.curr != null ? `${r.curr} cm` : "—"}</td>
-                                <td className="text-right py-2 pl-2 font-mono">
+                              <tr key={r.label} className="border-b border-white/10">
+                                <td className="py-2 pr-2 text-gray-200">{r.label}</td>
+                                <td className="text-right py-2 px-2 tabular-nums">{r.prev != null ? `${r.prev} cm` : "—"}</td>
+                                <td className="text-right py-2 px-2 tabular-nums font-semibold">{r.curr != null ? `${r.curr} cm` : "—"}</td>
+                                <td className="text-right py-2 pl-2 tabular-nums">
                                   {change != null && change !== 0 ? (
-                                    <span className={change < 0 ? "fc-text-success" : "fc-text-warning"}>{change > 0 ? "+" : ""}{change} cm</span>
+                                    <span className={change < 0 ? "text-emerald-300" : "text-amber-300"}>{change > 0 ? "+" : ""}{change} cm</span>
                                   ) : "—"}
                                 </td>
                               </tr>
@@ -652,134 +1006,150 @@ function BodyMetricsPageContent() {
                 );
               })()}
 
-              {/* Progress photos comparison */}
+              {/* Progress photos comparison — tap opens Photos tab */}
               {(latestDatePhotos.length > 0 || previousDatePhotos.length > 0) && (
-                <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                  <p className="mb-2 text-xs font-semibold uppercase fc-text-subtle">Progress photos</p>
-                  <div className="flex flex-wrap items-end gap-3">
-                    {previous && previousDatePhotos.length > 0 && (
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[10px] fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · previous</p>
-                        <img src={previousDatePhotos[0].url} alt="Previous" className="h-20 w-14 rounded-lg object-cover bg-[color:var(--fc-glass-soft)] sm:h-24 sm:w-16" />
-                      </div>
-                    )}
-                    {latest && latestDatePhotos.length > 0 && (
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[10px] fc-text-subtle">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · current</p>
-                        <img src={latestDatePhotos[0].url} alt="Current" className="h-20 w-14 rounded-lg object-cover bg-[color:var(--fc-glass-soft)] sm:h-24 sm:w-16" />
-                      </div>
-                    )}
-                  </div>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTab("photos")}
+                    className="w-full rounded-lg border border-white/10 bg-white/[0.02] p-3 text-left transition-colors hover:bg-white/[0.06]"
+                  >
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                      Progress photos
+                    </p>
+                    <p className="mb-2 text-xs text-gray-500">Tap to open Photos</p>
+                    <div className="flex flex-wrap items-end gap-3">
+                      {previous && previousDatePhotos.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · previous</p>
+                          <img src={previousDatePhotos[0].url} alt="Previous" className="h-20 w-14 rounded-lg object-cover bg-white/5 sm:h-24 sm:w-16 pointer-events-none" />
+                        </div>
+                      )}
+                      {latest && latestDatePhotos.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] text-gray-500">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · current</p>
+                          <img src={latestDatePhotos[0].url} alt="Current" className="h-20 w-14 rounded-lg object-cover bg-white/5 sm:h-24 sm:w-16 pointer-events-none" />
+                        </div>
+                      )}
+                    </div>
+                  </button>
                 </div>
               )}
             </section>
 
-            {/* Tabs: Weight & BF and Measurements */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="space-y-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-              <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                  <TabsTrigger value="weight-bf" className="data-[state=active]:fc-glass">
-                    Weight & BF
-                  </TabsTrigger>
-                  {hasCircumferenceData && (
-                    <TabsTrigger value="measurements" className="data-[state=active]:fc-glass">
-                      Measurements
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-                <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
-                  {(["12M", "6M", "1M"] as const).map((range) => (
-                    <button
-                      key={range}
-                      type="button"
-                      onClick={() => setChartRange(range)}
-                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        chartRange === range
-                          ? "fc-glass fc-text-primary"
-                          : "fc-text-subtle hover:fc-text-primary"
-                      }`}
-                    >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={() => setShowLogModal(true)}
+              className="flex h-11 w-full items-center justify-center rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25"
+            >
+              Log today
+            </button>
+          </main>
+        )}
 
-              <TabsContent value="weight-bf" className="mt-0">
-                {metrics.length > 0 ? (
-                  <div className="relative">
-                    <div className="flex h-48 items-end justify-between gap-1 sm:gap-2 sm:h-56">
-                      {metrics.slice(-12).map((metric, index) => {
-                        const maxW = Math.max(...metrics.map((m) => m.weight));
-                        const minW = Math.min(...metrics.map((m) => m.weight));
-                        const range = maxW - minW || 1;
-                        const height = ((metric.weight - minW) / range) * 100;
-                        
-                        // Body fat secondary indicator (if data exists)
-                        const hasBodyFat = metrics.some((m) => m.bodyFat != null);
-                        const maxBF = hasBodyFat ? Math.max(...metrics.map((m) => m.bodyFat || 0)) : 0;
-                        const minBF = hasBodyFat ? Math.min(...metrics.map((m) => m.bodyFat || 0)) : 0;
-                        const rangeBF = maxBF - minBF || 1;
-                        const heightBF = metric.bodyFat != null ? ((metric.bodyFat - minBF) / rangeBF) * 100 : 0;
-                        
-                        return (
-                          <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0 relative h-full">
-                            {/* Body fat indicator (positioned in chart area, above bar) */}
-                            {metric.bodyFat != null && heightBF > 0 && (
-                              <div
-                                className="absolute w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] border border-[color:var(--fc-glass-border)] z-10"
-                                style={{
-                                  bottom: `calc(${Math.max(heightBF, 2)}% + 2rem)`,
-                                }}
-                                title={`Body Fat: ${metric.bodyFat}%`}
-                              />
-                            )}
-                            {/* Weight bar */}
-                            <div
-                              className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90 relative"
-                              style={{
-                                height: `${Math.max(height, 8)}%`,
-                                background:
-                                  "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
-                              }}
-                            />
-                            <div className="mt-2 text-center truncate w-full">
-                              <p className="text-xs font-semibold fc-text-primary truncate">
-                                {metric.weight.toFixed(1)}
-                              </p>
-                              <p className="text-[10px] fc-text-subtle truncate">
-                                {new Date(metric.date).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {metrics.some((m) => m.bodyFat != null) && (
-                      <div className="flex items-center gap-3 mt-4 text-xs fc-text-subtle">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[color:var(--fc-status-error)] to-[color:var(--fc-accent-blue)]" />
-                          <span>Weight</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--fc-status-success)]" />
-                          <span>Body Fat %</span>
-                        </div>
-                      </div>
+        {activeTab === "weight-bf" && metrics.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-3">
+                    Weight &amp; body fat
+                  </p>
+                  <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+                    <span className="text-2xl font-bold text-white tabular-nums">
+                      {currentWeight > 0 ? currentWeight.toFixed(1) : "—"}
+                    </span>
+                    <span className="text-sm text-gray-400">kg</span>
+                    {previous != null && weightChange !== 0 && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border tabular-nums",
+                          weightChange > 0
+                            ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                            : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                        )}
+                      >
+                        {weightChange > 0 ? (
+                          <TrendingUp className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                        ) : (
+                          <TrendingDown className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                        )}
+                        {weightChange > 0 ? "+" : ""}
+                        {weightChange.toFixed(1)} kg
+                      </span>
                     )}
                   </div>
-                ) : (
-                  <p className="text-center py-12 text-sm fc-text-dim">
-                    Not enough data to show chart
-                  </p>
-                )}
-              </TabsContent>
+                  {metrics.length > 0 ? (
+                    <div className="overflow-x-auto -mx-1 px-1">
+                      <div className="min-w-[520px]">
+                        <div className="relative">
+                          <div className="flex h-48 items-end justify-between gap-1 sm:gap-2 sm:h-56">
+                            {metrics.slice(-12).map((metric, index) => {
+                              const maxW = Math.max(...metrics.map((m) => m.weight));
+                              const minW = Math.min(...metrics.map((m) => m.weight));
+                              const range = maxW - minW || 1;
+                              const height = ((metric.weight - minW) / range) * 100;
 
-              <TabsContent value="measurements" className="mt-0">
-                {fullMeasurements.length > 0 ? (
+                              const hasBodyFat = metrics.some((m) => m.bodyFat != null);
+                              const maxBF = hasBodyFat ? Math.max(...metrics.map((m) => m.bodyFat || 0)) : 0;
+                              const minBF = hasBodyFat ? Math.min(...metrics.map((m) => m.bodyFat || 0)) : 0;
+                              const rangeBF = maxBF - minBF || 1;
+                              const heightBF = metric.bodyFat != null ? ((metric.bodyFat - minBF) / rangeBF) * 100 : 0;
+
+                              return (
+                                <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0 relative h-full">
+                                  {metric.bodyFat != null && heightBF > 0 && (
+                                    <div
+                                      className="absolute w-2 h-2 rounded-full bg-emerald-400 border border-white/20 z-10"
+                                      style={{
+                                        bottom: `calc(${Math.max(heightBF, 2)}% + 2rem)`,
+                                      }}
+                                      title={`Body Fat: ${metric.bodyFat}%`}
+                                    />
+                                  )}
+                                  <div
+                                    className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90 relative"
+                                    style={{
+                                      height: `${Math.max(height, 8)}%`,
+                                      background:
+                                        "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
+                                    }}
+                                  />
+                                  <div className="mt-2 text-center truncate w-full">
+                                    <p className="text-xs font-semibold text-white truncate tabular-nums">
+                                      {metric.weight.toFixed(1)}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 truncate">
+                                      {new Date(metric.date).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {metrics.some((m) => m.bodyFat != null) && (
+                            <div className="flex items-center gap-3 mt-4 text-xs text-gray-500">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[color:var(--fc-status-error)] to-[color:var(--fc-accent-blue)]" />
+                                <span>Weight</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <span>Body Fat %</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-center py-8 text-sm text-gray-500">Not enough data to show chart</p>
+                  )}
+                </div>
+        )}
+
+        {activeTab === "measurements" && metrics.length > 0 && hasCircumferenceData && (
+                fullMeasurements.length > 0 ? (
                   <div className="space-y-3">
                     {/* Comparison Summary Card */}
                     {(() => {
@@ -796,6 +1166,7 @@ function BodyMetricsPageContent() {
                         change: number;
                         isGood: boolean;
                         hasData: boolean;
+                        currentValue: number;
                       }> = [];
 
                       // Waist
@@ -809,6 +1180,7 @@ function BodyMetricsPageContent() {
                           change,
                           isGood: change < 0, // Decrease is good
                           hasData: true,
+                          currentValue: lastMeasurement.waist_circumference,
                         });
                       }
 
@@ -823,6 +1195,7 @@ function BodyMetricsPageContent() {
                           change,
                           isGood: change < 0, // Decrease is good
                           hasData: true,
+                          currentValue: lastMeasurement.hips_circumference,
                         });
                       }
 
@@ -844,6 +1217,7 @@ function BodyMetricsPageContent() {
                           change,
                           isGood: change > 0, // Increase is good (muscle growth)
                           hasData: true,
+                          currentValue: lastAvg,
                         });
                       }
 
@@ -865,6 +1239,7 @@ function BodyMetricsPageContent() {
                           change,
                           isGood: change > 0, // Increase is good
                           hasData: true,
+                          currentValue: lastAvg,
                         });
                       }
 
@@ -886,36 +1261,50 @@ function BodyMetricsPageContent() {
                           change,
                           isGood: change > 0, // Increase is good
                           hasData: true,
+                          currentValue: lastAvg,
                         });
                       }
 
                       if (comparisons.length === 0) return null;
 
                       return (
-                        <div className="rounded-lg border border-[color:var(--fc-glass-border)]/60 py-2">
-                          <h3 className="mb-2 px-2 text-sm font-semibold fc-text-primary">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-2">
+                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
                             Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
                             })}
                           </h3>
-                          <div className="grid grid-cols-2 gap-2 px-2 pb-2 sm:grid-cols-3 lg:grid-cols-5">
+                          <div className="grid grid-cols-2 gap-2">
                             {comparisons.map((comp) => (
-                              <div key={comp.label} className="text-center">
-                                <p className="text-xs fc-text-subtle mb-1">{comp.label}</p>
-                                <p
-                                  className={`text-sm font-bold font-mono ${
-                                    comp.isGood
-                                      ? "fc-text-success"
-                                      : comp.change === 0
-                                        ? "fc-text-subtle"
-                                        : "fc-text-warning"
-                                  }`}
-                                >
-                                  {comp.change > 0 ? "+" : ""}
-                                  {comp.change.toFixed(1)} cm
+                              <div
+                                key={comp.label}
+                                className="rounded-lg border border-white/10 bg-white/[0.04] p-3"
+                              >
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500">{comp.label}</p>
+                                <p className="text-base font-semibold text-white tabular-nums mt-1">
+                                  {comp.currentValue.toFixed(1)}{" "}
+                                  <span className="text-xs font-normal text-gray-400">cm</span>
                                 </p>
+                                {comp.change !== 0 && (
+                                  <span
+                                    className={cn(
+                                      "mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border tabular-nums",
+                                      comp.change > 0
+                                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                                        : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                                    )}
+                                  >
+                                    {comp.change > 0 ? (
+                                      <TrendingUp className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                                    ) : (
+                                      <TrendingDown className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                                    )}
+                                    {comp.change > 0 ? "+" : ""}
+                                    {comp.change.toFixed(1)} cm
+                                  </span>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -924,121 +1313,172 @@ function BodyMetricsPageContent() {
                     })()}
 
                     {/* Measurement Charts Grid */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3">
                       {/* Waist */}
                       {fullMeasurements.filter((m) => m.waist_circumference != null).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Waist"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.waist_circumference ?? null}
-                          timeRange={chartRange}
-                          isDecreaseGood={true}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Waist"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.waist_circumference ?? null}
+                              timeRange={chartRange}
+                              isDecreaseGood={true}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Hips */}
                       {fullMeasurements.filter((m) => m.hips_circumference != null).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Hips"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.hips_circumference ?? null}
-                          timeRange={chartRange}
-                          isDecreaseGood={true}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Hips"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.hips_circumference ?? null}
+                              timeRange={chartRange}
+                              isDecreaseGood={true}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Torso/Chest */}
                       {fullMeasurements.filter((m) => m.torso_circumference != null).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Torso/Chest"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.torso_circumference ?? null}
-                          timeRange={chartRange}
-                          isDecreaseGood={false}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Torso/Chest"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.torso_circumference ?? null}
+                              timeRange={chartRange}
+                              isDecreaseGood={false}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Arms (Left & Right) */}
                       {fullMeasurements.filter(
                         (m) => m.left_arm_circumference != null || m.right_arm_circumference != null
                       ).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Arms"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.left_arm_circumference ?? null}
-                          getValue2={(m) => m.right_arm_circumference ?? null}
-                          label2="Right"
-                          timeRange={chartRange}
-                          isDecreaseGood={false}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Arms"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.left_arm_circumference ?? null}
+                              getValue2={(m) => m.right_arm_circumference ?? null}
+                              label2="Right"
+                              timeRange={chartRange}
+                              isDecreaseGood={false}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Thighs (Left & Right) */}
                       {fullMeasurements.filter(
                         (m) => m.left_thigh_circumference != null || m.right_thigh_circumference != null
                       ).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Thighs"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.left_thigh_circumference ?? null}
-                          getValue2={(m) => m.right_thigh_circumference ?? null}
-                          label2="Right"
-                          timeRange={chartRange}
-                          isDecreaseGood={false}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Thighs"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.left_thigh_circumference ?? null}
+                              getValue2={(m) => m.right_thigh_circumference ?? null}
+                              label2="Right"
+                              timeRange={chartRange}
+                              isDecreaseGood={false}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Calves (Left & Right) */}
                       {fullMeasurements.filter(
                         (m) => m.left_calf_circumference != null || m.right_calf_circumference != null
                       ).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Calves"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.left_calf_circumference ?? null}
-                          getValue2={(m) => m.right_calf_circumference ?? null}
-                          label2="Right"
-                          timeRange={chartRange}
-                          isDecreaseGood={false}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Calves"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.left_calf_circumference ?? null}
+                              getValue2={(m) => m.right_calf_circumference ?? null}
+                              label2="Right"
+                              timeRange={chartRange}
+                              isDecreaseGood={false}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Muscle mass */}
                       {fullMeasurements.filter((m) => m.muscle_mass_kg != null).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Muscle mass"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.muscle_mass_kg ?? null}
-                          timeRange={chartRange}
-                          isDecreaseGood={false}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Muscle mass"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.muscle_mass_kg ?? null}
+                              timeRange={chartRange}
+                              isDecreaseGood={false}
+                            />
+                          </div>
+                        </div>
                       )}
 
                       {/* Visceral fat */}
                       {fullMeasurements.filter((m) => m.visceral_fat_level != null).length >= 2 && (
-                        <MeasurementMiniChart
-                          title="Visceral fat"
-                          measurements={fullMeasurements}
-                          getValue={(m) => m.visceral_fat_level ?? null}
-                          timeRange={chartRange}
-                          isDecreaseGood={true}
-                        />
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[520px]">
+                            <MeasurementMiniChart
+                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              title="Visceral fat"
+                              measurements={fullMeasurements}
+                              getValue={(m) => m.visceral_fat_level ?? null}
+                              timeRange={chartRange}
+                              isDecreaseGood={true}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <p className="text-center py-12 text-sm fc-text-dim">
-                    No measurement data available
-                  </p>
-                )}
-              </TabsContent>
-            </Tabs>
+                  <div className="py-8 px-4 text-center">
+                    <Ruler className="mx-auto mb-3 h-10 w-10 text-gray-600" aria-hidden />
+                    <p className="text-sm text-gray-400">No measurement data available</p>
+                    <p className="mt-1 text-xs text-gray-500">Log a check-in with circumferences to see charts here.</p>
+                  </div>
+                )
+        )}
 
-            {/* Log history */}
-            <div className="flex flex-col border-t border-[color:var(--fc-glass-border)] pt-3">
+        {activeTab === "weight-bf" && metrics.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-500">
+            No weight data yet. Log a measurement from Overview or use Log today.
+          </p>
+        )}
+
+        {activeTab === "history" && metrics.length === 0 && (
+          <p className="py-8 text-center text-sm text-gray-500">No entries yet. Log a measurement to see history here.</p>
+        )}
+
+        {activeTab === "history" && metrics.length > 0 && (
+            <div className="flex flex-col border-t border-white/10 pt-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold fc-text-primary">Log history</h3>
-                <ListFilter className="h-4 w-4 fc-text-subtle" />
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Log history</h3>
+                <ListFilter className="h-4 w-4 text-gray-500" />
               </div>
               <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
                 {historyNewestFirst.map((metric, index) => {
@@ -1046,76 +1486,269 @@ function BodyMetricsPageContent() {
                   const delta = prev ? metric.weight - prev.weight : null;
                   const d = new Date(metric.date);
                   const full = fullMeasurements.find((m) => m.measured_date === metric.date);
+                  const subtitleParts = [
+                    metric.bodyFat != null && `${metric.bodyFat}% BF`,
+                    metric.waist != null && `${metric.waist} cm waist`,
+                  ].filter(Boolean);
+                  const subtitle =
+                    subtitleParts.length > 0
+                      ? subtitleParts.join(" · ")
+                      : full?.notes?.trim()
+                        ? undefined
+                        : "Body weight log";
                   return (
                     <div
                       key={metric.date}
-                      className="flex items-center justify-between rounded-lg border border-[color:var(--fc-glass-border)]/70 p-2.5 transition-colors hover:bg-[color:var(--fc-glass-highlight)]/40"
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-3"
                     >
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg fc-glass">
-                          <span className="text-[9px] font-bold uppercase fc-text-subtle">
-                            {d.toLocaleDateString("en-US", { month: "short" })}
-                          </span>
-                          <span className="text-sm font-bold leading-none fc-text-primary">
-                            {d.getDate()}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-mono text-sm font-semibold fc-text-primary">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-white tracking-tight">
+                          {d.toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className="text-sm font-semibold text-white tabular-nums">
                             {metric.weight.toFixed(1)} kg
-                          </p>
-                          <p className="text-xs fc-text-subtle truncate">
-                            {[metric.bodyFat != null && `${metric.bodyFat}% BF`, metric.waist != null && `${metric.waist} cm waist`]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
-                          </p>
-                          {full?.notes?.trim() && (
-                            <p className="text-xs fc-text-dim mt-1 whitespace-pre-wrap break-words">{full.notes.trim()}</p>
+                          </span>
+                          {delta !== null && delta !== 0 && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border tabular-nums",
+                                delta > 0
+                                  ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                                  : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                              )}
+                            >
+                              {delta > 0 ? (
+                                <TrendingUp className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                              ) : (
+                                <TrendingDown className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                              )}
+                              {delta > 0 ? "+" : ""}
+                              {delta.toFixed(1)} kg
+                            </span>
                           )}
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        {delta !== null && delta !== 0 && (
-                          <>
-                            <p
-                              className={`text-sm font-bold ${
-                                delta < 0 ? "fc-text-success" : "fc-text-warning"
-                              }`}
-                            >
-                              {delta > 0 ? "+" : ""}
-                              {delta.toFixed(1)} kg
-                            </p>
-                            <p className="text-[10px] fc-text-subtle uppercase">vs previous</p>
-                          </>
-                        )}
-                      </div>
+                      {subtitle != null && (
+                        <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+                      )}
+                      {full?.notes?.trim() && (
+                        <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">{full.notes.trim()}</p>
+                      )}
                     </div>
                   );
                 })}
               </div>
-              <p className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-2 text-center text-xs font-medium fc-text-subtle">
+              <p className="mt-3 border-t border-white/10 pt-2 text-center text-xs text-gray-500">
                 {metrics.length} entr{metrics.length === 1 ? "y" : "ies"} total
               </p>
             </div>
-          </main>
+        )}
+
+        {activeTab === "photos" && user && (
+          <div className="space-y-4 border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Photos</p>
+              {photoTimeline.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={startPhotoComparison}
+                  className={cn(tabChipBase, tabChipInactive, "inline-flex items-center gap-1.5")}
+                >
+                  <GitCompare className="h-3.5 w-3.5" />
+                  Compare
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-3">
+                Today&apos;s photos
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {photoSlots.map((slot) => (
+                  <div key={slot.type} className="flex flex-col">
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-dashed border-white/10 bg-white/[0.02]">
+                      {slot.preview ? (
+                        <>
+                          <img src={slot.preview} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (slot.existingPhoto && !slot.file) {
+                                void handleDeleteProgressPhoto(slot.existingPhoto.id);
+                              } else {
+                                clearPhotoSlot(slot.type);
+                              }
+                            }}
+                            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white"
+                            aria-label="Remove"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1">
+                          <Camera className="h-6 w-6 text-gray-500" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => handlePhotoSlotSelect(slot.type, e)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-center text-[10px] uppercase tracking-wider text-gray-500">
+                      {slot.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Weight (kg) — optional</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={photoUploadWeight}
+                    onChange={(e) => setPhotoUploadWeight(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    placeholder="From latest log"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Notes — optional</label>
+                  <input
+                    type="text"
+                    value={photoUploadNotes}
+                    onChange={(e) => setPhotoUploadNotes(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    placeholder="Add notes"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleSavePhotos()}
+                disabled={photoSaving || !photoSlots.some((s) => s.file || s.existingPhoto)}
+                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+              >
+                {photoSaving ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save photos
+                  </>
+                )}
+              </button>
+            </div>
+
+            {photoTimeline.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Timeline</p>
+                {photoTimeline.map((entry) => {
+                  const isExpanded = photoTimelineSelectedDate === entry.date;
+                  const photos = isExpanded ? photoTimelineSelectedPhotos : [];
+                  return (
+                    <div
+                      key={entry.date}
+                      className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-3"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          isExpanded
+                            ? setPhotoTimelineSelectedDate(null)
+                            : void loadPhotoDatePhotos(entry.date)
+                        }
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-white">{formatPhotoDateLong(entry.date)}</p>
+                          <p className="text-xs text-gray-500">
+                            {entry.types.length} photo{entry.types.length !== 1 ? "s" : ""}
+                            {entry.weight_kg != null && ` · ${entry.weight_kg.toFixed(1)} kg`}
+                          </p>
+                        </div>
+                        <ChevronRight
+                          className={cn(
+                            "h-5 w-5 shrink-0 text-gray-500 transition-transform",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
+                      </button>
+                      {photoTimelineLoading && isExpanded && (
+                        <p className="mt-2 text-xs text-gray-500">Loading…</p>
+                      )}
+                      {isExpanded && photos.length > 0 && (
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
+                          {(["front", "side", "back"] as PhotoType[]).map((type) => {
+                            const photo = photos.find((p) => p.photo_type === type);
+                            return (
+                              <div key={type}>
+                                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">{type}</p>
+                                {photo ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
+                                    className="block w-full overflow-hidden rounded-lg border border-white/10"
+                                  >
+                                    <img
+                                      src={photo.photo_url}
+                                      alt=""
+                                      className="aspect-[3/4] w-full object-cover"
+                                    />
+                                  </button>
+                                ) : (
+                                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-gray-500">
+                                    —
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* FAB */}
         <button
           type="button"
           onClick={() => setShowLogModal(true)}
-          className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl fc-btn fc-btn-primary flex items-center justify-center shadow-lg"
+          className="absolute bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-lg shadow-cyan-500/30"
           aria-label="Log metrics"
         >
           <Plus className="w-8 h-8" />
         </button>
-      </div>
+      </ClientPageShell>
 
       {showLogModal && user && (
         <LogMeasurementModal
           clientId={user.id}
+          compactForm
           onClose={() => setShowLogModal(false)}
-          onSuccess={() => loadMetricsData()}
+          onSuccess={() => {
+            void loadMetricsData();
+            void refreshPhotoData();
+            setPhotoStripNonce((n) => n + 1);
+          }}
           lastMeasurement={latest ?? undefined}
           onAchievementsUnlocked={(raw) => {
             const tierToRarity = (tier: string | null): Achievement["rarity"] =>
@@ -1148,6 +1781,155 @@ function BodyMetricsPageContent() {
           }}
         />
       )}
+
+      {comparisonMode && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black text-white">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+            <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold">Photo comparison</h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">Before</span>
+                  <select
+                    value={comparisonDate1 || ""}
+                    onChange={(e) => setComparisonDate1(e.target.value)}
+                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white"
+                  >
+                    {photoTimeline.map((entry) => (
+                      <option key={entry.date} value={entry.date}>
+                        {formatPhotoDateLong(entry.date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">After</span>
+                  <select
+                    value={comparisonDate2 || ""}
+                    onChange={(e) => setComparisonDate2(e.target.value)}
+                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white"
+                  >
+                    {photoTimeline.map((entry) => (
+                      <option key={entry.date} value={entry.date}>
+                        {formatPhotoDateLong(entry.date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComparisonMode(false);
+                    setComparisonPhotos(null);
+                  }}
+                  className="ml-auto flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]"
+                  aria-label="Close comparison"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {comparisonPhotos ? (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+                  <h3 className="mb-4 text-base font-semibold">
+                    {comparisonDate1 ? formatPhotoDateLong(comparisonDate1) : ""}
+                    {comparisonPhotos.before[0]?.weight_kg != null && (
+                      <span className="ml-2 text-sm font-normal text-gray-400">
+                        ({comparisonPhotos.before[0].weight_kg.toFixed(1)} kg)
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-4">
+                    {(["front", "side", "back"] as PhotoType[]).map((type) => {
+                      const photo = comparisonPhotos.before.find((p) => p.photo_type === type);
+                      return (
+                        <div key={type}>
+                          <p className="mb-2 text-sm capitalize text-gray-400">{type}</p>
+                          {photo ? (
+                            <button
+                              type="button"
+                              onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
+                              className="block w-full overflow-hidden rounded-xl border border-white/10"
+                            >
+                              <img src={photo.photo_url} alt="" className="w-full object-cover" />
+                            </button>
+                          ) : (
+                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-white/20 text-gray-500">
+                              No {type} photo
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+                  <h3 className="mb-4 text-base font-semibold">
+                    {comparisonDate2 ? formatPhotoDateLong(comparisonDate2) : ""}
+                    {comparisonPhotos.after[0]?.weight_kg != null && (
+                      <span className="ml-2 text-sm font-normal text-gray-400">
+                        ({comparisonPhotos.after[0].weight_kg.toFixed(1)} kg)
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-4">
+                    {(["front", "side", "back"] as PhotoType[]).map((type) => {
+                      const photo = comparisonPhotos.after.find((p) => p.photo_type === type);
+                      return (
+                        <div key={type}>
+                          <p className="mb-2 text-sm capitalize text-gray-400">{type}</p>
+                          {photo ? (
+                            <button
+                              type="button"
+                              onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
+                              className="block w-full overflow-hidden rounded-xl border border-white/10"
+                            >
+                              <img src={photo.photo_url} alt="" className="w-full object-cover" />
+                            </button>
+                          ) : (
+                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-white/20 text-gray-500">
+                              No {type} photo
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center py-16">
+                <div className="h-12 w-12 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {fullscreenPhotoUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm"
+          onClick={() => setFullscreenPhotoUrl(null)}
+          role="presentation"
+        >
+          <button
+            type="button"
+            onClick={() => setFullscreenPhotoUrl(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-3 text-white"
+            aria-label="Close"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={fullscreenPhotoUrl}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </AnimatedBackground>
   );
 }
@@ -1158,7 +1940,7 @@ export default function BodyMetricsPage() {
       <Suspense
         fallback={
           <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
               <div className="animate-pulse space-y-3">
                 <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
                 <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />

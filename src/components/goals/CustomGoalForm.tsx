@@ -99,7 +99,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
       }}
     >
       <div
-        className="w-full max-w-md mt-8 mb-8 fc-modal fc-card p-6 md:p-8"
+        className="w-full max-w-md mt-8 mb-8 fc-modal fc-card p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
@@ -107,7 +107,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
             <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
               Goals
             </span>
-            <h2 className="text-2xl font-bold fc-text-primary mt-2">
+            <h2 className="text-lg font-semibold fc-text-primary mt-2">
               Create Custom Goal
             </h2>
           </div>
@@ -182,7 +182,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
             <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Target *
             </Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <Input
                 type="number"
                 placeholder="Number"
@@ -193,7 +193,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 required
                 min={0}
                 step="0.01"
-                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
               <Input
                 type="text"
@@ -202,7 +202,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 onChange={(e) =>
                   setFormData({ ...formData, target_unit: e.target.value })
                 }
-                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,19 +43,38 @@ const GOAL_TYPE_OPTIONS: Record<Pillar, { value: string; label: string }[]> = {
 interface AddGoalModalProps {
   open: boolean;
   onClose: () => void;
-  pillar: Pillar;
+  defaultPillar?: Pillar;
+  defaultCategory?: string;
   onSuccess: () => void;
 }
 
-export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalProps) {
+export function AddGoalModal({
+  open,
+  onClose,
+  defaultPillar = "general",
+  defaultCategory: _defaultCategory,
+  onSuccess,
+}: AddGoalModalProps) {
   const { addToast } = useToast();
   const { user } = useAuth();
+  const [selectedPillar, setSelectedPillar] = useState<Pillar>(defaultPillar);
   const [title, setTitle] = useState("");
   const [targetValue, setTargetValue] = useState("");
   const [targetUnit, setTargetUnit] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [goalType, setGoalType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resolvedDefaultPillar = defaultPillar ?? "general";
+  useEffect(() => {
+    if (!open) return;
+    setSelectedPillar(resolvedDefaultPillar);
+    setGoalType((prev) =>
+      GOAL_TYPE_OPTIONS[resolvedDefaultPillar].some((opt) => opt.value === prev)
+        ? prev
+        : ""
+    );
+  }, [open, resolvedDefaultPillar]);
 
   if (!open) return null;
 
@@ -73,7 +92,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
 
       const { error } = await supabase.from("goals").insert({
         client_id: user.id,
-        pillar,
+        pillar: selectedPillar,
         title,
         target_value: parsed,
         target_unit: targetUnit || "units",
@@ -94,6 +113,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
       setTargetUnit("");
       setTargetDate("");
       setGoalType("");
+      setSelectedPillar(resolvedDefaultPillar);
       onClose();
       onSuccess();
     } catch (error) {
@@ -120,15 +140,15 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
       }}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto fc-modal fc-card p-6 md:p-8 my-8"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto fc-modal fc-card p-4 my-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
           <div>
             <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-              {pillarLabels[pillar]} Goals
+              {pillarLabels[selectedPillar]} Goals
             </span>
-            <h2 className="text-2xl font-bold fc-text-primary mt-2">
+            <h2 className="text-lg font-semibold fc-text-primary mt-2">
               Add Goal
             </h2>
           </div>
@@ -138,6 +158,27 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">Pillar</Label>
+            <select
+              value={selectedPillar}
+              onChange={(e) => {
+                const nextPillar = e.target.value as Pillar;
+                setSelectedPillar(nextPillar);
+                if (!GOAL_TYPE_OPTIONS[nextPillar].some((opt) => opt.value === goalType)) {
+                  setGoalType("");
+                }
+              }}
+              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="training">Training</option>
+              <option value="nutrition">Nutrition</option>
+              <option value="checkins">Check-ins</option>
+              <option value="lifestyle">Lifestyle</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+
           <div>
             <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Title *</Label>
             <Input
@@ -152,7 +193,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
 
           <div>
             <Label className="text-sm font-medium mb-2 block fc-text-subtle">Target *</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <Input
                 type="number"
                 placeholder="Number"
@@ -161,19 +202,19 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
                 required
                 min={0}
                 step="0.01"
-                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
               <Input
                 type="text"
                 placeholder="Unit (kg, reps, min, etc)"
                 value={targetUnit}
                 onChange={(e) => setTargetUnit(e.target.value)}
-                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
             </div>
           </div>
 
-          {GOAL_TYPE_OPTIONS[pillar].length > 0 && (
+          {GOAL_TYPE_OPTIONS[selectedPillar].length > 0 && (
             <div>
               <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Type (optional)</Label>
               <select
@@ -182,7 +223,7 @@ export function AddGoalModal({ open, onClose, pillar, onSuccess }: AddGoalModalP
                 className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">—</option>
-                {GOAL_TYPE_OPTIONS[pillar].map((opt) => (
+                {GOAL_TYPE_OPTIONS[selectedPillar].map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>

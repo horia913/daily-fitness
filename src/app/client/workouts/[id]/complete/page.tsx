@@ -1496,17 +1496,16 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-2xl pt-12">
-            <div className="space-y-6">
-              <div className="text-center space-y-4">
-                <div className="fc-skeleton w-20 h-20 rounded-full mx-auto" />
-                <div className="fc-skeleton h-8 w-64 rounded mx-auto" />
-                <div className="fc-skeleton h-4 w-40 rounded mx-auto" />
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <div className="space-y-3 animate-pulse">
+              <div className="h-20 w-20 rounded-full mx-auto bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-7 max-w-[200px] rounded-lg mx-auto bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 max-w-[120px] rounded mx-auto bg-[color:var(--fc-glass-highlight)]" />
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-2 mt-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-12 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                ))}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map(i => <div key={i} className="fc-skeleton h-28 rounded-2xl" />)}
-              </div>
-              <div className="fc-skeleton h-24 rounded-2xl" />
             </div>
           </ClientPageShell>
         </AnimatedBackground>
@@ -1518,9 +1517,10 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
-            <div className="w-full max-w-md border-b border-white/5 border-l-2 border-l-[color:var(--fc-status-error)] py-6 text-center">
-              <p className="mb-4 fc-text-dim">{loadError}</p>
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+            <div className="w-full py-8 px-4 text-center">
+              <p className="mb-1 text-sm text-gray-400">{loadError}</p>
+              <p className="mb-4 text-xs text-gray-500">Try again or return to your workouts.</p>
               <div className="flex flex-wrap justify-center gap-3">
                 <PrimaryButton
                   onClick={() => {
@@ -1566,12 +1566,10 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
-            <div className="w-full max-w-md border-b border-white/5 py-8 text-center">
-              <h3 className="text-xl font-semibold fc-text-primary">
-                Workout not found
-              </h3>
-              <p className="mt-2 text-sm fc-text-dim">
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+            <div className="w-full py-8 px-4 text-center">
+              <h3 className="text-sm text-gray-400 font-medium">Workout not found</h3>
+              <p className="mt-1 text-xs text-gray-500">
                 This workout does not exist or you do not have access to it.
               </p>
               <div className="mt-6 flex justify-center">
@@ -1748,10 +1746,10 @@ function WorkoutCompleteContent() {
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <ClientPageShell className="min-h-screen max-w-2xl pb-40 flex flex-col gap-6">
+        <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden flex flex-col gap-6">
             {/* Celebration Hero */}
-            <header className="text-center pt-10 pb-6">
-              <div className="mb-5 relative inline-block">
+            <header className="text-center pt-2 pb-4">
+              <div className="mb-4 relative inline-block">
                 <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: "color-mix(in srgb, var(--fc-status-success) 15%, transparent)" }}>
                   <Trophy className="w-10 h-10" style={{ color: "var(--fc-status-success)" }} />
                 </div>
@@ -1759,7 +1757,7 @@ function WorkoutCompleteContent() {
                   <CheckCircle className="w-3.5 h-3.5 text-[color:var(--fc-text-primary)]" />
                 </div>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-1">Workout Complete</h1>
+              <h1 className="text-xl font-bold tracking-tight text-white mb-1">Workout Complete</h1>
               <div className="flex items-center justify-center gap-2 fc-text-dim font-mono text-sm">
                 <Clock className="w-3.5 h-3.5" />
                 <span>{Math.floor(workoutStats.duration || 0)}m {(Math.round(((workoutStats.duration || 0) % 1) * 60))}s</span>
@@ -2038,7 +2036,7 @@ function WorkoutCompleteContent() {
 
             {/* Floating Bottom Action */}
             <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
-              <div className="max-w-2xl mx-auto">
+              <div className="max-w-lg mx-auto">
                 <PrimaryButton
                   onClick={() => { window.location.href = "/client"; }}
                   disabled={completing}
@@ -2076,8 +2074,8 @@ export default function WorkoutComplete() {
       fallback={
         <ProtectedRoute>
           <AnimatedBackground>
-            <ClientPageShell>
-              <div className="animate-pulse space-y-4 p-4">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+              <div className="animate-pulse space-y-4">
                 <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
                 <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
               </div>

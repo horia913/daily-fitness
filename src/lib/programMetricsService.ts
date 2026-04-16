@@ -4,8 +4,8 @@
  * REFACTORED: Now derives all program metrics from programStateService.
  * 
  * Reads from:
- *   - programStateService.getProgramSlots (total count)
- *   - programStateService.getCompletedSlots (completed count)
+ *   - programStateService.getProgramScheduleSlotsForAssignment (total count)
+ *   - programStateService.getCompletedSlots (completed count, workout_logs)
  * 
  * REMOVED: getProgramMetricsLegacy (no more fallback to program_day_assignments)
  */
@@ -14,9 +14,8 @@ import { supabase } from './supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
 import {
   getActiveProgramAssignment,
-  getProgramSlots,
+  getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
-  getNextSlot,
 } from './programStateService'
 
 export interface ProgramMetrics {
@@ -58,7 +57,7 @@ export async function getProgramMetrics(
 
     // 2. Get all slots and completed slots in parallel
     const [slots, completedSlots] = await Promise.all([
-      getProgramSlots(db, assignment.program_id),
+      getProgramScheduleSlotsForAssignment(db, assignment.program_id, programAssignmentId),
       getCompletedSlots(db, programAssignmentId),
     ])
 

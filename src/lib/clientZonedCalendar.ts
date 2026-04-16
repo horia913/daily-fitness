@@ -26,6 +26,20 @@ export function addCalendarDaysYmd(ymd: string, deltaDays: number): string {
   return new Date(u).toISOString().slice(0, 10);
 }
 
+/** Whole calendar days from ymdStart to ymdEnd (exclusive of ordering: end − start). YYYY-MM-DD only. */
+export function diffCalendarDaysYmd(ymdStart: string, ymdEnd: string): number {
+  const [ys, ms, ds] = ymdStart.split("-").map(Number);
+  const [ye, me, de] = ymdEnd.split("-").map(Number);
+  const u0 = Date.UTC(ys, ms - 1, ds);
+  const u1 = Date.UTC(ye, me - 1, de);
+  return Math.floor((u1 - u0) / 86400000);
+}
+
+/** Calendar YYYY-MM-DD for an ISO timestamp interpreted in `timeZone`. */
+export function zonedYmdFromIsoTimestamp(iso: string, timeZone: string): string {
+  return zonedCalendarDateString(new Date(iso), timeZone);
+}
+
 /** Monday = 0 … Sunday = 6 for `instant` interpreted in `timeZone`. */
 export function weekdayMon0Sun6InTimezone(
   instant: Date,

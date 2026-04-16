@@ -134,17 +134,17 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
   /* Compact row for completed-goals list */
   if (compact && isCompleted) {
     return (
-      <div className="flex min-h-[52px] items-center justify-between border-b border-white/5 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <CheckCircle className="h-5 w-5 shrink-0 fc-text-success" />
+      <div className="flex min-h-[48px] items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] p-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <CheckCircle className="h-4 w-4 shrink-0 fc-text-success" />
           <div className="min-w-0">
-            <div className="font-semibold fc-text-primary">{goal.title}</div>
-            <div className="font-mono text-xs fc-text-subtle">
-              Final: {goal.current_value ?? goal.target_value ?? "—"} {goal.target_unit ?? ""} • Completed {goal.target_date ? new Date(goal.target_date).toLocaleDateString() : "—"}
+            <div className="text-sm font-semibold fc-text-primary">{goal.title}</div>
+            <div className="mt-0.5 font-mono text-[11px] tabular-nums fc-text-subtle">
+              Final: {goal.current_value ?? goal.target_value ?? "—"} {goal.target_unit ?? ""} · {goal.target_date ? new Date(goal.target_date).toLocaleDateString() : "—"}
             </div>
           </div>
         </div>
-        <span className="fc-pill fc-pill-glass shrink-0 border border-[color:var(--fc-status-success)]/30 text-xs fc-text-success">
+        <span className="fc-pill fc-pill-glass shrink-0 border border-[color:var(--fc-status-success)]/30 text-[10px] font-semibold uppercase tracking-wide fc-text-success">
           Completed
         </span>
       </div>
@@ -156,30 +156,30 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
   const pillarTint = getPillarTintClass(goal.pillar);
   return (
     <div
-      className={`flex flex-col justify-between border-b border-white/5 border-l-[3px] bg-transparent py-4 ${pillarTint}`}
+      className={`flex flex-col justify-between rounded-xl border border-white/10 border-l-[3px] bg-white/[0.04] p-4 ${pillarTint}`}
       style={{ borderLeftColor: accentColor }}
     >
       <div>
-        <p className="text-xs uppercase tracking-wide font-semibold text-[color:var(--fc-text-dim)] mb-1">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
           {eyebrow}
         </p>
-        <h3 className="text-xl font-bold fc-text-primary mb-1">{goal.title}</h3>
+        <h3 className="mb-1 text-base font-semibold tracking-tight text-white">{goal.title}</h3>
         {goal.description && (
-          <p className="text-sm fc-text-dim mb-4">{goal.description}</p>
+          <p className="mb-3 text-sm leading-relaxed text-gray-400 line-clamp-2">{goal.description}</p>
         )}
       </div>
 
-      <div className="space-y-4">
-        <p className="text-sm font-mono fc-text-primary">
+      <div className="space-y-2">
+        <p className="text-sm font-mono tabular-nums text-white">
           {goal.current_value ?? 0}{goal.target_unit ? ` ${goal.target_unit}` : ""} / {goal.target_value ?? "—"}{goal.target_unit ? ` ${goal.target_unit}` : ""}
         </p>
-        <div className="w-full h-2 rounded-full overflow-hidden fc-progress-track border border-[color:var(--fc-glass-border)]">
+        <div className="h-1.5 w-full overflow-hidden rounded-full border border-white/10 bg-white/10">
           <div
-            className="h-full rounded-full transition-all duration-500 fc-progress-fill"
+            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
             style={{ width: `${Math.min(progressPercent, 100)}%` }}
           />
         </div>
-        <div className="flex items-center gap-2 text-xs fc-text-dim pt-1">
+        <div className="flex items-center gap-2 pt-0.5 text-[11px] text-gray-500">
           <Calendar className="w-3.5 h-3.5 shrink-0" />
           <span>
             {goal.target_date
@@ -191,7 +191,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
 
       {/* Manual update + actions: compact row */}
       {(!isAutoTracked || onEdit || onDelete) && !isCompleted && !isCancelled && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-4">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
           {!isAutoTracked && onUpdate && (
             <>
               <Input

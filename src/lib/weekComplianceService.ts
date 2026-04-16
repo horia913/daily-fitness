@@ -9,7 +9,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   getActiveProgramAssignment,
-  getProgramSlots,
+  getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
 } from './programStateService'
 
@@ -113,7 +113,7 @@ export async function computeWeekCompliance(
   if (!ianaTimezone) ianaTimezone = 'UTC'
 
   const [slots, completedSlots] = await Promise.all([
-    getProgramSlots(supabase, assignment.program_id),
+    getProgramScheduleSlotsForAssignment(supabase, assignment.program_id, programAssignmentId),
     getCompletedSlots(supabase, programAssignmentId),
   ])
 
@@ -225,7 +225,7 @@ export async function getCurrentWeekNumber(
   const assignment = await getActiveProgramAssignment(supabase, clientId)
   if (!assignment) return null
   const [slots, completedSlots] = await Promise.all([
-    getProgramSlots(supabase, assignment.program_id),
+    getProgramScheduleSlotsForAssignment(supabase, assignment.program_id, assignment.id),
     getCompletedSlots(supabase, assignment.id),
   ])
   const completedIds = new Set(completedSlots.map((c) => c.program_schedule_id))

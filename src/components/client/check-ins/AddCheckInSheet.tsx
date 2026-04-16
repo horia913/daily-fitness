@@ -119,7 +119,7 @@ export function AddCheckInSheet({
               className={rowClass}
               onClick={() => {
                 onOpenChange(false);
-                go("/client/progress/photos?from=check-ins");
+                go("/client/progress/body-metrics?from=check-ins&tab=photos");
               }}
             >
               <span className="text-xl shrink-0" aria-hidden>

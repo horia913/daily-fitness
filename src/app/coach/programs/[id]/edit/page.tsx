@@ -26,6 +26,9 @@ import {
   TrendingUp,
   Target,
   Layers,
+  Plus,
+  Copy,
+  X,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
@@ -56,6 +59,40 @@ function programDayLabel(dayNum: number): string {
   if (dayNum >= 1 && dayNum <= 7)
     return PROGRAM_DAY_SHORT_LABELS[dayNum - 1];
   return `Day ${dayNum}`;
+}
+
+function goalDotClassForGoal(goal?: string | null): string {
+  const g = (goal || "custom").toLowerCase();
+  const map: Record<string, string> = {
+    hypertrophy: "bg-cyan-400",
+    strength: "bg-amber-400",
+    power: "bg-orange-400",
+    accumulation: "bg-emerald-400",
+    conditioning: "bg-teal-400",
+    sport_specific: "bg-purple-400",
+    deload: "bg-gray-400",
+    peaking: "bg-purple-400",
+    general_fitness: "bg-emerald-400",
+    custom: "bg-gray-400",
+  };
+  return map[g] ?? "bg-gray-400";
+}
+
+function goalBarClassForGoal(goal?: string | null): string {
+  const g = (goal || "custom").toLowerCase();
+  const map: Record<string, string> = {
+    hypertrophy: "bg-cyan-400/60",
+    strength: "bg-amber-400/60",
+    power: "bg-orange-400/60",
+    accumulation: "bg-emerald-400/60",
+    conditioning: "bg-teal-400/60",
+    sport_specific: "bg-purple-400/60",
+    deload: "bg-gray-400/60",
+    peaking: "bg-purple-400/60",
+    general_fitness: "bg-emerald-400/60",
+    custom: "bg-gray-400/60",
+  };
+  return map[g] ?? "bg-gray-400/60";
 }
 
 /** Match schedule rows to the active training block; legacy rows with null training_block_id count when only one block exists */
@@ -244,6 +281,16 @@ function EditProgramContent() {
   const [schedule, setSchedule] = useState<ProgramSchedule[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [scheduleEditor, setScheduleEditor] = useState<{
+    isOpen: boolean;
+    week: number;
+    day: number;
+    blockId: string | null;
+    templateId: string;
+    isOptional: boolean;
+    search: string;
+  } | null>(null);
+  const [scheduleCellSaving, setScheduleCellSaving] = useState(false);
   const [templateBlocks, setTemplateBlocks] = useState<Record<string, any[]>>(
     {},
   );
@@ -285,6 +332,33 @@ function EditProgramContent() {
 
   // The absolute week number to use for DB reads/writes this render cycle
   const absoluteSelectedWeek = blockStartWeek + selectedWeek - 1;
+
+  const scheduleKey = useCallback(
+    (week: number, day: number, blockId: string | null) =>
+      `${week}:${day}:${blockId ?? "__none__"}`,
+    [],
+  );
+
+  const scheduleMap = useMemo(() => {
+    const map = new Map<string, ProgramSchedule>();
+    for (const row of schedule) {
+      const key = scheduleKey(
+        row.week_number || 1,
+        row.program_day,
+        row.training_block_id ?? null,
+      );
+      map.set(key, row);
+    }
+    return map;
+  }, [schedule, scheduleKey]);
+
+  const weeksWithAnyConfiguredRows = useMemo(() => {
+    const set = new Set<number>();
+    for (const row of schedule) {
+      set.add(row.week_number || 1);
+    }
+    return set;
+  }, [schedule]);
 
   const scheduleVolumeKey = useMemo(
     () =>
@@ -693,6 +767,8 @@ function EditProgramContent() {
             title: `Could not copy week 1 to other weeks: ${copyError.message}`,
             variant: "destructive",
           });
+        } else {
+          await WorkoutTemplateService.propagateAllScheduleSlotsToSnapshots(form.id);
         }
       }
 
@@ -707,10 +783,106 @@ function EditProgramContent() {
     }
   };
 
+  const openScheduleEditor = useCallback(
+    (week: number, day: number, blockId: string | null) => {
+      const existing = scheduleMap.get(scheduleKey(week, day, blockId));
+      setScheduleEditor({
+        isOpen: true,
+        week,
+        day,
+        blockId,
+        templateId: existing?.template_id || "rest",
+        isOptional: Boolean(existing?.is_optional),
+        search: "",
+      });
+      setSelectedWeek(Math.max(1, week - blockStartWeek + 1));
+      setSelectedDay(day);
+    },
+    [scheduleMap, scheduleKey, blockStartWeek],
+  );
+
+  const saveScheduleEditor = useCallback(async () => {
+    if (!form?.id || !scheduleEditor) return;
+    setScheduleCellSaving(true);
+    try {
+      if (scheduleEditor.templateId === "rest") {
+        await WorkoutTemplateService.removeProgramSchedule(
+          form.id,
+          scheduleEditor.day,
+          scheduleEditor.week,
+        );
+        setSchedule((prev) =>
+          prev.filter(
+            (row) =>
+              !(
+                (row.week_number || 1) === scheduleEditor.week &&
+                row.program_day === scheduleEditor.day &&
+                (row.training_block_id ?? null) === (scheduleEditor.blockId ?? null)
+              ),
+          ),
+        );
+      } else {
+        const result = await WorkoutTemplateService.setProgramSchedule(
+          form.id,
+          scheduleEditor.day,
+          scheduleEditor.week,
+          scheduleEditor.templateId,
+          scheduleEditor.isOptional,
+          undefined,
+          scheduleEditor.blockId ?? undefined,
+        );
+        if (!result) {
+          addToast({
+            title: "Failed to save schedule. Please check your permissions.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setSchedule((prev) => {
+          const filtered = prev.filter(
+            (row) =>
+              !(
+                (row.week_number || 1) === scheduleEditor.week &&
+                row.program_day === scheduleEditor.day &&
+                (row.training_block_id ?? null) === (scheduleEditor.blockId ?? null)
+              ),
+          );
+          return [...filtered, result];
+        });
+      }
+      setScheduleEditor(null);
+    } finally {
+      setScheduleCellSaving(false);
+    }
+  }, [form?.id, scheduleEditor, addToast]);
+
+  const handleCopyFromWeekOne = useCallback(async () => {
+    if (!form?.id) return;
+    const { error: copyError } = await supabase.rpc("copy_week_schedule", {
+      p_program_id: form.id,
+      p_source_week: 1,
+      p_total_weeks: form.duration_weeks,
+    });
+    if (copyError) {
+      addToast({
+        title: `Could not copy week 1 to other weeks: ${copyError.message}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    await WorkoutTemplateService.propagateAllScheduleSlotsToSnapshots(form.id);
+    const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
+    setSchedule(sched || []);
+    addToast({
+      title: "Copied week 1 schedule across all weeks.",
+    });
+  }, [form?.id, form?.duration_weeks, addToast]);
+
   if (loading || !form) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen p-4 max-w-5xl mx-auto">
+        <div className="min-h-screen p-4 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
             <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
@@ -726,7 +898,7 @@ function EditProgramContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-5xl mx-auto space-y-4 relative z-10">
+        <div className="max-w-7xl mx-auto space-y-4 relative z-10">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
             <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate min-w-0">
               Edit program
@@ -1051,181 +1223,246 @@ function EditProgramContent() {
             <div className="space-y-3 max-w-6xl border-t border-black/5 dark:border-white/5 pt-4 mt-1">
               <div className="flex min-h-9 max-h-11 items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold fc-text-primary truncate">
-                  Weekly schedule
+                  Week-at-a-glance schedule
                 </h2>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs fc-btn fc-btn-secondary"
+                  onClick={() => void handleCopyFromWeekOne()}
+                >
+                  <Copy className="w-3.5 h-3.5 mr-1" />
+                  Copy from week 1
+                </Button>
               </div>
               <p className="text-xs text-[color:var(--fc-text-dim)] -mt-2">
-                Week {selectedWeek} · edits apply to this week only.
+                Edit any week/day cell directly. Click a cell to assign template, optional flag, or rest.
               </p>
-              {/* Week Selector */}
+
               <div className="border-t border-black/5 dark:border-white/5 pt-3 mt-2">
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                    Week
-                  </label>
-                  <Select
-                    value={String(selectedWeek)}
-                    onValueChange={(v) => setSelectedWeek(parseInt(v, 10))}
-                  >
-                    <SelectTrigger
-                      className="w-40 [&>svg]:text-cyan-400"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.05)",
-                        border: `1px solid ${
-                          isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                        }`,
-                        color: isDark ? "#fff" : "#1A1A1A",
-                      }}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: maxWeeks }).map(
-                        (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            Week {i + 1}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Day strip */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 border-b border-black/5 dark:border-white/5">
-                  {[1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
-                    const daySchedule = schedule.find(
-                      (s) =>
-                        (s.week_number || 1) === absoluteSelectedWeek &&
-                        s.program_day === dayNum &&
-                        scheduleRowMatchesActiveBlock(
-                          s,
-                          activeBlockId,
-                          trainingBlocks.length,
-                        ),
-                    );
-                    const hasWorkout =
-                      daySchedule?.template_id &&
-                      daySchedule.template_id !== "rest";
-                    const isSelected = selectedDay === dayNum;
-                    return (
-                      <button
-                        key={dayNum}
-                        type="button"
-                        onClick={() => setSelectedDay(dayNum)}
-                        className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[52px] min-h-[52px] rounded-xl transition-all duration-150 ${
-                          isSelected
-                            ? "bg-[color:var(--fc-accent-cyan)] text-white ring-2 ring-[color:var(--fc-accent-cyan)]/30 shadow-lg"
-                            : "fc-surface hover:bg-[color:var(--fc-glass-highlight)]"
-                        }`}
-                      >
-                        <span
-                          className={`text-sm font-bold leading-tight ${
-                            isSelected ? "text-white" : "fc-text-primary"
-                          }`}
-                        >
-                          {programDayLabel(dayNum)}
-                        </span>
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                            hasWorkout
-                              ? "bg-green-400"
-                              : isSelected
-                                ? "bg-white/40"
-                                : "bg-[color:var(--fc-text-dim)]/30"
-                          }`}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Selected day detail */}
                 {(() => {
-                  const currentSchedule = schedule.find(
-                    (s) =>
-                      (s.week_number || 1) === absoluteSelectedWeek &&
-                      s.program_day === selectedDay &&
-                      scheduleRowMatchesActiveBlock(
-                        s,
-                        activeBlockId,
-                        trainingBlocks.length,
-                      ),
-                  );
-                  const currentTemplateValue =
-                    currentSchedule?.template_id || "rest";
-                  const hasWorkout = currentTemplateValue !== "rest";
-                  const selectedTemplate = templates.find(
-                    (t) => t.id === currentTemplateValue,
-                  );
+                  const effectiveBlocks =
+                    trainingBlocks.length > 0
+                      ? trainingBlocks
+                      : [
+                          {
+                            id: "__fallback__",
+                            block_order: 1,
+                            duration_weeks: form.duration_weeks,
+                            goal: "custom",
+                            name: "Block 1",
+                          } as unknown as TrainingBlock,
+                        ];
+
+                  let globalWeekCursor = 1;
                   return (
-                    <div className="mt-3 space-y-2 border-t border-black/5 dark:border-white/5 pt-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <h4 className="text-sm font-semibold fc-text-primary truncate">
-                            {programDayLabel(selectedDay)}
-                          </h4>
-                          {hasWorkout && selectedTemplate && (
-                            <span className="text-xs fc-text-subtle truncate">
-                              {selectedTemplate.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    <div className="space-y-4">
+                      {effectiveBlocks.map((block, idx) => {
+                        const blockStart = globalWeekCursor;
+                        const blockEnd = blockStart + block.duration_weeks - 1;
+                        globalWeekCursor = blockEnd + 1;
 
-                      <div>
-                        <label className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1 block">
-                          Template
-                        </label>
-                        <Select
-                          value={currentTemplateValue}
-                          onValueChange={(value) =>
-                            handleDayTemplateChange(selectedDay, value)
-                          }
-                        >
-                          <SelectTrigger
-                            className="h-9 text-sm"
-                            style={{
-                              background: isDark
-                                ? "rgba(255,255,255,0.1)"
-                                : "rgba(255,255,255,0.8)",
-                              border: `1px solid ${
-                                isDark
-                                  ? "rgba(255,255,255,0.2)"
-                                  : "rgba(0,0,0,0.1)"
-                              }`,
-                              color: isDark ? "#fff" : "#1A1A1A",
-                            }}
-                          >
-                            <SelectValue placeholder="Select template or Rest Day" />
-                          </SelectTrigger>
-                          <SelectContent className="z-[10000]" position="popper">
-                            <SelectItem value="rest">Rest Day</SelectItem>
-                            {templates.map((t) => (
-                              <SelectItem key={t.id} value={t.id}>
-                                {t.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                        const blockRows = Array.from(
+                          { length: block.duration_weeks },
+                          (_, i) => blockStart + i,
+                        );
 
-                      {hasWorkout && selectedTemplate && (
-                        <div className="text-xs fc-text-subtle flex gap-3 border-t border-black/5 dark:border-white/5 pt-2">
-                          <span>
-                            {selectedTemplate.exercise_count ?? "?"} exercises
-                          </span>
-                          <span>
-                            {selectedTemplate.estimated_duration ?? "?"} min
-                          </span>
-                        </div>
-                      )}
+                        return (
+                          <section key={`${block.id}-${blockStart}`} className="space-y-2">
+                            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                              Block {idx + 1} · {(block.goal || "custom").replace(/_/g, " ")} (Weeks {blockStart}-{blockEnd})
+                            </h3>
+
+                            <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03]">
+                              <div className="min-w-[860px] p-2">
+                                <div className="grid grid-cols-[110px_repeat(7,minmax(110px,1fr))] gap-2 text-[10px] uppercase tracking-wide text-gray-400">
+                                  <div className="sticky left-0 z-20 rounded-md bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
+                                    Week
+                                  </div>
+                                  {PROGRAM_DAY_SHORT_LABELS.map((d) => (
+                                    <div key={d} className="rounded-md px-2 py-2 text-center">
+                                      {d}
+                                    </div>
+                                  ))}
+                </div>
+
+                                {blockRows.map((absoluteWeek) => (
+                                  <React.Fragment key={`${block.id}-week-${absoluteWeek}`}>
+                                    <div className="sticky left-0 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
+                                      <span className={cn("h-5 w-1 rounded-full", goalBarClassForGoal(block.goal))} />
+                                      <span className="text-xs font-semibold text-white">
+                                        Week {absoluteWeek}
+                                      </span>
+                                    </div>
+
+                                    {Array.from({ length: 7 }, (_, i) => i + 1).map((dayNum) => {
+                                      const cell = scheduleMap.get(
+                                        scheduleKey(absoluteWeek, dayNum, block.id === "__fallback__" ? null : block.id),
+                                      );
+                                      const template = cell
+                                        ? templates.find((t) => t.id === cell.template_id)
+                                        : null;
+                                      const weekHasConfig = weeksWithAnyConfiguredRows.has(absoluteWeek);
+                                      const isEmpty = !cell && !weekHasConfig;
+                                      const isRest = !cell && weekHasConfig;
+                                      return (
+                                        <button
+                                          key={`${absoluteWeek}-${dayNum}`}
+                                          type="button"
+                                          onClick={() =>
+                                            openScheduleEditor(
+                                              absoluteWeek,
+                                              dayNum,
+                                              block.id === "__fallback__" ? null : block.id,
+                                            )
+                                          }
+                                          className={cn(
+                                            "group min-h-[72px] rounded-lg border p-2 text-left transition-colors",
+                                            "hover:border-cyan-500/40 hover:bg-cyan-500/5",
+                                            isEmpty
+                                              ? "border-dashed border-white/20 bg-transparent"
+                                              : "border-white/10 bg-white/[0.04]",
+                                          )}
+                                        >
+                                          {isEmpty ? (
+                                            <div className="h-full flex items-center justify-center text-gray-500">
+                                              <Plus className="w-4 h-4 opacity-50" />
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-1">
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className={cn("inline-block w-2 h-2 rounded-full", goalDotClassForGoal(block.goal))} />
+                                                {cell?.is_optional ? (
+                                                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                                                    Opt
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              <p className="text-xs font-semibold text-white truncate">
+                                                {template?.name || (isRest ? "Rest" : "Optional")}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </div>
+                          </section>
+                        );
+                      })}
                     </div>
                   );
                 })()}
               </div>
+
+              {scheduleEditor?.isOpen && (
+                <div className="fixed inset-0 z-[12000] flex items-center justify-center p-3">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/50"
+                    onClick={() => setScheduleEditor(null)}
+                  />
+                  <div className="relative w-full max-w-sm rounded-xl border border-white/10 bg-[color:var(--fc-bg)] p-4 shadow-2xl">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h4 className="text-sm font-semibold text-white">
+                        Week {scheduleEditor.week} · {programDayLabel(scheduleEditor.day)}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleEditor(null)}
+                        className="p-1 rounded text-gray-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <Input
+                      value={scheduleEditor.search}
+                      onChange={(e) =>
+                        setScheduleEditor((prev) =>
+                          prev ? { ...prev, search: e.target.value } : prev,
+                        )
+                      }
+                      placeholder="Search templates..."
+                      className="h-9 text-sm mb-2"
+                    />
+
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-white/10 divide-y divide-white/5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScheduleEditor((prev) =>
+                            prev ? { ...prev, templateId: "rest" } : prev,
+                          )
+                        }
+                        className={cn(
+                          "w-full text-left px-3 py-2 text-sm hover:bg-white/[0.04]",
+                          scheduleEditor.templateId === "rest" ? "bg-cyan-500/10 text-cyan-300" : "text-gray-200",
+                        )}
+                      >
+                        Set as Rest
+                      </button>
+                      {templates
+                        .filter((t) =>
+                          t.name.toLowerCase().includes(scheduleEditor.search.toLowerCase()),
+                        )
+                        .map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() =>
+                              setScheduleEditor((prev) =>
+                                prev ? { ...prev, templateId: t.id } : prev,
+                              )
+                            }
+                            className={cn(
+                              "w-full text-left px-3 py-2 text-sm hover:bg-white/[0.04]",
+                              scheduleEditor.templateId === t.id ? "bg-cyan-500/10 text-cyan-300" : "text-gray-200",
+                            )}
+                          >
+                            {t.name}
+                          </button>
+                        ))}
+                    </div>
+
+                    <label className="mt-3 flex items-center gap-2 text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={scheduleEditor.isOptional}
+                        onChange={(e) =>
+                          setScheduleEditor((prev) =>
+                            prev ? { ...prev, isOptional: e.target.checked } : prev,
+                          )
+                        }
+                      />
+                      Mark optional
+                    </label>
+
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={() => setScheduleEditor(null)}
+                        disabled={scheduleCellSaving}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-8 text-xs fc-btn fc-btn-primary"
+                        onClick={() => void saveScheduleEditor()}
+                        disabled={scheduleCellSaving}
+                      >
+                        {scheduleCellSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Program Volume Calculator */}
               {form && form.category && (

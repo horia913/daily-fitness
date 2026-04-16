@@ -37,6 +37,12 @@ function buildTabs(clientId: string): TabDef[] {
         pathname.includes(`${base}/programs/`),
     },
     {
+      label: "Stats",
+      href: `${base}/stats`,
+      icon: TrendingUp,
+      isActive: (pathname) => pathname.startsWith(`${base}/stats`),
+    },
+    {
       label: "Nutrition",
       href: `${base}/meals`,
       icon: Utensils,
@@ -61,8 +67,9 @@ function buildTabs(clientId: string): TabDef[] {
 const TAB_SHORT_LABEL: Record<string, string> = {
   Overview: "Home",
   Training: "Train",
+  Stats: "Stats",
   Nutrition: "Meals",
-  Progress: "Stats",
+  Progress: "Prog",
   Profile: "Prof",
 };
 

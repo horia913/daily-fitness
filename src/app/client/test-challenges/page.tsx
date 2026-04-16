@@ -147,6 +147,7 @@ function TestChallengesContent() {
           scoringCategories={[]}
           userId={selfId}
           onBackClick={() => setDetailId(null)}
+          layoutVariant="legacy"
           cornerBadge={<TestDataBadge />}
           submitModalCategory={submitModalCategory}
           setSubmitModalCategory={setSubmitModalCategory}

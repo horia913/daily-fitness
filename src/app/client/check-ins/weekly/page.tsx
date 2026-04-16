@@ -57,7 +57,7 @@ export default function WeeklyCheckInPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-2xl px-4 sm:px-6 pb-40">
+          <ClientPageShell className="max-w-lg px-4 pb-32">
             <Skeleton className="h-12 w-64 rounded-xl mb-6" />
             <Skeleton className="h-80 w-full rounded-2xl" />
           </ClientPageShell>
@@ -70,7 +70,7 @@ export default function WeeklyCheckInPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-2xl px-4 sm:px-6 pb-40">
+        <ClientPageShell className="max-w-lg px-4 pb-32">
           <WeeklyCheckInFlow
             clientId={user.id}
             config={config}

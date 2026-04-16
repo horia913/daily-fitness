@@ -26,7 +26,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import {
-  getProgramSlots,
+  getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
   getNextSlot,
   updateProgressCache,
@@ -269,7 +269,9 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     // 6-pre. Get program_id, slots, and completions for week lock check + progression
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
-      .select('program_id, progression_mode, coach_unlocked_week')
+      .select(
+        'id, client_id, program_id, start_date, status, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days'
+      )
       .eq('id', programAssignmentId)
       .single()
 
@@ -278,7 +280,11 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       programProgression = { status: 'no_program' }
     } else {
       const [allSlots, completedSlots] = await Promise.all([
-        getProgramSlots(supabaseAdmin, assignment.program_id),
+        getProgramScheduleSlotsForAssignment(
+          supabaseAdmin,
+          assignment.program_id,
+          programAssignmentId
+        ),
         getCompletedSlots(supabaseAdmin, programAssignmentId),
       ])
 
@@ -286,7 +292,16 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       const targetSlot = allSlots.find(s => s.id === programScheduleId)
       if (targetSlot) {
         try {
-          assertWeekUnlocked(targetSlot.week_number, allSlots, completedSlots, assignment)
+          assertWeekUnlocked(
+            targetSlot.week_number,
+            allSlots,
+            completedSlots,
+            {
+              progression_mode:
+                assignment.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
+              coach_unlocked_week: assignment.coach_unlocked_week,
+            }
+          )
         } catch (lockErr: any) {
           if (lockErr.code === 'WEEK_LOCKED') {
             console.warn('[completeWorkoutService] Week lock rejected completion:', lockErr.message)

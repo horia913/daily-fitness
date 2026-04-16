@@ -7,7 +7,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AnimatedEntry } from "@/components/ui/AnimatedEntry";
-import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import {
   Users,
   Dumbbell,
@@ -23,7 +22,6 @@ import {
   Flame,
   Utensils,
   Trophy,
-  Clock,
 } from "lucide-react";
 import { type MorningBriefing, type ClientAlert, sortAlertsByPriority } from "@/lib/coachDashboardService";
 import {
@@ -44,14 +42,6 @@ function CoachDashboardContent() {
   const [sortBy, setSortBy] = useState<"name" | "lastActive" | "streak" | "compliance">("name");
   const loadingRef = useRef(false);
   const didLoadRef = useRef(false);
-  const [reviewModal, setReviewModal] = useState<{
-    isOpen: boolean;
-    assignmentId: string;
-    programId: string;
-    weekNumber: number;
-    clientName: string;
-  }>({ isOpen: false, assignmentId: "", programId: "", weekNumber: 0, clientName: "" });
-
   const loadData = useCallback(async (signal?: AbortSignal) => {
     if (!user) return;
     if (didLoadRef.current) return;
@@ -147,17 +137,6 @@ function CoachDashboardContent() {
   const infoAlerts = allAlerts.filter((a) => a.severity === "low");
   const orderedAlerts = [...urgentAlerts, ...warningAlerts, ...infoAlerts];
   const visibleAlerts = orderedAlerts.slice(0, 5);
-
-  const weekReviewQueue = useMemo(() => {
-    if (!briefing) return [];
-    return briefing.clientSummaries.filter(
-      (c) =>
-        c.weekReviewNeeded &&
-        c.completedWeekNumber != null &&
-        c.activeProgramAssignmentId &&
-        c.activeProgramId,
-    );
-  }, [briefing]);
 
   const recentCheckinQueue = useMemo(() => {
     if (!briefing) return [];
@@ -320,50 +299,6 @@ function CoachDashboardContent() {
                     </div>
                   </div>
                 </div>
-              </section>
-            </AnimatedEntry>
-
-            {/* ===== WEEK REVIEWS ===== */}
-            <AnimatedEntry delay={80} animation="fade-up">
-              <section className="mb-6">
-                <h3 className="text-xs font-semibold uppercase tracking-widest fc-text-dim mb-3">
-                  Week reviews
-                </h3>
-                {weekReviewQueue.length === 0 ? (
-                  <div className="fc-surface rounded-xl p-4 text-center">
-                    <p className="text-xs fc-text-dim">No pending week reviews</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col border-y border-white/5">
-                    {weekReviewQueue.map((c) => (
-                      <button
-                        key={c.clientId}
-                        type="button"
-                        onClick={() =>
-                          setReviewModal({
-                            isOpen: true,
-                            assignmentId: c.activeProgramAssignmentId!,
-                            programId: c.activeProgramId!,
-                            weekNumber: c.completedWeekNumber!,
-                            clientName: `${c.firstName} ${c.lastName}`.trim() || "Client",
-                          })
-                        }
-                        className="flex w-full items-center gap-3 border-b border-white/5 py-3 pl-2 text-left transition-colors hover:bg-white/[0.02] border-l-[3px] border-l-amber-500"
-                      >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg fc-surface-elevated fc-text-warning">
-                          <Clock className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium fc-text-primary">
-                            {c.firstName} {c.lastName}
-                          </div>
-                          <p className="text-xs fc-text-dim">Week {c.completedWeekNumber} ready for review</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
               </section>
             </AnimatedEntry>
 
@@ -669,18 +604,6 @@ function CoachDashboardContent() {
         )}
       </div>
 
-      <WeekReviewModal
-        isOpen={reviewModal.isOpen}
-        onClose={() => setReviewModal((prev) => ({ ...prev, isOpen: false }))}
-        onComplete={() => {
-          didLoadRef.current = false;
-          refetchDashboard();
-        }}
-        programAssignmentId={reviewModal.assignmentId}
-        programId={reviewModal.programId}
-        weekNumber={reviewModal.weekNumber}
-        clientName={reviewModal.clientName}
-      />
     </AnimatedBackground>
   );
 }

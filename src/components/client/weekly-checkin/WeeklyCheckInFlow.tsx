@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { StepBodyMetrics } from "./StepBodyMetrics";
 import { StepPhotos } from "./StepPhotos";
 import { StepReview, type WellnessSummary } from "./StepReview";
@@ -63,7 +61,6 @@ export function WeeklyCheckInFlow({
   onComplete,
   onBack,
 }: WeeklyCheckInFlowProps) {
-  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [bodyData, setBodyData] = useState<WeeklyCheckInBodyData>(emptyBodyData());
   const [photoFiles, setPhotoFiles] = useState<WeeklyCheckInPhotoFiles>({});
@@ -227,7 +224,7 @@ export function WeeklyCheckInFlow({
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
-  }, [clientId, bodyData, photoFiles, notesToCoach, onComplete, router, firstMeasurement]);
+  }, [clientId, bodyData, photoFiles, notesToCoach, onComplete, firstMeasurement]);
 
   const photosEnabled = config?.photos_enabled ?? true;
   const notesEnabled = config?.notes_to_coach_enabled ?? true;
@@ -235,14 +232,17 @@ export function WeeklyCheckInFlow({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link
-          href="/client/check-ins"
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = "/client/check-ins";
+          }}
           className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
         >
           <ArrowLeft className="w-5 h-5" />
-        </Link>
+        </button>
         <div>
-          <h1 className="text-2xl font-bold fc-text-primary">
+          <h1 className="text-xl font-bold fc-text-primary">
             Scheduled Check-In{config?.frequency_days ? ` · ${config.frequency_days === 7 ? "Weekly" : config.frequency_days === 14 ? "Every 2 weeks" : config.frequency_days === 30 ? "Monthly" : `Every ${config.frequency_days} days`}` : ""}
           </h1>
           <p className="text-sm fc-text-dim">Step {step} of 3</p>
@@ -299,7 +299,7 @@ export function WeeklyCheckInFlow({
             if (newAchievementsQueue.length > 0) {
               setShowAchievementModal(true);
             } else {
-              router.push("/client/check-ins");
+              window.location.href = "/client/check-ins";
             }
           }}
         />
@@ -316,7 +316,7 @@ export function WeeklyCheckInFlow({
               setNewAchievementsQueue([]);
               setAchievementModalIndex(0);
               setShowAchievementModal(false);
-              router.push("/client/check-ins");
+              window.location.href = "/client/check-ins";
             }
           }}
         />

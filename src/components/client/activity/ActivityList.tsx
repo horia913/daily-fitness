@@ -1,14 +1,51 @@
 "use client";
 
 import React from "react";
-import { ClientGlassCard } from "@/components/client-ui";
-import { Trash2, Pencil, Clock, MapPin } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import {
   ACTIVITY_META,
   INTENSITY_META,
+  type ActivityType,
   type ClientActivity,
 } from "@/lib/clientActivityService";
 import { cn } from "@/lib/utils";
+
+type ActivityCategory = "cardio" | "strength" | "flexibility" | "other";
+
+const ACTIVITY_TYPE_CATEGORY: Record<ActivityType, ActivityCategory> = {
+  running: "cardio",
+  jogging: "cardio",
+  cycling: "cardio",
+  swimming: "cardio",
+  walking: "cardio",
+  hiking: "cardio",
+  yoga: "flexibility",
+  stretching: "flexibility",
+  sports: "strength",
+  martial_arts: "strength",
+  dance: "cardio",
+  custom: "other",
+};
+
+const CATEGORY_LABEL: Record<ActivityCategory, string> = {
+  cardio: "Cardio",
+  strength: "Strength",
+  flexibility: "Flexibility",
+  other: "Other",
+};
+
+function categoryPillClass(cat: ActivityCategory): string {
+  switch (cat) {
+    case "cardio":
+      return "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+    case "strength":
+      return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+    case "flexibility":
+      return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    default:
+      return "bg-white/[0.06] text-gray-400 border-white/10";
+  }
+}
 
 interface ActivityListProps {
   activities: ClientActivity[];
@@ -62,6 +99,8 @@ function ActivityRow({
     activity.activity_type === "custom"
       ? activity.custom_activity_name ?? "Custom"
       : meta.label;
+  const category =
+    ACTIVITY_TYPE_CATEGORY[activity.activity_type] ?? "other";
 
   if (compact) {
     return (
@@ -80,68 +119,66 @@ function ActivityRow({
   }
 
   return (
-    <div className="flex items-start gap-3 py-3 group">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg"
-        style={{ backgroundColor: `${meta.color}15` }}
-      >
-        {meta.icon}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold fc-text-primary truncate">
-            {displayName}
-          </span>
+    <div
+      className={cn(
+        "group rounded-xl border border-white/10 bg-white/[0.04] p-4"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h3 className="text-base font-semibold text-white tracking-tight min-w-0 pr-2">
+          {displayName}
+        </h3>
+        <div className="flex items-center gap-2 shrink-0">
           <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-            style={{
-              backgroundColor: `${intensityMeta.color}20`,
-              color: intensityMeta.color,
-            }}
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] border",
+              categoryPillClass(category)
+            )}
           >
-            {intensityMeta.label}
+            {CATEGORY_LABEL[category]}
           </span>
+          <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => onEdit(activity)}
+              className="p-1.5 rounded-lg hover:bg-cyan-500/10 transition-colors"
+              title="Edit"
+            >
+              <Pencil className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(activity.id)}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-xs fc-text-dim flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {activity.duration_minutes} min
-          </span>
-          {activity.distance_km && (
-            <span className="text-xs fc-text-dim flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {activity.distance_km} km
+      <div className="text-xs text-gray-500 mt-2 flex flex-wrap items-center gap-x-1.5">
+        <span>{formatDate(activity.activity_date)}</span>
+        <span className="text-gray-600">·</span>
+        <span className="tabular-nums">{activity.duration_minutes} min</span>
+        {activity.distance_km != null ? (
+          <>
+            <span className="text-gray-600">·</span>
+            <span>
+              <span className="tabular-nums">{activity.distance_km}</span> km
             </span>
-          )}
-        </div>
-
-        {activity.notes && (
-          <p className="text-xs fc-text-dim mt-1 line-clamp-1">
-            {activity.notes}
-          </p>
-        )}
+          </>
+        ) : null}
+        <span className="text-gray-600">·</span>
+        <span>{intensityMeta.label}</span>
       </div>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          type="button"
-          onClick={() => onEdit(activity)}
-          className="p-1.5 rounded-lg hover:bg-cyan-500/10 transition-colors"
-          title="Edit"
-        >
-          <Pencil className="w-3.5 h-3.5 fc-text-dim" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(activity.id)}
-          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-          title="Delete"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-        </button>
-      </div>
+      {activity.notes ? (
+        <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 mt-2">
+          {activity.notes}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -177,21 +214,19 @@ export function ActivityList({
     <div className="space-y-4">
       {sortedDates.map((date) => (
         <div key={date}>
-          <p className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-1 px-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
             {formatDate(date)}
           </p>
-          <ClientGlassCard className="p-3">
-            <div className="divide-y divide-[color:var(--fc-glass-border)]">
-              {grouped[date].map((a) => (
-                <ActivityRow
-                  key={a.id}
-                  activity={a}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              ))}
-            </div>
-          </ClientGlassCard>
+          <div className="space-y-3">
+            {grouped[date].map((a) => (
+              <ActivityRow
+                key={a.id}
+                activity={a}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
         </div>
       ))}
     </div>

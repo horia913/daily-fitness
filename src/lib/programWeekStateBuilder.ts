@@ -60,6 +60,9 @@ export interface ProgramWeekState {
   progressionMode: 'auto' | 'coach_managed'
   isWeekCompleteAwaitingReview: boolean
   coachFeedback: { notes: string; reviewedAt: string } | null
+  /** B.1 coach pause — mirrors program_assignments.pause_status */
+  pauseStatus: 'active' | 'paused'
+  pauseReason: string | null
 }
 
 /**
@@ -90,6 +93,8 @@ export async function buildProgramWeekState(
     progressionMode: 'auto',
     isWeekCompleteAwaitingReview: false,
     coachFeedback: null,
+    pauseStatus: 'active',
+    pauseReason: null,
   }
 
   const state = await getProgramState(supabase, clientId)
@@ -126,6 +131,8 @@ export async function buildProgramWeekState(
         progressionMode: completedAssignment.progression_mode ?? 'auto',
         isWeekCompleteAwaitingReview: false,
         coachFeedback: null,
+        pauseStatus: 'active',
+        pauseReason: null,
       }
     }
     return empty
@@ -231,6 +238,9 @@ export async function buildProgramWeekState(
     }
   }
 
+  const pauseStatus: 'active' | 'paused' =
+    state.assignment.pause_status === 'paused' ? 'paused' : 'active'
+
   return {
     hasProgram: true,
     programName,
@@ -250,5 +260,7 @@ export async function buildProgramWeekState(
     progressionMode,
     isWeekCompleteAwaitingReview,
     coachFeedback,
+    pauseStatus,
+    pauseReason: state.assignment.pause_reason ?? null,
   }
 }

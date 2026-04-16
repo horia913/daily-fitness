@@ -213,7 +213,19 @@ export async function getClientActivitiesForCoach(
 }
 
 /**
- * Get current week boundaries (Monday-Sunday)
+ * YYYY-MM-DD in the user's local calendar (not UTC).
+ * `toISOString().split("T")[0]` shifts the calendar day for many timezones
+ * and breaks inclusive date filters (e.g. "this week" vs `activity_date`).
+ */
+export function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Get current week boundaries (Monday–Sunday), local calendar dates.
  */
 export function getCurrentWeekBounds(): { start: string; end: string } {
   const now = new Date();
@@ -226,9 +238,10 @@ export function getCurrentWeekBounds(): { start: string; end: string } {
 
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(0, 0, 0, 0);
 
   return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0],
+    start: toLocalDateString(monday),
+    end: toLocalDateString(sunday),
   };
 }

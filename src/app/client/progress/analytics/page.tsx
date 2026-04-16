@@ -40,6 +40,7 @@ import { getWeeklyVolume, getWorkoutsWithVolumeForSleepAnalysis, type VolumeStat
 import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { VolumeTrendChart } from "@/components/progress/VolumeTrendChart";
 import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
+import { cn } from "@/lib/utils";
 import {
   getActivitiesByDateRange,
   ACTIVITY_META,
@@ -607,6 +608,11 @@ function AnalyticsPageContent() {
     };
   }, [wellnessStats, workoutsForSleepAnalysis]);
 
+  const rangeChipBase =
+    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
+  const rangeChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+  const rangeChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
@@ -614,54 +620,64 @@ function AnalyticsPageContent() {
       <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
         <div className="fc-card-shell backdrop-blur-[8px] p-4 mb-4">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/progress";
+                }}
+                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-gray-400 hover:text-white transition-colors"
+                aria-label="Back"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = "/client/progress"; }}
-                  className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
-                >
-                  <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
-                </button>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)] shrink-0">
-                    <BarChart3 className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold tracking-widest uppercase text-[color:var(--fc-domain-workouts)] block mb-0.5">
-                      Performance
-                    </span>
-                    <h1 className="text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                      Analytics <span className="text-[color:var(--fc-text-dim)]">Overview</span>
-                    </h1>
-                  </div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 shrink-0">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-0.5">
+                    Performance
+                  </span>
+                  <h1 className="text-xl font-bold tracking-tight text-white truncate">
+                    Analytics <span className="text-gray-500 font-normal">· Overview</span>
+                  </h1>
+                  <p className="text-xs text-gray-500 mt-0.5">Training insights for the range you select.</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <div className="flex bg-[color:var(--fc-glass-highlight)] p-0.5 rounded-xl border border-[color:var(--fc-glass-border)] overflow-x-auto max-w-full">
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="-mx-1 px-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex flex-wrap gap-2 min-w-min">
                   {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((range) => (
                     <button
                       key={range}
                       type="button"
                       onClick={() => setTimeRange(range)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all whitespace-nowrap ${
-                        timeRange === range
-                          ? "fc-surface fc-text-primary shadow-sm"
-                          : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
-                      }`}
+                      className={cn(
+                        rangeChipBase,
+                        timeRange === range ? rangeChipActive : rangeChipInactive
+                      )}
                     >
                       {range}
                     </button>
                   ))}
                 </div>
-                <a href="#strength-exercises" className="fc-btn fc-btn-primary shrink-0 inline-flex items-center h-8 text-xs px-3">
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="#strength-exercises"
+                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-semibold shrink-0"
+                >
                   <Search className="mr-1 h-3.5 w-3.5" />
                   Exercises
                 </a>
                 <button
                   type="button"
-                  onClick={() => { window.location.href = "/client/progress/personal-records"; }}
-                  className="fc-btn fc-btn-ghost shrink-0 inline-flex items-center h-8 text-xs px-2"
+                  onClick={() => {
+                    window.location.href = "/client/progress/personal-records";
+                  }}
+                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-white/10 bg-white/[0.04] text-gray-400 hover:text-white shrink-0"
                 >
                   PRs
                 </button>
@@ -691,8 +707,8 @@ function AnalyticsPageContent() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
-              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
+            <div className="grid gap-2 grid-cols-2">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4 min-w-0">
                 <div className="flex items-center justify-between">
                   <Calendar className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -706,7 +722,7 @@ function AnalyticsPageContent() {
                   Workouts logged
                 </p>
               </div>
-              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4 min-w-0">
                 <div className="flex items-center justify-between">
                   <Target className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -720,7 +736,7 @@ function AnalyticsPageContent() {
                   {goalCompletion.completed} of {goalCompletion.total} completed
                 </p>
               </div>
-              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4 min-w-0">
                 <div className="flex items-center justify-between">
                   <Scale className="h-5 w-5 text-[color:var(--fc-domain-meals)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -736,7 +752,7 @@ function AnalyticsPageContent() {
                     : "Body composition"}
                 </p>
               </div>
-              <div className="fc-card-shell backdrop-blur-[8px] p-3 min-w-0">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4 min-w-0">
                 <div className="flex items-center justify-between">
                   <Dumbbell className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -752,16 +768,16 @@ function AnalyticsPageContent() {
               </div>
             </div>
             {/* Workout Frequency Chart */}
-            <div className="fc-card-shell backdrop-blur-[8px] p-6">
-              <div className="mb-6 flex items-center gap-3">
+            <div className="fc-card-shell backdrop-blur-[8px] p-4">
+              <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <h2 className="text-base font-semibold text-white tracking-tight">
                     Workout Frequency
                   </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-xs text-gray-500">
                     Last 5 weeks
                   </p>
                 </div>
@@ -801,7 +817,7 @@ function AnalyticsPageContent() {
                   </div>
                 </div>
               ) : (
-                <div className="py-12 text-center">
+                <div className="py-8 px-4 text-center">
                   <p className="text-sm font-semibold fc-text-primary mb-1">No workout data yet</p>
                   <p className="text-xs fc-text-dim">Start training to see your frequency trends here.</p>
                 </div>
@@ -810,16 +826,16 @@ function AnalyticsPageContent() {
 
             {/* Workout Duration Trend */}
             {durationTrend && durationTrend.weeklyData.length > 0 && (
-              <div className="fc-card-shell backdrop-blur-[8px] p-6">
-                <div className="mb-6 flex items-center gap-3">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4">
+                <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)]/80">
                     <Timer className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h2 className="text-base font-semibold text-white tracking-tight">
                       Avg Workout Duration
                     </h2>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    <p className="text-xs text-gray-500">
                       This week: {durationTrend.thisWeekAvg} min (avg: {durationTrend.overallAvg} min)
                     </p>
                   </div>
@@ -865,10 +881,10 @@ function AnalyticsPageContent() {
                     <Dumbbell className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h2 className="text-base font-semibold text-white tracking-tight">
                       Strength Progress
                     </h2>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    <p className="text-xs text-gray-500">
                       Estimated 1RM and progression over time
                     </p>
                   </div>
@@ -876,10 +892,10 @@ function AnalyticsPageContent() {
 
                 {topProgressions.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                       Biggest Gains
                     </h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="flex flex-col gap-4">
                       {topProgressions.map((prog) => (
                         <ExerciseProgressionChart
                           key={prog.exerciseId}
@@ -893,11 +909,11 @@ function AnalyticsPageContent() {
                 )}
 
                 {compoundProgressions.length > 0 && (
-                  <div className="fc-card-shell backdrop-blur-[8px] p-4 sm:p-6">
-                    <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                  <div className="fc-card-shell backdrop-blur-[8px] p-4">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                       Estimated 1RM — Compound Lifts
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {compoundProgressions.map((prog) => (
                         <div
                           key={prog.exerciseId}
@@ -916,7 +932,7 @@ function AnalyticsPageContent() {
                 )}
 
                 <div id="strength-exercises">
-                  <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                     All Exercises
                   </h3>
                   <div className="relative mb-3">
@@ -979,7 +995,7 @@ function AnalyticsPageContent() {
                             {isExpanded && (
                               <div className="border-t border-[color:var(--fc-glass-border)] p-4 bg-[color:var(--fc-bg-base)]/50">
                                 {loading && (
-                                  <div className="flex items-center justify-center py-12">
+                                  <div className="flex items-center justify-center py-8">
                                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-domain-workouts)] border-t-transparent" />
                                   </div>
                                 )}
@@ -1015,16 +1031,16 @@ function AnalyticsPageContent() {
             )}
 
             {/* Recovery Insight Card — last 4 weeks volume vs soreness */}
-            <div className="fc-card-shell backdrop-blur-[8px] p-6">
+            <div className="fc-card-shell backdrop-blur-[8px] p-4">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-domain-habits)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-domain-habits)_25%,transparent)]">
                   <Dumbbell className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <h2 className="text-base font-semibold text-white tracking-tight">
                     Recovery Insight
                   </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-xs text-gray-500">
                     Training load vs recovery (last 4 weeks)
                   </p>
                 </div>
@@ -1138,16 +1154,16 @@ function AnalyticsPageContent() {
             </div>
 
             {/* Sleep vs Performance Insight Card */}
-            <div className="fc-card-shell backdrop-blur-[8px] p-6">
-              <div className="mb-2 flex items-center gap-3">
+            <div className="fc-card-shell backdrop-blur-[8px] p-4">
+              <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <BarChart3 className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <h2 className="text-base font-semibold text-white tracking-tight">
                     Sleep vs Performance
                   </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-xs text-gray-500">
                     How rest affects your workouts (last 30 days)
                   </p>
                 </div>
@@ -1159,22 +1175,22 @@ function AnalyticsPageContent() {
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (
-              <div className="fc-card-shell backdrop-blur-[8px] p-6">
-                <div className="mb-6 flex items-center gap-3">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4">
+                <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h2 className="text-base font-semibold text-white tracking-tight">
                       Body Composition
                     </h2>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    <p className="text-xs text-gray-500">
                       Weight and body fat trends
                     </p>
                   </div>
                 </div>
 
-                <div className="relative h-64 mb-6">
+                <div className="relative h-64 mb-4">
                   <div className="absolute inset-0 flex items-end justify-between gap-2">
                     {bodyComposition.map((point, index) => {
                       const height = bodyWeightRange > 0 ? ((point.weight - minBodyWeight) / bodyWeightRange) * 100 : 50;
@@ -1233,21 +1249,21 @@ function AnalyticsPageContent() {
                 )}
               </div>
             ) : (
-              <div className="fc-card-shell backdrop-blur-[8px] p-6">
-                <div className="mb-6 flex items-center gap-3">
+              <div className="fc-card-shell backdrop-blur-[8px] p-4">
+                <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h2 className="text-base font-semibold text-white tracking-tight">
                       Body Composition
                     </h2>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    <p className="text-xs text-gray-500">
                       Weight and body fat trends
                     </p>
                   </div>
                 </div>
-                <div className="py-12 text-center">
+                <div className="py-8 px-4 text-center">
                   <p className="text-sm font-semibold fc-text-primary mb-1">No body metrics yet</p>
                   <p className="text-xs fc-text-dim">Log your weight and measurements to track progress.</p>
                 </div>
@@ -1255,16 +1271,16 @@ function AnalyticsPageContent() {
             )}
 
             {/* Goal Completion */}
-            <div className="fc-card-shell backdrop-blur-[8px] p-6">
-              <div className="mb-6 flex items-center gap-3">
+            <div className="fc-card-shell backdrop-blur-[8px] p-4">
+              <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
                   <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <h2 className="text-base font-semibold text-white tracking-tight">
                     Goal Completion
                   </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-xs text-gray-500">
                     Track your goal achievements
                   </p>
                 </div>
@@ -1285,7 +1301,7 @@ function AnalyticsPageContent() {
                   <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     {goalCompletion.completed} of {goalCompletion.total}
                   </p>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">goals completed</p>
+                  <p className="text-xs text-gray-500">goals completed</p>
                 </div>
               </div>
             </div>
@@ -1295,16 +1311,16 @@ function AnalyticsPageContent() {
         {/* Extra Activities Summary */}
         {!loading && recentActivities.length > 0 && (
           <div className="space-y-6" style={{ animation: "fadeInUp 0.8s ease-out 0.6s both" }}>
-            <div className="fc-card-shell backdrop-blur-[8px] p-6">
-              <div className="mb-6 flex items-center gap-3">
+            <div className="fc-card-shell backdrop-blur-[8px] p-4">
+              <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Activity className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <h2 className="text-base font-semibold text-white tracking-tight">
                     Extra Activities
                   </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-xs text-gray-500">
                     Your logged activities beyond workouts
                   </p>
                 </div>

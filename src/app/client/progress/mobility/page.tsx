@@ -283,7 +283,7 @@ function MobilityMetricsPageContent() {
               <ArrowLeft className="h-4 w-4 text-[color:var(--fc-text-primary)]" />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Mobility Assessment</h1>
+              <h1 className="text-xl font-bold text-[color:var(--fc-text-primary)]">Mobility Assessment</h1>
               <p className="text-sm text-[color:var(--fc-text-dim)]">Flexibility and ROM over time</p>
             </div>
             <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary h-9 shrink-0 px-3 text-sm">
@@ -393,7 +393,7 @@ function MobilityMetricsPageContent() {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <div className="mt-3 grid grid-cols-2 gap-2">
                       {/* Shoulder Metrics */}
                       {((metric as any).left_shoulder_flexion ||
                         (metric as any).right_shoulder_flexion) && (

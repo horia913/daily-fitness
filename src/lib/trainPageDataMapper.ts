@@ -1,15 +1,18 @@
 /**
  * Maps get_train_page_data RPC response to ProgramWeekState.
  * Uses programStateService helpers for unlocked week, today slot, and overdue.
+ * Schedule rows come from program_day_assignments (canonical), not RPC schedule.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ProgramWeekState, ProgramWeekDayCard, OverdueSlotCard } from '@/lib/programWeekStateBuilder'
 import {
   computeUnlockedWeekMax,
   getTodaySlot,
   getOverdueSlots,
+  getProgramScheduleSlotsForAssignment,
+  getCompletedSlots,
   type ProgramScheduleSlot,
-  type CompletedSlot,
 } from './programStateService'
 
 export interface TrainPageRpcScheduleRow {
@@ -51,6 +54,11 @@ export interface TrainPageRpcResponse {
   /** Latest coach review notes for the current week (coach_managed mode) */
   coachReviewNotes?: string | null
   coachReviewDate?: string | null
+  /** When RPC includes B.1 pause fields (camelCase or snake_case) */
+  pauseStatus?: string | null
+  pauseReason?: string | null
+  pause_status?: string | null
+  pause_reason?: string | null
   schedule?: TrainPageRpcScheduleRow[] | null
   completions?: TrainPageRpcCompletionRow[] | null
   extraWorkouts?: TrainPageRpcExtraWorkoutRow[] | null
@@ -75,6 +83,8 @@ const emptyState: ProgramWeekState = {
   progressionMode: 'auto',
   isWeekCompleteAwaitingReview: false,
   coachFeedback: null,
+  pauseStatus: 'active',
+  pauseReason: null,
 }
 
 /**
@@ -96,40 +106,42 @@ function getWeekStartDate(assignmentStartDate: string, weekNumber: number): Date
  * Build ProgramWeekState from get_train_page_data RPC response.
  * When hasProgram is false, returns empty state (extraWorkouts are returned separately).
  */
-export function rpcResponseToProgramWeekState(
+export async function rpcResponseToProgramWeekState(
+  supabase: SupabaseClient,
   data: TrainPageRpcResponse,
   todayWeekday: number
-): ProgramWeekState {
-  if (!data.hasProgram || !data.schedule || !data.assignmentId || !data.programId) {
+): Promise<ProgramWeekState> {
+  if (!data.hasProgram || !data.assignmentId || !data.programId) {
     return emptyState
   }
 
   const programId = data.programId
   const assignmentId = data.assignmentId
-  const schedule = Array.isArray(data.schedule) ? data.schedule : []
-  const completions = Array.isArray(data.completions) ? data.completions : []
 
-  const slots: ProgramScheduleSlot[] = schedule.map((s) => ({
-    id: s.id,
-    program_id: programId,
-    week_number: s.week_number,
-    day_number: s.day_number,
-    day_of_week: s.day_of_week,
-    template_id: s.template_id,
-    is_optional: s.is_optional,
-  }))
+  const [slots, completedSlots] = await Promise.all([
+    getProgramScheduleSlotsForAssignment(supabase, programId, assignmentId),
+    getCompletedSlots(supabase, assignmentId),
+  ])
 
-  const completedSlots: CompletedSlot[] = completions.map((c) => ({
-    id: '',
-    program_assignment_id: assignmentId,
-    program_schedule_id: c.program_schedule_id,
-    completed_at: c.completed_at,
-    completed_by: '',
-    notes: null,
-    week_number: 0,
-    day_number: 0,
-    template_id: '',
-  }))
+  if (slots.length === 0) {
+    return emptyState
+  }
+
+  const templateIds = [...new Set(slots.map((s) => s.template_id).filter(Boolean))]
+  const templateMap = new Map<string, { name: string; estimated_duration: number }>()
+  if (templateIds.length > 0) {
+    const { data: tmplRows } = await supabase
+      .from('workout_templates')
+      .select('id, name, estimated_duration')
+      .in('id', templateIds)
+    for (const row of tmplRows ?? []) {
+      const r = row as { id: string; name: string | null; estimated_duration: number | null }
+      templateMap.set(r.id, {
+        name: r.name ?? 'Workout',
+        estimated_duration: r.estimated_duration ?? 0,
+      })
+    }
+  }
 
   const assignmentForUnlock = {
     progression_mode: data.progressionMode ?? 'auto',
@@ -160,7 +172,7 @@ export function rpcResponseToProgramWeekState(
       const currentWeekEnd = new Date(currentWeekStart)
       currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
       completedScheduleIdsCurrentWeek = new Set(
-        completions
+        completedSlots
           .filter((c) => {
             const completedAt = new Date(c.completed_at)
             return completedAt >= currentWeekStart && completedAt < currentWeekEnd
@@ -173,16 +185,6 @@ export function rpcResponseToProgramWeekState(
   }
 
   const completedScheduleIds = completedScheduleIdsCurrentWeek
-
-  const templateMap = new Map<string, { name: string; estimated_duration: number }>()
-  for (const s of schedule) {
-    if (s.template_id) {
-      templateMap.set(s.template_id, {
-        name: s.template_name ?? 'Workout',
-        estimated_duration: s.estimated_duration ?? 0,
-      })
-    }
-  }
 
   const toDayCard = (slot: ProgramScheduleSlot): ProgramWeekDayCard => {
     const template = templateMap.get(slot.template_id)
@@ -244,6 +246,13 @@ export function rpcResponseToProgramWeekState(
     ? { notes: data.coachReviewNotes, reviewedAt: data.coachReviewDate ?? '' }
     : null
 
+  const rawPause =
+    data.pauseStatus ?? data.pause_status ?? 'active'
+  const pauseStatus: 'active' | 'paused' =
+    rawPause === 'paused' ? 'paused' : 'active'
+  const pauseReason =
+    data.pauseReason ?? data.pause_reason ?? null
+
   return {
     hasProgram: true,
     programName: data.programName ?? 'Training Program',
@@ -263,5 +272,7 @@ export function rpcResponseToProgramWeekState(
     progressionMode,
     isWeekCompleteAwaitingReview,
     coachFeedback,
+    pauseStatus,
+    pauseReason,
   }
 }

@@ -11,6 +11,7 @@ import { DailyCheckInForm } from "@/components/client/check-ins/DailyCheckInForm
 import { AddCheckInSheet } from "@/components/client/check-ins/AddCheckInSheet";
 import { WeeklyStrip } from "@/components/client/check-ins/WeeklyStrip";
 import { WellnessTrends } from "@/components/client/check-ins/WellnessTrends";
+import { WeeklyCheckInCard } from "@/components/client/WeeklyCheckInCard";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
@@ -21,9 +22,13 @@ import {
   DailyWellnessLog,
   MonthlyStats,
 } from "@/lib/wellnessService";
-import { getLatestMeasurement } from "@/lib/measurementService";
+import {
+  getClientMeasurements,
+  type BodyMeasurement,
+} from "@/lib/measurementService";
 import { getClientCheckInConfig } from "@/lib/checkInConfigService";
 import { usePageData } from "@/hooks/usePageData";
+import { supabase } from "@/lib/supabase";
 
 function getWeekStartMonday(): string {
   const d = new Date();
@@ -43,7 +48,15 @@ function getDueThreshold(frequencyDays: number): number {
 interface CheckInPageData {
   todayLog: DailyWellnessLog | null;
   logRange: DailyWellnessLog[];
-  latestMeasurement: Awaited<ReturnType<typeof getLatestMeasurement>>;
+  latestMeasurement: BodyMeasurement | null;
+  recentMeasurements: BodyMeasurement[];
+  activeCheckInGoals: Array<{
+    id: string;
+    title: string | null;
+    pillar: string | null;
+    metric_type: string | null;
+    target_value: number | null;
+  }>;
   checkInConfig: Awaited<ReturnType<typeof getClientCheckInConfig>>;
   currentStreak: number;
   bestStreak: number;
@@ -65,6 +78,8 @@ export default function ClientCheckInsPage() {
         todayLog: null,
         logRange: [],
         latestMeasurement: null,
+        recentMeasurements: [],
+        activeCheckInGoals: [],
         checkInConfig: null,
         currentStreak: 0,
         bestStreak: 0,
@@ -76,12 +91,21 @@ export default function ClientCheckInsPage() {
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const rangeStartDateStr = ninetyDaysAgo.toISOString().split("T")[0];
 
-    const [todayLogData, logs, latest, config] = await Promise.all([
+    const [todayLogData, logs, measurements, config, goalsResult] = await Promise.all([
       getTodayLog(user.id),
       getLogRange(user.id, rangeStartDateStr, todayStr),
-      getLatestMeasurement(user.id),
+      getClientMeasurements(user.id, 2),
       getClientCheckInConfig(user.id),
+      supabase
+        .from("goals")
+        .select("id, title, pillar, goal_type, target_value")
+        .eq("client_id", user.id)
+        .eq("pillar", "checkins")
+        .eq("status", "active")
+        .not("target_value", "is", null),
     ]);
+    const recentMeasurements = measurements ?? [];
+    const latest = recentMeasurements[0] ?? null;
 
     const completeDatesSet = new Set(
       logs
@@ -145,6 +169,17 @@ export default function ClientCheckInsPage() {
       todayLog: todayLogData,
       logRange: logs,
       latestMeasurement: latest,
+      recentMeasurements,
+      activeCheckInGoals: (goalsResult.data ?? []).map((g) => ({
+        id: g.id,
+        title: g.title ?? null,
+        pillar: g.pillar ?? null,
+        metric_type: g.goal_type ?? null,
+        target_value:
+          g.target_value == null || Number.isNaN(Number(g.target_value))
+            ? null
+            : Number(g.target_value),
+      })),
       checkInConfig: config,
       currentStreak: streak,
       bestStreak: bestStreakCalc,
@@ -162,6 +197,8 @@ export default function ClientCheckInsPage() {
   const todayLog = data?.todayLog ?? null;
   const logRange = data?.logRange ?? [];
   const latestMeasurement = data?.latestMeasurement ?? null;
+  const recentMeasurements = data?.recentMeasurements ?? [];
+  const activeCheckInGoals = data?.activeCheckInGoals ?? [];
   const checkInConfig = data?.checkInConfig ?? null;
   const frequencyDays = checkInConfig?.frequency_days ?? 30;
 
@@ -268,6 +305,14 @@ export default function ClientCheckInsPage() {
 
           {user?.id && (
             <>
+              <WeeklyCheckInCard
+                daysSinceLast={daysSinceLast}
+                lastMeasuredDate={latestMeasurement?.measured_date ?? null}
+                frequencyDays={frequencyDays}
+                recentMeasurements={recentMeasurements}
+                activeCheckInGoals={activeCheckInGoals}
+              />
+
               <DailyCheckInForm
                 clientId={user.id}
                 initialTodayLog={todayLog}

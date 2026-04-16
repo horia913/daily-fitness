@@ -8,20 +8,15 @@ import {
   ImageIcon,
   ClipboardCheck,
   Target,
-  LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { FileText, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCoachClient } from "@/contexts/CoachClientContext";
-import { exportBodyMetricsCsv } from "@/lib/exportBodyMetricsCsv";
 import ClientProgressBodySection from "@/components/coach/client-views/ClientProgressBodySection";
 import ClientProgressWellnessSection from "@/components/coach/client-views/ClientProgressWellnessSection";
 import ClientProgressPhotosSection from "@/components/coach/client-views/ClientProgressPhotosSection";
 import { ClientFmsAssessmentsPanel } from "@/components/coach/client-views/ClientFmsAssessmentsPanel";
 import ClientGoalsView from "@/components/coach/client-views/ClientGoalsView";
-import ClientAnalyticsView from "@/components/coach/client-views/ClientAnalyticsView";
 
 const SECTIONS = [
   { id: "body" as const, label: "Body", shortLabel: "Body", icon: Scale },
@@ -29,7 +24,6 @@ const SECTIONS = [
   { id: "photos" as const, label: "Photos", shortLabel: "Photos", icon: ImageIcon },
   { id: "fms" as const, label: "FMS", shortLabel: "FMS", icon: ClipboardCheck },
   { id: "goals" as const, label: "Goals", shortLabel: "Goals", icon: Target },
-  { id: "trends" as const, label: "Trends", shortLabel: "Trends", icon: LineChart },
 ];
 
 export type ProgressHubSectionId = (typeof SECTIONS)[number]["id"];
@@ -44,12 +38,10 @@ function parseSectionParam(raw: string | null): ProgressHubSectionId | null {
 
 interface CoachClientProgressHubProps {
   clientId: string;
-  onOpenReport: () => void;
 }
 
 export default function CoachClientProgressHub({
   clientId,
-  onOpenReport,
 }: CoachClientProgressHubProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,33 +66,6 @@ export default function CoachClientProgressHub({
   }, [clientId, router, searchParams]);
 
   const coachId = user?.id ?? null;
-
-  const trendsToolbar = (
-    <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:shrink-0">
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2 w-full sm:w-auto justify-center"
-        type="button"
-        onClick={onOpenReport}
-      >
-        <FileText className="w-4 h-4 shrink-0" />
-        <span className="sm:hidden">Report</span>
-        <span className="hidden sm:inline">Generate Report</span>
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2 w-full sm:w-auto justify-center"
-        type="button"
-        onClick={() => exportBodyMetricsCsv(clientId, clientName)}
-      >
-        <Download className="w-4 h-4 shrink-0" />
-        <span className="sm:hidden">Export</span>
-        <span className="hidden sm:inline">Export Data</span>
-      </Button>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -152,9 +117,6 @@ export default function CoachClientProgressHub({
         />
       )}
       {activeSection === "goals" && <ClientGoalsView clientId={clientId} />}
-      {activeSection === "trends" && (
-        <ClientAnalyticsView clientId={clientId} toolbar={trendsToolbar} />
-      )}
     </div>
   );
 }

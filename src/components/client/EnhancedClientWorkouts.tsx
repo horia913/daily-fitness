@@ -1695,7 +1695,7 @@ export default function EnhancedClientWorkouts({
             <AddGoalModal
               open={showAddGoalModal}
               onClose={() => setShowAddGoalModal(false)}
-              pillar="training"
+              defaultPillar="training"
               onSuccess={fetchPillarGoals}
             />
           </ClientPageShell>

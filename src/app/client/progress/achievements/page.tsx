@@ -7,8 +7,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AchievementCard } from "@/components/ui/AchievementCard";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Award, Filter } from "lucide-react";
+import { ClientPageShell } from "@/components/client-ui";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, Award } from "lucide-react";
 import { AchievementService } from "@/lib/achievementService";
 import type { AchievementProgress } from "@/lib/achievementService";
 
@@ -192,221 +193,166 @@ function AchievementsPageContent() {
     (a) => !a.unlocked && a.progress === undefined
   ).length;
 
+  const tabChipBase =
+    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
+  const tabChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+  const tabChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-        <div className="space-y-8">
-          <div className="fc-card-shell backdrop-blur-[8px] p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = "/client/progress"; }}
-                  className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]"
-                >
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </button>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
-                    <Award className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-                      Achievements
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                      {unlockedCount} unlocked · {inProgressCount} in progress ·{" "}
-                      {lockedCount} locked
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="fc-glass-soft fc-card p-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    Unlocked
-                  </p>
-                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                    {unlockedCount}
-                  </p>
-                </div>
-                <div className="fc-glass-soft fc-card p-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    In Progress
-                  </p>
-                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                    {inProgressCount}
-                  </p>
-                </div>
-                <div className="fc-glass-soft fc-card p-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    Locked
-                  </p>
-                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                    {lockedCount}
-                  </p>
-                </div>
-              </div>
+      <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        <div className="space-y-6">
+          {/* Flat header */}
+          <div className="flex items-start gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/progress";
+              }}
+              className="w-10 h-10 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="text-xl font-bold text-white tracking-tight">Achievements</h1>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Milestones and progress across your training.
+              </p>
             </div>
           </div>
 
-          <div className="my-3">
-            <div className="mb-3 flex items-center gap-2">
-              <Filter className="h-4 w-4 text-[color:var(--fc-text-dim)]" />
-              <h2 className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                Filters
-              </h2>
+          {/* Stat strip */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 flex items-stretch">
+            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
+              <span className="text-base font-semibold tabular-nums text-white">{unlockedCount}</span>
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+                Unlocked
+              </span>
+            </div>
+            <div className="w-px self-stretch min-h-8 bg-white/10" />
+            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
+              <span className="text-base font-semibold tabular-nums text-white">{inProgressCount}</span>
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+                In progress
+              </span>
+            </div>
+            <div className="w-px self-stretch min-h-8 bg-white/10" />
+            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
+              <span className="text-base font-semibold tabular-nums text-white">{lockedCount}</span>
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+                Locked
+              </span>
+            </div>
+          </div>
+
+          {/* Filters — reference chips, stacked sections (no lg: grid) */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Status</p>
+            <div className="-mx-4 px-4 mb-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex flex-wrap gap-2 min-w-min">
+                {(
+                  [
+                    ["all", "All"],
+                    ["unlocked", "Unlocked"],
+                    ["progress", "In progress"],
+                    ["locked", "Locked"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilterStatus(key)}
+                    className={cn(
+                      tabChipBase,
+                      filterStatus === key ? tabChipActive : tabChipInactive
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                  Status
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFilterStatus("all")}
-                    className={`fc-btn ${
-                      filterStatus === "all" ? "fc-btn-primary" : "fc-btn-ghost"
-                    }`}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFilterStatus("unlocked")}
-                    className={`fc-btn ${
-                      filterStatus === "unlocked"
-                        ? "fc-btn-primary"
-                        : "fc-btn-ghost"
-                    }`}
-                  >
-                    Unlocked
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFilterStatus("progress")}
-                    className={`fc-btn ${
-                      filterStatus === "progress"
-                        ? "fc-btn-primary"
-                        : "fc-btn-ghost"
-                    }`}
-                  >
-                    In Progress
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFilterStatus("locked")}
-                    className={`fc-btn ${
-                      filterStatus === "locked"
-                        ? "fc-btn-primary"
-                        : "fc-btn-ghost"
-                    }`}
-                  >
-                    Locked
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                  Rarity
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Rarity</p>
+            <div className="-mx-4 px-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex flex-wrap gap-2 min-w-min">
+                {(
+                  [
                     "all",
                     "common",
                     "uncommon",
                     "rare",
                     "epic",
                     "legendary",
-                  ].map((rarity) => (
-                    <Button
-                      key={rarity}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setFilterRarity(
-                          rarity as
-                            | "all"
-                            | "common"
-                            | "uncommon"
-                            | "rare"
-                            | "epic"
-                            | "legendary"
-                        )
-                      }
-                      className={`fc-btn ${
-                        filterRarity === rarity
-                          ? "fc-btn-primary"
-                          : "fc-btn-ghost"
-                      }`}
-                    >
-                      {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-                    </Button>
-                  ))}
-                </div>
+                  ] as const
+                ).map((rarity) => (
+                  <button
+                    key={rarity}
+                    type="button"
+                    onClick={() => setFilterRarity(rarity)}
+                    className={cn(
+                      tabChipBase,
+                      filterRarity === rarity ? tabChipActive : tabChipInactive
+                    )}
+                  >
+                    {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
           {loadError ? (
-            <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
-              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
-              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+            <div className="py-8 px-4 text-center">
+              <p className="text-sm text-gray-400 mb-1">{loadError}</p>
+              <p className="text-xs text-gray-500 mb-4">Refresh the page or try again in a moment.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-6 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+              >
+                Retry
+              </button>
             </div>
           ) : loading ? (
-            <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]" />
-              <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
-                Loading achievements...
-              </p>
+            <div className="py-8 px-4 text-center">
+              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-cyan-400" />
+              <p className="mt-4 text-sm text-gray-400">Loading achievements…</p>
+              <p className="mt-1 text-xs text-gray-500">This may take a few seconds.</p>
             </div>
           ) : (
             <>
+              {/* Single column at all widths — avoids tight 2-col at ~375px; AchievementCard unchanged */}
               <div className="flex flex-col border-y border-white/5">
                 {filteredAchievements.map((achievement) => (
-                  <AchievementCard
-                    key={achievement.id}
-                    achievement={achievement}
-                    dense
-                  />
+                  <AchievementCard key={achievement.id} achievement={achievement} dense />
                 ))}
               </div>
 
               {filteredAchievements.length === 0 && (
-                <div className="fc-card-shell backdrop-blur-[8px] p-12 text-center">
-                  <Award className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
-                  <p className="mb-2 text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                    No achievements found
-                  </p>
-                  <p className="mb-4 text-sm text-[color:var(--fc-text-dim)]">
-                    Try adjusting your filters to see more achievements.
-                  </p>
-                  <Button
-                    variant="ghost"
+                <div className="py-8 px-4 text-center">
+                  <Award className="mx-auto mb-3 h-12 w-12 text-gray-600" aria-hidden />
+                  <p className="text-sm text-gray-400 mb-1">No achievements match these filters</p>
+                  <p className="text-xs text-gray-500 mb-4">Try widening status or rarity.</p>
+                  <button
+                    type="button"
                     onClick={() => {
                       setFilterRarity("all");
                       setFilterStatus("all");
                     }}
-                    className="fc-btn fc-btn-secondary"
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-5 text-sm font-semibold text-cyan-300"
                   >
-                    Reset Filters
-                  </Button>
+                    Reset filters
+                  </button>
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
+      </ClientPageShell>
     </AnimatedBackground>
   );
 }

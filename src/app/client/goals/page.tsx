@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -42,15 +43,13 @@ import {
   Crown,
   Rocket,
   Timer,
+  X,
   XCircle,
   PauseCircle,
-  Filter,
-  SortAsc,
   Calendar as CalendarIcon,
   Clock as ClockIcon,
   Target as TargetIcon,
   ChevronDown,
-  Archive,
   Leaf,
   BarChart3,
   type LucideIcon,
@@ -309,6 +308,29 @@ export default function ClientGoals() {
   const [addGoalPillar, setAddGoalPillar] = useState<Goal["pillar"]>("general");
   const [addGoalModalPillar, setAddGoalModalPillar] = useState<Goal["pillar"] | null>(null);
   const [completedSectionOpen, setCompletedSectionOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fabPortalReady, setFabPortalReady] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shouldOpen = params.get("add") === "true";
+    const category = params.get("category");
+    const allowedPillars: Goal["pillar"][] = [
+      "training",
+      "nutrition",
+      "checkins",
+      "lifestyle",
+      "general",
+    ];
+    if (!shouldOpen || !category) return;
+    if (allowedPillars.includes(category as Goal["pillar"])) {
+      setAddGoalModalPillar(category as Goal["pillar"]);
+    }
+  }, []);
+
+  useEffect(() => {
+    setFabPortalReady(true);
+  }, []);
 
   const goalCategories: GoalCategory[] = [
     {
@@ -1122,12 +1144,12 @@ export default function ClientGoals() {
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
           <div className="p-4">
-            <ClientPageShell className="max-w-lg mx-auto space-y-3 py-4">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-3 overflow-x-hidden">
               <div className="animate-pulse space-y-3">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded-lg w-48 mx-auto" />
-                <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-full max-w-xs mx-auto" />
-                <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
-                <div className="h-32 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
+                <div className="h-7 bg-[color:var(--fc-glass-highlight)] rounded-lg w-40" />
+                <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-2/3" />
+                <div className="h-20 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
+                <div className="h-28 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
               </div>
             </ClientPageShell>
           </div>
@@ -1140,13 +1162,13 @@ export default function ClientGoals() {
     return (
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
-          <ClientPageShell className="max-w-lg w-full">
-            <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
-              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+          <ClientPageShell className="max-w-lg mx-auto w-full px-4 pb-32 pt-6">
+            <div className="py-8 px-4 text-center rounded-xl border border-white/10 bg-white/[0.04]">
+              <p className="text-sm text-gray-400 mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary h-10 text-sm">
                 Retry
               </Button>
-            </GlassCard>
+            </div>
           </ClientPageShell>
         </div>
       </ProtectedRoute>
@@ -1157,6 +1179,8 @@ export default function ClientGoals() {
   const goalStatsFromService = getGoalStatsFromService(goals);
   const completedGoalsList = goals.filter((g) => g.status === "completed");
   const activeGoalsList = goals.filter((g) => g.status === "active" || g.status === "in_progress");
+  const activeFilterCount =
+    (filterStatus !== "all" ? 1 : 0) + (sortBy !== "newest" ? 1 : 0);
 
   const getActiveGoalsForPillar = (pillar: Goal["pillar"]) => {
     let list = activeGoalsList.filter((g) => (g.pillar ?? "general") === pillar);
@@ -1169,77 +1193,136 @@ export default function ClientGoals() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen fc-page min-w-0 overflow-x-hidden px-4 sm:px-6">
-          <div className="max-w-6xl mx-auto flex flex-col min-w-0" style={{ gap: "var(--fc-gap-sections)" }}>
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden space-y-4">
             {/* Header */}
-            <header className="flex justify-between items-end flex-wrap gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="w-12 h-0.5 bg-[color:var(--fc-status-error)]" aria-hidden />
-                  <span className="fc-micro fc-text-error font-mono">GOAL CENTER</span>
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
-                  My Goals
-                </h1>
+            <header>
+              <h1 className="text-xl font-bold text-white tracking-tight mb-4">My Goals</h1>
+              <div className="flex items-center justify-between gap-2 -mt-2 mb-1">
+                <p className="text-sm fc-text-dim min-w-0">Set and track goals by pillar.</p>
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = "/client/goals/history"; }}
+                  className="shrink-0 text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
+                >
+                  History
+                </button>
               </div>
             </header>
 
             {/* Overall stats */}
-            <GlassCard elevation={2} className="fc-card-shell p-6">
-              <div className="flex items-center gap-5">
-                <div className="relative w-16 h-16 flex-shrink-0">
-                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                    <circle cx="32" cy="32" r="27" fill="none" stroke="var(--fc-glass-border)" strokeWidth="4" />
-                    <circle cx="32" cy="32" r="27" fill="none" stroke="var(--fc-accent-cyan)" strokeWidth="4" strokeLinecap="round"
-                      strokeDasharray={`${goalStatsFromService.overallAdherence * 1.696} 999`} />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-sm font-black fc-text-primary">
-                    {goalStatsFromService.overallAdherence}%
-                  </span>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{stats.total}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Total</p>
                 </div>
-                <div>
-                  <p className="text-base font-bold fc-text-primary">Overall Adherence</p>
-                  <p className="text-sm fc-text-dim">{goalStatsFromService.active} active goals</p>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{goalStatsFromService.active}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Active</p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{stats.completed}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Completed</p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{goalStatsFromService.overallAdherence}%</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Adherence</p>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
-            {/* Status and Sort (no category tabs) */}
-            <GlassCard elevation={1} className="fc-card-shell p-4 rounded-xl">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="min-w-0">
-                  <label className="fc-micro fc-text-subtle mb-2 block">Status</label>
-                  <Select value={filterStatus} onValueChange={(v: typeof filterStatus) => setFilterStatus(v)}>
-                    <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="paused">Paused</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+            {/* Status and Sort chips */}
+            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between py-2 mb-3 text-left"
+                aria-expanded={filtersOpen}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500">
+                    Filters
+                  </span>
+                  {activeFilterCount > 0 ? (
+                    <span className="text-[10px] text-cyan-400/70">
+                      {activeFilterCount} active
+                    </span>
+                  ) : null}
                 </div>
-                <div className="min-w-0">
-                  <label className="fc-micro fc-text-subtle mb-2 block">Sort</label>
-                  <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
-                    <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
-                      <SortAsc className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Sort" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Newest</SelectItem>
-                      <SelectItem value="oldest">Oldest</SelectItem>
-                      <SelectItem value="priority">Priority</SelectItem>
-                      <SelectItem value="progress">Progress</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <ChevronDown
+                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+                    filtersOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {filtersOpen ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-2">Status</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { value: "all", label: "All" },
+                          { value: "active", label: "Active" },
+                          { value: "completed", label: "Completed" },
+                          { value: "paused", label: "Paused" },
+                          { value: "cancelled", label: "Cancelled" },
+                        ] as const
+                      ).map((option) => {
+                        const isActive = filterStatus === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setFilterStatus(option.value)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
+                              isActive
+                                ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
+                                : "border-white/10 bg-white/[0.03] text-gray-400 hover:text-gray-300"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-2">Sort</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { value: "newest", label: "Newest" },
+                          { value: "oldest", label: "Oldest" },
+                          { value: "priority", label: "Priority" },
+                          { value: "progress", label: "Progress" },
+                        ] as const
+                      ).map((option) => {
+                        const isActive = sortBy === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setSortBy(option.value)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
+                              isActive
+                                ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
+                                : "border-white/10 bg-white/[0.03] text-gray-400 hover:text-gray-300"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </GlassCard>
+              ) : null}
+            </section>
 
             {/* Pillar sections */}
             {PILLAR_SECTIONS.map(({ id: pillarId, label, icon: PillarIcon }) => {
@@ -1248,34 +1331,33 @@ export default function ClientGoals() {
               const count = pillarStat?.count ?? 0;
               const adherence = pillarStat?.adherence ?? 0;
               return (
-                <section key={pillarId}>
-                  <GlassCard elevation={2} className="fc-card-shell p-6">
-                    <div className="flex items-center justify-between gap-4 mb-4">
-                      <h2 className="text-lg font-bold fc-text-primary flex items-center gap-2">
-                        <PillarIcon className="w-5 h-5" style={{ color: "var(--fc-accent-primary)" }} />
-                        {label}
-                        {count > 0 && (
-                          <span className="fc-text-dim font-normal ml-2">
-                            {count} goal{count !== 1 ? "s" : ""} · {adherence}%
-                          </span>
-                        )}
-                      </h2>
-                    </div>
+                <section key={pillarId} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-1">{label} pillar</p>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight text-white">
+                      <PillarIcon className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--fc-accent-primary)" }} />
+                      <span className="truncate">{label}</span>
+                    </h2>
+                    {count > 0 ? (
+                      <span className="shrink-0 text-xs tabular-nums text-gray-500">
+                        {count} · {adherence}%
+                      </span>
+                    ) : null}
+                  </div>
                     {pillarGoalsList.length === 0 ? (
-                      <div className="py-4 text-center">
-                        <p className="fc-text-dim text-sm mb-3">No goals in this pillar yet. Set one to start tracking!</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                      <div className="py-8 px-4 text-center">
+                        <p className="text-sm text-gray-400 mb-1">No goals in this pillar yet.</p>
+                        <button
+                          type="button"
                           onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="fc-btn fc-btn-secondary"
+                          className="text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
                         >
                           + Add {label} Goal
-                        </Button>
+                        </button>
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4" style={{ gap: "var(--fc-gap-cards)" }}>
+                        <div className="grid grid-cols-1 gap-3 mb-3">
                           {pillarGoalsList.map((goal) => (
                             <GoalCard
                               key={goal.id}
@@ -1287,17 +1369,15 @@ export default function ClientGoals() {
                             />
                           ))}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        <button
+                          type="button"
                           onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="fc-btn fc-btn-secondary"
+                          className="text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
                         >
                           + Add {label} Goal
-                        </Button>
+                        </button>
                       </>
                     )}
-                  </GlassCard>
                 </section>
               );
             })}
@@ -1307,7 +1387,7 @@ export default function ClientGoals() {
               <AddGoalModal
                 open={true}
                 onClose={() => setAddGoalModalPillar(null)}
-                pillar={addGoalModalPillar}
+                defaultPillar={addGoalModalPillar}
                 onSuccess={() => {
                   loadGoals();
                   setAddGoalModalPillar(null);
@@ -1316,27 +1396,25 @@ export default function ClientGoals() {
             )}
 
             {/* Completed goals: collapsible */}
-            <section className="fc-card-shell overflow-hidden">
+            <section className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
               <button
                 type="button"
                 onClick={() => setCompletedSectionOpen((o) => !o)}
-                className="w-full flex items-center justify-between p-6 hover:bg-[color:var(--fc-glass-soft)] transition-colors text-left"
+                className="w-full flex items-center justify-between py-3 px-4 hover:bg-white/[0.03] transition-colors text-left"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                    <Archive className="w-5 h-5 fc-text-subtle" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold fc-text-primary">Completed goals</h3>
-                    <p className="text-xs fc-text-subtle uppercase font-mono">{completedGoalsList.length} completed</p>
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-cyan-300/70">Archive</p>
+                  <h3 className="text-sm font-semibold text-white tracking-tight">Completed goals</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">{completedGoalsList.length} completed</p>
                 </div>
-                <ChevronDown className={`w-5 h-5 fc-text-subtle transition-transform duration-300 ${completedSectionOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-5 h-5 shrink-0 fc-text-subtle transition-transform duration-300 ${completedSectionOpen ? "rotate-180" : ""}`} />
               </button>
               <div className={completedSectionOpen ? "block" : "hidden"}>
-                <div className="px-6 pb-6 pt-0 space-y-4">
+                <div className="px-4 pb-4 pt-0 space-y-3">
                   {completedGoalsList.length === 0 ? (
-                    <p className="text-sm fc-text-dim py-4">No completed goals yet.</p>
+                    <div className="py-8 px-4 text-center">
+                      <p className="text-sm text-gray-400">No completed goals yet.</p>
+                    </div>
                   ) : (
                     filteredAndSortedGoals(completedGoalsList).map((goal) => (
                       <GoalCard
@@ -1350,21 +1428,6 @@ export default function ClientGoals() {
                 </div>
               </div>
             </section>
-
-            {/* Floating action button (mockup): add new goal */}
-            <div className="fixed bottom-8 right-8 z-40">
-              <button
-                type="button"
-                onClick={() => setShowPresetSelection(true)}
-                className="fc-fab group"
-                aria-label="Add new goal"
-              >
-                <Plus className="w-8 h-8 text-white" />
-                <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-lg fc-text-primary">
-                  Add goal
-                </span>
-              </button>
-            </div>
 
               {/* Custom Goal Form Modal */}
               <CustomGoalForm
@@ -1390,125 +1453,139 @@ export default function ClientGoals() {
               />
 
               {/* Preset Goal Selection Modal */}
-              {showPresetSelection && !selectedPreset && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <GlassCard
-                    elevation={2}
-                    className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8"
-                  >
-                    <h2
-                      className="text-2xl md:text-3xl font-bold text-center mb-2"
-                      style={{ color: "var(--fc-text-primary)" }}
-                    >
-                      Select Your Goal
-                    </h2>
-                    <p
-                      className="text-center mb-4"
-                      style={{
-                        color: "var(--fc-text-dim)",
-                      }}
-                    >
-                      Choose what you want to achieve
-                    </p>
-                    <div className="flex justify-center mb-6">
-                      <div className="space-y-2 w-full max-w-xs">
-                        <Label className="text-sm font-medium fc-text-subtle">Pillar</Label>
-                        <Select
-                          value={addGoalPillar}
-                          onValueChange={(v) => setAddGoalPillar(v as Goal["pillar"])}
+              {showPresetSelection && !selectedPreset && fabPortalReady
+                ? createPortal(
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <GlassCard
+                        elevation={2}
+                        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPresetSelection(false);
+                            setSelectedPreset(null);
+                          }}
+                          className="absolute top-4 right-4 rounded-lg p-1 text-gray-400 hover:text-white transition-colors"
+                          aria-label="Close"
                         >
-                          <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="training">Training</SelectItem>
-                            <SelectItem value="nutrition">Nutrition</SelectItem>
-                            <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
-                            <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
-                            <SelectItem value="general">General</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Group goals by category */}
-                    {[
-                      "Body Composition",
-                      "Strength & Performance",
-                      "Consistency & Adherence",
-                    ].map((category) => {
-                      const goalsInCategory = PRESET_GOALS.filter(
-                        (g) => g.subcategory === category
-                      );
-
-                      return (
-                        <div key={category} className="mb-10">
-                          <h3
-                            className="text-lg md:text-xl font-bold mb-4"
-                            style={{ color: "var(--fc-text-primary)" }}
-                          >
-                            {category}
-                          </h3>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                            {goalsInCategory.map((preset) => (
-                              <button
-                                key={preset.id}
-                                onClick={() => {
-                                  setSelectedPreset(preset.id);
-                                  setCustomizing(true);
-                                }}
-                                className="flex flex-col items-center p-4 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all"
-                                style={{
-                                  background: "var(--fc-glass-highlight)",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <span className="text-4xl mb-2">
-                                  {preset.emoji}
-                                </span>
-                                <span
-                                  className="font-bold text-center text-sm"
-                                  style={{
-                                    color: "var(--fc-text-primary)",
-                                  }}
-                                >
-                                  {preset.title}
-                                </span>
-                                <span
-                                  className="text-xs text-center mt-1"
-                                  style={{
-color: "var(--fc-text-subtle)",
-                                  }}
-                                >
-                                  {preset.description}
-                                </span>
-                              </button>
-                            ))}
+                          <X className="w-5 h-5" />
+                        </button>
+                        <h2
+                          className="text-lg font-semibold text-center mb-2"
+                          style={{ color: "var(--fc-text-primary)" }}
+                        >
+                          Select Your Goal
+                        </h2>
+                        <p
+                          className="text-center mb-4"
+                          style={{
+                            color: "var(--fc-text-dim)",
+                          }}
+                        >
+                          Choose what you want to achieve
+                        </p>
+                        <div className="flex justify-center mb-6">
+                          <div className="space-y-2 w-full max-w-xs">
+                            <Label className="text-sm font-medium fc-text-subtle">Pillar</Label>
+                            <Select
+                              value={addGoalPillar}
+                              onValueChange={(v) => setAddGoalPillar(v as Goal["pillar"])}
+                            >
+                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="training">Training</SelectItem>
+                                <SelectItem value="nutrition">Nutrition</SelectItem>
+                                <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
+                                <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
+                                <SelectItem value="general">General</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
-                      );
-                    })}
 
-                    <Button
-                      onClick={() => {
-                        setShowPresetSelection(false);
-                        setSelectedPreset(null);
-                      }}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      Cancel
-                    </Button>
-                  </GlassCard>
-                </div>
-              )}
+                        {/* Group goals by category */}
+                        {[
+                          "Body Composition",
+                          "Strength & Performance",
+                          "Consistency & Adherence",
+                        ].map((category) => {
+                          const goalsInCategory = PRESET_GOALS.filter(
+                            (g) => g.subcategory === category
+                          );
+
+                          return (
+                            <div key={category} className="mb-10">
+                              <h3
+                                className="text-base font-semibold mb-4"
+                                style={{ color: "var(--fc-text-primary)" }}
+                              >
+                                {category}
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4 mb-8">
+                                {goalsInCategory.map((preset) => (
+                                  <button
+                                    key={preset.id}
+                                    onClick={() => {
+                                      setSelectedPreset(preset.id);
+                                      setCustomizing(true);
+                                    }}
+                                    className="flex flex-col items-center p-4 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all"
+                                    style={{
+                                      background: "var(--fc-glass-highlight)",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    <span className="text-4xl mb-2">
+                                      {preset.emoji}
+                                    </span>
+                                    <span
+                                      className="font-bold text-center text-sm"
+                                      style={{
+                                        color: "var(--fc-text-primary)",
+                                      }}
+                                    >
+                                      {preset.title}
+                                    </span>
+                                    <span
+                                      className="text-xs text-center mt-1"
+                                      style={{
+                                        color: "var(--fc-text-subtle)",
+                                      }}
+                                    >
+                                      {preset.description}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <Button
+                          onClick={() => {
+                            setShowPresetSelection(false);
+                            setSelectedPreset(null);
+                          }}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Cancel
+                        </Button>
+                      </GlassCard>
+                    </div>,
+                    document.body
+                  )
+                : null}
 
               {/* Customization Modal */}
               {customizing && selectedPreset && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <GlassCard
                     elevation={2}
-                    className="w-full max-w-md max-h-[90vh] overflow-y-auto p-6 md:p-8"
+                    className="w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
                   >
                     {(() => {
                       const preset = PRESET_GOALS.find(
@@ -1523,7 +1600,7 @@ color: "var(--fc-text-subtle)",
                               {preset.emoji}
                             </span>
                             <h2
-                              className="text-2xl font-bold"
+                              className="text-lg font-semibold"
                               style={{ color: "var(--fc-text-primary)" }}
                             >
                               {preset.title}
@@ -1543,7 +1620,7 @@ color: "var(--fc-text-subtle)",
                               >
                                 What&apos;s your target?
                               </Label>
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2">
                                 {preset.category === "consistency" ? (
                                   // Consistency goals (workouts per week, days, liters)
                                   <>
@@ -1569,7 +1646,7 @@ color: "var(--fc-text-subtle)",
                                         })
                                       }
                                     >
-                                      <SelectTrigger className="w-32 rounded-xl border-[color:var(--fc-glass-border)]">
+                                      <SelectTrigger className="w-full rounded-xl border-[color:var(--fc-glass-border)]">
                                         <SelectValue
                                           placeholder={preset.suggestedUnit}
                                         />
@@ -1611,7 +1688,7 @@ color: "var(--fc-text-subtle)",
                                     </Select>
                                   </>
                                 ) : preset.id === "body-recomp" ? (
-                                  <>
+                                  <div className="flex flex-col gap-2">
                                     <Input
                                       type="number"
                                       placeholder="Muscle (kg)"
@@ -1633,7 +1710,7 @@ color: "var(--fc-text-subtle)",
                                       className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                     />
                                     <span
-                                      className="flex items-center"
+                                      className="hidden"
                                       style={{
 color: "var(--fc-text-subtle)",
                                       }}
@@ -1660,7 +1737,7 @@ color: "var(--fc-text-subtle)",
                                       }}
                                       className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                     />
-                                  </>
+                                  </div>
                                 ) : (
                                   <>
                                     <Input
@@ -1685,7 +1762,7 @@ color: "var(--fc-text-subtle)",
                                         })
                                       }
                                     >
-                                      <SelectTrigger className="w-32 rounded-xl border-[color:var(--fc-glass-border)]">
+                                      <SelectTrigger className="w-full rounded-xl border-[color:var(--fc-glass-border)]">
                                         <SelectValue
                                           placeholder={preset.suggestedUnit}
                                         />
@@ -2146,9 +2223,27 @@ color: "var(--fc-text-subtle)",
                   </Card>
                 </div>
               )}
-          </div>
-        </div>
+        </ClientPageShell>
       </AnimatedBackground>
+
+      {fabPortalReady
+        ? createPortal(
+            <div className="fixed bottom-24 right-4 z-40 pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => setShowPresetSelection(true)}
+                className="fc-fab group"
+                aria-label="Add new goal"
+              >
+                <Plus className="w-8 h-8 text-white" />
+                <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-3 py-1.5 rounded-xl text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap fc-text-primary">
+                  Add goal
+                </span>
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </ProtectedRoute>
   );
 }

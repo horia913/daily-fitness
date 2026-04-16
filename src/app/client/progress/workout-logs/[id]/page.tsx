@@ -1034,7 +1034,7 @@ export default function WorkoutLogDetailPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-36 pt-6 space-y-4">
             {/* Top bar + session meta */}
-            <div className="fc-card-shell p-3 sm:p-4">
+            <div className="fc-card-shell p-3">
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
@@ -1147,8 +1147,8 @@ export default function WorkoutLogDetailPage() {
             </div>
 
             {personalRecords.length > 0 && (
-              <div className="fc-card-shell fc-card-shell--warning p-3 sm:p-4">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold fc-text-primary mb-2">
+              <div className="fc-card-shell fc-card-shell--warning p-3">
+                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5 font-bold fc-text-primary">
                   <Trophy className="w-4 h-4 text-[color:var(--fc-status-warning)] shrink-0" />
                   PRs this session
                 </h3>
@@ -1187,7 +1187,7 @@ export default function WorkoutLogDetailPage() {
             {isAbandoned && hasNoSets && (
               <div className="fc-card-shell p-4 text-center">
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 text-[color:var(--fc-text-subtle)]" />
-                <h3 className="text-sm font-bold fc-text-primary mb-1">Workout not completed</h3>
+                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 font-bold fc-text-primary">Workout not completed</h3>
                 <p className="text-xs fc-text-dim">Started but not finished — no sets logged.</p>
               </div>
             )}
@@ -1195,7 +1195,7 @@ export default function WorkoutLogDetailPage() {
             {/* Exercise Breakdown — all expanded, card-per-exercise with table layout */}
             {!(isAbandoned && hasNoSets) && (
               <section className="space-y-3">
-                <h3 className="text-sm font-bold flex items-center gap-2 px-0.5 fc-text-primary">
+                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 font-bold flex items-center gap-2 px-0.5 fc-text-primary">
                   Exercises
                   <span className="h-px flex-1 bg-[color:var(--fc-glass-border)]" />
                 </h3>

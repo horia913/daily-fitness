@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast-provider'
 import { Button } from '@/components/ui/button'
@@ -21,12 +21,26 @@ import {
   AlertCircle,
   SkipForward,
   X,
+  Info,
 } from 'lucide-react'
 import Link from 'next/link'
 import ClientProgressionEditor from '@/components/coach/client-views/ClientProgressionEditor'
 import { WeekReviewModal } from '@/components/coach/WeekReviewModal'
+import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { cn } from '@/lib/utils'
-import { getCategoryAccent } from '@/lib/workoutCategoryColors'
+import { Input } from '@/components/ui/input'
+import {
+  getAssignmentSchedule,
+  getProgramScheduleSlotsForAssignment,
+  getCompletedSlots,
+  type AssignmentScheduleSlot,
+} from '@/lib/programStateService'
+import {
+  diffCalendarDaysYmd,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+  zonedYmdFromIsoTimestamp,
+} from '@/lib/clientZonedCalendar'
 
 interface ProgramAssignment {
   id: string
@@ -39,6 +53,10 @@ interface ProgramAssignment {
   created_at: string
   progression_mode?: string
   coach_unlocked_week?: number | null
+  pause_status?: string | null
+  paused_at?: string | null
+  pause_reason?: string | null
+  pause_accumulated_days?: number | null
   workout_programs?: {
     id: string
     name: string
@@ -49,27 +67,16 @@ interface ProgramAssignment {
   }
 }
 
-interface ScheduleItem {
+interface CoachTemplateOption {
   id: string
-  program_id: string
-  template_id: string
-  week_number: number
-  day_of_week: number
-  /** 1-based ordering when present (aligns with program_progress.current_day_number); else derived from day_of_week */
-  day_number?: number | null
-  workout_templates?: {
-    id: string
-    name: string
-    description?: string
-    estimated_duration?: number
-    difficulty_level?: string
-    category?: string | null
-  }
+  name: string
+  estimated_duration?: number | null
 }
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
 function ClientProgramDetailsContent() {
   const params = useParams()
-  const router = useRouter()
   const { clientName: contextClientName } = useCoachClient()
   const { addToast } = useToast()
   
@@ -77,24 +84,31 @@ function ClientProgramDetailsContent() {
   const programId = params.programId as string
   
   const [assignment, setAssignment] = useState<ProgramAssignment | null>(null)
-  const [schedule, setSchedule] = useState<ScheduleItem[]>([])
+  /** Per-client snapshot rows (canonical schedule). */
+  const [snapshotRows, setSnapshotRows] = useState<AssignmentScheduleSlot[]>([])
+  /** program_day_assignments.id → program_schedule.id (for completions + skip-day). */
+  const [scheduleIdByPdaId, setScheduleIdByPdaId] = useState<Record<string, string>>({})
+  const [snapshotTemplateNames, setSnapshotTemplateNames] = useState<Record<string, string>>({})
   const [progress, setProgress] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   // Skip-day state
   const [completedScheduleIds, setCompletedScheduleIds] = useState<Set<string>>(new Set())
   const [skippedScheduleIds, setSkippedScheduleIds] = useState<Set<string>>(new Set())
-  const [skippingId, setSkippingId] = useState<string | null>(null)
   const [skipReason, setSkipReason] = useState('')
   const [skipLoading, setSkipLoading] = useState(false)
-  const [weekPicker, setWeekPicker] = useState(1)
-  const [weekSaving, setWeekSaving] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [clientTz, setClientTz] = useState('UTC')
+  const [pauseModalOpen, setPauseModalOpen] = useState(false)
+  const [resumeModalOpen, setResumeModalOpen] = useState(false)
+  const [pauseReasonDraft, setPauseReasonDraft] = useState('')
+  const [pauseBusy, setPauseBusy] = useState(false)
 
-  useEffect(() => {
-    if (progress?.current_week_number) {
-      setWeekPicker(progress.current_week_number)
-    }
-  }, [progress])
+  const [snapshotEditorOpen, setSnapshotEditorOpen] = useState(false)
+  const [editingSnapshot, setEditingSnapshot] = useState<AssignmentScheduleSlot | null>(null)
+  const [coachTemplates, setCoachTemplates] = useState<CoachTemplateOption[]>([])
+  const [templateSearch, setTemplateSearch] = useState('')
+  const [snapshotSaveBusy, setSnapshotSaveBusy] = useState(false)
+  const [masterHasOptionalDays, setMasterHasOptionalDays] = useState(false)
 
   const difficultyColors: Record<string, string> = {
     'beginner': 'fc-text-success',
@@ -157,66 +171,99 @@ function ClientProgramDetailsContent() {
         setAssignment(assignmentData)
       }
 
-      // Load program schedule with templates
-      const { data: scheduleData } = await supabase
-        .from('program_schedule')
-        .select('*')
-        .eq('program_id', programId)
-        .order('week_number', { ascending: true })
-        .order('day_of_week', { ascending: true })
+      const { data: profTz } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', clientId)
+        .maybeSingle()
+      setClientTz(normalizeClientTimezone((profTz as { timezone?: string | null } | null)?.timezone))
 
-      if (scheduleData && scheduleData.length > 0) {
-        // Fetch templates for schedule items
-        const templateIds = [...new Set(scheduleData.map(s => s.template_id).filter(Boolean))]
-        
-        if (templateIds.length > 0) {
-          const { data: templatesData } = await supabase
-            .from('workout_templates')
-            .select('*')
-            .in('id', templateIds)
-          
-          if (templatesData) {
-            const templatesMap = new Map(templatesData.map(t => [t.id, t]))
-            const scheduleWithTemplates = scheduleData.map(s => ({
-              ...s,
-              workout_templates: s.template_id ? templatesMap.get(s.template_id) : null
-            }))
-            setSchedule(scheduleWithTemplates)
-          }
-        } else {
-          setSchedule(scheduleData)
-        }
-      }
-
-      // Load program progress (may not exist yet for new assignments)
       if (assignmentData?.id) {
-        const { data: progressData } = await supabase
-          .from('program_progress')
-          .select('*')
-          .eq('program_assignment_id', assignmentData.id)
-          .maybeSingle()
+        const [snaps, slots, completedList, progressData, completionsData, psOptional] =
+          await Promise.all([
+            getAssignmentSchedule(supabase, assignmentData.id),
+            getProgramScheduleSlotsForAssignment(supabase, programId, assignmentData.id),
+            getCompletedSlots(supabase, assignmentData.id),
+            supabase
+              .from('program_progress')
+              .select('*')
+              .eq('program_assignment_id', assignmentData.id)
+              .maybeSingle()
+              .then((r) => r.data),
+            supabase
+              .from('program_day_completions')
+              .select('program_schedule_id, notes')
+              .eq('program_assignment_id', assignmentData.id)
+              .then((r) => r.data ?? []),
+            supabase
+              .from('program_schedule')
+              .select('is_optional')
+              .eq('program_id', programId)
+              .then((r) => r.data ?? []),
+          ])
+
+        setSnapshotRows(snaps)
+
+        const idMap: Record<string, string> = {}
+        for (const snap of snaps) {
+          const slot = slots.find(
+            (s) => s.week_number === snap.week_number && s.day_number === snap.program_day
+          )
+          if (slot) idMap[snap.id] = slot.id
+        }
+        setScheduleIdByPdaId(idMap)
+
+        const completedFromLogs = new Set(
+          completedList.map((c) => c.program_schedule_id).filter(Boolean)
+        )
+        setCompletedScheduleIds(completedFromLogs)
+
+        const skippedIds = new Set<string>()
+        completionsData.forEach((c: { program_schedule_id: string; notes?: string | null }) => {
+          if (c.notes?.startsWith('Skipped by coach')) {
+            skippedIds.add(c.program_schedule_id)
+          }
+        })
+        setSkippedScheduleIds(skippedIds)
 
         if (progressData) setProgress(progressData)
 
-        // Load completed/skipped slots for skip-day UI badges
-        const { data: completionsData } = await supabase
-          .from('program_day_completions')
-          .select('program_schedule_id, notes')
-          .eq('program_assignment_id', assignmentData.id)
+        const anyOptional = (psOptional as { is_optional?: boolean }[]).some((r) => r.is_optional === true)
+        setMasterHasOptionalDays(anyOptional)
 
-        if (completionsData) {
-          const completedIds = new Set<string>()
-          const skippedIds = new Set<string>()
-          completionsData.forEach(c => {
-            if (c.notes?.startsWith('Skipped by coach')) {
-              skippedIds.add(c.program_schedule_id)
-            } else {
-              completedIds.add(c.program_schedule_id)
-            }
-          })
-          setCompletedScheduleIds(completedIds)
-          setSkippedScheduleIds(skippedIds)
+        const tmplIds = [...new Set(snaps.map((s) => s.workout_template_id).filter(Boolean) as string[])]
+        const nameById: Record<string, string> = {}
+        if (tmplIds.length > 0) {
+          const { data: tmplRows } = await supabase
+            .from('workout_templates')
+            .select('id, name')
+            .in('id', tmplIds)
+          for (const t of tmplRows ?? []) {
+            const row = t as { id: string; name: string | null }
+            nameById[row.id] = row.name ?? 'Workout'
+          }
         }
+        setSnapshotTemplateNames(nameById)
+
+        if (assignmentData.coach_id) {
+          const { data: coachTpl } = await supabase
+            .from('workout_templates')
+            .select('id, name, estimated_duration')
+            .eq('coach_id', assignmentData.coach_id)
+            .order('name', { ascending: true })
+            .limit(200)
+          setCoachTemplates((coachTpl ?? []) as CoachTemplateOption[])
+        } else {
+          setCoachTemplates([])
+        }
+      } else {
+        setSnapshotRows([])
+        setScheduleIdByPdaId({})
+        setCompletedScheduleIds(new Set())
+        setSkippedScheduleIds(new Set())
+        setSnapshotTemplateNames({})
+        setCoachTemplates([])
+        setMasterHasOptionalDays(false)
       }
 
     } catch (error) {
@@ -245,39 +292,6 @@ function ClientProgramDetailsContent() {
     }
   }
 
-  const handleSetCurrentWeek = async () => {
-    if (!assignment) return
-    setWeekSaving(true)
-    try {
-      const slots = schedule.filter((s) => s.week_number === weekPicker)
-      slots.sort((a, b) => {
-        const da = a.day_number ?? (a.day_of_week ?? 0) + 1
-        const db = b.day_number ?? (b.day_of_week ?? 0) + 1
-        return da - db
-      })
-      const first = slots[0]
-      const dayNum = first?.day_number ?? (first != null ? (first.day_of_week ?? 0) + 1 : 1)
-      const { error } = await supabase.from('program_progress').upsert(
-        {
-          program_assignment_id: assignment.id,
-          current_week_number: weekPicker,
-          current_day_number: dayNum,
-          is_completed: false,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'program_assignment_id' }
-      )
-      if (error) throw error
-      addToast({ title: `Client moved to week ${weekPicker}`, variant: 'default' })
-      await loadData()
-    } catch (e) {
-      console.error(e)
-      addToast({ title: 'Failed to update current week', variant: 'destructive' })
-    } finally {
-      setWeekSaving(false)
-    }
-  }
-
   const handleSkipDay = async (scheduleId: string) => {
     if (!assignment) return
     setSkipLoading(true)
@@ -285,6 +299,7 @@ function ClientProgramDetailsContent() {
       const res = await fetch('/api/coach/program-assignments/skip-day', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           programAssignmentId: assignment.id,
           programScheduleId: scheduleId,
@@ -296,10 +311,9 @@ function ClientProgramDetailsContent() {
         addToast({ title: data.error || 'Failed to skip day', variant: 'destructive' })
         return
       }
-      // Update local state — move to skipped set
-      setSkippedScheduleIds(prev => new Set([...prev, scheduleId]))
-      setSkippingId(null)
+      setSkippedScheduleIds((prev) => new Set([...prev, scheduleId]))
       setSkipReason('')
+      await loadData()
     } catch (err) {
       console.error('Error skipping day:', err)
       addToast({ title: 'Unexpected error — please try again', variant: 'destructive' })
@@ -308,18 +322,117 @@ function ClientProgramDetailsContent() {
     }
   }
 
+  const reviewWeekNumber =
+    progress?.current_week_number ??
+    (progress?.current_week_index != null ? progress.current_week_index + 1 : 1)
+
+  const pausedDaysSoFar =
+    assignment?.paused_at && clientTz
+      ? Math.max(
+          0,
+          diffCalendarDaysYmd(
+            zonedYmdFromIsoTimestamp(assignment.paused_at, clientTz),
+            zonedCalendarDateString(new Date(), clientTz)
+          )
+        )
+      : 0
+
+  const submitPause = async () => {
+    if (!assignment) return
+    setPauseBusy(true)
+    try {
+      const res = await fetch(`/api/coach/program-assignments/${assignment.id}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: pauseReasonDraft.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Pause failed')
+      addToast({ title: 'Program paused', variant: 'default' })
+      setPauseModalOpen(false)
+      setPauseReasonDraft('')
+      await loadData()
+    } catch (e) {
+      addToast({
+        title: e instanceof Error ? e.message : 'Pause failed',
+        variant: 'destructive',
+      })
+    } finally {
+      setPauseBusy(false)
+    }
+  }
+
+  const submitResume = async () => {
+    if (!assignment) return
+    setPauseBusy(true)
+    try {
+      const res = await fetch(`/api/coach/program-assignments/${assignment.id}/pause`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Resume failed')
+      addToast({ title: 'Program resumed', variant: 'default' })
+      setResumeModalOpen(false)
+      await loadData()
+    } catch (e) {
+      addToast({
+        title: e instanceof Error ? e.message : 'Resume failed',
+        variant: 'destructive',
+      })
+    } finally {
+      setPauseBusy(false)
+    }
+  }
+
   const program = assignment?.workout_programs
   const clientName = contextClientName || 'Client'
 
-  // Group schedule by week
-  const scheduleByWeek = schedule.reduce((acc, item) => {
-    const week = item.week_number
-    if (!acc[week]) acc[week] = []
-    acc[week].push(item)
-    return acc
-  }, {} as Record<number, ScheduleItem[]>)
+  const gridWeeks = React.useMemo(
+    () => [...new Set(snapshotRows.map((s) => s.week_number))].sort((a, b) => a - b),
+    [snapshotRows]
+  )
 
-  const weeks = Object.keys(scheduleByWeek).map(Number).sort((a, b) => a - b)
+  const workoutDayCount = React.useMemo(
+    () => snapshotRows.filter((s) => s.day_type === 'workout').length,
+    [snapshotRows]
+  )
+
+  const openSnapshotEditor = (snap: AssignmentScheduleSlot) => {
+    setEditingSnapshot(snap)
+    setTemplateSearch('')
+    setSnapshotEditorOpen(true)
+  }
+
+  const runSnapshotPatch = async (body: Record<string, unknown>) => {
+    if (!assignment || !editingSnapshot) return
+    setSnapshotSaveBusy(true)
+    try {
+      const res = await fetch(
+        `/api/coach/clients/${clientId}/program-assignments/${assignment.id}/snapshot/${editingSnapshot.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        }
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Save failed')
+      addToast({ title: 'Schedule updated', variant: 'default' })
+      setSnapshotEditorOpen(false)
+      setEditingSnapshot(null)
+      await loadData()
+    } catch (e) {
+      addToast({
+        title: e instanceof Error ? e.message : 'Save failed',
+        variant: 'destructive',
+      })
+    } finally {
+      setSnapshotSaveBusy(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -452,8 +565,8 @@ function ClientProgramDetailsContent() {
                 <Dumbbell className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold fc-text-primary">{schedule.length}</p>
-                <p className="text-sm fc-text-dim">Total Workouts</p>
+                <p className="text-2xl font-bold fc-text-primary">{workoutDayCount}</p>
+                <p className="text-sm fc-text-dim">Workout days</p>
               </div>
             </div>
           </div>
@@ -487,7 +600,7 @@ function ClientProgramDetailsContent() {
           </div>
         </div>
 
-        {/* Progress Section — week control works even before a program_progress row exists */}
+        {/* Progress Section */}
         <div className="fc-card-shell p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 fc-text-workouts" />
@@ -521,56 +634,57 @@ function ClientProgramDetailsContent() {
               >
                 {!progress ? 'Not started' : progress.is_completed ? 'Completed' : 'In Progress'}
               </p>
-            </div>
-            <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-              <p className="text-sm fc-text-dim">Progression</p>
-              <p className="text-lg font-bold fc-text-primary">
-                {assignment.progression_mode === 'coach_managed' ? 'Coach-managed' : 'Automatic'}
-              </p>
-              {assignment.progression_mode === 'coach_managed' && assignment.coach_unlocked_week && (
-                <p className="text-xs fc-text-dim mt-1">Unlocked up to Week {assignment.coach_unlocked_week}</p>
+              {assignment.pause_status === 'paused' && (
+                <p className="text-xs fc-text-dim mt-2">Program timeline is paused — client unlock week is frozen.</p>
               )}
             </div>
           </div>
-          <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)] flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-xs fc-text-dim block mb-1">Set current week</label>
-              <select
-                value={weekPicker}
-                onChange={(e) => setWeekPicker(Number(e.target.value))}
-                className="text-sm fc-glass rounded-lg px-3 py-2 border border-[color:var(--fc-glass-border)] fc-text-primary bg-transparent min-w-[140px]"
-              >
-                {Array.from({ length: Math.max(1, program.duration_weeks || 1) }, (_, i) => i + 1).map((w) => (
-                  <option key={w} value={w}>
-                    Week {w} of {program.duration_weeks}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button
-              type="button"
-              className="fc-btn fc-btn-primary"
-              disabled={weekSaving || assignment.status === 'completed'}
-              onClick={() => {
-                if (
-                  !confirm(
-                    `Move client to week ${weekPicker}? Their unlocked schedule will follow this week (day resets to first training day in that week).`
-                  )
-                ) {
-                  return
-                }
-                void handleSetCurrentWeek()
-              }}
-            >
-              {weekSaving ? 'Saving…' : 'Apply week'}
-            </Button>
-            {assignment.progression_mode === 'coach_managed' && (
+          <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)] flex flex-col gap-4">
+            {assignment.pause_status === 'paused' ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                <p className="text-sm font-semibold fc-text-primary">Paused</p>
+                {assignment.paused_at && (
+                  <p className="text-xs fc-text-dim">
+                    Since {new Date(assignment.paused_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                )}
+                <p className="text-xs fc-text-dim">
+                  Paused for <strong className="fc-text-primary">{pausedDaysSoFar}</strong> day{pausedDaysSoFar === 1 ? '' : 's'} (client calendar)
+                </p>
+                {assignment.pause_reason ? (
+                  <p className="text-xs fc-text-dim">
+                    Reason: <span className="fc-text-primary">{assignment.pause_reason}</span>
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  className="fc-btn fc-btn-primary w-full sm:w-auto"
+                  onClick={() => setResumeModalOpen(true)}
+                >
+                  Resume program
+                </Button>
+              </div>
+            ) : (
+              (assignment.pause_status ?? 'active') === 'active' &&
+              assignment.status === 'active' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="fc-btn fc-btn-secondary w-full sm:w-auto text-gray-400 border-gray-600 hover:bg-white/5"
+                  onClick={() => setPauseModalOpen(true)}
+                >
+                  <Pause className="w-4 h-4 mr-2 inline" aria-hidden />
+                  Pause program
+                </Button>
+              )
+            )}
+            {(assignment.status === 'active' || assignment.status === 'paused') && !progress?.is_completed && (
               <Button
                 type="button"
-                className="fc-btn fc-btn-secondary"
+                className="fc-btn fc-btn-secondary w-full sm:w-auto"
                 onClick={() => setShowReviewModal(true)}
               >
-                Review Week {assignment.coach_unlocked_week ?? weekPicker}
+                Review week {reviewWeekNumber}
               </Button>
             )}
           </div>
@@ -595,209 +709,322 @@ function ClientProgramDetailsContent() {
           </div>
         )}
 
-        {/* Weekly Schedule */}
+        {/* Client schedule snapshot — Section C3 */}
         <div className="fc-card-shell p-6">
-          <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-bold fc-text-primary mb-2 flex items-center gap-2">
             <Calendar className="w-5 h-5 fc-text-workouts" />
-            Weekly Schedule
+            Client schedule
           </h2>
-          <div className="overflow-x-auto min-w-0 -mx-1 px-1">
-            <div className="grid grid-cols-7 gap-2 min-w-[36rem] sm:min-w-0">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
-              // Get workouts for this day across all weeks (just show week 1 as example)
-              const dayWorkouts = schedule.filter(s => s.day_of_week === index && s.week_number === 1)
-              return (
-                <div key={day} className="p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] text-center min-h-[100px]">
-                  <h4 className="font-semibold fc-text-primary mb-2">{day}</h4>
-                  {dayWorkouts.length > 0 ? (
-                    <div className="space-y-1">
-                      {dayWorkouts.map((item, idx) => {
-                        const cat =
-                          typeof item.workout_templates?.category === 'string'
-                            ? item.workout_templates.category
-                            : ''
-                        const accent = getCategoryAccent(cat)
+          <div className="flex items-start gap-2 text-xs text-gray-400 mb-4">
+            <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" aria-hidden />
+            <p>
+              Editing this client&apos;s program affects only{' '}
+              <span className="fc-text-primary font-medium">{clientName}</span>. Master template stays unchanged.
+            </p>
+          </div>
+
+          {gridWeeks.length === 0 ? (
+            <p className="text-sm fc-text-dim">No snapshot days found for this assignment.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-1 px-1">
+              <div
+                className="grid gap-2 text-xs min-w-[720px]"
+                style={{
+                  gridTemplateColumns: '88px repeat(7, minmax(96px, 1fr))',
+                }}
+              >
+                <div />
+                {WEEKDAY_LABELS.map((d) => (
+                  <div key={d} className="text-center font-semibold fc-text-dim py-2">
+                    {d}
+                  </div>
+                ))}
+                {gridWeeks.map((weekNum) => (
+                  <React.Fragment key={weekNum}>
+                    <div className="flex items-center font-semibold fc-text-primary pr-2 py-1 border-t border-white/5 pt-2">
+                      W{weekNum}
+                    </div>
+                    {[1, 2, 3, 4, 5, 6, 7].map((programDay) => {
+                      const snap = snapshotRows.find(
+                        (s) => s.week_number === weekNum && s.program_day === programDay
+                      )
+                      if (!snap) {
                         return (
                           <div
-                            key={idx}
-                            className={cn(
-                              'text-xs p-2 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] border-l-2 flex items-start gap-2',
-                              accent.border
-                            )}
+                            key={`${weekNum}-${programDay}`}
+                            className="min-h-[76px] rounded-lg border border-dashed border-white/10 bg-white/[0.02] flex items-center justify-center fc-text-subtle"
                           >
-                            <div
-                              className={cn(
-                                'rounded-md p-1 shrink-0',
-                                accent.iconBg
-                              )}
-                              aria-hidden
-                            >
-                              <Dumbbell
-                                className={cn('w-3 h-3', accent.text)}
-                              />
-                            </div>
-                            <div className="min-w-0 text-left flex-1">
-                              <div className="font-medium fc-text-primary truncate">
-                                {item.workout_templates?.name || 'Workout'}
-                              </div>
-                              <div className="fc-text-subtle">
-                                {item.workout_templates?.estimated_duration || 60}m
-                              </div>
-                            </div>
+                            —
                           </div>
                         )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-xs fc-text-subtle">Rest</div>
-                  )}
-                </div>
-              )
-            })}
-            </div>
-          </div>
-        </div>
+                      }
+                      const schedId = scheduleIdByPdaId[snap.id] ?? ''
+                      const isCompleted = Boolean(schedId && completedScheduleIds.has(schedId))
+                      const isSkipped = Boolean(schedId && skippedScheduleIds.has(schedId))
+                      const tplLabel =
+                        snap.workout_template_id && snapshotTemplateNames[snap.workout_template_id]
+                          ? snapshotTemplateNames[snap.workout_template_id]
+                          : snap.workout_template_id
+                            ? 'Workout template'
+                            : null
 
-        {/* Full Schedule by Week */}
-        <div className="fc-card-shell p-6">
-          <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
-            <Dumbbell className="w-5 h-5 fc-text-workouts" />
-            Full Program Schedule ({schedule.length} workouts)
-          </h2>
-          
-          <div className="space-y-6">
-            {weeks.map(weekNum => (
-              <div key={weekNum}>
-                <h3 className="text-lg font-semibold fc-text-primary mb-3 pb-2 border-b border-[color:var(--fc-glass-border)]">
-                  Week {weekNum}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {scheduleByWeek[weekNum].map((item, idx) => {
-                    const isCompleted = completedScheduleIds.has(item.id)
-                    const isSkipped = skippedScheduleIds.has(item.id)
-                    const isDone = isCompleted || isSkipped
-                    const isSkipping = skippingId === item.id
-                    const cat =
-                      typeof item.workout_templates?.category === 'string'
-                        ? item.workout_templates.category
-                        : ''
-                    const accent = getCategoryAccent(cat)
-
-                    return (
-                      <div
-                        key={item.id || idx}
-                        className={cn(
-                          'p-4 rounded-xl fc-glass-soft border transition-colors border-l-2',
-                          isCompleted
-                            ? 'border-[color:var(--fc-text-success)] opacity-75'
-                            : isSkipped
-                            ? 'border-[color:var(--fc-text-warning)] opacity-75'
-                            : 'border-[color:var(--fc-glass-border)]',
-                          accent.border
-                        )}
-                      >
-                        {/* Card header — name + status badge */}
-                        <div className="flex items-start gap-2 mb-2">
+                      return (
+                        <button
+                          type="button"
+                          key={snap.id}
+                          onClick={() => openSnapshotEditor(snap)}
+                          className={cn(
+                            'relative rounded-lg border p-2 text-left min-h-[76px] transition-colors',
+                            snap.is_customized
+                              ? 'border-cyan-500/40 bg-cyan-500/10'
+                              : 'border-white/10 bg-white/[0.04]',
+                            isCompleted && 'ring-1 ring-emerald-500/20',
+                            'hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40'
+                          )}
+                        >
+                          {snap.is_customized && (
+                            <span className="absolute top-1 right-1 z-[1] px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300">
+                              Edited
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="absolute top-1 left-1 z-[1]" title="Completed (client)">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-400" aria-hidden />
+                            </span>
+                          )}
+                          {isSkipped && !isCompleted && (
+                            <span className="absolute bottom-1 right-1 z-[1]" title="Skipped">
+                              <SkipForward className="w-3 h-3 text-amber-400" aria-hidden />
+                            </span>
+                          )}
                           <div
                             className={cn(
-                              'rounded-lg p-2 shrink-0',
-                              accent.iconBg
+                              'font-medium fc-text-primary truncate text-[11px] leading-tight pr-6',
+                              (isCompleted || snap.is_customized) && 'pl-4'
                             )}
-                            aria-hidden
                           >
-                            <Dumbbell
-                              className={cn('w-4 h-4', accent.text)}
-                            />
+                            {snap.name}
                           </div>
-                          <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
-                          <Link
-                            href={`/coach/workouts/templates/${item.template_id}`}
-                            className="font-semibold fc-text-primary truncate hover:underline text-sm min-w-0 flex-1"
+                          {snap.day_type === 'workout' && tplLabel ? (
+                            <div className="fc-text-subtle text-[10px] truncate mt-1">{tplLabel}</div>
+                          ) : (
+                            <div className="fc-text-subtle text-[10px] mt-1">Rest</div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+      <ResponsiveModal
+        isOpen={snapshotEditorOpen}
+        onClose={() => {
+          setSnapshotEditorOpen(false)
+          setEditingSnapshot(null)
+          setTemplateSearch('')
+        }}
+        title="Edit program day"
+        maxWidth="md"
+      >
+        {editingSnapshot ? (
+          <div className="space-y-4">
+            {(() => {
+              const sid = scheduleIdByPdaId[editingSnapshot.id] ?? ''
+              const completedLock = Boolean(sid && completedScheduleIds.has(sid))
+              const filtered = coachTemplates.filter((t) =>
+                t.name.toLowerCase().includes(templateSearch.trim().toLowerCase())
+              )
+              return (
+                <>
+                  <p className="text-xs fc-text-dim">
+                    Week {editingSnapshot.week_number} · Day {editingSnapshot.program_day} ·{' '}
+                    <span className="fc-text-primary">{editingSnapshot.name}</span>
+                  </p>
+                  {completedLock ? (
+                    <p className="text-sm fc-text-warning border border-amber-500/30 rounded-lg p-3 bg-amber-500/5">
+                      This day has a completed workout. Snapshot template cannot be changed here.
+                    </p>
+                  ) : (
+                    <>
+                      <div>
+                        <button
+                          type="button"
+                          className="w-full text-left text-sm py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 fc-text-primary mb-2"
+                          onClick={() =>
+                            void runSnapshotPatch({
+                              day_type: 'rest',
+                              workout_template_id: null,
+                              is_customized: true,
+                            })
+                          }
+                          disabled={snapshotSaveBusy}
+                        >
+                          Set as rest day
+                        </button>
+                        {editingSnapshot.is_customized && (
+                          <button
+                            type="button"
+                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-200 mb-2"
+                            onClick={() => void runSnapshotPatch({ reset_to_template: true })}
+                            disabled={snapshotSaveBusy}
                           >
-                            {item.workout_templates?.name || 'Workout'}
-                          </Link>
-                          {isCompleted && (
-                            <span className="shrink-0 flex items-center gap-1 text-xs fc-text-success">
-                              <CheckCircle className="w-3 h-3" />
-                              Done
-                            </span>
-                          )}
-                          {isSkipped && (
-                            <span className="shrink-0 flex items-center gap-1 text-xs fc-text-warning">
-                              <SkipForward className="w-3 h-3" />
-                              Skipped
-                            </span>
-                          )}
-                          </div>
-                        </div>
-
-                        {/* Day/duration meta */}
-                        <div className="flex flex-wrap items-center gap-2 text-xs fc-text-dim mb-3">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Day {item.day_of_week + 1}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {item.workout_templates?.estimated_duration || 60}m
-                          </span>
-                        </div>
-
-                        {item.workout_templates?.difficulty_level && (
-                          <span className={`mb-3 inline-block fc-pill fc-pill-glass text-xs ${difficultyColors[item.workout_templates.difficulty_level]}`}>
-                            {item.workout_templates.difficulty_level}
-                          </span>
+                            Reset to master template
+                          </button>
                         )}
-
-                        {/* Skip action — only for incomplete days on active/paused programs */}
-                        {!isDone && assignment?.status !== 'completed' && assignment?.status !== 'cancelled' && (
-                          <>
-                            {!isSkipping ? (
-                              <button
-                                onClick={() => { setSkippingId(item.id); setSkipReason('') }}
-                                className="mt-1 flex items-center gap-1 text-xs fc-text-subtle hover:fc-text-warning transition-colors"
-                              >
-                                <SkipForward className="w-3 h-3" />
-                                Mark as skipped
-                              </button>
-                            ) : (
-                              <div className="mt-2 space-y-2">
-                                <input
-                                  type="text"
-                                  placeholder="Reason (optional)"
-                                  value={skipReason}
-                                  onChange={e => setSkipReason(e.target.value)}
-                                  className="w-full text-xs px-2 py-1.5 rounded-lg bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-subtle outline-none focus:border-[color:var(--fc-domain-workouts)]"
-                                  maxLength={200}
-                                />
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => handleSkipDay(item.id)}
-                                    disabled={skipLoading}
-                                    className="flex-1 text-xs py-1.5 rounded-lg fc-btn fc-btn-primary disabled:opacity-50"
-                                  >
-                                    {skipLoading ? 'Skipping...' : 'Confirm skip'}
-                                  </button>
-                                  <button
-                                    onClick={() => { setSkippingId(null); setSkipReason('') }}
-                                    disabled={skipLoading}
-                                    className="p-1.5 rounded-lg fc-btn fc-btn-ghost"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
+                        {masterHasOptionalDays && (
+                          <p className="text-[11px] fc-text-subtle border border-white/5 rounded-lg p-2 mb-2">
+                            Optional days are defined on the master program template. Per-client optional flags are
+                            not stored on snapshot rows yet.
+                          </p>
+                        )}
+                        <label className="text-xs font-semibold fc-text-dim block mb-1">Search templates</label>
+                        <Input
+                          value={templateSearch}
+                          onChange={(e) => setTemplateSearch(e.target.value)}
+                          placeholder="Filter by name…"
+                          className="bg-white/5 border-white/10"
+                        />
+                      </div>
+                      <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                        {filtered.slice(0, 40).map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 fc-text-primary flex justify-between gap-2"
+                            disabled={snapshotSaveBusy}
+                            onClick={() =>
+                              void runSnapshotPatch({
+                                workout_template_id: t.id,
+                                is_customized: true,
+                                day_type: 'workout',
+                              })
+                            }
+                          >
+                            <span className="truncate">{t.name}</span>
+                            {t.estimated_duration != null && (
+                              <span className="shrink-0 fc-text-subtle text-xs">{t.estimated_duration}m</span>
                             )}
-                          </>
+                          </button>
+                        ))}
+                        {filtered.length === 0 && (
+                          <p className="text-xs fc-text-subtle py-2">No templates match.</p>
                         )}
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+                      {sid &&
+                        !completedLock &&
+                        assignment?.status !== 'completed' &&
+                        assignment?.status !== 'cancelled' && (
+                          <div className="pt-2 border-t border-white/10">
+                            <button
+                              type="button"
+                              className="text-xs fc-text-subtle hover:fc-text-warning flex items-center gap-1"
+                              onClick={async () => {
+                                setSnapshotSaveBusy(true)
+                                try {
+                                  await handleSkipDay(sid)
+                                  setSnapshotEditorOpen(false)
+                                  setEditingSnapshot(null)
+                                } finally {
+                                  setSnapshotSaveBusy(false)
+                                }
+                              }}
+                              disabled={skipLoading || snapshotSaveBusy}
+                            >
+                              <SkipForward className="w-3 h-3" />
+                              Mark this day as skipped (client ledger)
+                            </button>
+                          </div>
+                        )}
+                    </>
+                  )}
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="fc-btn fc-btn-secondary"
+                      onClick={() => {
+                        setSnapshotEditorOpen(false)
+                        setEditingSnapshot(null)
+                        setTemplateSearch('')
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </>
+              )
+            })()}
           </div>
+        ) : null}
+      </ResponsiveModal>
+
+      <ResponsiveModal
+        isOpen={pauseModalOpen}
+        onClose={() => {
+          setPauseModalOpen(false)
+          setPauseReasonDraft('')
+        }}
+        title="Pause program?"
+        maxWidth="md"
+      >
+        <p className="text-sm fc-text-dim mb-3">
+          The client&apos;s program week unlock will freeze until you resume. They will see that the program is paused.
+        </p>
+        <label className="block text-xs font-semibold fc-text-dim mb-1">Reason (optional)</label>
+        <textarea
+          value={pauseReasonDraft}
+          onChange={(e) => setPauseReasonDraft(e.target.value)}
+          rows={3}
+          className="w-full text-sm fc-glass rounded-xl border border-[color:var(--fc-glass-border)] p-3 fc-text-primary bg-transparent mb-4"
+          placeholder="e.g. Vacation, injury, deload week…"
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="fc-btn fc-btn-secondary"
+            disabled={pauseBusy}
+            onClick={() => {
+              setPauseModalOpen(false)
+              setPauseReasonDraft('')
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="button" className="fc-btn fc-btn-primary" disabled={pauseBusy} onClick={() => void submitPause()}>
+            {pauseBusy ? 'Pausing…' : 'Confirm pause'}
+          </Button>
         </div>
+      </ResponsiveModal>
+
+      <ResponsiveModal
+        isOpen={resumeModalOpen}
+        onClose={() => setResumeModalOpen(false)}
+        title="Resume program?"
+        maxWidth="md"
+      >
+        <p className="text-sm fc-text-dim mb-4">
+          The pause will end and accumulated pause days will be added to their timeline so week unlocks stay fair.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="fc-btn fc-btn-secondary"
+            disabled={pauseBusy}
+            onClick={() => setResumeModalOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button type="button" className="fc-btn fc-btn-primary" disabled={pauseBusy} onClick={() => void submitResume()}>
+            {pauseBusy ? 'Resuming…' : 'Confirm resume'}
+          </Button>
+        </div>
+      </ResponsiveModal>
 
       {assignment && (
         <WeekReviewModal
@@ -809,7 +1036,7 @@ function ClientProgramDetailsContent() {
           }}
           programAssignmentId={assignment.id}
           programId={assignment.program_id}
-          weekNumber={assignment.coach_unlocked_week ?? weekPicker}
+          weekNumber={reviewWeekNumber}
           clientName={clientName}
         />
       )}

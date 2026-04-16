@@ -168,8 +168,8 @@ export function ClientLeaderboardPageBody({
   return (
     <div
       className={cn(
-        "relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page",
-        denseLayout ? "space-y-4" : "space-y-8"
+        "relative z-10 mx-auto w-full fc-page px-4 pb-32 pt-8",
+        denseLayout ? "max-w-lg space-y-4" : "max-w-6xl sm:px-6 lg:px-10 space-y-8"
       )}
     >
       {cornerBadge ? (
@@ -186,15 +186,24 @@ export function ClientLeaderboardPageBody({
         )}
       >
         <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-          <Link
-            href={backHref}
-            className={cn(
-              "flex w-10 h-10 items-center justify-center shrink-0 border border-[color:var(--fc-glass-border)]",
-              denseLayout ? "rounded-lg bg-white/[0.03]" : "fc-surface rounded-xl"
-            )}
-          >
-            <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-          </Link>
+          {denseLayout ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = backHref;
+              }}
+              className="flex w-10 h-10 items-center justify-center shrink-0 border border-[color:var(--fc-glass-border)] rounded-lg bg-white/[0.03]"
+            >
+              <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+            </button>
+          ) : (
+            <Link
+              href={backHref}
+              className="flex w-10 h-10 items-center justify-center shrink-0 border border-[color:var(--fc-glass-border)] fc-surface rounded-xl"
+            >
+              <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+            </Link>
+          )}
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
               className={cn(

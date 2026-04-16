@@ -12,7 +12,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell, ClientGlassCard } from "@/components/client-ui";
-import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { AthleteScoreRing } from "@/components/client-ui/AthleteScoreRing";
 import {
@@ -25,16 +24,18 @@ import {
   Dumbbell,
   CheckCircle,
   ChevronRight,
-  Pencil,
   Trophy,
   Coffee,
+  Heart,
+  Calendar,
 } from "lucide-react";
-import { dbToUiScale, DailyWellnessLog } from "@/lib/wellnessService";
-import { getWellnessValueColor } from "@/lib/wellnessValueColors";
+import { DailyWellnessLog } from "@/lib/wellnessService";
 import { usePageData } from "@/hooks/usePageData";
 import { supabase } from "@/lib/supabase";
 import { getWorkoutStreakDisplay } from "@/lib/workoutStreakDisplay";
 import { isClientNutritionConfigured } from "@/lib/athleteScoreService";
+import { getLatestMeasurement } from "@/lib/measurementService";
+import { getClientCheckInConfig } from "@/lib/checkInConfigService";
 
 interface DashboardData {
   avatarUrl: string | null;
@@ -71,6 +72,7 @@ interface DashboardPageData {
   hasCheckInToday: boolean | null;
   todayWellnessLog: DailyWellnessLog | null;
   checkinStreak: number;
+  hasScheduledCheckInThisPeriod: boolean;
   scoreError: string | null;
 }
 
@@ -147,49 +149,33 @@ function formatDate(): string {
   });
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-// Helper functions for wellness display
-function getSleepQualityLabel(value: number | null | undefined): string {
-  if (value == null) return "—";
-  const labels = ["Terrible", "Poor", "Fair", "Good", "Great"];
-  return labels[Math.min(4, Math.max(0, value - 1))] || "—";
-}
-
-function getStressLabel(dbValue: number | null | undefined): string {
-  if (dbValue == null) return "—";
-  const uiValue = dbToUiScale(dbValue);
-  if (uiValue == null) return "—";
-  const labels = ["Calm", "Mild", "Moderate", "High", "Extreme"];
-  return labels[Math.min(4, Math.max(0, uiValue - 1))] || "—";
-}
-
-function getSorenessLabel(dbValue: number | null | undefined): string {
-  if (dbValue == null) return "—";
-  const uiValue = dbToUiScale(dbValue);
-  if (uiValue == null) return "—";
-  const labels = ["Fresh", "Mild", "Moderate", "Sore", "Severe"];
-  return labels[Math.min(4, Math.max(0, uiValue - 1))] || "—";
-}
-
-
 /** Single source: one RPC returns everything the dashboard UI needs. */
-async function fetchDashboardPageData(_userId: string): Promise<DashboardPageData> {
-  const { data, error } = await supabase.rpc("get_client_dashboard");
+async function fetchDashboardPageData(userId: string): Promise<DashboardPageData> {
+  const [{ data, error }, latestMeasurement, checkInConfig] = await Promise.all([
+    supabase.rpc("get_client_dashboard"),
+    getLatestMeasurement(userId),
+    getClientCheckInConfig(userId),
+  ]);
   if (error) {
     if (error.message?.includes("Not authenticated")) {
       throw new Error("Unauthorized");
     }
     throw new Error(error.message || "Failed to load dashboard");
   }
-  return mapDashboardRpcResponse((data ?? null) as Record<string, unknown> | null);
+  const frequencyDays = checkInConfig?.frequency_days ?? 30;
+  const today = new Date();
+  const hasScheduledCheckInThisPeriod =
+    latestMeasurement?.measured_date != null
+      ? Math.floor(
+          (today.getTime() - new Date(latestMeasurement.measured_date + "T12:00:00").getTime()) /
+            (1000 * 60 * 60 * 24),
+        ) < frequencyDays
+      : false;
+
+  return mapDashboardRpcResponse(
+    (data ?? null) as Record<string, unknown> | null,
+    hasScheduledCheckInThisPeriod,
+  );
 }
 
 /** Tier from API when valid; otherwise infer from score so the ring matches ATHLETE_TIERS bands. */
@@ -202,7 +188,10 @@ function tierForAthleteScoreRow(row: AthleteScore): string {
   return band?.key ?? "benched";
 }
 
-function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): DashboardPageData {
+function mapDashboardRpcResponse(
+  rpc: Record<string, unknown> | null,
+  hasScheduledCheckInThisPeriod: boolean,
+): DashboardPageData {
   if (!rpc) {
     return {
       dashboard: null,
@@ -210,6 +199,7 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
       hasCheckInToday: null,
       todayWellnessLog: null,
       checkinStreak: 0,
+      hasScheduledCheckInThisPeriod,
       scoreError: null,
     };
   }
@@ -239,6 +229,7 @@ function mapDashboardRpcResponse(rpc: Record<string, unknown> | null): Dashboard
     hasCheckInToday,
     todayWellnessLog,
     checkinStreak,
+    hasScheduledCheckInThisPeriod,
     scoreError: null,
   };
 }
@@ -274,6 +265,7 @@ export default function ClientDashboard() {
         hasCheckInToday: null,
         todayWellnessLog: null,
         checkinStreak: 0,
+        hasScheduledCheckInThisPeriod: false,
         scoreError: null,
       };
     }
@@ -285,8 +277,7 @@ export default function ClientDashboard() {
   const dashboardData = pageData?.dashboard ?? null;
   const athleteScore = pageData?.athleteScore ?? null;
   const hasCheckInToday = pageData?.hasCheckInToday ?? null;
-  const todayWellnessLog = pageData?.todayWellnessLog ?? null;
-  const checkinStreak = pageData?.checkinStreak ?? 0;
+  const hasScheduledCheckInThisPeriod = pageData?.hasScheduledCheckInThisPeriod ?? false;
   const scoreError = pageData?.scoreError ?? null;
 
   const userName = dashboardData?.firstName || profile?.first_name || "there";
@@ -604,102 +595,82 @@ export default function ClientDashboard() {
               )}
           </section>
 
-          {/* Section 5: Daily Check-in Card */}
-          {hasCheckInToday === false && (
-            <section className="mb-4">
-              <ClientGlassCard className="p-4 border-l-4 border-amber-500/50 bg-amber-950/10 dark:bg-amber-950/25">
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium fc-text-primary">
-                      How are you feeling today?
-                    </p>
-                    <p className="text-xs fc-text-dim mt-0.5">
-                      {checkinStreak > 0
-                        ? `🔥 Keep your ${checkinStreak}-day streak alive!`
-                        : "Start your check-in streak today"}
-                    </p>
+          {/* Section 5: Check-in Status Cards */}
+          <section className="mb-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/check-ins";
+                }}
+                className={`rounded-xl p-3 text-left transition-colors ${
+                  hasCheckInToday === true
+                    ? "bg-emerald-500/8 border border-emerald-500/15 opacity-75"
+                    : "bg-cyan-500/10 border border-cyan-500/20"
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-start">
+                    {hasCheckInToday === true ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-400/60" />
+                    ) : (
+                      <Heart className="w-4 h-4 text-cyan-400" />
+                    )}
                   </div>
-                  <Button
-                    variant="fc-primary"
-                    className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins";
-                    }}
+                  <p
+                    className={`text-[10px] font-bold uppercase tracking-[0.15em] ${
+                      hasCheckInToday === true ? "text-emerald-300/60" : "text-cyan-300/70"
+                    }`}
                   >
-                    Check in
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+                    DAILY
+                  </p>
+                  <p
+                    className={`text-sm font-semibold ${
+                      hasCheckInToday === true ? "text-emerald-300/70" : "text-white"
+                    }`}
+                  >
+                    {hasCheckInToday === true ? "Done today" : "Not done"}
+                  </p>
                 </div>
-              </ClientGlassCard>
-            </section>
-          )}
+              </button>
 
-          {hasCheckInToday === true && todayWellnessLog && (
-            <section className="mb-4">
-              <ClientGlassCard className="p-4 border-l-4 border-amber-500/50 bg-amber-950/10 dark:bg-amber-950/25">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 fc-text-success" />
-                      <p className="text-sm font-medium fc-text-primary">Checked in today</p>
-                    </div>
-                    {todayWellnessLog.created_at && (
-                      <p className="text-xs fc-text-subtle">
-                        {formatTime(todayWellnessLog.created_at)}
-                      </p>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/client/check-ins/weekly";
+                }}
+                className={`rounded-xl p-3 text-left transition-colors ${
+                  hasScheduledCheckInThisPeriod
+                    ? "bg-emerald-500/8 border border-emerald-500/15 opacity-75"
+                    : "bg-cyan-500/10 border border-cyan-500/20"
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-start">
+                    {hasScheduledCheckInThisPeriod ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-400/60" />
+                    ) : (
+                      <Calendar className="w-4 h-4 text-cyan-400" />
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2 text-xs fc-text-subtle">
-                    {todayWellnessLog.sleep_hours != null && (
-                      <span>
-                        Sleep: <span className={getWellnessValueColor(todayWellnessLog.sleep_hours, "sleep_hours")}>{todayWellnessLog.sleep_hours}h</span>
-                        {todayWellnessLog.sleep_quality != null && (
-                          <> (<span className={getWellnessValueColor(todayWellnessLog.sleep_quality, "sleep_quality")}>{getSleepQualityLabel(todayWellnessLog.sleep_quality)}</span>)</>
-                        )}
-                      </span>
-                    )}
-                    {todayWellnessLog.stress_level != null && (() => {
-                      const uiValue = dbToUiScale(todayWellnessLog.stress_level);
-                      return uiValue != null ? (
-                        <span>
-                          Stress: <span className={getWellnessValueColor(uiValue, "stress")}>{uiValue}/5</span>
-                        </span>
-                      ) : null;
-                    })()}
-                    {todayWellnessLog.soreness_level != null && (() => {
-                      const uiValue = dbToUiScale(todayWellnessLog.soreness_level);
-                      return uiValue != null ? (
-                        <span>
-                          Soreness: <span className={getWellnessValueColor(uiValue, "soreness")}>{uiValue}/5</span>
-                        </span>
-                      ) : null;
-                    })()}
-                    {todayWellnessLog.steps != null && (
-                      <span className="fc-text-primary">
-                        Steps: {(todayWellnessLog.steps / 1000).toFixed(1)}K
-                      </span>
-                    )}
-                  </div>
-                  {checkinStreak > 0 && (
-                    <p className="text-xs font-semibold fc-text-primary">
-                      🔥 {checkinStreak}-day streak
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins";
-                    }}
-                    className="text-xs font-medium fc-text-subtle hover:fc-text-primary transition-colors inline-flex items-center gap-1"
+                  <p
+                    className={`text-[10px] font-bold uppercase tracking-[0.15em] ${
+                      hasScheduledCheckInThisPeriod ? "text-emerald-300/60" : "text-cyan-300/70"
+                    }`}
                   >
-                    <Pencil className="w-3 h-3" />
-                    Edit
-                  </button>
+                    CHECK-IN
+                  </p>
+                  <p
+                    className={`text-sm font-semibold ${
+                      hasScheduledCheckInThisPeriod ? "text-emerald-300/70" : "text-white"
+                    }`}
+                  >
+                    {hasScheduledCheckInThisPeriod ? "Done this week" : "Not done"}
+                  </p>
                 </div>
-              </ClientGlassCard>
-            </section>
-          )}
+              </button>
+            </div>
+          </section>
 
           {/* Highlights row: PRs this month, latest achievement, leaderboard rank */}
           {dashboardData?.highlights &&

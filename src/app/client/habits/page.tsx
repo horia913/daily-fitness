@@ -6,14 +6,13 @@ import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast-provider'
-import { Flame, Target, CheckCircle, ChevronDown, LayoutGrid, Repeat, Plus } from 'lucide-react'
-import { EmptyState } from '@/components/ui/EmptyState'
+import { Flame, CheckCircle, ChevronDown, Repeat, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 import { withTimeout } from '@/lib/withTimeout'
 import { ClientPageShell } from '@/components/client-ui'
 interface HabitAssignment {
@@ -31,6 +30,11 @@ interface HabitAssignment {
   category?: string
   /** Last 7 days (oldest to newest): true if logged that day */
   week_days_logged?: boolean[]
+}
+
+function habitScheduleLabel(habit: HabitAssignment): string {
+  if (habit.frequency_type === 'daily') return 'DAILY'
+  return `WEEKLY · ${habit.target_days}x / WK`
 }
 
 export default function ClientHabitsPage() {
@@ -285,7 +289,6 @@ export default function ClientHabitsPage() {
 
   const completedHabitsCount = habits.filter(habit => habit.is_logged_today).length
   const allHabitsCompleted = completedHabitsCount === habits.length && habits.length > 0
-  const totalStreakDays = habits.reduce((sum, habit) => sum + habit.streak_days, 0)
   const averageCompletionRate = habits.length > 0 
     ? Math.round(habits.reduce((sum, habit) => sum + habit.completion_rate, 0) / habits.length)
     : 0
@@ -300,31 +303,11 @@ export default function ClientHabitsPage() {
     }
   }
 
-  const getCategoryColor = (category?: string) => {
-    switch (category) {
-      case 'fitness': return 'from-green-500 to-emerald-600'
-      case 'hydration': return 'from-blue-500 to-cyan-600'
-      case 'wellness': return 'from-purple-500 to-violet-600'
-      case 'sleep': return 'from-indigo-500 to-blue-600'
-      default: return 'from-slate-500 to-slate-600'
-    }
-  }
-
-  const getCategoryIconBg = (category?: string) => {
-    switch (category) {
-      case 'fitness': return 'bg-green-500/10 border-green-500/20'
-      case 'hydration': return 'bg-blue-500/10 border-blue-500/20'
-      case 'wellness': return 'bg-purple-500/10 border-purple-500/20'
-      case 'sleep': return 'bg-indigo-500/10 border-indigo-500/20'
-      default: return 'bg-[color:var(--fc-domain-neutral)]/10 border-[color:var(--fc-glass-border)]'
-    }
-  }
-
-  const getStreakColor = (streak: number) => {
-    if (streak >= 21) return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-    if (streak >= 7) return 'text-orange-600 bg-orange-50 border-orange-200'
-    if (streak >= 3) return 'text-green-600 bg-green-50 border-green-200'
-    return 'text-[color:var(--fc-text-dim)] bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]'
+  const getStreakBadgeClass = (streak: number) => {
+    if (streak >= 21) return 'text-amber-200 border-amber-500/30 bg-amber-500/10'
+    if (streak >= 7) return 'text-orange-200 border-orange-500/30 bg-orange-500/10'
+    if (streak >= 3) return 'text-emerald-200 border-emerald-500/30 bg-emerald-500/10'
+    return 'text-gray-300 border-white/10 bg-white/[0.06]'
   }
 
   const handleCreateHabit = async () => {
@@ -440,7 +423,7 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
             <div className="animate-pulse space-y-3">
               <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
               <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]"></div>
@@ -457,13 +440,13 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
-              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center">
+              <p className="text-sm text-gray-400 mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadHabits(); }} className="fc-btn fc-btn-primary h-10 text-sm">
                 Retry
               </Button>
-            </GlassCard>
+            </div>
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -487,101 +470,110 @@ export default function ClientHabitsPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-36 pt-6 overflow-x-hidden flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
-          <header>
-            <div className="flex justify-between items-start gap-3 mb-3">
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight fc-text-primary">
-                  Daily Habits
-                </h1>
-                <p className="text-xs fc-text-dim mt-0.5">
-                  {getMotivationalMessage()}
-                </p>
-              </div>
-              {habits.length > 0 && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-success font-bold text-xs font-mono shrink-0">
-                  <Flame className="w-3.5 h-3.5 fill-current" />
-                  {totalStreakDays}d
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs fc-text-dim border-b border-[color:var(--fc-glass-border)] pb-3 leading-relaxed">
-              <span className="font-mono font-semibold fc-text-primary">{habits.length}</span> active
-              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
-              <span className="font-mono font-semibold fc-text-primary">{completedHabitsCount}/{habits.length || 1}</span> today
-              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
-              <span className="font-mono font-semibold fc-text-primary">{averageCompletionRate}%</span> avg
-              <span className="mx-1.5 text-[color:var(--fc-glass-border)]">·</span>
-              best <span className="font-mono font-semibold fc-text-primary">{bestStreak}</span>d
-            </p>
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <header className="mb-4">
+            <h1 className="text-xl font-bold text-white tracking-tight">Daily Habits</h1>
+            <p className="text-sm text-gray-500 mt-1">{getMotivationalMessage()}</p>
           </header>
 
-          {/* Habit completion heatmap — only when client has habits */}
           {habits.length > 0 && (
-            <section className="fc-card-shell backdrop-blur-[8px] p-4 sm:p-6">
-              <h2 className="text-lg font-semibold fc-text-primary mb-2 flex items-center gap-2">
-                <LayoutGrid className="w-5 h-5" />
-                Completion overview
-              </h2>
-              <p className="text-sm fc-text-dim mb-3">Last 90 days</p>
-              <div className="grid grid-cols-7 gap-[3px] mb-3" style={{ width: 'min(100%, 280px)' }}>
-                {(() => {
-                  const today = new Date().toISOString().split('T')[0]
-                  const days: string[] = []
-                  for (let i = 89; i >= 0; i--) {
-                    const d = new Date()
-                    d.setDate(d.getDate() - i)
-                    days.push(d.toISOString().split('T')[0])
-                  }
-                  const maxCount = Math.max(...Array.from(heatmapData.values()), 1)
-                  return days.map((dateStr) => {
-                    const count = heatmapData.get(dateStr) || 0
-                    const intensity = maxCount > 0 ? count / maxCount : 0
-                    const isToday = dateStr === today
-                    return (
-                      <div
-                        key={dateStr}
-                        className="w-3 h-3 rounded-sm flex-shrink-0"
-                        style={{
-                          backgroundColor: intensity === 0
-                            ? 'var(--fc-glass-highlight)'
-                            : `color-mix(in srgb, var(--fc-status-success) ${Math.round(30 + intensity * 70)}%, transparent)`,
-                          border: isToday ? '2px solid var(--fc-accent-primary)' : 'none',
-                        }}
-                        title={`${dateStr}: ${count} habit${count !== 1 ? 's' : ''} completed`}
-                      />
-                    )
-                  })
-                })()}
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-4">
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{habits.length}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Active</p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">
+                    {completedHabitsCount}/{habits.length}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Today</p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{averageCompletionRate}%</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Avg week</p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">{bestStreak}d</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Best streak</p>
+                </div>
               </div>
-              <p className="text-sm fc-text-dim">
-                Completion rate: {completionRate30.totalDays > 0 ? Math.round((completionRate30.daysWithCompletion / completionRate30.totalDays) * 100) : 0}% ({completionRate30.daysWithCompletion} of {completionRate30.totalDays} days)
+            </div>
+          )}
+
+          {habits.length > 0 && (
+            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-2">
+                Completion heatmap · last 90 days
+              </p>
+              <div className="overflow-x-auto -mx-1 px-1 pb-1">
+                <div
+                  className="grid grid-cols-7 gap-[3px] mb-3 mx-auto"
+                  style={{ minWidth: 280, width: 'min(100%, 280px)' }}
+                >
+                  {(() => {
+                    const today = new Date().toISOString().split('T')[0]
+                    const days: string[] = []
+                    for (let i = 89; i >= 0; i--) {
+                      const d = new Date()
+                      d.setDate(d.getDate() - i)
+                      days.push(d.toISOString().split('T')[0])
+                    }
+                    const maxCount = Math.max(...Array.from(heatmapData.values()), 1)
+                    return days.map((dateStr) => {
+                      const count = heatmapData.get(dateStr) || 0
+                      const intensity = maxCount > 0 ? count / maxCount : 0
+                      const isToday = dateStr === today
+                      return (
+                        <div
+                          key={dateStr}
+                          className="w-3 h-3 rounded-sm flex-shrink-0"
+                          style={{
+                            backgroundColor: intensity === 0
+                              ? 'var(--fc-glass-highlight)'
+                              : `color-mix(in srgb, var(--fc-status-success) ${Math.round(30 + intensity * 70)}%, transparent)`,
+                            border: isToday ? '2px solid var(--fc-accent-primary)' : 'none',
+                          }}
+                          title={`${dateStr}: ${count} habit${count !== 1 ? 's' : ''} completed`}
+                        />
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                30-day rate:{' '}
+                {completionRate30.totalDays > 0
+                  ? Math.round((completionRate30.daysWithCompletion / completionRate30.totalDays) * 100)
+                  : 0}
+                % ({completionRate30.daysWithCompletion}/{completionRate30.totalDays} days)
               </p>
             </section>
           )}
 
-          {/* Section: Today's checklist + habit cards */}
-          <section className="space-y-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold fc-text-primary flex items-center gap-2">
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 flex items-center gap-2">
                 Today&apos;s checklist
                 {habits.length > 0 && completedHabitsCount < habits.length && (
-                  <span className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" aria-hidden />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
                 )}
               </h2>
               <Button
                 type="button"
                 onClick={() => setShowAddHabitForm((prev) => !prev)}
-                className="fc-btn fc-btn-primary h-10 px-4 rounded-xl font-semibold"
+                className="fc-btn fc-btn-primary h-9 px-3 rounded-lg text-sm font-semibold shrink-0"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4 mr-1.5" />
                 Add habit
               </Button>
             </div>
 
             {showAddHabitForm && (
-              <GlassCard elevation={2} className="p-4 rounded-2xl">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="block text-sm fc-text-subtle mb-1">Habit name</label>
@@ -641,119 +633,165 @@ export default function ClientHabitsPage() {
                     {addingHabit ? 'Adding...' : 'Save habit'}
                   </Button>
                 </div>
-              </GlassCard>
+              </div>
             )}
 
             {habits.length > 0 ? (
-              <div className="space-y-6">
-                {habits.map(habit => (
-                  <GlassCard key={habit.id} elevation={2} className="p-5 rounded-2xl transition-all hover:opacity-95">
-                    <div className="flex items-center gap-5 mb-5">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border ${getCategoryIconBg(habit.category)}`}>
-                        {habit.habit_icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-lg fc-text-primary">{habit.habit_name}</h3>
-                          </div>
-                          <div className="relative w-10 h-10 flex-shrink-0">
-                            <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
-                              <circle cx="20" cy="20" r="16" fill="none" stroke="var(--fc-glass-border)" strokeWidth="3" />
-                              <circle cx="20" cy="20" r="16" fill="none" stroke="var(--fc-status-success)" strokeWidth="3" strokeLinecap="round"
-                                strokeDasharray={`${habit.completion_rate * 1.005} 999`} />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold fc-text-primary">
-                              {habit.completion_rate}%
-                            </span>
-                          </div>
+              <div className="space-y-3">
+                {habits.map((habit) => (
+                  <div
+                    key={habit.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/5 bg-white/[0.03] text-xl">
+                          {habit.habit_icon}
+                        </div>
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-base font-semibold tracking-tight text-white truncate">
+                            {habit.habit_name}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                            {habitScheduleLabel(habit)}
+                          </span>
                         </div>
                       </div>
-                      <Button
-                        onClick={() => handleHabitToggle(habit.id)}
-                        disabled={optimisticUpdates.has(habit.id)}
-                        className={`fc-btn h-12 w-12 rounded-2xl flex-shrink-0 border-2 ${habit.is_logged_today ? 'fc-btn-primary border-transparent' : 'fc-btn-secondary border-[color:var(--fc-glass-border)]'}`}
-                      >
-                        <CheckCircle className="w-6 h-6" />
-                      </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <div className="inline-flex items-center gap-1 rounded-md border border-white/5 bg-white/[0.04] px-2 py-0.5">
+                          <Flame className="h-2.5 w-2.5 shrink-0 text-amber-400" aria-hidden />
+                          <span className="text-[11px] font-medium tabular-nums text-gray-300">
+                            {habit.streak_days === 1 ? '1 day' : `${habit.streak_days}d`}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => handleHabitToggle(habit.id)}
+                          disabled={optimisticUpdates.has(habit.id)}
+                          className={cn(
+                            'fc-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 p-0',
+                            habit.is_logged_today
+                              ? 'fc-btn-primary border-transparent'
+                              : 'fc-btn-secondary border-white/10',
+                          )}
+                          aria-pressed={habit.is_logged_today}
+                          aria-label={habit.is_logged_today ? 'Mark incomplete' : 'Mark complete'}
+                        >
+                          <CheckCircle className="h-5 w-5" />
+                        </Button>
+                      </div>
                     </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                        style={{ width: `${Math.min(100, Math.max(0, habit.completion_rate))}%` }}
+                      />
+                    </div>
+                    {habit.habit_description ? (
+                      <p className="mt-2 line-clamp-1 text-sm text-gray-400">{habit.habit_description}</p>
+                    ) : null}
                     {habit.week_days_logged && (
-                      <div className="flex items-center justify-between pt-4 border-t border-[color:var(--fc-glass-border)]">
-                        <div className="flex gap-2 overflow-x-auto pb-1">
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
+                        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                           {habit.week_days_logged.map((logged, i) => (
                             <div
                               key={i}
-                              className={`w-8 h-8 rounded-lg border flex items-center justify-center text-[10px] font-mono ${
-                                logged ? 'fc-text-success bg-[color:var(--fc-status-success)]/20 border-[color:var(--fc-status-success)]/40' : 'border-[color:var(--fc-glass-border)] fc-text-subtle'
-                              }`}
+                              className={cn(
+                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-[10px] font-mono',
+                                logged
+                                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                                  : 'border-white/10 text-gray-500',
+                              )}
                             >
                               {dayLabels[i]}
                             </div>
                           ))}
                         </div>
-                        <span className="text-[10px] uppercase tracking-widest fc-text-subtle font-bold">
-                          {habit.streak_days} day{habit.streak_days !== 1 ? 's' : ''}
-                        </span>
                       </div>
                     )}
-                  </GlassCard>
+                  </div>
                 ))}
               </div>
             ) : (
-              <GlassCard elevation={2} className="fc-card-shell p-8 rounded-2xl">
-                <EmptyState
-                  icon={Repeat}
-  title="No habits yet"
-  description="Your coach will assign habits for you, or ask them to add some. Small daily wins build big results!"
-                />
-              </GlassCard>
+              <div className="py-8 px-4 text-center">
+                <Repeat className="mx-auto h-8 w-8 text-gray-600 mb-3" strokeWidth={1.25} aria-hidden />
+                <p className="text-sm text-gray-400">No habits yet</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
+                  Your coach can assign habits, or use Add habit above. Small daily wins add up.
+                </p>
+              </div>
             )}
           </section>
 
-          {/* Collapsible: Weekly progress */}
           {habits.length > 0 && (
-            <section className="fc-card-shell overflow-hidden">
+            <section className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowAnalytics(!showAnalytics)}
-                className="w-full flex justify-between items-center p-6 hover:bg-[color:var(--fc-glass-soft)] transition-colors text-left"
+                className="flex w-full items-center justify-between py-3 px-4 text-left transition-colors hover:bg-white/[0.03]"
               >
-                <h3 className="text-xl font-semibold fc-text-primary">Weekly Performance</h3>
-                <ChevronDown className={`w-5 h-5 fc-text-subtle transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
+                <span className="text-sm font-semibold uppercase tracking-wider text-cyan-300/70">
+                  Weekly performance
+                </span>
+                <ChevronDown
+                  className={cn('h-4 w-4 shrink-0 text-gray-500 transition-transform', showAnalytics && 'rotate-180')}
+                  aria-hidden
+                />
               </button>
               {showAnalytics && (
-                <div className="px-6 pb-6 pt-0 space-y-4">
+                <div className="space-y-4 border-t border-white/5 px-4 pb-4 pt-3">
                   <div className="flex items-center gap-4">
-                    <div className="relative w-14 h-14 flex-shrink-0">
-                      <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                    <div className="relative h-12 w-12 shrink-0">
+                      <svg className="h-12 w-12 -rotate-90" viewBox="0 0 56 56">
                         <circle cx="28" cy="28" r="23" fill="none" stroke="var(--fc-glass-border)" strokeWidth="4" />
-                        <circle cx="28" cy="28" r="23" fill="none" stroke="var(--fc-status-success)" strokeWidth="4" strokeLinecap="round"
-                          strokeDasharray={`${averageCompletionRate * 1.445} 999`} />
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="23"
+                          fill="none"
+                          stroke="var(--fc-status-success)"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={`${averageCompletionRate * 1.445} 999`}
+                        />
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold fc-text-primary">
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
                         {averageCompletionRate}%
                       </span>
                     </div>
-                    <p className="text-sm fc-text-dim">Weekly average</p>
+                    <p className="text-xs text-gray-500">Weekly average completion</p>
                   </div>
-                  <div className="space-y-4">
-                    {habits.map(habit => (
-                      <div key={habit.id} className="fc-glass-soft fc-card p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold fc-text-primary">{habit.habit_name}</span>
-                          <Badge className={`text-xs ${getStreakColor(habit.streak_days)}`}>
-                            <Flame className="w-3 h-3 mr-1" />
+                  <div className="space-y-3">
+                    {habits.map((habit) => (
+                      <div
+                        key={habit.id}
+                        className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-semibold text-white">{habit.habit_name}</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'shrink-0 border text-[10px] gap-0.5 px-1.5 py-0 bg-transparent',
+                              getStreakBadgeClass(habit.streak_days),
+                            )}
+                          >
+                            <Flame className="h-2.5 w-2.5" />
                             {habit.streak_days}
                           </Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-2 gap-3 text-xs">
                           <div>
-                            <span className="fc-text-subtle">Completion</span>
-                            <span className="font-mono font-bold fc-text-primary ml-2">{habit.completion_rate}%</span>
+                            <span className="text-gray-500">Completion</span>
+                            <span className="ml-2 font-mono font-semibold tabular-nums text-white">
+                              {habit.completion_rate}%
+                            </span>
                           </div>
                           <div>
-                            <span className="fc-text-subtle">Today</span>
-                            <span className="font-semibold fc-text-primary ml-2">{habit.is_logged_today ? 'Done' : 'Pending'}</span>
+                            <span className="text-gray-500">Today</span>
+                            <span className="ml-2 font-medium text-white">
+                              {habit.is_logged_today ? 'Done' : 'Pending'}
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -6,29 +6,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import {
-  ClientPageShell,
-  ClientGlassCard,
-  SectionHeader,
-} from "@/components/client-ui";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { ClientPageShell } from "@/components/client-ui";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
 import { ActivityList } from "@/components/client/activity/ActivityList";
-import {
-  Activity,
-  ArrowLeft,
-  Plus,
-  Clock,
-  TrendingUp,
-  Calendar,
-} from "lucide-react";
+import { Activity, ArrowLeft, Plus } from "lucide-react";
 import {
   logActivity,
   updateActivity,
   deleteActivity,
   getActivitiesByDateRange,
   getCurrentWeekBounds,
-  ACTIVITY_META,
+  toLocalDateString,
   type ClientActivity,
   type LogActivityInput,
 } from "@/lib/clientActivityService";
@@ -39,7 +27,7 @@ type FilterRange = "week" | "month" | "all";
 
 function getDateRange(filter: FilterRange): { start: string; end: string } {
   const today = new Date();
-  const end = today.toISOString().split("T")[0];
+  const end = toLocalDateString(today);
 
   if (filter === "week") {
     return getCurrentWeekBounds();
@@ -47,11 +35,10 @@ function getDateRange(filter: FilterRange): { start: string; end: string } {
 
   if (filter === "month") {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    return { start: start.toISOString().split("T")[0], end };
+    return { start: toLocalDateString(start), end };
   }
 
-  const start = new Date("2020-01-01");
-  return { start: start.toISOString().split("T")[0], end };
+  return { start: "2020-01-01", end };
 }
 
 function ActivityHubContent() {
@@ -136,76 +123,72 @@ function ActivityHubContent() {
     <>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-3xl flex flex-col gap-5 pb-32">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex flex-col gap-4">
           {/* Header */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
               onClick={() => { window.location.href = "/client/me"; }}
-              className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity"
+              className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity shrink-0"
             >
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
             </button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold fc-text-primary">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-white tracking-tight">
                 Activity Log
               </h1>
-              <p className="text-sm fc-text-dim">
+              <p className="text-sm text-gray-500 mt-0.5">
                 Track your extra training and activities
               </p>
             </div>
           </div>
 
-          {/* Summary Cards */}
+          {/* Stats strip */}
           {activities.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              <ClientGlassCard className="p-3 text-center">
-                <TrendingUp className="w-4 h-4 fc-text-dim mx-auto mb-1" />
-                <p className="text-lg font-bold fc-text-primary">
-                  {activities.length}
-                </p>
-                <p className="text-[10px] fc-text-dim uppercase tracking-wide">
-                  Activities
-                </p>
-              </ClientGlassCard>
-              <ClientGlassCard className="p-3 text-center">
-                <Clock className="w-4 h-4 fc-text-dim mx-auto mb-1" />
-                <p className="text-lg font-bold fc-text-primary">
-                  {totalDuration}
-                </p>
-                <p className="text-[10px] fc-text-dim uppercase tracking-wide">
-                  Minutes
-                </p>
-              </ClientGlassCard>
-              <ClientGlassCard className="p-3 text-center">
-                <span className="text-base block mb-1">
-                  {topType
-                    ? (ACTIVITY_META[topType[0] as keyof typeof ACTIVITY_META]
-                        ?.icon ?? "⭐")
-                    : "—"}
-                </span>
-                <p className="text-lg font-bold fc-text-primary">
-                  {topType?.[1] ?? 0}
-                </p>
-                <p className="text-[10px] fc-text-dim uppercase tracking-wide">
-                  Top Type
-                </p>
-              </ClientGlassCard>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">
+                    {activities.length}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                    Activities
+                  </p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">
+                    {totalDuration}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                    Minutes
+                  </p>
+                </div>
+                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-base font-semibold text-white tabular-nums">
+                    {topType?.[1] ?? 0}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                    Top type
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Filter Tabs */}
-          <div className="flex gap-2">
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-2 mb-4">
             {(["week", "month", "all"] as FilterRange[]).map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
                 className={cn(
-                  "flex-1 py-2 px-3 rounded-xl text-xs font-medium transition-all",
+                  "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors",
                   filter === f
-                    ? "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]"
-                    : "fc-surface border border-[color:var(--fc-glass-border)] fc-text-dim hover:opacity-80"
+                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
+                    : "bg-white/[0.03] text-gray-400 border-white/10"
                 )}
               >
                 {f === "week"
@@ -220,16 +203,17 @@ function ActivityHubContent() {
           {/* Activity List */}
           {loading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <ClientGlassCard key={i} className="p-4 animate-pulse">
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-1/3" />
-                      <div className="h-3 bg-[color:var(--fc-glass-highlight)] rounded w-1/2" />
-                    </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-white/10 bg-white/[0.02] p-4 animate-pulse"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="h-4 bg-white/10 rounded w-[45%]" />
+                    <div className="h-5 bg-white/10 rounded-full w-16 shrink-0" />
                   </div>
-                </ClientGlassCard>
+                  <div className="h-3 bg-white/10 rounded w-[75%] mt-2" />
+                </div>
               ))}
             </div>
           ) : activities.length > 0 ? (
@@ -239,17 +223,19 @@ function ActivityHubContent() {
               onDelete={handleDelete}
             />
           ) : (
-            <ClientGlassCard className="p-12">
-              <EmptyState
-                icon={Activity}
-                title="No activities yet"
-                description={
-                  filter === "week"
-                    ? "Log your first activity this week!"
-                    : "Your activity log will appear here"
-                }
+            <div className="py-8 px-4 text-center">
+              <Activity
+                className="w-8 h-8 mx-auto text-gray-600 mb-3"
+                strokeWidth={1.25}
+                aria-hidden
               />
-            </ClientGlassCard>
+              <p className="text-sm text-gray-400">No activities yet</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {filter === "week"
+                  ? "Log your first activity this week!"
+                  : "Your activity log will appear here"}
+              </p>
+            </div>
           )}
         </ClientPageShell>
 

@@ -1,29 +1,20 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense } from "react";
 import { useParams } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useCoachClient } from "@/contexts/CoachClientContext";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TrendingUp } from "lucide-react";
 import CoachClientProgressHub from "@/components/coach/client-views/CoachClientProgressHub";
-import { GenerateReportModal } from "@/components/coach/GenerateReportModal";
-
 function ProgressHubWithSearchParams({
   clientId,
-  onOpenReport,
 }: {
   clientId: string;
-  onOpenReport: () => void;
 }) {
-  return <CoachClientProgressHub clientId={clientId} onOpenReport={onOpenReport} />;
+  return <CoachClientProgressHub clientId={clientId} />;
 }
 
 export default function ClientProgressMergedPage() {
   const params = useParams();
-  const { user } = useAuth();
-  const { clientName } = useCoachClient();
-  const [showReportModal, setShowReportModal] = useState(false);
 
   const clientId = params.id as string;
 
@@ -57,19 +48,8 @@ export default function ClientProgressMergedPage() {
       >
         <ProgressHubWithSearchParams
           clientId={clientId}
-          onOpenReport={() => setShowReportModal(true)}
         />
       </Suspense>
-
-      {user?.id && (
-        <GenerateReportModal
-          open={showReportModal}
-          onClose={() => setShowReportModal(false)}
-          coachId={user.id}
-          clientId={clientId}
-          clientName={clientName}
-        />
-      )}
     </div>
   );
 }

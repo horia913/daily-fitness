@@ -10,8 +10,6 @@ import { supabase } from './supabase'
 import {
   getProgramState,
   getActiveProgramAssignment,
-  getProgramSlots,
-  getCompletedSlots,
 } from './programStateService'
 
 export interface ActiveProgram {

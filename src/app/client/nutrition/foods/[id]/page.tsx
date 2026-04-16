@@ -10,13 +10,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
 import { supabase } from "@/lib/supabase";
-import { withTimeout } from "@/lib/withTimeout";
-import {
-  ChevronLeft,
-  Zap,
-  Edit3,
-  Trash2,
-} from "lucide-react";
+import { ChevronLeft, Edit3 } from "lucide-react";
 
 interface Food {
   id: string;
@@ -31,33 +25,6 @@ interface Food {
   fiber: number;
   category: string;
 }
-
-const getFoodIcon = (category: string) => {
-  switch (category.toLowerCase()) {
-    case "fruits":
-      return "🍎";
-    case "vegetables":
-      return "🥕";
-    case "grains":
-      return "🌾";
-    case "protein":
-      return "🥩";
-    case "dairy":
-      return "🥛";
-    case "snacks":
-      return "🍿";
-    case "beverages":
-      return "🥤";
-    case "condiments":
-      return "🧂";
-    case "desserts":
-      return "🍰";
-    default:
-      return "🍽️";
-  }
-};
-
-const headerGradient = "fc-card-shell";
 
 const calculateNutritionForServing = (food: Food, servingSize: number) => {
   const multiplier = servingSize / food.serving_size;
@@ -130,12 +97,32 @@ export default function FoodDetailPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 flex items-center justify-center min-h-[50vh]">
-            <div className="fc-card-shell p-4 text-center w-full">
-              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex flex-col items-center justify-center min-h-[50vh]">
+            <div className="py-8 px-4 text-center w-full">
+              <p className="text-sm text-gray-400 mb-1">{loadError}</p>
+              <p className="text-xs text-gray-500 mb-4">Check your connection and try again.</p>
               <div className="flex gap-2 justify-center flex-wrap">
-                <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadFood(); }} className="fc-btn fc-btn-primary">Retry</Button>
-                <Button variant="outline" onClick={() => { window.location.href = "/client/nutrition"; }} className="fc-btn fc-btn-secondary"><ChevronLeft className="w-4 h-4 mr-2" />Back</Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setLoadError(null);
+                    setLoading(true);
+                    loadFood();
+                  }}
+                  className="fc-btn fc-btn-primary"
+                >
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    window.location.href = "/client/nutrition";
+                  }}
+                  className="fc-btn fc-btn-secondary"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
               </div>
             </div>
           </ClientPageShell>
@@ -149,17 +136,21 @@ export default function FoodDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-4xl">
-              <div className="fc-card-shell p-6 sm:p-10">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-48 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <div className="animate-pulse space-y-3">
+              <div className="h-9 w-9 rounded-xl bg-white/10" />
+              <div className="h-7 max-w-[240px] rounded-lg bg-white/10" />
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
+                <div className="h-4 w-24 rounded bg-white/10" />
+                <div className="h-8 w-32 rounded bg-white/10" />
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-2">
+                <div className="h-3 w-full rounded bg-white/10" />
+                <div className="h-3 w-full rounded bg-white/10" />
+                <div className="h-3 w-5/6 rounded bg-white/10" />
               </div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -170,16 +161,17 @@ export default function FoodDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-12 text-center">
-            <div className="fc-card-shell p-6">
-              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                Food not found
-              </h2>
-              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
-                This food item is no longer available.
-              </p>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <div className="py-8 px-4 text-center">
+              <h2 className="text-sm text-gray-400 font-medium">Food not found</h2>
+              <p className="mt-1 text-xs text-gray-500">This food item is no longer available.</p>
               <div className="mt-4 flex justify-center">
-                <Button className="fc-btn fc-btn-secondary h-10 text-sm" onClick={() => { window.location.href = "/client/nutrition"; }}>
+                <Button
+                  className="fc-btn fc-btn-secondary h-10 text-sm"
+                  onClick={() => {
+                    window.location.href = "/client/nutrition";
+                  }}
+                >
                   Back to Nutrition
                 </Button>
               </div>
@@ -201,98 +193,137 @@ export default function FoodDetailPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">
-            <nav className="flex items-center justify-between mb-2">
-              <button
-                type="button"
-                onClick={() => { window.location.href = "/client/nutrition"; }}
-                className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors"
-                aria-label="Back"
+          <nav className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/nutrition";
+              }}
+              className="w-10 h-10 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              aria-label="Back"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </nav>
+
+          <header className="mb-1">
+            <h1 className="text-xl font-bold text-white tracking-tight mb-2 break-words">{food.name}</h1>
+            {food.brand ? <p className="text-xs text-gray-500 mb-2">{food.brand}</p> : null}
+            <p className="text-xs text-gray-500">
+              <span className="text-gray-600">·</span> {food.category}
+            </p>
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-xs text-gray-500">Serving</span>
+              <span className="text-sm font-semibold tabular-nums text-white">
+                {foodServingSize} {food.serving_unit}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-h-[44px] min-w-[44px] p-0 border-white/10 bg-white/[0.04] text-white"
+                onClick={() => setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))}
               >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </nav>
+                −
+              </Button>
+              <span className="w-16 text-center font-mono text-sm font-semibold tabular-nums text-white">
+                {foodServingSize}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-h-[44px] min-w-[44px] p-0 border-white/10 bg-white/[0.04] text-white"
+                onClick={() => setFoodServingSize(foodServingSize + 0.1)}
+              >
+                +
+              </Button>
+              <span className="text-sm text-gray-500">{food.serving_unit}</span>
+            </div>
+          </header>
 
-            <header className="mb-3">
-              <h1 className="text-xl font-bold tracking-tight fc-text-primary mb-1 break-words">{food.name}</h1>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm fc-text-subtle">Serving Size:</span>
-                <span className="font-mono text-sm font-bold fc-text-workouts">{foodServingSize} {food.serving_unit}</span>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Energy</p>
+            <div className="flex flex-wrap items-end gap-1 mb-3">
+              <span className="text-2xl font-semibold tabular-nums text-white">{nutrition.calories}</span>
+              <span className="text-sm font-medium text-gray-500 uppercase tracking-wide pb-0.5">kcal</span>
+            </div>
+            <div className="flex flex-wrap items-stretch gap-0 rounded-lg border border-white/10 overflow-hidden bg-black/20">
+              <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
+                <span className="text-base font-semibold tabular-nums text-white">{nutrition.protein}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Protein g</span>
               </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] p-0" onClick={() => setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))}>−</Button>
-                <span className="w-16 text-center font-mono text-sm font-bold fc-text-primary">{foodServingSize}</span>
-                <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] p-0" onClick={() => setFoodServingSize(foodServingSize + 0.1)}>+</Button>
-                <span className="text-sm fc-text-dim">{food.serving_unit}</span>
+              <div className="w-px self-stretch min-h-[2rem] bg-white/10" />
+              <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
+                <span className="text-base font-semibold tabular-nums text-white">{nutrition.carbs}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Carbs g</span>
               </div>
-            </header>
+              <div className="w-px self-stretch min-h-[2rem] bg-white/10" />
+              <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
+                <span className="text-base font-semibold tabular-nums text-white">{nutrition.fat}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Fat g</span>
+              </div>
+              <div className="w-px self-stretch min-h-[2rem] bg-white/10" />
+              <div className="flex flex-1 min-w-[4.5rem] flex-col items-center justify-center py-2.5 px-2">
+                <span className="text-base font-semibold tabular-nums text-white">{nutrition.fiber}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Fiber g</span>
+              </div>
+            </div>
+          </div>
 
-            <div className="fc-card-shell p-8 text-center border-t-2 border-t-[color:var(--fc-domain-workouts)]/30">
-              <div className="text-xs fc-text-subtle font-medium uppercase tracking-widest mb-1">Total Energy</div>
-              <div className="flex justify-center items-baseline gap-2">
-                <span className="text-4xl font-bold font-mono fc-text-primary">{nutrition.calories}</span>
-                <span className="text-xl font-bold fc-text-subtle uppercase">kcal</span>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-4">Macro mix</h3>
+            <div className="space-y-5">
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold text-white tracking-tight">Protein</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-cyan-300/90">
+                    {nutrition.protein}g <span className="text-gray-500 font-normal">/ {proteinPct}%</span>
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-cyan-500/60" style={{ width: `${proteinPct}%` }} />
+                </div>
               </div>
-              <div className="mt-4 flex justify-center gap-6">
-                <div className="flex items-center gap-1.5 fc-text-success">
-                  <Zap className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">High Protein</span>
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold text-white tracking-tight">Carbohydrates</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-amber-300/90">
+                    {nutrition.carbs}g <span className="text-gray-500 font-normal">/ {carbsPct}%</span>
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500/50" style={{ width: `${carbsPct}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold text-white tracking-tight">Fats</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-emerald-300/90">
+                    {nutrition.fat}g <span className="text-gray-500 font-normal">/ {fatPct}%</span>
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500/50" style={{ width: `${fatPct}%` }} />
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="fc-card-shell p-6">
-              <h3 className="text-sm font-bold uppercase tracking-widest fc-text-subtle mb-6">Macronutrients</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-semibold fc-text-primary">Protein</span>
-                    <span className="font-mono text-sm font-bold fc-text-workouts">{nutrition.protein}g <span className="fc-text-dim font-normal">/ {proteinPct}%</span></span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                    <div className="h-full rounded-full bg-[color:var(--fc-domain-workouts)]" style={{ width: `${proteinPct}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-semibold fc-text-primary">Carbohydrates</span>
-                    <span className="font-mono text-sm font-bold fc-text-error">{nutrition.carbs}g <span className="fc-text-dim font-normal">/ {carbsPct}%</span></span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                    <div className="h-full rounded-full bg-[color:var(--fc-status-error)]" style={{ width: `${carbsPct}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-semibold fc-text-primary">Fats</span>
-                    <span className="font-mono text-sm font-bold fc-text-success">{nutrition.fat}g <span className="fc-text-dim font-normal">/ {fatPct}%</span></span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
-                    <div className="h-full rounded-full bg-[color:var(--fc-status-success)]" style={{ width: `${fatPct}%` }} />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] flex justify-between text-sm fc-text-dim">
-                <span>Fiber</span>
-                <span className="font-mono">{nutrition.fiber}g</span>
-              </div>
+          <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/90 to-transparent z-50">
+            <div className="max-w-lg mx-auto w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  window.location.href = `/client/nutrition/foods/create?edit=${food.id}`;
+                }}
+                className="w-full h-11 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-semibold text-sm gap-1.5"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit food
+              </Button>
             </div>
-
-            <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/90 to-transparent z-50">
-              <div className="max-w-lg mx-auto w-full grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { window.location.href = `/client/nutrition/foods/create?edit=${food.id}`; }}
-                  className="w-full h-10 rounded-xl fc-glass border border-[color:var(--fc-domain-workouts)]/40 fc-text-workouts font-semibold text-xs gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Edit
-                </Button>
-                <Button variant="outline" className="w-full h-10 rounded-xl border border-[color:var(--fc-status-error)]/40 fc-text-error font-semibold text-xs gap-1.5 bg-[color:var(--fc-status-error)]/10">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete
-                </Button>
-              </div>
-            </div>
+          </div>
         </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>

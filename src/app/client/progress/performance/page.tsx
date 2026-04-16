@@ -197,7 +197,7 @@ function PerformancePageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <ClientPageShell className="max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden">
-        <div className="fc-card-shell p-4 mb-4">
+        <div className="border-b border-white/5 mb-4 pb-4">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
               type="button"
@@ -223,7 +223,7 @@ function PerformancePageContent() {
         </div>
 
         <main className="space-y-4">
-          <section className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <section className="flex flex-col gap-2">
             <button
               type="button"
               onClick={() => setSelectedType("1km_run")}
@@ -277,9 +277,9 @@ function PerformancePageContent() {
 
           {/* Main display */}
           <div
-            className="fc-card-shell overflow-hidden p-6 md:p-8"
+            className="fc-card-shell overflow-hidden p-4"
           >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
+            <div className="flex flex-col gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
                   <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-widest">
@@ -326,16 +326,16 @@ function PerformancePageContent() {
                   )}
                 </div>
               </div>
-              <div className="w-full md:w-52 space-y-2 flex-shrink-0 text-xs">
-                <div className="flex items-center justify-between p-2.5 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center justify-between gap-2">
                   <span className="fc-text-subtle">Improvement</span>
-                  <span className="font-bold font-mono fc-text-success">
+                  <span className="font-mono font-bold fc-text-success">
                     {improvement ?? "—"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2.5 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                <div className="flex items-center justify-between gap-2">
                   <span className="fc-text-subtle">Percentile</span>
-                  <span className="font-bold font-mono fc-text-subtle">—</span>
+                  <span className="font-mono font-bold fc-text-subtle">—</span>
                 </div>
               </div>
             </div>
@@ -384,10 +384,10 @@ function PerformancePageContent() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-widest fc-text-subtle border-b border-[color:var(--fc-glass-border)]">
-                      <th className="p-2 md:p-3 font-bold">Date</th>
-                      <th className="p-2 md:p-3 font-bold">Result</th>
-                      <th className="p-2 md:p-3 font-bold">Trend</th>
-                      <th className="p-2 md:p-3 font-bold text-right">Notes</th>
+                      <th className="p-2 font-bold">Date</th>
+                      <th className="p-2 font-bold">Result</th>
+                      <th className="p-2 font-bold">Trend</th>
+                      <th className="p-2 font-bold text-right">Notes</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm font-mono">
@@ -419,8 +419,8 @@ function PerformancePageContent() {
                                 year: "numeric",
                               })}
                             </td>
-                            <td className="p-2 md:p-3 font-bold fc-text-primary text-xs">{result}</td>
-                            <td className="p-2 md:p-3 text-xs">
+                            <td className="p-2 font-bold fc-text-primary text-xs">{result}</td>
+                            <td className="p-2 text-xs">
                               {trend === "—" ? (
                                 <span className="fc-text-subtle">—</span>
                               ) : (

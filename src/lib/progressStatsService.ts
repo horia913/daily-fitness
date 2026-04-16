@@ -366,6 +366,124 @@ async function getMonthSummary(clientId: string, first: string, last: string): P
   return { workouts, volume, avgDurationMinutes, checkIns, newPRs, weightChange, achievements }
 }
 
+/** Scannable month snapshot for Progress Hub (stats + weekly workout bars). */
+export interface ProgressMonthHubSnapshot {
+  monthYearLabel: string
+  workouts: number
+  totalDurationMinutes: number
+  volumeKg: number
+  newPRs: number
+  streakDays: number
+  weeklyWorkoutCounts: number[]
+  currentWeekIndex: number
+}
+
+/**
+ * Current calendar month aggregates + per-week workout counts (local calendar weeks: days 1–7 → W1, etc.).
+ * Workouts/volume/duration from `workout_logs` + `workout_set_logs`; PRs from `personal_records.achieved_date`;
+ * streak from `getStreak` (same as dashboard).
+ */
+export async function getProgressMonthHubSnapshot(
+  clientId: string
+): Promise<ProgressMonthHubSnapshot> {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const { first, last } = getMonthBounds(y, m)
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  const numWeeks = Math.ceil(daysInMonth / 7)
+  const firstISO = `${first}T00:00:00.000Z`
+  const lastISO = `${last}T23:59:59.999Z`
+  const monthYearLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const currentWeekIndex = Math.min(
+    Math.max(numWeeks - 1, 0),
+    Math.floor((now.getDate() - 1) / 7)
+  )
+
+  try {
+    const [logsRes, streak, prsRes] = await Promise.all([
+      supabase
+        .from('workout_logs')
+        .select('id, completed_at, total_duration_minutes')
+        .eq('client_id', clientId)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', firstISO)
+        .lte('completed_at', lastISO),
+      getStreak(clientId),
+      supabase
+        .from('personal_records')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('achieved_date', first)
+        .lte('achieved_date', last),
+    ])
+
+    const logs = (logsRes.data ?? []) as {
+      id: string
+      completed_at: string
+      total_duration_minutes: number | null
+    }[]
+
+    const weeklyWorkoutCounts = Array.from({ length: numWeeks }, () => 0)
+    const inMonth = logs.filter((log) => {
+      const d = new Date(log.completed_at)
+      return d.getFullYear() === y && d.getMonth() === m
+    })
+
+    for (const log of inMonth) {
+      const day = new Date(log.completed_at).getDate()
+      const wi = Math.floor((day - 1) / 7)
+      const idx = Math.min(numWeeks - 1, Math.max(0, wi))
+      weeklyWorkoutCounts[idx] += 1
+    }
+
+    const workouts = inMonth.length
+    const totalDurationMinutes = inMonth.reduce(
+      (s, r) => s + (Number(r.total_duration_minutes) || 0),
+      0
+    )
+
+    let volumeKg = 0
+    const logIds = inMonth.map((r) => r.id)
+    if (logIds.length > 0) {
+      const { data: sets } = await supabase
+        .from('workout_set_logs')
+        .select('weight, reps')
+        .in('workout_log_id', logIds)
+        .eq('client_id', clientId)
+      volumeKg = (sets ?? []).reduce(
+        (sum, row) => sum + (Number(row.weight) || 0) * (Number(row.reps) || 0),
+        0
+      )
+    }
+
+    const newPRs = prsRes.count ?? 0
+
+    return {
+      monthYearLabel,
+      workouts,
+      totalDurationMinutes,
+      volumeKg,
+      newPRs,
+      streakDays: streak,
+      weeklyWorkoutCounts,
+      currentWeekIndex,
+    }
+  } catch (error) {
+    console.error('Error in getProgressMonthHubSnapshot:', error)
+    return {
+      monthYearLabel,
+      workouts: 0,
+      totalDurationMinutes: 0,
+      volumeKg: 0,
+      newPRs: 0,
+      streakDays: 0,
+      weeklyWorkoutCounts: Array.from({ length: numWeeks }, () => 0),
+      currentWeekIndex,
+    }
+  }
+}
+
 /**
  * Get monthly progress summary for Progress Hub "This month" card.
  */

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useCoachClient } from "@/contexts/CoachClientContext";
 import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
-import { Mail, Check, Circle } from "lucide-react";
+import { Mail, Dumbbell, TrendingUp, Trophy, Heart, Smile } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { attentionCardSurfaceStyle } from "@/lib/coachClientAttention";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
@@ -58,19 +58,67 @@ export type NutritionCardJson = {
   mealsLoggedToday: number;
 } | null;
 
+export type WeeklyReviewBucketJson = {
+  weekStart: string;
+  weekEnd: string;
+  workouts: {
+    completed: number;
+    planned: number;
+    workoutIds: string[];
+  };
+  volume: {
+    totalKg: number;
+  };
+  prs: {
+    count: number;
+    items: Array<{
+      exerciseId: string | null;
+      exerciseName: string | null;
+      weight: number | null;
+      reps: number | null;
+      achievedDate: string;
+    }>;
+  };
+  checkIns: {
+    daily: {
+      submitted: number;
+      total: number;
+      avgMood: number | null;
+      avgEnergy: number | null;
+      avgSleep: number | null;
+      avgStress: number | null;
+    };
+    scheduled: {
+      submitted: boolean;
+      submittedDate: string | null;
+    };
+  };
+  bodyMetrics: {
+    weight: number | null;
+    bodyFat: number | null;
+  };
+};
+
+export type WeeklyReviewJson = {
+  clientId: string;
+  clientTimezone: string;
+  hasActiveAssignment: boolean;
+  currentWeek: WeeklyReviewBucketJson;
+  previousWeek: WeeklyReviewBucketJson;
+} | null;
+
 type Props = {
   clientId: string;
   name: string;
   email: string;
   attention: { level: AttentionLevel; reasons: string[] };
-  weeklyProgress: { current: number; goal: number };
   trainedToday: boolean;
   todayWorkout: TodayWorkoutJson;
   nextScheduledWorkout: NextScheduledJson;
   latestCheckIn: LatestCheckInJson;
-  weekWorkoutDots: boolean[];
   program: ProgramCardJson;
   nutrition: NutritionCardJson;
+  weeklyReview: WeeklyReviewJson;
 };
 
 function tierColor(tier: "green" | "amber" | "red" | null) {
@@ -94,14 +142,13 @@ export default function CoachClientDailyReview({
   name,
   email,
   attention,
-  weeklyProgress,
   trainedToday,
   todayWorkout,
   nextScheduledWorkout,
   latestCheckIn,
-  weekWorkoutDots,
   program,
   nutrition,
+  weeklyReview,
 }: Props) {
   const { clientName } = useCoachClient();
   const { addToast } = useToast();
@@ -130,9 +177,69 @@ export default function CoachClientDailyReview({
     program?.currentWeek ??
     1;
 
+  const formatRangeDate = (ymd: string): string => {
+    const d = new Date(`${ymd}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return ymd;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const formatVolume = (kg: number): string => {
+    if (!Number.isFinite(kg)) return "0 kg";
+    if (Math.abs(kg) >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+    return `${Math.round(kg).toLocaleString()} kg`;
+  };
+
+  const deltaBadge = (
+    current: number | null,
+    previous: number | null,
+    lowerBetter = false
+  ): { text: string; className: string } | null => {
+    if (current == null || previous == null) return null;
+    const delta = current - previous;
+    if (delta === 0) {
+      return {
+        text: "—",
+        className: "bg-white/5 text-gray-400 border border-white/10",
+      };
+    }
+    const sign = delta > 0 ? "+" : "";
+    const tone = deltaTone(delta, lowerBetter);
+    if (tone === "green") {
+      return {
+        text: `${sign}${delta}`,
+        className: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
+      };
+    }
+    return {
+      text: `${sign}${delta}`,
+      className: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
+    };
+  };
+
+  const currentWeek = weeklyReview?.currentWeek ?? null;
+  const previousWeek = weeklyReview?.previousWeek ?? null;
+  const hasPreviousWeekData = !!previousWeek && (
+    previousWeek.workouts.completed > 0 ||
+    previousWeek.workouts.planned > 0 ||
+    previousWeek.volume.totalKg > 0 ||
+    previousWeek.prs.count > 0 ||
+    previousWeek.checkIns.daily.submitted > 0 ||
+    previousWeek.checkIns.daily.avgMood != null ||
+    previousWeek.checkIns.scheduled.submitted
+  );
+  const weekJustStarted = !!currentWeek && (
+    currentWeek.workouts.completed === 0 &&
+    currentWeek.workouts.planned === 0 &&
+    currentWeek.volume.totalKg === 0 &&
+    currentWeek.prs.count === 0 &&
+    currentWeek.checkIns.daily.submitted === 0 &&
+    !currentWeek.checkIns.scheduled.submitted &&
+    currentWeek.checkIns.daily.avgMood == null
+  );
+
   return (
     <div
-      className="mx-auto w-full max-w-lg fc-page flex flex-col min-w-0 gap-3 pb-6"
+      className="mx-auto w-full max-w-6xl px-4 lg:px-8 fc-page flex flex-col min-w-0 gap-3 pb-6"
       style={{ gap: "var(--fc-gap-sections)" }}
     >
       {attentionLine && (
@@ -219,29 +326,114 @@ export default function CoachClientDailyReview({
       </section>
 
       <section className="border-t border-white/5 pt-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60">
-            This week
-          </h2>
-          <span className="text-xs text-white tabular-nums">
-            {weeklyProgress.current}/
-            {weeklyProgress.goal > 0 ? weeklyProgress.goal : "—"} workouts
-          </span>
-        </div>
-        <div className="flex justify-between gap-1 max-w-xs">
-          {weekWorkoutDots.map((done, i) => (
-            <div key={i} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
-              {done ? (
-                <Check className="w-3.5 h-3.5 text-cyan-400" aria-hidden />
+        <h2 className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+          This Week
+        </h2>
+        {currentWeek ? (
+          <>
+            <p className="mb-3 text-xs text-gray-500">
+              Mon {formatRangeDate(currentWeek.weekStart)} - Sun {formatRangeDate(currentWeek.weekEnd)}
+            </p>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              {!weeklyReview?.hasActiveAssignment ? (
+                <p className="text-xs text-gray-400">
+                  No active program - workouts/volume/PRs are zero
+                </p>
               ) : (
-                <Circle className="w-3.5 h-3.5 text-gray-600" aria-hidden />
+                <>
+                  {weekJustStarted && (
+                    <p className="mb-3 text-xs text-gray-500">Week just started</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {[
+                      {
+                        key: "workouts",
+                        icon: <Dumbbell className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        value: `${currentWeek.workouts.completed}/${currentWeek.workouts.planned}`,
+                        label: "Workouts",
+                        delta: hasPreviousWeekData
+                          ? deltaBadge(currentWeek.workouts.completed, previousWeek?.workouts.completed ?? null)
+                          : null,
+                        onClick: () => { window.location.href = `/coach/clients/${clientId}/workout-logs`; },
+                        sub: null as string | null,
+                      },
+                      {
+                        key: "volume",
+                        icon: <TrendingUp className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        value: formatVolume(currentWeek.volume.totalKg),
+                        label: "Volume",
+                        delta: hasPreviousWeekData
+                          ? deltaBadge(Math.round(currentWeek.volume.totalKg), Math.round(previousWeek?.volume.totalKg ?? 0))
+                          : null,
+                        onClick: () => { window.location.href = `/coach/clients/${clientId}/stats`; },
+                        sub: null as string | null,
+                      },
+                      {
+                        key: "prs",
+                        icon: <Trophy className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        value: `${currentWeek.prs.count}`,
+                        label: "PRs",
+                        delta: hasPreviousWeekData
+                          ? deltaBadge(currentWeek.prs.count, previousWeek?.prs.count ?? null)
+                          : null,
+                        onClick: () => { window.location.href = `/coach/clients/${clientId}/stats`; },
+                        sub: null as string | null,
+                      },
+                      {
+                        key: "checkins",
+                        icon: <Heart className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        value: `${currentWeek.checkIns.daily.submitted}/7`,
+                        label: "Check-ins",
+                        delta: hasPreviousWeekData
+                          ? deltaBadge(currentWeek.checkIns.daily.submitted, previousWeek?.checkIns.daily.submitted ?? null)
+                          : null,
+                        onClick: () => { window.location.href = `/coach/clients/${clientId}/check-ins`; },
+                        sub: `Wkly: ${currentWeek.checkIns.scheduled.submitted ? "done" : "pending"}`,
+                      },
+                      ...(currentWeek.checkIns.daily.avgMood != null
+                        ? [{
+                            key: "mood",
+                            icon: <Smile className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                            value: `${Math.round(currentWeek.checkIns.daily.avgMood * 10) / 10}/10`,
+                            label: "Avg mood",
+                            delta: hasPreviousWeekData
+                              ? deltaBadge(
+                                  Math.round((currentWeek.checkIns.daily.avgMood ?? 0) * 10),
+                                  previousWeek?.checkIns.daily.avgMood != null
+                                    ? Math.round(previousWeek.checkIns.daily.avgMood * 10)
+                                    : null
+                                )
+                              : null,
+                            onClick: () => { window.location.href = `/coach/clients/${clientId}/check-ins`; },
+                            sub: null as string | null,
+                          }]
+                        : []),
+                    ].map((tile) => (
+                      <button
+                        key={tile.key}
+                        type="button"
+                        onClick={tile.onClick}
+                        className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.06] transition-colors min-h-[96px]"
+                      >
+                        <div className="mb-2">{tile.icon}</div>
+                        <p className="text-xl font-bold tabular-nums text-white">{tile.value}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500">{tile.label}</p>
+                        {tile.sub ? <p className="mt-1 text-[10px] text-gray-400">{tile.sub}</p> : null}
+                        {tile.delta ? (
+                          <span className={`mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ${tile.delta.className}`}>
+                            {tile.delta.text}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              <span className="text-[9px] text-gray-500">
-                {["M", "T", "W", "T", "F", "S", "S"][i]}
-              </span>
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <p className="text-xs text-gray-500">Weekly review unavailable</p>
+        )}
       </section>
 
       <section className="border-t border-white/5 pt-3">
@@ -330,18 +522,17 @@ export default function CoachClientDailyReview({
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              {program.progressionMode === "coach_managed" && program.weekReviewNeeded ? (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-cyan-400 hover:underline"
-                  onClick={() => setReviewOpen(true)}
-                >
-                  Review week →
-                </button>
-              ) : program.behindOnWeeklyWorkouts ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-cyan-400 hover:underline"
+                onClick={() => setReviewOpen(true)}
+              >
+                Review week →
+              </button>
+              {program.behindOnWeeklyWorkouts ? (
                 <span className="text-xs text-amber-400">Behind schedule ⚠️</span>
               ) : (
-                <span className="text-xs text-emerald-400">On track ✅</span>
+                <span className="text-xs text-emerald-400">On track</span>
               )}
             </div>
           </div>
@@ -381,7 +572,7 @@ export default function CoachClientDailyReview({
         </button>
       </div>
 
-      {program && program.progressionMode === "coach_managed" && (
+      {program && (
         <WeekReviewModal
           isOpen={reviewOpen}
           onClose={() => setReviewOpen(false)}

@@ -89,6 +89,8 @@ export interface ProgramSchedule {
   week_number: number // Week number in the program
   template_id: string
   training_block_id?: string | null // Added in Phase 2
+  /** Populated when schedule is enriched with `training_blocks` (e.g. client program details). */
+  training_block?: import('@/types/trainingBlock').TrainingBlock | null
   // Note: is_optional, is_active, notes are NOT in database schema (mapped/optional fields)
   is_optional?: boolean // Optional field (not in DB schema, defaults to false)
   is_active?: boolean // Optional field (not in DB schema, defaults to true)
@@ -1254,6 +1256,180 @@ export class WorkoutTemplateService {
     }
   }
 
+  /**
+   * Master program_schedule → program_day_assignments for active/paused assignments.
+   * Only rows with is_customized = false are updated; never deletes snapshot rows.
+   */
+  private static snapshotDayNumber(weekNumber: number, programDay: number): number {
+    return (weekNumber - 1) * 7 + programDay
+  }
+
+  private static async getActivePausedAssignmentIds(programId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('program_assignments')
+      .select('id')
+      .eq('program_id', programId)
+      .in('status', ['active', 'paused'])
+
+    if (error) {
+      console.error('[propagation] load assignments:', error)
+      return []
+    }
+    return (data ?? []).map((r) => r.id as string).filter(Boolean)
+  }
+
+  private static snapshotSlotDefaultName(
+    weekNumber: number,
+    programDay: number,
+    templateId: string | null,
+  ): string {
+    return templateId
+      ? `Workout Day ${weekNumber}-${programDay}`
+      : `Rest Day ${weekNumber}-${programDay}`
+  }
+
+  private static async resolveSnapshotDisplayName(
+    templateId: string | null,
+    weekNumber: number,
+    programDay: number,
+    hintName?: string | null,
+  ): Promise<string> {
+    if (hintName && hintName.trim()) return hintName.trim()
+    if (!templateId) return this.snapshotSlotDefaultName(weekNumber, programDay, null)
+    const { data, error } = await supabase
+      .from('workout_templates')
+      .select('name')
+      .eq('id', templateId)
+      .maybeSingle()
+    if (error) {
+      console.error('[propagation] template name:', error)
+    }
+    const n = (data?.name as string) || ''
+    return n.trim() || this.snapshotSlotDefaultName(weekNumber, programDay, templateId)
+  }
+
+  /**
+   * Push one master (week, program_day) slot to all non-customized snapshots for this program.
+   * @returns Count of snapshot rows updated (not including inserts).
+   */
+  static async propagateScheduleSlotToSnapshots(
+    programId: string,
+    weekNumber: number,
+    programDay: number,
+    templateId: string | null | undefined,
+    options?: { ensureMissingRows?: boolean; templateNameHint?: string | null },
+  ): Promise<number> {
+    try {
+      if (programDay < 1 || programDay > 7 || weekNumber < 1) return 0
+
+      const tid =
+        templateId && typeof templateId === 'string' && templateId.trim().length > 0
+          ? templateId.trim()
+          : null
+
+      const assignmentIds = await this.getActivePausedAssignmentIds(programId)
+      if (assignmentIds.length === 0) return 0
+
+      const dayNumber = this.snapshotDayNumber(weekNumber, programDay)
+      const dayType: 'workout' | 'rest' = tid ? 'workout' : 'rest'
+      const name = await this.resolveSnapshotDisplayName(
+        tid,
+        weekNumber,
+        programDay,
+        options?.templateNameHint,
+      )
+
+      const now = new Date().toISOString()
+      const { data: updated, error: updateError } = await supabase
+        .from('program_day_assignments')
+        .update({
+          workout_template_id: tid,
+          name,
+          day_type: dayType,
+          updated_at: now,
+        })
+        .in('program_assignment_id', assignmentIds)
+        .eq('day_number', dayNumber)
+        .eq('is_customized', false)
+        .select('id')
+
+      if (updateError) {
+        console.error('[propagation] update snapshots:', updateError)
+        return 0
+      }
+
+      const n = updated?.length ?? 0
+      console.log(
+        `[propagation] template change for program ${programId} (week ${weekNumber}, day ${programDay}) -> ${n} snapshot rows updated`,
+      )
+
+      if (options?.ensureMissingRows) {
+        const { data: existingPd, error: exErr } = await supabase
+          .from('program_day_assignments')
+          .select('program_assignment_id')
+          .eq('day_number', dayNumber)
+          .in('program_assignment_id', assignmentIds)
+
+        if (exErr) {
+          console.error('[propagation] list existing snapshot rows:', exErr)
+          return n
+        }
+
+        const have = new Set((existingPd ?? []).map((r) => r.program_assignment_id as string))
+        const missing = assignmentIds.filter((id) => !have.has(id))
+        if (missing.length === 0) return n
+
+        const description = tid ? null : 'Rest day'
+        const insertRows = missing.map((program_assignment_id) => ({
+          program_assignment_id,
+          program_day_id: null,
+          program_day: programDay,
+          day_number: dayNumber,
+          day_type: dayType,
+          workout_template_id: tid,
+          name,
+          description,
+          estimated_duration: null,
+          target_muscles: [] as string[],
+          intensity_level: null,
+          rest_focus: null,
+          recommended_activities: [] as string[],
+          is_completed: false,
+          completed_date: null,
+          notes: null,
+          is_customized: false,
+        }))
+
+        const { error: insErr } = await supabase.from('program_day_assignments').insert(insertRows)
+        if (insErr) {
+          console.error('[propagation] insert missing snapshot rows:', insErr)
+        }
+      }
+
+      return n
+    } catch (e) {
+      console.error('[propagation] propagateScheduleSlotToSnapshots', e)
+      return 0
+    }
+  }
+
+  /**
+   * After copy_week_schedule (or any full master refresh), sync every program_schedule
+   * cell to non-customized snapshots and create missing rows for active assignments.
+   */
+  static async propagateAllScheduleSlotsToSnapshots(programId: string): Promise<void> {
+    const schedule = await this.getProgramSchedule(programId)
+    for (const slot of schedule) {
+      const w = slot.week_number ?? 1
+      const d = slot.program_day ?? 1
+      const tid = slot.template_id && String(slot.template_id).trim() ? String(slot.template_id) : null
+      await this.propagateScheduleSlotToSnapshots(programId, w, d, tid, {
+        ensureMissingRows: true,
+        templateNameHint: slot.template_name ?? null,
+      })
+    }
+  }
+
   // ===== PROGRAM ASSIGNMENT MANAGEMENT =====
 
   static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string, progressionMode?: 'auto' | 'coach_managed'): Promise<ProgramAssignment | null> {
@@ -1671,6 +1847,8 @@ export class WorkoutTemplateService {
 
       let row: any = existing
 
+      const wasInsert = !existing
+
       if (row) {
         const { data: updated, error: updateError } = await supabase
           .from('program_schedule')
@@ -1714,6 +1892,15 @@ export class WorkoutTemplateService {
 
         row = inserted
       }
+
+      const effectiveTemplateId =
+        row.template_id != null && String(row.template_id).trim() !== ''
+          ? String(row.template_id)
+          : templateId
+      await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, effectiveTemplateId, {
+        ensureMissingRows: wasInsert,
+        templateNameHint: row.template_name ?? null,
+      })
 
       // Progression rules are not generated during schedule save (avoids heavy block loads).
       // Editors fall back to week-1 rules / template defaults when rules are missing.
@@ -1785,6 +1972,11 @@ export class WorkoutTemplateService {
         .eq('week_number', weekNumber)
 
       if (error) throw error
+
+      await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, null, {
+        ensureMissingRows: false,
+      })
+
       return true
     } catch (error) {
       console.error('Error removing program schedule:', error)

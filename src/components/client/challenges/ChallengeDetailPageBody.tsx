@@ -38,6 +38,11 @@ export interface ChallengeDetailPageBodyProps {
   backHref?: string;
   /** When set, back control uses this handler instead of navigating to backHref. */
   onBackClick?: () => void;
+  /**
+   * `compact` (default): elevated row shells for client challenge detail.
+   * `legacy`: GlassCard + fc-card-shell (used by /client/test-challenges as a visual reference).
+   */
+  layoutVariant?: "compact" | "legacy";
   cornerBadge?: React.ReactNode;
   submitModalCategory: any;
   setSubmitModalCategory: (c: any) => void;
@@ -54,6 +59,29 @@ export interface ChallengeDetailPageBodyProps {
   getSubmissionForCategory: (categoryId: string) => any;
 }
 
+function DetailSection({
+  legacy,
+  legacyClassName,
+  children,
+}: {
+  legacy: boolean;
+  legacyClassName: string;
+  children: React.ReactNode;
+}) {
+  if (legacy) {
+    return (
+      <GlassCard elevation={2} className={cn("fc-card-shell", legacyClassName)}>
+        {children}
+      </GlassCard>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      {children}
+    </div>
+  );
+}
+
 export function ChallengeDetailPageBody({
   challenge,
   leaderboard,
@@ -61,6 +89,7 @@ export function ChallengeDetailPageBody({
   userId,
   backHref = "/client/challenges",
   onBackClick,
+  layoutVariant = "compact",
   cornerBadge,
   submitModalCategory,
   setSubmitModalCategory,
@@ -76,6 +105,8 @@ export function ChallengeDetailPageBody({
   handleSubmitProof,
   getSubmissionForCategory,
 }: ChallengeDetailPageBodyProps) {
+  const isLegacy = layoutVariant === "legacy";
+
   const backControl = onBackClick ? (
     <button
       type="button"
@@ -101,14 +132,26 @@ export function ChallengeDetailPageBody({
   return (
     <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-32 pt-6 fc-page space-y-4 overflow-x-hidden">
       {cornerBadge ? (
-        <div className="fixed right-3 top-3 z-[60] sm:right-6 sm:top-4">
+        <div
+          className={cn(
+            "fixed right-3 top-3 z-[60]",
+            isLegacy && "sm:right-6 sm:top-4"
+          )}
+        >
           {cornerBadge}
         </div>
       ) : null}
 
       <header className="mb-4">
         {backControl}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+        <div
+          className={cn(
+            "flex gap-3",
+            isLegacy
+              ? "flex-col md:flex-row md:items-end justify-between"
+              : "flex-col"
+          )}
+        >
           <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-tight fc-text-primary mb-1.5 break-words">
               {challenge.name}
@@ -133,7 +176,12 @@ export function ChallengeDetailPageBody({
           </div>
           <button
             type="button"
-            className="fc-card-shell w-12 h-12 flex items-center justify-center rounded-2xl border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-soft)] transition-colors shrink-0"
+            className={cn(
+              "w-12 h-12 flex items-center justify-center rounded-xl border transition-colors shrink-0",
+              isLegacy
+                ? "fc-card-shell rounded-2xl border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-soft)]"
+                : "border-white/10 bg-white/[0.04] hover:bg-white/[0.07]"
+            )}
             aria-label="Share challenge"
             onClick={() => {
               if (typeof navigator !== "undefined" && navigator.share) {
@@ -156,16 +204,8 @@ export function ChallengeDetailPageBody({
         const rank = userEntry.final_rank ?? leaderboard.indexOf(userEntry) + 1;
         const isWinner = rank === 1;
         const isTopThree = rank <= 3;
-        return (
-          <GlassCard
-            elevation={2}
-            className={cn(
-              "fc-card-shell p-6 sm:p-8 rounded-2xl text-center",
-              isWinner
-                ? "border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-transparent"
-                : ""
-            )}
-          >
+        const resultInner = (
+          <>
             <div className="text-4xl mb-2">
               {isWinner ? "🏆" : isTopThree ? "🥈" : "🎉"}
             </div>
@@ -198,7 +238,30 @@ export function ChallengeDetailPageBody({
               <Share2 className="w-4 h-4" />
               Share Result
             </button>
+          </>
+        );
+        return isLegacy ? (
+          <GlassCard
+            elevation={2}
+            className={cn(
+              "fc-card-shell p-6 sm:p-8 rounded-2xl text-center",
+              isWinner
+                ? "border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-transparent"
+                : ""
+            )}
+          >
+            {resultInner}
           </GlassCard>
+        ) : (
+          <div
+            className={cn(
+              "rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center",
+              isWinner &&
+                "border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-transparent"
+            )}
+          >
+            {resultInner}
+          </div>
         );
       })()}
 
@@ -207,37 +270,69 @@ export function ChallengeDetailPageBody({
           ? leaderboard.find((e: any) => e.client_id === userId)
           : null;
         return userEntry ? (
-          <GlassCard
-            elevation={2}
-            className="fc-card-shell p-6 sm:p-8 rounded-2xl border-l-4 border-l-[color:var(--fc-accent-blue)]"
-          >
-            <p className="text-sm font-bold uppercase tracking-widest fc-text-workouts mb-2">
-              Your performance
-            </p>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-              <div>
-                <div className="flex items-end gap-4 mb-2">
-                  <span className="text-4xl font-bold font-mono fc-text-primary">
-                    #{userEntry.final_rank ?? leaderboard.indexOf(userEntry) + 1}
-                  </span>
-                  <span className="fc-text-subtle mb-1">
-                    of {leaderboard.length} participants
-                  </span>
+          isLegacy ? (
+            <GlassCard
+              elevation={2}
+              className="fc-card-shell p-6 sm:p-8 rounded-2xl border-l-4 border-l-[color:var(--fc-accent-blue)]"
+            >
+              <p className="text-sm font-bold uppercase tracking-widest fc-text-workouts mb-2">
+                Your performance
+              </p>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div>
+                  <div className="flex items-end gap-4 mb-2">
+                    <span className="text-4xl font-bold font-mono fc-text-primary">
+                      #{userEntry.final_rank ?? leaderboard.indexOf(userEntry) + 1}
+                    </span>
+                    <span className="fc-text-subtle mb-1">
+                      of {leaderboard.length} participants
+                    </span>
+                  </div>
+                  <div className="fc-glass-soft fc-text-success px-4 py-3 rounded-xl inline-flex items-center gap-2 text-sm font-semibold">
+                    <span>{userEntry.total_score ?? 0} points</span>
+                  </div>
                 </div>
-                <div className="fc-glass-soft fc-text-success px-4 py-3 rounded-xl inline-flex items-center gap-2 text-sm font-semibold">
-                  <span>{userEntry.total_score ?? 0} points</span>
+                <div className="fc-glass-soft p-6 rounded-2xl border border-[color:var(--fc-glass-border)] w-full sm:w-48 text-center">
+                  <span className="text-xs fc-text-subtle uppercase tracking-wider">
+                    Points
+                  </span>
+                  <p className="text-2xl font-bold font-mono fc-text-primary mt-1">
+                    {userEntry.total_score ?? 0}
+                  </p>
                 </div>
               </div>
-              <div className="fc-glass-soft p-6 rounded-2xl border border-[color:var(--fc-glass-border)] w-full sm:w-48 text-center">
-                <span className="text-xs fc-text-subtle uppercase tracking-wider">
-                  Points
-                </span>
-                <p className="text-2xl font-bold font-mono fc-text-primary mt-1">
-                  {userEntry.total_score ?? 0}
-                </p>
+            </GlassCard>
+          ) : (
+            <div className="rounded-xl border-y border-r border-white/10 border-l-4 border-l-[color:var(--fc-accent-blue)] bg-white/[0.04] p-4">
+              <p className="text-xs font-bold uppercase tracking-widest fc-text-workouts mb-3">
+                Your performance
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 snap-x snap-mandatory">
+                <div className="min-w-[calc(50%-0.25rem)] shrink-0 snap-start rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                    Rank
+                  </p>
+                  <p className="text-2xl font-bold font-mono fc-text-primary">
+                    #{userEntry.final_rank ?? leaderboard.indexOf(userEntry) + 1}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    of {leaderboard.length} participants
+                  </p>
+                </div>
+                <div className="min-w-[calc(50%-0.25rem)] shrink-0 snap-start rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                    Points
+                  </p>
+                  <p className="text-2xl font-bold font-mono fc-text-primary">
+                    {userEntry.total_score ?? 0}
+                  </p>
+                  <p className="text-xs text-emerald-400/90 mt-1 font-medium">
+                    Total score
+                  </p>
+                </div>
               </div>
             </div>
-          </GlassCard>
+          )
         ) : null;
       })()}
 
@@ -252,7 +347,7 @@ export function ChallengeDetailPageBody({
           challenge.status === "active";
         if (!canSubmit) return null;
         return (
-          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
+          <DetailSection legacy={isLegacy} legacyClassName="p-6 rounded-2xl">
             <h2 className="text-xl font-semibold fc-text-primary mb-4 flex items-center gap-2">
               <Video className="w-5 h-5" />
               Submit proof
@@ -267,7 +362,12 @@ export function ChallengeDetailPageBody({
                 return (
                   <div
                     key={cat.id}
-                    className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]"
+                    className={cn(
+                      "flex flex-wrap items-center justify-between gap-2 p-4 rounded-xl",
+                      isLegacy
+                        ? "bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]"
+                        : "border border-white/10 bg-white/[0.04]"
+                    )}
                   >
                     <div>
                       <p className="font-semibold fc-text-primary">
@@ -317,36 +417,58 @@ export function ChallengeDetailPageBody({
                 );
               })}
             </div>
-          </GlassCard>
+          </DetailSection>
         );
       })()}
 
       {challenge.description && (
-        <GlassCard
-          elevation={2}
-          className="fc-card-shell overflow-hidden"
-        >
-          <details className="group">
-            <summary className="flex justify-between items-center p-6 cursor-pointer list-none hover:bg-[color:var(--fc-glass-highlight)] transition-colors">
-              <div className="flex items-center gap-3">
-                <ScrollText className="w-6 h-6 fc-text-subtle" />
-                <h3 className="text-xl font-semibold fc-text-primary">
-                  Rules & info
-                </h3>
+        isLegacy ? (
+          <GlassCard elevation={2} className="fc-card-shell overflow-hidden">
+            <details className="group">
+              <summary className="flex justify-between items-center p-6 cursor-pointer list-none hover:bg-[color:var(--fc-glass-highlight)] transition-colors">
+                <div className="flex items-center gap-3">
+                  <ScrollText className="w-6 h-6 fc-text-subtle" />
+                  <h3 className="text-xl font-semibold fc-text-primary">
+                    Rules & info
+                  </h3>
+                </div>
+                <ChevronDown className="w-5 h-5 fc-text-subtle group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-6 pb-6 pt-2 border-t border-[color:var(--fc-glass-border)]">
+                <p className="fc-text-dim text-sm leading-relaxed">
+                  {challenge.description}
+                </p>
+                <p className="text-xs fc-text-subtle mt-4 italic">
+                  {new Date(challenge.start_date).toLocaleDateString()} –{" "}
+                  {new Date(challenge.end_date).toLocaleDateString()}
+                </p>
               </div>
-              <ChevronDown className="w-5 h-5 fc-text-subtle group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="px-6 pb-6 pt-2 border-t border-[color:var(--fc-glass-border)]">
-              <p className="fc-text-dim text-sm leading-relaxed">
-                {challenge.description}
-              </p>
-              <p className="text-xs fc-text-subtle mt-4 italic">
-                {new Date(challenge.start_date).toLocaleDateString()} –{" "}
-                {new Date(challenge.end_date).toLocaleDateString()}
-              </p>
-            </div>
-          </details>
-        </GlassCard>
+            </details>
+          </GlassCard>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
+            <details className="group">
+              <summary className="flex justify-between items-center p-4 cursor-pointer list-none hover:bg-white/[0.06] transition-colors">
+                <div className="flex items-center gap-3">
+                  <ScrollText className="w-6 h-6 fc-text-subtle" />
+                  <h3 className="text-base font-semibold text-white tracking-tight">
+                    Rules & info
+                  </h3>
+                </div>
+                <ChevronDown className="w-5 h-5 fc-text-subtle group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 pt-2 border-t border-white/10">
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  {challenge.description}
+                </p>
+                <p className="text-xs text-gray-500 mt-4 italic">
+                  {new Date(challenge.start_date).toLocaleDateString()} –{" "}
+                  {new Date(challenge.end_date).toLocaleDateString()}
+                </p>
+              </div>
+            </details>
+          </div>
+        )
       )}
 
       {challenge.status === "active" && (() => {
@@ -365,7 +487,7 @@ export function ChallengeDetailPageBody({
         const isEndingSoon = daysLeft <= 3;
 
         return (
-          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
+          <DetailSection legacy={isLegacy} legacyClassName="p-6 rounded-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase tracking-widest fc-text-dim flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
@@ -417,35 +539,161 @@ export function ChallengeDetailPageBody({
                 </span>
               )}
             </div>
-          </GlassCard>
+          </DetailSection>
         );
       })()}
 
       <section>
-        <h2 className="text-xl font-semibold fc-text-primary mb-6 flex items-center gap-3">
-          <Trophy className="w-6 h-6 fc-text-workouts" />
-          Leaderboard
-        </h2>
-        <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
+        <div
+          className={cn(
+            "mb-3 flex flex-col gap-1",
+            isLegacy && "mb-6"
+          )}
+        >
+          <h2
+            className={cn(
+              "flex items-center gap-2 font-semibold text-white tracking-tight",
+              isLegacy
+                ? "text-xl fc-text-primary mb-0"
+                : "text-base"
+            )}
+          >
+            <Trophy
+              className={cn(
+                "fc-text-workouts shrink-0",
+                isLegacy ? "w-6 h-6" : "w-5 h-5"
+              )}
+            />
+            Leaderboard
+          </h2>
           {leaderboard.length > 0 && (
-            <p className="text-sm fc-text-subtle mb-4">
+            <p
+              className={cn(
+                "text-xs text-gray-500",
+                isLegacy && "text-sm fc-text-subtle"
+              )}
+            >
               {leaderboard.length} participants
             </p>
           )}
-          {leaderboard.length === 0 ? (
-            <div className="text-center py-12">
-              <Trophy className="w-16 h-16 mx-auto mb-4 text-[color:var(--fc-text-subtle)]" />
-              <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                No participants yet
-              </p>
-              <p className="text-sm mt-2 text-[color:var(--fc-text-dim)]">
-                Be the first to join.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {challenge.status === "completed" && leaderboard.length >= 3 && (
-                <div className="flex items-end justify-center gap-3 mb-4 py-4">
+        </div>
+        {isLegacy ? (
+          <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
+            {leaderboard.length === 0 ? (
+              <div className="text-center py-12">
+                <Trophy className="w-16 h-16 mx-auto mb-4 text-[color:var(--fc-text-subtle)]" />
+                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                  No participants yet
+                </p>
+                <p className="text-sm mt-2 text-[color:var(--fc-text-dim)]">
+                  Be the first to join.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {challenge.status === "completed" && leaderboard.length >= 3 && (
+                  <div className="flex items-end justify-center gap-3 mb-4 py-4">
+                    {[1, 0, 2].map((podiumIdx) => {
+                      const entry = leaderboard[podiumIdx];
+                      if (!entry) return null;
+                      const heights = ["h-20", "h-16", "h-12"];
+                      const badges = ["🥇", "🥈", "🥉"];
+                      return (
+                        <div
+                          key={entry.id}
+                          className="flex flex-col items-center gap-1 flex-1 max-w-[100px]"
+                        >
+                          <span className="text-xl">{badges[podiumIdx]}</span>
+                          <p className="text-xs font-semibold fc-text-primary truncate w-full text-center">
+                            {entry.display_name ?? "Participant"}
+                          </p>
+                          <p className="text-xs font-mono font-bold text-[color:var(--fc-accent-cyan)]">
+                            {entry.total_score} pts
+                          </p>
+                          <div
+                            className={cn(
+                              "w-full rounded-t-xl border-t-2 border-amber-400 bg-gradient-to-t from-amber-500/10 to-transparent",
+                              heights[podiumIdx]
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {leaderboard.map((entry, index) => {
+                  const rank = entry.final_rank || index + 1;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={cn(
+                        "fc-glass-soft fc-card p-4 transition-all",
+                        entry.client_id === userId
+                          ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
+                          : "border border-[color:var(--fc-glass-border)]"
+                      )}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={cn(
+                            "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0",
+                            rank === 1
+                              ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
+                              : rank === 2
+                                ? "bg-gradient-to-br from-slate-300 to-slate-500 text-white"
+                                : rank === 3
+                                  ? "bg-gradient-to-br from-amber-700 to-orange-900 text-white"
+                                  : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                          )}
+                        >
+                          {rank}
+                        </div>
+
+                        <div className="flex-1">
+                          <p className="font-semibold text-[color:var(--fc-text-primary)]">
+                            {entry.display_name ?? `Participant ${index + 1}`}
+                            {entry.client_id === userId && (
+                              <span className="text-xs ml-2 text-[color:var(--fc-accent-cyan)]">
+                                (You)
+                              </span>
+                            )}
+                          </p>
+                          {entry.selected_track && (
+                            <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                              {entry.selected_track === "fat_loss"
+                                ? "Fat Loss Track"
+                                : "Muscle Gain Track"}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
+                            {entry.total_score}
+                          </p>
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                            points
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </GlassCard>
+        ) : leaderboard.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center py-10">
+            <Trophy className="w-12 h-12 mx-auto mb-3 text-gray-500" />
+            <p className="text-base font-semibold text-white">No participants yet</p>
+            <p className="text-xs text-gray-500 mt-2">Be the first to join.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {challenge.status === "completed" && leaderboard.length >= 3 && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-2">
+                <div className="flex items-end justify-center gap-3 py-2">
                   {[1, 0, 2].map((podiumIdx) => {
                     const entry = leaderboard[podiumIdx];
                     if (!entry) return null;
@@ -473,20 +721,20 @@ export function ChallengeDetailPageBody({
                     );
                   })}
                 </div>
-              )}
+              </div>
+            )}
 
-              {leaderboard.map((entry, index) => {
-                const rank = entry.final_rank || index + 1;
-                return (
-                  <div
-                    key={entry.id}
-                    className={cn(
-                      "fc-glass-soft fc-card p-4 transition-all",
-                      entry.client_id === userId
-                        ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
-                        : "border border-[color:var(--fc-glass-border)]"
-                    )}
-                  >
+            {leaderboard.map((entry, index) => {
+              const rank = entry.final_rank || index + 1;
+              return (
+                <div
+                  key={entry.id}
+                  className={cn(
+                    "rounded-xl border border-white/10 bg-white/[0.04] p-4 transition-all",
+                    entry.client_id === userId &&
+                      "border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
+                  )}
+                >
                     <div className="flex items-center gap-4">
                       <div
                         className={cn(
@@ -534,8 +782,7 @@ export function ChallengeDetailPageBody({
                 );
               })}
             </div>
-          )}
-        </GlassCard>
+        )}
       </section>
 
       <Dialog

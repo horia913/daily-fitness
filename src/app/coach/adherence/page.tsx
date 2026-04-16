@@ -6,8 +6,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { Button } from '@/components/ui/button'
-import { Filter, Download } from 'lucide-react'
+import { Filter } from 'lucide-react'
 import OptimizedAdherenceTracking from '@/components/coach/OptimizedAdherenceTracking'
 import AnalyticsNav from '@/components/coach/AnalyticsNav'
 
@@ -33,16 +32,6 @@ export default function CoachAdherencePage() {
                     Track client follow-through and identify at-risk clients
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filter
-                </Button>
-                <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
               </div>
             </header>
 

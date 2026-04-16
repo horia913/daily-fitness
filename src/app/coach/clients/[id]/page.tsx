@@ -10,6 +10,7 @@ import CoachClientDailyReview, {
   type NutritionCardJson,
   type ProgramCardJson,
   type TodayWorkoutJson,
+  type WeeklyReviewJson,
 } from "@/components/coach/client-views/CoachClientDailyReview";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
 
@@ -18,22 +19,14 @@ type ClientOverviewData = {
   name: string;
   email: string;
   attention: { level: AttentionLevel; reasons: string[] };
-  weeklyProgress: { current: number; goal: number };
   trainedToday: boolean;
   todayWorkout: TodayWorkoutJson;
   nextScheduledWorkout: NextScheduledJson;
   latestCheckIn: LatestCheckInJson;
-  weekWorkoutDots: boolean[];
   program: ProgramCardJson;
   nutrition: NutritionCardJson;
+  weeklyReview: WeeklyReviewJson;
 };
-
-function normalizeDots(raw: unknown): boolean[] {
-  if (!Array.isArray(raw) || raw.length !== 7) {
-    return [false, false, false, false, false, false, false];
-  }
-  return raw.map((x) => Boolean(x));
-}
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -56,12 +49,10 @@ export default function ClientDetailPage() {
           level: "good" as AttentionLevel,
           reasons: [],
         },
-        weeklyProgress: json.weeklyProgress ?? { current: 0, goal: 0 },
         trainedToday: json.trainedToday === true,
         todayWorkout: json.todayWorkout ?? null,
         nextScheduledWorkout: json.nextScheduledWorkout ?? null,
         latestCheckIn: json.latestCheckIn ?? null,
-        weekWorkoutDots: normalizeDots(json.weekWorkoutDots),
         program: json.program ?? null,
         nutrition: json.nutrition
           ? {
@@ -70,6 +61,7 @@ export default function ClientDetailPage() {
               mealsLoggedToday: json.nutrition.mealsLoggedToday ?? 0,
             }
           : null,
+        weeklyReview: json.weeklyReview ?? null,
       };
     },
     [clientId]
@@ -82,7 +74,7 @@ export default function ClientDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-lg fc-page flex flex-col min-w-0 overflow-x-hidden">
+      <div className="mx-auto w-full max-w-6xl px-4 lg:px-8 fc-page flex flex-col min-w-0 overflow-x-hidden">
         <div className="animate-pulse space-y-4 py-2">
           <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
           {[1, 2, 3, 4, 5].map((i) => (
@@ -103,14 +95,13 @@ export default function ClientDetailPage() {
       name: "Client",
       email: "",
       attention: { level: "good" as AttentionLevel, reasons: [] },
-      weeklyProgress: { current: 0, goal: 0 },
       trainedToday: false,
       todayWorkout: null,
       nextScheduledWorkout: null,
       latestCheckIn: null,
-      weekWorkoutDots: normalizeDots(null),
       program: null,
       nutrition: null,
+      weeklyReview: null,
     } satisfies ClientOverviewData);
 
   return (
@@ -119,14 +110,13 @@ export default function ClientDetailPage() {
       name={c.name}
       email={c.email}
       attention={c.attention}
-      weeklyProgress={c.weeklyProgress}
       trainedToday={c.trainedToday}
       todayWorkout={c.todayWorkout}
       nextScheduledWorkout={c.nextScheduledWorkout}
       latestCheckIn={c.latestCheckIn}
-      weekWorkoutDots={c.weekWorkoutDots}
       program={c.program}
       nutrition={c.nutrition}
+      weeklyReview={c.weeklyReview}
     />
   );
 }

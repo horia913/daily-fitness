@@ -5,13 +5,14 @@
  * 
  * This service reads from:
  *   - program_assignments (active assignment)
- *   - program_schedule (ordered slots with day_number)
- *   - program_day_completions (the ledger — keyed by program_schedule_id)
- *   - program_progress (cache — derived from ledger)
+ *   - program_day_assignments (per-client canonical schedule snapshot)
+ *   - program_schedule (resolves program_schedule.id per snapshot row for legacy keys)
+ *   - workout_logs (completion — program_schedule_id + program_assignment_id, completed_at)
+ *   - program_progress (cache — derived from next-slot reads)
  * 
  * All other services and components MUST use this service for program state.
- * Do NOT read from program_assignment_progress, program_day_assignments.is_completed,
- * or program_workout_completions directly.
+ * Do NOT read from program_assignment_progress or program_workout_completions directly.
+ * Schedule reads use program_day_assignments (not program_day_assignments.is_completed).
  * 
  * All week/day numbers are 1-based.
  */
@@ -34,6 +35,22 @@ export interface ProgramAssignment {
   created_at: string
   progression_mode: 'auto' | 'coach_managed'
   coach_unlocked_week: number | null
+  /** B.1 — coach pause (CHECK: active | paused) */
+  pause_status?: 'active' | 'paused'
+  pause_reason?: string | null
+}
+
+/** Per-client snapshot row from program_day_assignments (canonical schedule reads). */
+export interface AssignmentScheduleSlot {
+  id: string
+  program_assignment_id: string
+  day_number: number
+  program_day: number
+  week_number: number
+  workout_template_id: string | null
+  name: string
+  is_customized: boolean
+  day_type: string
 }
 
 export interface ProgramScheduleSlot {
@@ -47,7 +64,7 @@ export interface ProgramScheduleSlot {
 }
 
 export interface CompletedSlot {
-  id: string               // program_day_completions.id
+  id: string               // workout_logs.id (first completion per program_schedule_id)
   program_assignment_id: string
   program_schedule_id: string
   completed_at: string
@@ -89,7 +106,7 @@ export async function getActiveProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -114,7 +131,7 @@ export async function getRecentlyCompletedProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'completed')
     .order('created_at', { ascending: false })
@@ -178,51 +195,204 @@ export async function getProgramSlots(
 }
 
 /**
- * Get completed slots from the ledger (program_day_completions).
- * Joins program_schedule to include week_number, day_number, template_id.
+ * Per-client schedule snapshot from program_day_assignments.
+ * week_number is derived: ceil(day_number / 7) (same as floor((day_number-1)/7)+1 for day_number >= 1).
+ */
+export async function getAssignmentSchedule(
+  supabase: SupabaseClient,
+  assignmentId: string
+): Promise<AssignmentScheduleSlot[]> {
+  const { data, error } = await supabase
+    .from('program_day_assignments')
+    .select(
+      'id, program_assignment_id, day_number, program_day, workout_template_id, name, is_customized, day_type'
+    )
+    .eq('program_assignment_id', assignmentId)
+    .order('day_number', { ascending: true })
+
+  if (error) {
+    console.error('[programStateService] getAssignmentSchedule:', error)
+    return []
+  }
+
+  if (!data?.length) {
+    console.log('[assignment-schedule] 0 slots loaded for assignment', assignmentId)
+    return []
+  }
+
+  const rows: AssignmentScheduleSlot[] = data.map((row: any) => {
+    const dayNum = Number(row.day_number) || 1
+    const weekNum = Math.max(1, Math.ceil(dayNum / 7))
+    const programDayRaw = row.program_day
+    const programDay =
+      typeof programDayRaw === 'number' && programDayRaw >= 1 && programDayRaw <= 7
+        ? programDayRaw
+        : Math.max(1, Math.min(7, dayNum - (weekNum - 1) * 7))
+
+    return {
+      id: row.id,
+      program_assignment_id: row.program_assignment_id,
+      day_number: dayNum,
+      program_day: programDay,
+      week_number: weekNum,
+      workout_template_id: row.workout_template_id ?? null,
+      name: typeof row.name === 'string' ? row.name : '',
+      is_customized: Boolean(row.is_customized),
+      day_type: typeof row.day_type === 'string' ? row.day_type : 'workout',
+    }
+  })
+
+  console.log('[assignment-schedule]', rows.length, 'slots loaded for assignment', assignmentId)
+  return rows
+}
+
+function scheduleLookupKey(weekNumber: number, dayWithinWeek: number): string {
+  return `${weekNumber}:${dayWithinWeek}`
+}
+
+/**
+ * Canonical assignment-scoped slots as ProgramScheduleSlot[] (program_schedule.id, week/day, template).
+ * Joins snapshot to program_schedule via (program_id, week_number, day_number 1..7).
+ */
+export async function getProgramScheduleSlotsForAssignment(
+  supabase: SupabaseClient,
+  programId: string,
+  assignmentId: string
+): Promise<ProgramScheduleSlot[]> {
+  const [snapshots, scheduleResult] = await Promise.all([
+    getAssignmentSchedule(supabase, assignmentId),
+    supabase
+      .from('program_schedule')
+      .select('id, program_id, week_number, day_number, day_of_week, template_id, is_optional')
+      .eq('program_id', programId),
+  ])
+
+  if (snapshots.length === 0) {
+    console.warn(
+      '[assignment-schedule] No program_day_assignments for assignment',
+      assignmentId,
+      '— falling back to program_schedule'
+    )
+    return getProgramSlots(supabase, programId)
+  }
+
+  const { data: psRows, error: psErr } = scheduleResult
+  if (psErr) {
+    console.error('[programStateService] getProgramScheduleSlotsForAssignment program_schedule:', psErr)
+    return []
+  }
+
+  const lookup = new Map<string, {
+    id: string
+    program_id: string
+    week_number: number
+    day_number: number
+    day_of_week: number
+    template_id: string
+    is_optional?: boolean
+  }>()
+  for (const ps of psRows ?? []) {
+    const w = Number(ps.week_number) || 1
+    const d = Number(ps.day_number) || (typeof ps.day_of_week === 'number' ? ps.day_of_week + 1 : 1)
+    lookup.set(scheduleLookupKey(w, d), ps)
+  }
+
+  return snapshots.map((snap) => {
+    const ps = lookup.get(scheduleLookupKey(snap.week_number, snap.program_day))
+    const templateFromSnapshot = snap.workout_template_id
+    const templateFromMaster = ps?.template_id ?? ''
+    const templateId =
+      templateFromSnapshot && templateFromSnapshot.length > 0
+        ? templateFromSnapshot
+        : templateFromMaster
+
+    if (!ps) {
+      console.warn(
+        '[assignment-schedule] No program_schedule row for week',
+        snap.week_number,
+        'program_day',
+        snap.program_day,
+        'assignment',
+        assignmentId
+      )
+    }
+
+    const id = ps?.id ?? snap.id
+    const dayOfWeek =
+      typeof ps?.day_of_week === 'number' ? ps.day_of_week : Math.max(0, Math.min(6, snap.program_day - 1))
+
+    return {
+      id,
+      program_id: programId,
+      week_number: snap.week_number,
+      day_number: snap.program_day,
+      day_of_week: dayOfWeek,
+      template_id: templateId || templateFromMaster || '',
+      is_optional: ps?.is_optional ?? false,
+    }
+  })
+}
+
+/**
+ * Completed program slots from workout_logs (canonical), joined to program_schedule for indices.
  */
 export async function getCompletedSlots(
   supabase: SupabaseClient,
   programAssignmentId: string
 ): Promise<CompletedSlot[]> {
-  const { data, error } = await supabase
-    .from('program_day_completions')
-    .select(`
-      id,
-      program_assignment_id,
-      program_schedule_id,
-      completed_at,
-      completed_by,
-      notes,
-      program_schedule!inner (
-        week_number,
-        day_number,
-        day_of_week,
-        template_id
-      )
-    `)
+  const { data: logs, error } = await supabase
+    .from('workout_logs')
+    .select('id, program_schedule_id, completed_at')
     .eq('program_assignment_id', programAssignmentId)
+    .not('completed_at', 'is', null)
+    .not('program_schedule_id', 'is', null)
     .order('completed_at', { ascending: true })
 
   if (error) {
-    console.error('[programStateService] Error fetching completed slots:', error)
+    console.error('[programStateService] getCompletedSlots (workout_logs):', error)
     return []
   }
 
-  if (!data || data.length === 0) return []
+  if (!logs?.length) return []
 
-  // Flatten joined data
-  return data.map((row: any) => ({
-    id: row.id,
-    program_assignment_id: row.program_assignment_id,
-    program_schedule_id: row.program_schedule_id,
-    completed_at: row.completed_at,
-    completed_by: row.completed_by,
-    notes: row.notes,
-    week_number: row.program_schedule?.week_number,
-    day_number: row.program_schedule?.day_number ?? (row.program_schedule?.day_of_week + 1),
-    template_id: row.program_schedule?.template_id,
-  }))
+  const firstBySchedule = new Map<string, { id: string; completed_at: string }>()
+  for (const row of logs as { id: string; program_schedule_id: string; completed_at: string }[]) {
+    const sid = row.program_schedule_id
+    if (!sid || firstBySchedule.has(sid)) continue
+    firstBySchedule.set(sid, { id: row.id, completed_at: row.completed_at })
+  }
+
+  const scheduleIds = [...firstBySchedule.keys()]
+  if (scheduleIds.length === 0) return []
+
+  const { data: psRows, error: psErr } = await supabase
+    .from('program_schedule')
+    .select('id, week_number, day_number, day_of_week, template_id')
+    .in('id', scheduleIds)
+
+  if (psErr) {
+    console.error('[programStateService] getCompletedSlots program_schedule:', psErr)
+    return []
+  }
+
+  const psById = new Map((psRows ?? []).map((r: any) => [r.id, r]))
+
+  return scheduleIds.map((sid) => {
+    const meta = firstBySchedule.get(sid)!
+    const ps = psById.get(sid) as any
+    const dayNum = ps?.day_number ?? (typeof ps?.day_of_week === 'number' ? ps.day_of_week + 1 : 1)
+    return {
+      id: meta.id,
+      program_assignment_id: programAssignmentId,
+      program_schedule_id: sid,
+      completed_at: meta.completed_at,
+      completed_by: '',
+      notes: null,
+      week_number: ps?.week_number ?? 1,
+      day_number: dayNum,
+      template_id: ps?.template_id ?? '',
+    }
+  })
 }
 
 /**
@@ -253,7 +423,7 @@ export async function getNextSlot(
 
   // Get all slots and completed slot IDs in parallel
   const [slots, completedSlots] = await Promise.all([
-    getProgramSlots(supabase, resolvedProgramId),
+    getProgramScheduleSlotsForAssignment(supabase, resolvedProgramId, programAssignmentId),
     getCompletedSlots(supabase, programAssignmentId),
   ])
 
@@ -294,7 +464,7 @@ export async function getProgramState(
 
   // 2. Get slots and completions in parallel
   const [slots, completedSlots] = await Promise.all([
-    getProgramSlots(supabase, assignment.program_id),
+    getProgramScheduleSlotsForAssignment(supabase, assignment.program_id, assignment.id),
     getCompletedSlots(supabase, assignment.id),
   ])
 
@@ -507,4 +677,47 @@ export function assertWeekUnlocked(
     err.unlockedWeekMax = unlockedWeekMax
     throw err
   }
+}
+
+// ============================================================================
+// CLIENT TIMEZONE + PROGRAM LENGTH (pause / calendar helpers)
+// ============================================================================
+
+/**
+ * Client IANA timezone for calendar-day math (`profiles.timezone`, else UTC).
+ * Used by coach pause/resume and B.2 sanity tooling.
+ */
+export async function getClientIanaTimezone(
+  supabase: SupabaseClient,
+  clientId: string
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', clientId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[programStateService] getClientIanaTimezone:', error)
+  }
+
+  const raw = data?.timezone
+  const t = typeof raw === 'string' ? raw.trim() : ''
+  return t.length > 0 ? t : 'UTC'
+}
+
+/**
+ * Structural program length in weeks: max `week_number` on `program_schedule` (min 1).
+ */
+export async function getTotalWeeksForProgram(
+  supabase: SupabaseClient,
+  programId: string
+): Promise<number> {
+  const slots = await getProgramSlots(supabase, programId)
+  if (slots.length === 0) return 1
+  let max = 1
+  for (const s of slots) {
+    if (s.week_number > max) max = s.week_number
+  }
+  return max
 }

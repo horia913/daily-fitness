@@ -87,9 +87,9 @@ export default function MePage() {
         <AnimatedBackground>
           <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
             {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold fc-text-primary mb-2">Me</h1>
-              <div className="flex items-center gap-4">
+            <div className="mb-4">
+              <h1 className="text-xl font-bold fc-text-primary mb-4">Me</h1>
+              <div className="flex items-center gap-3">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-[color:var(--fc-accent-cyan)] flex items-center justify-center">
                   {avatarUrl ? (
                     <img

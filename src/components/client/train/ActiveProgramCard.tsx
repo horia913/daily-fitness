@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ClientGlassCard } from "@/components/client-ui";
-import { Play, Loader2, Dumbbell, ChevronRight } from "lucide-react";
+import { Play, Loader2, Dumbbell, ChevronRight, PauseCircle } from "lucide-react";
 import { ProgramWeekState, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
@@ -47,7 +47,7 @@ export function ActiveProgramCard({
   startingScheduleId,
   exerciseCounts,
 }: ActiveProgramCardProps) {
-  const { programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay } = programWeek;
+  const { programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay, pauseStatus, pauseReason } = programWeek;
 
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
   const cachedProgramIdRef = useRef<string | null>(null);
@@ -55,7 +55,7 @@ export function ActiveProgramCard({
   const inFlightProgramIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!programId) return;
+    if (pauseStatus === "paused" || !programId) return;
     if (cachedProgramIdRef.current === programId && cachedBlocksRef.current) {
       setTrainingBlocks(cachedBlocksRef.current);
       return;
@@ -73,7 +73,31 @@ export function ActiveProgramCard({
         setTrainingBlocks(blocks);
       }
     });
-  }, [programId]);
+  }, [programId, pauseStatus]);
+
+  if (pauseStatus === "paused") {
+    return (
+      <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+        <div className="flex items-start gap-3">
+          <PauseCircle className="h-5 w-5 shrink-0 text-amber-400" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-300/70">
+              PROGRAM PAUSED
+            </p>
+            <p className="mt-2 text-sm text-white">
+              Your coach has paused your program
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              Training will resume when your coach unpauses
+            </p>
+            {pauseReason ? (
+              <p className="mt-2 text-xs italic text-gray-400">&ldquo;{pauseReason}&rdquo;</p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const blockInfo = trainingBlocks.length > 0
     ? getCurrentBlock(trainingBlocks, currentUnlockedWeek)
@@ -103,9 +127,23 @@ export function ActiveProgramCard({
     <ClientGlassCard
       className="p-6 mb-6 border border-[color:var(--fc-glass-border)] shadow-[0_0_20px_rgba(6,182,212,0.1)]"
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h2 className="text-xl font-bold fc-text-primary">Active program</h2>
+          {programId ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = `/client/programs/${programId}/details`;
+              }}
+              className="inline-flex shrink-0 items-center gap-0.5 text-xs text-cyan-400 hover:text-cyan-300"
+            >
+              View outline
+              <ChevronRight className="h-3 w-3" aria-hidden />
+            </button>
+          ) : null}
+        </div>
         <div className="flex-1">
-          <h2 className="text-xl font-bold fc-text-primary mb-1">Active program</h2>
           {blockInfo && (
             <div className="flex items-center gap-2 mb-1">
               <span

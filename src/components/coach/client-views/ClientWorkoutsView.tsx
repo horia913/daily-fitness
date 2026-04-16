@@ -1017,10 +1017,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
                   {activeProgramSummary.durationWeeks != null &&
                     activeProgramSummary.durationWeeks > 0 &&
                     ` of ${activeProgramSummary.durationWeeks}`}
-                  <span className="mx-2 opacity-40">·</span>
-                  {activeProgramSummary.progressionMode === 'coach_managed'
-                    ? 'Coach-managed'
-                    : 'Automatic progression'}
                 </p>
               </div>
             </div>
@@ -1101,16 +1097,14 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              {activeProgramSummary.progressionMode === 'coach_managed' && (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="fc-btn fc-btn-primary"
-                  onClick={() => setReviewModalOpen(true)}
-                >
-                  Review week
-                </Button>
-              )}
+              <Button
+                type="button"
+                size="sm"
+                className="fc-btn fc-btn-secondary"
+                onClick={() => setReviewModalOpen(true)}
+              >
+                Review week
+              </Button>
               <Button
                 type="button"
                 size="sm"

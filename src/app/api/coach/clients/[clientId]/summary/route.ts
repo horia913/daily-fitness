@@ -19,7 +19,10 @@ import {
 } from '@/lib/coachClientSummaryServer';
 import {
   normalizeClientTimezone,
+  addCalendarDaysYmd,
+  diffCalendarDaysYmd,
   zonedCalendarDateString,
+  zonedYmdFromIsoTimestamp,
   zonedDayInclusiveUtcBounds,
   mondayYmdOfZonedWeekContaining,
 } from '@/lib/clientZonedCalendar';
@@ -39,6 +42,97 @@ async function assertCoachHasClient(
   if (error) throw new Error('Failed to verify client access');
   if (!data) throw new Error('Forbidden - Client not found or access denied');
   return { status: data.status ?? null };
+}
+
+type WeeklyReviewBucket = {
+  weekStart: string;
+  weekEnd: string;
+  workouts: {
+    completed: number;
+    planned: number;
+    workoutIds: string[];
+  };
+  volume: {
+    totalKg: number;
+  };
+  prs: {
+    count: number;
+    items: Array<{
+      exerciseId: string | null;
+      exerciseName: string | null;
+      weight: number | null;
+      reps: number | null;
+      achievedDate: string;
+    }>;
+  };
+  checkIns: {
+    daily: {
+      submitted: number;
+      total: 7;
+      avgMood: number | null;
+      avgEnergy: number | null;
+      avgSleep: number | null;
+      avgStress: number | null;
+    };
+    scheduled: {
+      submitted: boolean;
+      submittedDate: string | null;
+    };
+  };
+  bodyMetrics: {
+    weight: number | null;
+    bodyFat: number | null;
+  };
+};
+
+function averageOrNull(values: Array<number | null | undefined>): number | null {
+  const nums = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (nums.length === 0) return null;
+  const avg = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+  return Math.round(avg * 10) / 10;
+}
+
+function bucketByIsoRange(
+  iso: string,
+  current: { startIso: string; endIso: string },
+  previous: { startIso: string; endIso: string }
+): 'current' | 'previous' | null {
+  if (iso >= current.startIso && iso <= current.endIso) return 'current';
+  if (iso >= previous.startIso && iso <= previous.endIso) return 'previous';
+  return null;
+}
+
+function bucketByYmdRange(
+  ymd: string,
+  current: { start: string; end: string },
+  previous: { start: string; end: string }
+): 'current' | 'previous' | null {
+  if (ymd >= current.start && ymd <= current.end) return 'current';
+  if (ymd >= previous.start && ymd <= previous.end) return 'previous';
+  return null;
+}
+
+function computeProgramWeekForCalendarYmd(args: {
+  assignmentStartDate: string | null;
+  pauseAccumulatedDays: number | null | undefined;
+  pauseStatus: string | null | undefined;
+  pausedAt: string | null | undefined;
+  targetYmd: string;
+  clientTimezone: string;
+}): number {
+  const startRaw = typeof args.assignmentStartDate === 'string' ? args.assignmentStartDate.trim() : '';
+  const startYmd = startRaw.length >= 10 ? startRaw.slice(0, 10) : startRaw;
+  if (!startYmd) return 1;
+  const pauseAccum = Math.max(0, Number(args.pauseAccumulatedDays) || 0);
+  const effectiveStartYmd = addCalendarDaysYmd(startYmd, pauseAccum);
+  const pausedYmd =
+    args.pauseStatus === 'paused' && args.pausedAt
+      ? zonedYmdFromIsoTimestamp(args.pausedAt, args.clientTimezone)
+      : null;
+  const effectiveTargetYmd =
+    pausedYmd && args.targetYmd > pausedYmd ? pausedYmd : args.targetYmd;
+  const elapsed = Math.max(0, diffCalendarDaysYmd(effectiveStartYmd, effectiveTargetYmd));
+  return Math.floor(elapsed / 7) + 1;
 }
 
 export async function GET(
@@ -79,6 +173,14 @@ export async function GET(
       clientTz
     );
     const weekStartStr = mondayYmdOfZonedWeekContaining(now, clientTz);
+    const currentWeekStart = weekStartStr;
+    const currentWeekEnd = addCalendarDaysYmd(currentWeekStart, 6);
+    const previousWeekStart = addCalendarDaysYmd(currentWeekStart, -7);
+    const previousWeekEnd = addCalendarDaysYmd(currentWeekStart, -1);
+    const currentWeekIso = zonedDayInclusiveUtcBounds(currentWeekStart, clientTz);
+    const currentWeekEndIso = zonedDayInclusiveUtcBounds(currentWeekEnd, clientTz);
+    const previousWeekIso = zonedDayInclusiveUtcBounds(previousWeekStart, clientTz);
+    const previousWeekEndIso = zonedDayInclusiveUtcBounds(previousWeekEnd, clientTz);
 
     const [
       workoutCounters,
@@ -96,7 +198,7 @@ export async function GET(
       getClientMetrics([clientId], supabaseAdmin),
       supabaseAdmin
         .from('program_assignments')
-        .select('id, program_id, name, duration_weeks, progression_mode, coach_unlocked_week')
+        .select('id, program_id, name, duration_weeks, progression_mode, coach_unlocked_week, start_date, pause_status, paused_at, pause_accumulated_days')
         .eq('client_id', clientId)
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
@@ -225,9 +327,13 @@ export async function GET(
       id: string;
       program_id: string;
       name: string | null;
+      start_date?: string | null;
       duration_weeks: number | null;
       progression_mode?: string | null;
       coach_unlocked_week?: number | null;
+      pause_status?: string | null;
+      paused_at?: string | null;
+      pause_accumulated_days?: number | null;
     } | null;
 
     let programCard: {
@@ -286,6 +392,10 @@ export async function GET(
       nextScheduledWorkout,
       latestCheckIn,
       weekWorkoutDots,
+      workoutsTwoWeeksRes,
+      prsTwoWeeksRes,
+      wellnessTwoWeeksRes,
+      bodyMetricsTwoWeeksRes,
     ] = await Promise.all([
       trainedTodayZoned
         ? buildTodayWorkoutSummary(supabaseAdmin, clientId, todayStart, todayEnd)
@@ -295,7 +405,229 @@ export async function GET(
         : Promise.resolve(null),
       buildLatestCheckIn(supabaseAdmin, clientId),
       buildWeekWorkoutDots(supabaseAdmin, clientId, clientTz),
+      supabaseAdmin
+        .from('workout_logs')
+        .select('id, completed_at')
+        .eq('client_id', clientId)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', previousWeekIso.startIso)
+        .lte('completed_at', currentWeekEndIso.endIso),
+      supabaseAdmin
+        .from('personal_records')
+        .select('exercise_id, record_type, record_value, achieved_date, exercises(name)')
+        .eq('client_id', clientId)
+        .gte('achieved_date', previousWeekStart)
+        .lte('achieved_date', currentWeekEnd),
+      supabaseAdmin
+        .from('daily_wellness_logs')
+        .select('log_date, mood_rating, energy_level, sleep_quality, stress_level')
+        .eq('client_id', clientId)
+        .gte('log_date', previousWeekStart)
+        .lte('log_date', currentWeekEnd),
+      supabaseAdmin
+        .from('body_metrics')
+        .select('measured_date, weight_kg, body_fat_percentage')
+        .eq('client_id', clientId)
+        .gte('measured_date', previousWeekStart)
+        .lte('measured_date', currentWeekEnd)
+        .order('measured_date', { ascending: false }),
     ]);
+
+    let plannedCurrentWeek = 0;
+    let plannedPreviousWeek = 0;
+    if (pa?.program_id) {
+      const currentProgramWeek = computeProgramWeekForCalendarYmd({
+        assignmentStartDate: pa.start_date ?? null,
+        pauseAccumulatedDays: pa.pause_accumulated_days ?? 0,
+        pauseStatus: pa.pause_status ?? null,
+        pausedAt: pa.paused_at ?? null,
+        targetYmd: currentWeekStart,
+        clientTimezone: clientTz,
+      });
+      const previousProgramWeek = computeProgramWeekForCalendarYmd({
+        assignmentStartDate: pa.start_date ?? null,
+        pauseAccumulatedDays: pa.pause_accumulated_days ?? 0,
+        pauseStatus: pa.pause_status ?? null,
+        pausedAt: pa.paused_at ?? null,
+        targetYmd: previousWeekStart,
+        clientTimezone: clientTz,
+      });
+      const weekNumbers = [...new Set([currentProgramWeek, previousProgramWeek])];
+      const scheduleRes = await supabaseAdmin
+        .from('program_schedule')
+        .select('week_number')
+        .eq('program_id', pa.program_id)
+        .in('week_number', weekNumbers);
+      const scheduleRows = (scheduleRes.data ?? []) as Array<{ week_number: number }>;
+      for (const row of scheduleRows) {
+        if (row.week_number === currentProgramWeek) plannedCurrentWeek += 1;
+        if (row.week_number === previousProgramWeek) plannedPreviousWeek += 1;
+      }
+    }
+
+    const workoutRows = (workoutsTwoWeeksRes.data ?? []) as Array<{ id: string; completed_at: string }>;
+    const currentWorkoutIds: string[] = [];
+    const previousWorkoutIds: string[] = [];
+    for (const row of workoutRows) {
+      const bucket = bucketByIsoRange(
+        row.completed_at,
+        { startIso: currentWeekIso.startIso, endIso: currentWeekEndIso.endIso },
+        { startIso: previousWeekIso.startIso, endIso: previousWeekEndIso.endIso }
+      );
+      if (bucket === 'current') currentWorkoutIds.push(row.id);
+      if (bucket === 'previous') previousWorkoutIds.push(row.id);
+    }
+
+    const allWorkoutIds = [...new Set([...currentWorkoutIds, ...previousWorkoutIds])];
+    const setRowsRes = allWorkoutIds.length
+      ? await supabaseAdmin
+          .from('workout_set_logs')
+          .select('workout_log_id, weight, reps')
+          .eq('client_id', clientId)
+          .in('workout_log_id', allWorkoutIds)
+      : { data: [] };
+    const logBucketMap = new Map<string, 'current' | 'previous'>();
+    for (const id of currentWorkoutIds) logBucketMap.set(id, 'current');
+    for (const id of previousWorkoutIds) logBucketMap.set(id, 'previous');
+    let currentVolume = 0;
+    let previousVolume = 0;
+    for (const row of (setRowsRes.data ?? []) as Array<{ workout_log_id: string; weight: number | null; reps: number | null }>) {
+      const bucket = logBucketMap.get(row.workout_log_id);
+      if (!bucket) continue;
+      const volume = (Number(row.weight) || 0) * (Number(row.reps) || 0);
+      if (bucket === 'current') currentVolume += volume;
+      if (bucket === 'previous') previousVolume += volume;
+    }
+
+    const currentPrItems: WeeklyReviewBucket['prs']['items'] = [];
+    const previousPrItems: WeeklyReviewBucket['prs']['items'] = [];
+    for (const row of (prsTwoWeeksRes.data ?? []) as Array<{
+      exercise_id: string | null;
+      record_type: string;
+      record_value: number;
+      achieved_date: string;
+      exercises?: { name?: string | null } | Array<{ name?: string | null }> | null;
+    }>) {
+      const bucket = bucketByYmdRange(
+        row.achieved_date,
+        { start: currentWeekStart, end: currentWeekEnd },
+        { start: previousWeekStart, end: previousWeekEnd }
+      );
+      if (!bucket) continue;
+      const exerciseName = Array.isArray(row.exercises)
+        ? row.exercises[0]?.name ?? null
+        : row.exercises?.name ?? null;
+      const item = {
+        exerciseId: row.exercise_id ?? null,
+        exerciseName,
+        weight: row.record_type === 'weight' ? Number(row.record_value) : null,
+        reps: row.record_type === 'reps' ? Number(row.record_value) : null,
+        achievedDate: row.achieved_date,
+      };
+      if (bucket === 'current') currentPrItems.push(item);
+      if (bucket === 'previous') previousPrItems.push(item);
+    }
+
+    const currentWellness: Array<{ mood_rating: number | null; energy_level: number | null; sleep_quality: number | null; stress_level: number | null }> = [];
+    const previousWellness: Array<{ mood_rating: number | null; energy_level: number | null; sleep_quality: number | null; stress_level: number | null }> = [];
+    for (const row of (wellnessTwoWeeksRes.data ?? []) as Array<{
+      log_date: string;
+      mood_rating: number | null;
+      energy_level: number | null;
+      sleep_quality: number | null;
+      stress_level: number | null;
+    }>) {
+      const bucket = bucketByYmdRange(
+        row.log_date,
+        { start: currentWeekStart, end: currentWeekEnd },
+        { start: previousWeekStart, end: previousWeekEnd }
+      );
+      if (!bucket) continue;
+      if (bucket === 'current') currentWellness.push(row);
+      if (bucket === 'previous') previousWellness.push(row);
+    }
+
+    const currentBodyRows: Array<{ measured_date: string; weight_kg: number | null; body_fat_percentage: number | null }> = [];
+    const previousBodyRows: Array<{ measured_date: string; weight_kg: number | null; body_fat_percentage: number | null }> = [];
+    for (const row of (bodyMetricsTwoWeeksRes.data ?? []) as Array<{
+      measured_date: string;
+      weight_kg: number | null;
+      body_fat_percentage: number | null;
+    }>) {
+      const bucket = bucketByYmdRange(
+        row.measured_date,
+        { start: currentWeekStart, end: currentWeekEnd },
+        { start: previousWeekStart, end: previousWeekEnd }
+      );
+      if (!bucket) continue;
+      if (bucket === 'current') currentBodyRows.push(row);
+      if (bucket === 'previous') previousBodyRows.push(row);
+    }
+
+    const latestBodyFor = (rows: Array<{ measured_date: string; weight_kg: number | null; body_fat_percentage: number | null }>) =>
+      rows.slice().sort((a, b) => b.measured_date.localeCompare(a.measured_date))[0] ?? null;
+    const latestCurrentBody = latestBodyFor(currentBodyRows);
+    const latestPreviousBody = latestBodyFor(previousBodyRows);
+
+    const currentWeekReview: WeeklyReviewBucket = {
+      weekStart: currentWeekStart,
+      weekEnd: currentWeekEnd,
+      workouts: {
+        completed: currentWorkoutIds.length,
+        planned: plannedCurrentWeek,
+        workoutIds: currentWorkoutIds,
+      },
+      volume: { totalKg: Math.round(currentVolume * 100) / 100 },
+      prs: { count: currentPrItems.length, items: currentPrItems },
+      checkIns: {
+        daily: {
+          submitted: currentWellness.length,
+          total: 7,
+          avgMood: averageOrNull(currentWellness.map((r) => r.mood_rating)),
+          avgEnergy: averageOrNull(currentWellness.map((r) => r.energy_level)),
+          avgSleep: averageOrNull(currentWellness.map((r) => r.sleep_quality)),
+          avgStress: averageOrNull(currentWellness.map((r) => r.stress_level)),
+        },
+        scheduled: {
+          submitted: currentBodyRows.length > 0,
+          submittedDate: latestCurrentBody?.measured_date ?? null,
+        },
+      },
+      bodyMetrics: {
+        weight: latestCurrentBody?.weight_kg ?? null,
+        bodyFat: latestCurrentBody?.body_fat_percentage ?? null,
+      },
+    };
+
+    const previousWeekReview: WeeklyReviewBucket = {
+      weekStart: previousWeekStart,
+      weekEnd: previousWeekEnd,
+      workouts: {
+        completed: previousWorkoutIds.length,
+        planned: plannedPreviousWeek,
+        workoutIds: previousWorkoutIds,
+      },
+      volume: { totalKg: Math.round(previousVolume * 100) / 100 },
+      prs: { count: previousPrItems.length, items: previousPrItems },
+      checkIns: {
+        daily: {
+          submitted: previousWellness.length,
+          total: 7,
+          avgMood: averageOrNull(previousWellness.map((r) => r.mood_rating)),
+          avgEnergy: averageOrNull(previousWellness.map((r) => r.energy_level)),
+          avgSleep: averageOrNull(previousWellness.map((r) => r.sleep_quality)),
+          avgStress: averageOrNull(previousWellness.map((r) => r.stress_level)),
+        },
+        scheduled: {
+          submitted: previousBodyRows.length > 0,
+          submittedDate: latestPreviousBody?.measured_date ?? null,
+        },
+      },
+      bodyMetrics: {
+        weight: latestPreviousBody?.weight_kg ?? null,
+        bodyFat: latestPreviousBody?.body_fat_percentage ?? null,
+      },
+    };
 
     let nutritionCard: {
       assignmentId: string;
@@ -420,6 +752,13 @@ export async function GET(
       subscription: {
         expiringSoon: subExpiring,
         endDate: subEnd,
+      },
+      weeklyReview: {
+        clientId,
+        clientTimezone: clientTz,
+        hasActiveAssignment: Boolean(pa),
+        currentWeek: currentWeekReview,
+        previousWeek: previousWeekReview,
       },
     });
   } catch (error: unknown) {

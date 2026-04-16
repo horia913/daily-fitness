@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Search, Grid3x3, List, UserPlus, Users, Flame, Dumbbell, ClipboardCheck, Clock, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { type ClientMetrics } from "@/lib/coachDashboardService";
-import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import {
   computeClientAttention,
   attentionCardSurfaceStyle,
@@ -55,13 +54,6 @@ function ClientManagementContent() {
   const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const loadingRef = useRef(false);
   const didLoadRef = useRef(false);
-  const [reviewModal, setReviewModal] = useState<{
-    isOpen: boolean;
-    assignmentId: string;
-    programId: string;
-    weekNumber: number;
-    clientName: string;
-  }>({ isOpen: false, assignmentId: '', programId: '', weekNumber: 0, clientName: '' });
 
   const loadClients = useCallback(async (signal?: AbortSignal) => {
     if (!user) return;
@@ -495,35 +487,6 @@ function ClientManagementContent() {
                           </div>
                         )}
 
-                        {client.metrics.weekReviewNeeded && client.metrics.completedWeekNumber != null && (
-                          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 truncate">
-                                  Week {client.metrics.completedWeekNumber} review needed
-                                </span>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setReviewModal({
-                                    isOpen: true,
-                                    assignmentId: client.metrics.activeProgramAssignmentId ?? '',
-                                    programId: client.metrics.activeProgramId ?? '',
-                                    weekNumber: client.metrics.completedWeekNumber!,
-                                    clientName: client.name,
-                                  });
-                                }}
-                                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-colors shrink-0"
-                              >
-                                Review
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
                         {sameActivityAndCheckin ? (
                           <div className="mb-3 text-xs">
                             <div className="text-sm font-medium" style={{ color: relative.color }}>
@@ -762,19 +725,6 @@ function ClientManagementContent() {
         </main>
       </div>
 
-      <WeekReviewModal
-        isOpen={reviewModal.isOpen}
-        onClose={() => setReviewModal(prev => ({ ...prev, isOpen: false }))}
-        onComplete={() => {
-          didLoadRef.current = false;
-          loadingRef.current = false;
-          loadClients();
-        }}
-        programAssignmentId={reviewModal.assignmentId}
-        programId={reviewModal.programId}
-        weekNumber={reviewModal.weekNumber}
-        clientName={reviewModal.clientName}
-      />
     </AnimatedBackground>
   );
 }

@@ -20,6 +20,7 @@ import {
   type Intensity,
   type LogActivityInput,
   type ClientActivity,
+  toLocalDateString,
 } from "@/lib/clientActivityService";
 import { cn } from "@/lib/utils";
 
@@ -42,8 +43,8 @@ export function LogActivityModal({
   const [distanceKm, setDistanceKm] = useState("");
   const [intensity, setIntensity] = useState<Intensity>("moderate");
   const [notes, setNotes] = useState("");
-  const [activityDate, setActivityDate] = useState(
-    new Date().toISOString().split("T")[0]
+  const [activityDate, setActivityDate] = useState(() =>
+    toLocalDateString(new Date())
   );
   const [saving, setSaving] = useState(false);
 
@@ -72,7 +73,7 @@ export function LogActivityModal({
     setDistanceKm("");
     setIntensity("moderate");
     setNotes("");
-    setActivityDate(new Date().toISOString().split("T")[0]);
+    setActivityDate(toLocalDateString(new Date()));
   };
 
   const isValid =
@@ -266,7 +267,7 @@ export function LogActivityModal({
               type="date"
               value={activityDate}
               onChange={(e) => setActivityDate(e.target.value)}
-              max={new Date().toISOString().split("T")[0]}
+              max={toLocalDateString(new Date())}
               className="fc-surface border-[color:var(--fc-glass-border)] fc-text-primary h-10 text-sm"
             />
           </div>

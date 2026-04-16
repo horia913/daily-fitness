@@ -19,6 +19,7 @@ import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
 import { ActivityWeekSummary } from "@/components/client/activity/ActivityWeekSummary";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
+import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import {
   getActivitiesByDateRange,
   getCurrentWeekBounds,
@@ -38,7 +39,7 @@ import {
   type PreviewDayStatus,
 } from "@/components/client/train/WorkoutDayPreview";
 import { useToast } from "@/components/ui/toast-provider";
-import { Dumbbell, Clock, MessageSquare, X } from "lucide-react";
+import { Dumbbell, Check, MessageSquare, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
 import {
@@ -139,6 +140,7 @@ export default function TrainPage() {
     null,
   );
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
+  const [addGoalOpen, setAddGoalOpen] = useState(false);
 
   // Extra activities state
   const [weekActivities, setWeekActivities] = useState<ClientActivity[]>([]);
@@ -176,7 +178,7 @@ export default function TrainPage() {
 
     const data = (rpcData ?? null) as TrainPageRpcResponse | null;
     const programWeek = data
-      ? rpcResponseToProgramWeekState(data, todayWeekday)
+      ? await rpcResponseToProgramWeekState(supabase, data, todayWeekday)
       : null;
     const extraFromRpc: TrainPageRpcExtraWorkoutRow[] = Array.isArray(data?.extraWorkouts)
       ? data.extraWorkouts
@@ -185,6 +187,9 @@ export default function TrainPage() {
     const extraWorkouts = buildExtraWorkoutsFromRpc(extraFromRpc, exerciseCounts);
 
     const templateIdSet = new Set<string>();
+    for (const d of programWeek?.days ?? []) {
+      if (d.templateId) templateIdSet.add(d.templateId);
+    }
     for (const s of data?.schedule ?? []) {
       if (s.template_id) templateIdSet.add(s.template_id);
     }
@@ -247,7 +252,7 @@ export default function TrainPage() {
   const prefetchedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!programWeek?.days?.length) return;
+    if (programWeek?.pauseStatus === "paused" || !programWeek?.days?.length) return;
     const templateIds = [
       ...new Set(programWeek.days.map((d) => d.templateId).filter(Boolean)),
     ];
@@ -267,13 +272,14 @@ export default function TrainPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [programWeek?.days]);
+  }, [programWeek?.days, programWeek?.pauseStatus]);
 
   // Default selected day to today or first day when program first loads (do not override user selection)
   React.useEffect(() => {
     if (
       !programWeek?.hasProgram ||
       programWeek.isCompleted ||
+      programWeek.pauseStatus === "paused" ||
       !programWeek.days?.length
     )
       return;
@@ -288,6 +294,7 @@ export default function TrainPage() {
     programWeek?.days?.length,
     programWeek?.todaySlot?.scheduleId,
     programWeek?.days?.[0]?.scheduleId,
+    programWeek?.pauseStatus,
   ]);
 
   const handleStartWorkout = async (scheduleId: string) => {
@@ -437,142 +444,154 @@ export default function TrainPage() {
                     exerciseCounts={exerciseCounts}
                   />
 
-                  {/* Coach Feedback Card (dismissible, coach_managed mode) */}
-                  {programWeek.coachFeedback && !feedbackDismissed && (
-                    <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-domain-workouts)] py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <MessageSquare className="w-5 h-5 mt-0.5 shrink-0 fc-text-workouts" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-1">Coach feedback</p>
-                            <p className="text-sm fc-text-primary leading-relaxed">{programWeek.coachFeedback.notes}</p>
-                          </div>
-                        </div>
+                  {programWeek.pauseStatus !== "paused" && (
+                    <>
+                      <div className="mb-4 -mt-2">
                         <button
-                          onClick={() => {
-                            setFeedbackDismissed(true);
-                            try {
-                              const key = `coach_feedback_dismissed_${programWeek.programAssignmentId}_${programWeek.currentWeekNumber}`;
-                              localStorage.setItem(key, '1');
-                            } catch {}
-                          }}
-                          className="shrink-0 p-1 rounded-lg fc-text-dim hover:fc-text-primary transition-colors"
-                          aria-label="Dismiss"
+                          type="button"
+                          onClick={() => setAddGoalOpen(true)}
+                          className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
                         >
-                          <X className="w-4 h-4" />
+                          Set a training goal
                         </button>
                       </div>
-                    </div>
-                  )}
 
-                  {/* Waiting for Coach Review (coach_managed mode, week complete) */}
-                  {programWeek.isWeekCompleteAwaitingReview && (
-                    <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-status-warning)] py-4 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-[color:var(--fc-status-warning)]/15 flex items-center justify-center">
-                          <Clock className="w-6 h-6 text-[color:var(--fc-status-warning)]" />
+                      {/* Coach note (coach_managed); not a gate for week unlock */}
+                      {programWeek.coachFeedback && !feedbackDismissed && (
+                        <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-domain-workouts)] py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <MessageSquare className="w-5 h-5 mt-0.5 shrink-0 fc-text-workouts" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-1">Coach note</p>
+                                <p className="text-sm fc-text-primary leading-relaxed">{programWeek.coachFeedback.notes}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setFeedbackDismissed(true);
+                                try {
+                                  const key = `coach_feedback_dismissed_${programWeek.programAssignmentId}_${programWeek.currentWeekNumber}`;
+                                  localStorage.setItem(key, '1');
+                                } catch {}
+                              }}
+                              className="shrink-0 p-1 rounded-lg fc-text-dim hover:fc-text-primary transition-colors"
+                              aria-label="Dismiss"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold fc-text-primary mb-1">
-                            All workouts this week completed!
-                          </p>
-                          <p className="text-sm fc-text-dim leading-relaxed">
-                            Waiting for your coach to review Week {programWeek.currentWeekNumber} and advance you to Week {programWeek.currentWeekNumber + 1}.
-                          </p>
+                      )}
+
+                      {/* Week finished — next week follows your program calendar */}
+                      {programWeek.isWeekCompleteAwaitingReview && (
+                        <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-cyan-500/60 py-4 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/15">
+                              <Check className="h-6 w-6 text-cyan-400" aria-hidden />
+                            </div>
+                            <div>
+                              <p className="mb-1 font-semibold fc-text-primary">
+                                All workouts this week completed!
+                              </p>
+                              <p className="text-sm leading-relaxed fc-text-dim">
+                                Next week unlocks on your calendar when it begins.
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
+                      )}
 
-                  {/* Section 3: Week Overview Strip */}
-                  <WeekStrip
-                    days={programWeek.days}
-                    todaySlot={programWeek.todaySlot}
-                    todayWeekday={todayWeekday}
-                    onDaySelect={handleDaySelect}
-                    selectedScheduleId={
-                      selectedDay?.scheduleId ??
-                      selectedOverdueSlot?.scheduleId ??
-                      null
-                    }
-                    selectedRestWeekday={selectedRestWeekday}
-                  />
+                      <WeekStrip
+                        days={programWeek.days}
+                        todaySlot={programWeek.todaySlot}
+                        todayWeekday={todayWeekday}
+                        onDaySelect={handleDaySelect}
+                        selectedScheduleId={
+                          selectedDay?.scheduleId ??
+                          selectedOverdueSlot?.scheduleId ??
+                          null
+                        }
+                        selectedRestWeekday={selectedRestWeekday}
+                      />
 
-                  <OverdueWorkouts
-                    overdueSlots={programWeek.overdueSlots}
-                    onOpenPreview={handleOpenOverduePreview}
-                    onComplete={handleStartWorkout}
-                    isStarting={isStarting}
-                    startingScheduleId={startingScheduleId}
-                  />
+                      <OverdueWorkouts
+                        overdueSlots={programWeek.overdueSlots}
+                        onOpenPreview={handleOpenOverduePreview}
+                        onComplete={handleStartWorkout}
+                        isStarting={isStarting}
+                        startingScheduleId={startingScheduleId}
+                      />
 
-                  {/* Workout Day Preview */}
-                  {(selectedDay ||
-                    selectedOverdueSlot !== null ||
-                    selectedRestWeekday !== null) && (
-                    <div className="mb-6" data-workout-preview>
-                      {selectedOverdueSlot ? (
-                        <WorkoutDayPreview
-                          key={selectedOverdueSlot.scheduleId}
-                          day={null}
-                          status="missed"
-                          templateId={selectedOverdueSlot.templateId}
-                          workoutName={selectedOverdueSlot.workoutName}
-                          dayLabel={selectedOverdueSlot.dayLabel}
-                          estimatedDuration={
-                            selectedOverdueSlot.estimatedDuration
-                          }
-                          scheduleId={selectedOverdueSlot.scheduleId}
-                          onStartWorkout={handleStartWorkout}
-                          onClose={handleClosePreview}
-                          isStarting={isStarting}
-                          startingScheduleId={startingScheduleId}
-                          clientId={user?.id}
-                          blocks={prefetchedBlocks.get(selectedOverdueSlot.templateId) ?? undefined}
-                          exerciseCount={
-                            exerciseCounts.get(selectedOverdueSlot.templateId) ??
-                            undefined
-                          }
-                        />
-                      ) : selectedRestWeekday !== null ? (
-                        <WorkoutDayPreview
-                          key={`rest-${selectedRestWeekday}`}
-                          day={null}
-                          status="rest"
-                          templateId={null}
-                          workoutName=""
-                          dayLabel={`${WEEKDAY_NAMES[selectedRestWeekday]} — Rest`}
-                          estimatedDuration={0}
-                          scheduleId={null}
-                          onStartWorkout={handleStartWorkout}
-                          onClose={handleClosePreview}
-                          isStarting={isStarting}
-                          startingScheduleId={startingScheduleId}
-                          clientId={user?.id}
-                        />
-                      ) : selectedDay ? (
-                        <WorkoutDayPreview
-                          key={selectedDay.scheduleId}
-                          day={selectedDay}
-                          status={getDayStatus(selectedDay, todayWeekday)}
-                          templateId={selectedDay.templateId}
-                          workoutName={selectedDay.workoutName}
-                          dayLabel={`Day ${selectedDay.dayNumber} — ${WEEKDAY_NAMES[selectedDay.dayOfWeek]}`}
-                          estimatedDuration={selectedDay.estimatedDuration}
-                          scheduleId={selectedDay.scheduleId}
-                          onStartWorkout={handleStartWorkout}
-                          onClose={handleClosePreview}
-                          isStarting={isStarting}
-                          startingScheduleId={startingScheduleId}
-                          clientId={user?.id}
-                          blocks={prefetchedBlocks.get(selectedDay.templateId) ?? undefined}
-                          exerciseCount={
-                            exerciseCounts.get(selectedDay.templateId) ??
-                            undefined
-                          }
-                        />
-                      ) : null}
-                    </div>
+                      {(selectedDay ||
+                        selectedOverdueSlot !== null ||
+                        selectedRestWeekday !== null) && (
+                        <div className="mb-6" data-workout-preview>
+                          {selectedOverdueSlot ? (
+                            <WorkoutDayPreview
+                              key={selectedOverdueSlot.scheduleId}
+                              day={null}
+                              status="missed"
+                              templateId={selectedOverdueSlot.templateId}
+                              workoutName={selectedOverdueSlot.workoutName}
+                              dayLabel={selectedOverdueSlot.dayLabel}
+                              estimatedDuration={
+                                selectedOverdueSlot.estimatedDuration
+                              }
+                              scheduleId={selectedOverdueSlot.scheduleId}
+                              onStartWorkout={handleStartWorkout}
+                              onClose={handleClosePreview}
+                              isStarting={isStarting}
+                              startingScheduleId={startingScheduleId}
+                              clientId={user?.id}
+                              blocks={prefetchedBlocks.get(selectedOverdueSlot.templateId) ?? undefined}
+                              exerciseCount={
+                                exerciseCounts.get(selectedOverdueSlot.templateId) ??
+                                undefined
+                              }
+                            />
+                          ) : selectedRestWeekday !== null ? (
+                            <WorkoutDayPreview
+                              key={`rest-${selectedRestWeekday}`}
+                              day={null}
+                              status="rest"
+                              templateId={null}
+                              workoutName=""
+                              dayLabel={`${WEEKDAY_NAMES[selectedRestWeekday]} — Rest`}
+                              estimatedDuration={0}
+                              scheduleId={null}
+                              onStartWorkout={handleStartWorkout}
+                              onClose={handleClosePreview}
+                              isStarting={isStarting}
+                              startingScheduleId={startingScheduleId}
+                              clientId={user?.id}
+                            />
+                          ) : selectedDay ? (
+                            <WorkoutDayPreview
+                              key={selectedDay.scheduleId}
+                              day={selectedDay}
+                              status={getDayStatus(selectedDay, todayWeekday)}
+                              templateId={selectedDay.templateId}
+                              workoutName={selectedDay.workoutName}
+                              dayLabel={`Day ${selectedDay.dayNumber} — ${WEEKDAY_NAMES[selectedDay.dayOfWeek]}`}
+                              estimatedDuration={selectedDay.estimatedDuration}
+                              scheduleId={selectedDay.scheduleId}
+                              onStartWorkout={handleStartWorkout}
+                              onClose={handleClosePreview}
+                              isStarting={isStarting}
+                              startingScheduleId={startingScheduleId}
+                              clientId={user?.id}
+                              blocks={prefetchedBlocks.get(selectedDay.templateId) ?? undefined}
+                              exerciseCount={
+                                exerciseCounts.get(selectedDay.templateId) ??
+                                undefined
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      )}
+                    </>
                   )}
 
                 </>
@@ -593,7 +612,10 @@ export default function TrainPage() {
                 />
               )}
 
-              {!loading && programWeek?.hasProgram && !programWeek.isCompleted && (
+              {!loading &&
+                programWeek?.hasProgram &&
+                !programWeek.isCompleted &&
+                programWeek.pauseStatus !== "paused" && (
                 <ActivityWeekSummary
                   activities={weekActivities}
                   onQuickAdd={() => setShowActivityModal(true)}
@@ -608,6 +630,14 @@ export default function TrainPage() {
         isOpen={showActivityModal}
         onClose={() => setShowActivityModal(false)}
         onSave={handleLogActivity}
+      />
+      <AddGoalModal
+        open={addGoalOpen}
+        onClose={() => setAddGoalOpen(false)}
+        defaultPillar="training"
+        onSuccess={() => {
+          setAddGoalOpen(false);
+        }}
       />
     </ProtectedRoute>
   );
