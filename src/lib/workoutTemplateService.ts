@@ -1151,24 +1151,122 @@ export class WorkoutTemplateService {
     }
   }
 
-  static async updateProgram(programId: string, programData: Partial<Program>): Promise<Program | null> {
-    try {
-      const { data, error } = await supabase
-        .from('workout_programs')
-        .update({
-          ...programData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', programId)
-        .select()
-        .single()
+  /**
+   * Align training_blocks durations with workout_programs.duration_weeks.
+   * Shrinks from the last block in program order (delete whole tail blocks or shrink last).
+   */
+  static async reconcileBlocksToDuration(programId: string, targetDuration: number): Promise<void> {
+    for (;;) {
+      const { data: blocks, error: blocksError } = await supabase
+        .from('training_blocks')
+        .select('id, duration_weeks, block_order, created_at')
+        .eq('program_id', programId)
+        .order('block_order', { ascending: true })
+        .order('created_at', { ascending: true })
 
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error updating program:', error)
-      return null
+      if (blocksError) throw blocksError
+
+      if (!blocks || blocks.length === 0) {
+        const { error: insErr } = await supabase.from('training_blocks').insert({
+          program_id: programId,
+          name: 'Block 1',
+          goal: 'custom',
+          duration_weeks: targetDuration,
+          block_order: 1,
+        })
+        if (insErr) throw insErr
+        return
+      }
+
+      const currentSum = blocks.reduce((s, b) => s + Math.max(0, Number(b.duration_weeks) || 0), 0)
+
+      if (currentSum === targetDuration) return
+
+      if (currentSum < targetDuration) {
+        const last = blocks[blocks.length - 1]
+        const shortfall = targetDuration - currentSum
+        const { error: upErr } = await supabase
+          .from('training_blocks')
+          .update({
+            duration_weeks: last.duration_weeks + shortfall,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', last.id)
+        if (upErr) throw upErr
+        return
+      }
+
+      const remaining = currentSum - targetDuration
+      const last = blocks[blocks.length - 1]
+
+      if (blocks.length === 1) {
+        const { error: upErr } = await supabase
+          .from('training_blocks')
+          .update({
+            duration_weeks: Math.max(1, last.duration_weeks - remaining),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', last.id)
+        if (upErr) throw upErr
+        return
+      }
+
+      if (last.duration_weeks <= remaining) {
+        const { error: delErr } = await supabase.from('training_blocks').delete().eq('id', last.id)
+        if (delErr) throw delErr
+        continue
+      }
+
+      const { error: upErr } = await supabase
+        .from('training_blocks')
+        .update({
+          duration_weeks: last.duration_weeks - remaining,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', last.id)
+      if (upErr) throw upErr
+      return
     }
+  }
+
+  static async updateProgram(programId: string, programData: Partial<Program>): Promise<Program | null> {
+    const { data: currentProgram, error: curErr } = await supabase
+      .from('workout_programs')
+      .select('duration_weeks')
+      .eq('id', programId)
+      .single()
+
+    if (curErr) throw curErr
+
+    const oldDuration = currentProgram?.duration_weeks ?? null
+    const newDuration =
+      programData.duration_weeks !== undefined ? programData.duration_weeks : oldDuration
+
+    const { data, error } = await supabase
+      .from('workout_programs')
+      .update({
+        ...programData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', programId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    if (oldDuration !== null && newDuration !== null && newDuration !== oldDuration) {
+      await this.reconcileBlocksToDuration(programId, newDuration)
+
+      if (newDuration < oldDuration) {
+        const { error: rpcErr } = await supabase.rpc('cleanup_orphan_schedule', {
+          p_program_id: programId,
+          p_max_week: newDuration,
+        })
+        if (rpcErr) throw rpcErr
+      }
+    }
+
+    return data
   }
 
   static async deleteProgram(programId: string): Promise<boolean> {
@@ -1794,139 +1892,81 @@ export class WorkoutTemplateService {
     return successCount
   }
 
-  static async setProgramSchedule(
-    programId: string,
-    programDay: number,
-    weekNumber: number,
-    templateId: string,
-    isOptional: boolean = false,
-    notes?: string,
-    trainingBlockId?: string
-  ): Promise<ProgramSchedule | null> {
-    try {
-      // programDay is 1-based (Day 1-7), but DB uses day_of_week (0-based, 0-6)
-      // Validate programDay is between 1-7
-      if (programDay < 1 || programDay > 7) {
-        throw new Error(`Invalid program_day: ${programDay}. Must be between 1-7.`)
-      }
+  static async setProgramSchedule(args: {
+    programId: string
+    programDay: number
+    weekNumber: number
+    templateId: string
+    isOptional?: boolean
+  }): Promise<void> {
+    const { programId, programDay, weekNumber, templateId, isOptional = false } = args
 
-      const dayOfWeek = programDay - 1; // Convert to 0-based (1→0, 2→1, ..., 7→6)
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[setProgramSchedule] Saving slot:', {
-          programId,
-          programDay,
-          dayOfWeek,
-          weekNumber,
-          templateId,
-        })
-      }
-
-      // Manual upsert-style logic that respects existing schema and constraints.
-      // When trainingBlockId is provided, scope the lookup to that specific block so that
-      // multiple training blocks using different absolute week offsets don't collide.
-      let scheduleQuery = supabase
-        .from('program_schedule')
-        .select('*')
-        .eq('program_id', programId)
-        .eq('day_of_week', dayOfWeek)
-        .eq('week_number', weekNumber)
-
-      if (trainingBlockId) {
-        scheduleQuery = scheduleQuery.eq('training_block_id', trainingBlockId)
-      }
-
-      const { data: existing, error: selectError } = await scheduleQuery.maybeSingle()
-
-      if (selectError && selectError.code !== 'PGRST116') {
-        console.error('[setProgramSchedule] Error selecting existing schedule row:', selectError)
-        throw selectError
-      }
-
-      let row: any = existing
-
-      const wasInsert = !existing
-
-      if (row) {
-        const { data: updated, error: updateError } = await supabase
-          .from('program_schedule')
-          .update({
-            template_id: templateId,
-            is_optional: isOptional,
-            updated_at: new Date().toISOString(),
-            // Ensure training_block_id is stamped on update so migrated rows
-            // (which had it set via SQL UPDATE) stay correctly attributed
-            ...(trainingBlockId ? { training_block_id: trainingBlockId } : {}),
-          })
-          .eq('id', row.id)
-          .select('*')
-          .single()
-
-        if (updateError) {
-          console.error('[setProgramSchedule] Error updating program_schedule row:', updateError)
-          throw updateError
-        }
-
-        row = updated
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('program_schedule')
-          .insert({
-            program_id: programId,
-            day_number: programDay,
-            day_of_week: dayOfWeek,
-            week_number: weekNumber,
-            template_id: templateId,
-            is_optional: isOptional,
-            ...(trainingBlockId ? { training_block_id: trainingBlockId } : {}),
-          })
-          .select('*')
-          .single()
-
-        if (insertError) {
-          console.error('[setProgramSchedule] Error inserting program_schedule row:', insertError)
-          throw insertError
-        }
-
-        row = inserted
-      }
-
-      const effectiveTemplateId =
-        row.template_id != null && String(row.template_id).trim() !== ''
-          ? String(row.template_id)
-          : templateId
-      await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, effectiveTemplateId, {
-        ensureMissingRows: wasInsert,
-        templateNameHint: row.template_name ?? null,
-      })
-
-      // Progression rules are not generated during schedule save (avoids heavy block loads).
-      // Editors fall back to week-1 rules / template defaults when rules are missing.
-
-      // Map to ProgramSchedule interface, setting is_optional to false by default
-      return {
-        id: row.id,
-        program_id: row.program_id,
-        program_day: programDay, // Keep 1-based for interface (1-7)
-        week_number: weekNumber,
-        template_id: templateId,
-        training_block_id: row.training_block_id ?? null,
-        is_optional: false, // Default value since column doesn't exist in DB
-        is_active: true,
-        notes: row.notes || undefined,
-        created_at: row.created_at || new Date().toISOString(),
-        updated_at: row.updated_at || new Date().toISOString(),
-      } as ProgramSchedule
-    } catch (error: any) {
-      console.error('Error setting program schedule:', error)
-      console.error('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      })
-      return null
+    if (programDay < 1 || programDay > 7) {
+      throw new Error(`Invalid program_day: ${programDay}. Must be between 1-7.`)
     }
+
+    const dayOfWeek = programDay - 1
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[setProgramSchedule] Saving slot:', {
+        programId,
+        programDay,
+        dayOfWeek,
+        weekNumber,
+        templateId,
+      })
+    }
+
+    const { data: existing, error: selectError } = await supabase
+      .from('program_schedule')
+      .select('id')
+      .eq('program_id', programId)
+      .eq('day_of_week', dayOfWeek)
+      .eq('week_number', weekNumber)
+      .maybeSingle()
+
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('[setProgramSchedule] Error selecting existing schedule row:', selectError)
+      throw selectError
+    }
+
+    const wasInsert = !existing
+
+    const { data: row, error } = await supabase
+      .from('program_schedule')
+      .upsert(
+        {
+          program_id: programId,
+          day_of_week: dayOfWeek,
+          week_number: weekNumber,
+          day_number: programDay,
+          template_id: templateId,
+          is_optional: isOptional,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'program_id,day_of_week,week_number' },
+      )
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('[setProgramSchedule] upsert error:', error)
+      throw error
+    }
+
+    if (!row) {
+      throw new Error('setProgramSchedule: no row returned from upsert')
+    }
+
+    const effectiveTemplateId =
+      row.template_id != null && String(row.template_id).trim() !== ''
+        ? String(row.template_id)
+        : templateId
+
+    await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, effectiveTemplateId, {
+      ensureMissingRows: wasInsert,
+      templateNameHint: row.template_name ?? null,
+    })
   }
 
   static async removeProgramSchedule(programId: string, programDay: number, weekNumber: number): Promise<boolean> {

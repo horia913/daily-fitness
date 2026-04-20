@@ -564,16 +564,13 @@ function EditProgramContent() {
       }
       setSchedule(sched || []);
 
-      // Load training blocks; auto-create implicit block if none exist
+      // Load training blocks (DB trigger ensures at least one block per program).
       if (programId) {
-        let blocks = await TrainingBlockService.getTrainingBlocks(programId);
-        if (blocks.length === 0 && programData) {
-          const implicit = await TrainingBlockService.getOrCreateImplicitBlock(
-            programId,
-            programData.name,
-            programData.duration_weeks ?? 4,
+        const blocks = await TrainingBlockService.getTrainingBlocks(programId);
+        if (blocks.length === 0) {
+          console.error(
+            `[edit page] Program ${programId} has no blocks — DB trigger may have failed.`,
           );
-          blocks = implicit ? [implicit] : [];
         }
         setTrainingBlocks(blocks);
         if (blocks.length > 0) {
