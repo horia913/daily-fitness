@@ -55,6 +55,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ProgramProgressionService } from "@/lib/programProgressionService";
 import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
 import { useToast } from "@/components/ui/toast-provider";
+import { TrainingBlockService } from "@/lib/trainingBlockService";
+import type { TrainingBlock } from "@/types/trainingBlock";
 
 interface Program {
   id: string;
@@ -1199,21 +1201,6 @@ export default function EnhancedProgramManager({
                   console.log("🔧 Create result:", newProgram);
                   if (!newProgram) throw new Error("Failed to create program");
                   programId = newProgram.id;
-
-                  // Auto-create implicit training block for new programs
-                  try {
-                    const { TrainingBlockService } = await import("@/lib/trainingBlockService");
-                    await TrainingBlockService.createTrainingBlock({
-                      program_id: newProgram.id,
-                      name: `${finalProgramData.name} - Phase 1`,
-                      goal: "custom",
-                      duration_weeks: finalProgramData.duration_weeks ?? 4,
-                      block_order: 1,
-                      progression_profile: "none",
-                    });
-                  } catch (blockErr) {
-                    console.warn("Could not create implicit training block:", blockErr);
-                  }
                 }
 
                 // Save schedule using only columns that exist in DB (program_id, day_of_week, week_number, template_id)
@@ -2209,6 +2196,9 @@ function ProgramCreateForm({
   });
 
   const [schedule, setSchedule] = useState<ProgramSchedule[]>([]);
+  const [programTrainingBlocks, setProgramTrainingBlocks] = useState<
+    TrainingBlock[]
+  >([]);
   const [progressionRules, setProgressionRules] = useState<ProgressionRule[]>(
     []
   );
@@ -2289,6 +2279,21 @@ function ProgramCreateForm({
   const [activeTab, setActiveTab] = useState<
     "basic" | "schedule" | "progression"
   >("basic");
+
+  useEffect(() => {
+    const pid = program?.id;
+    if (!pid) {
+      setProgramTrainingBlocks([]);
+      return;
+    }
+    let cancelled = false;
+    TrainingBlockService.getTrainingBlocks(pid).then((blocks) => {
+      if (!cancelled) setProgramTrainingBlocks(blocks);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [program?.id]);
 
   const dayNames = [
     "Day 1",
@@ -3549,17 +3554,29 @@ function ProgramCreateForm({
                         programScheduleId={selectedScheduleForProgression.id || `temp-${selectedScheduleForProgression.template_id}-${selectedScheduleForProgression.program_day}`}
                         weekNumber={selectedWeek}
                         trainingBlockId={
-                          selectedScheduleForProgression.training_block_id ??
-                          undefined
+                          TrainingBlockService.getBlockForWeekFromBlocks(
+                            programTrainingBlocks,
+                            selectedScheduleForProgression.week_number ||
+                              selectedWeek,
+                          )?.id ?? undefined
                         }
                         blockSchedules={schedule
-                          .filter(
-                            (s) =>
+                          .filter((s) => {
+                            const anchor =
+                              TrainingBlockService.getBlockForWeekFromBlocks(
+                                programTrainingBlocks,
+                                selectedScheduleForProgression.week_number ||
+                                  selectedWeek,
+                              )?.id ?? null;
+                            return (
                               s.program_day ===
                                 selectedScheduleForProgression.program_day &&
-                              s.training_block_id ===
-                                selectedScheduleForProgression.training_block_id,
-                          )
+                              (TrainingBlockService.getBlockForWeekFromBlocks(
+                                programTrainingBlocks,
+                                s.week_number || 1,
+                              )?.id ?? null) === anchor
+                            );
+                          })
                           .map((s) => ({
                             id: s.id,
                             week_number: s.week_number,

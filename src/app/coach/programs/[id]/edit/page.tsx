@@ -106,16 +106,18 @@ function goalBarClassForGoal(goal?: string | null): string {
   return map[g] ?? "bg-gray-400/60";
 }
 
-/** Match schedule rows to the active training block; legacy rows with null training_block_id count when only one block exists */
+/** Match schedule rows to the active block using week ranges (program_schedule.training_block_id is not authoritative). */
 function scheduleRowMatchesActiveBlock(
-  s: { training_block_id?: string | null },
+  s: { week_number?: number },
   activeBlockId: string | null,
-  trainingBlockCount: number,
+  trainingBlocks: TrainingBlock[],
 ): boolean {
   if (!activeBlockId) return true;
-  if (s.training_block_id === activeBlockId) return true;
-  if (s.training_block_id == null && trainingBlockCount <= 1) return true;
-  return false;
+  const w = s.week_number ?? 1;
+  return (
+    TrainingBlockService.getBlockForWeekFromBlocks(trainingBlocks, w)?.id ===
+    activeBlockId
+  );
 }
 
 interface Program {
@@ -354,15 +356,20 @@ function EditProgramContent() {
   const scheduleMap = useMemo(() => {
     const map = new Map<string, ProgramSchedule>();
     for (const row of schedule) {
+      const blockForRow =
+        TrainingBlockService.getBlockForWeekFromBlocks(
+          trainingBlocks,
+          row.week_number || 1,
+        )?.id ?? null;
       const key = scheduleKey(
         row.week_number || 1,
         row.program_day,
-        row.training_block_id ?? null,
+        blockForRow,
       );
       map.set(key, row);
     }
     return map;
-  }, [schedule, scheduleKey]);
+  }, [schedule, scheduleKey, trainingBlocks]);
 
   const weeksWithAnyConfiguredRows = useMemo(() => {
     const set = new Set<number>();
@@ -400,11 +407,7 @@ function EditProgramContent() {
           .filter(
             (s) =>
               (s.week_number || 1) === absoluteSelectedWeek &&
-              scheduleRowMatchesActiveBlock(
-                s,
-                activeBlockId,
-                trainingBlocks.length,
-              ) &&
+              scheduleRowMatchesActiveBlock(s, activeBlockId, trainingBlocks) &&
               s.template_id &&
               s.template_id !== "rest",
           )
@@ -441,13 +444,7 @@ function EditProgramContent() {
     return () => {
       cancelled = true;
     };
-  }, [
-    programId,
-    schedule,
-    absoluteSelectedWeek,
-    activeBlockId,
-    trainingBlocks.length,
-  ]);
+  }, [programId, schedule, absoluteSelectedWeek, activeBlockId, trainingBlocks]);
 
   // Background chunk load for volume calculator (avoids one giant query over all templates)
   useEffect(() => {
@@ -650,28 +647,28 @@ function EditProgramContent() {
     if (!programId) return [];
     const blocks = await TrainingBlockService.getTrainingBlocks(programId);
     setTrainingBlocks(blocks);
-    // Auto-sync program duration_weeks to sum of block durations
-    const total = blocks.reduce((sum, b) => sum + b.duration_weeks, 0);
-    if (total > 0 && form) {
-      await WorkoutTemplateService.updateProgram(programId, { duration_weeks: total });
-      setForm((prev) => (prev ? { ...prev, duration_weeks: total } : prev));
-    }
     return blocks;
   };
 
   const handleUpdateBlock = async (blockId: string, updates: Partial<TrainingBlock>) => {
-    const updated = await TrainingBlockService.updateTrainingBlock(blockId, updates);
-    if (updated) {
+    try {
+      const updated = await TrainingBlockService.updateTrainingBlock(blockId, updates);
       setTrainingBlocks((prev) => prev.map((b) => (b.id === blockId ? updated : b)));
-      // Re-sync program duration when block duration changes
       if (updates.duration_weeks !== undefined && form) {
-        const newTotal = trainingBlocks.reduce(
-          (sum, b) => sum + (b.id === blockId ? (updates.duration_weeks as number) : b.duration_weeks),
-          0,
-        );
-        await WorkoutTemplateService.updateProgram(programId, { duration_weeks: newTotal });
-        setForm((prev) => (prev ? { ...prev, duration_weeks: newTotal } : prev));
+        const { data: prog } = await supabase
+          .from("workout_programs")
+          .select("duration_weeks")
+          .eq("id", programId)
+          .single();
+        if (prog?.duration_weeks != null) {
+          setForm((prev) =>
+            prev ? { ...prev, duration_weeks: prog.duration_weeks } : prev,
+          );
+        }
       }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not update training block.";
+      addToast({ title: msg, variant: "destructive" });
     }
   };
 
@@ -702,10 +699,12 @@ function EditProgramContent() {
     ) {
       return;
     }
-    const ok = await TrainingBlockService.deleteTrainingBlock(blockId);
-    if (!ok) {
+    try {
+      await TrainingBlockService.deleteTrainingBlock(blockId);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not delete training block.";
       addToast({
-        title: "Could not delete training block.",
+        title: msg,
         variant: "destructive",
       });
       return;
@@ -739,46 +738,29 @@ function EditProgramContent() {
             !(
               (s.week_number || 1) === absoluteSelectedWeek &&
               s.program_day === day &&
-              scheduleRowMatchesActiveBlock(
-                s,
-                activeBlockId,
-                trainingBlocks.length,
-              )
+              scheduleRowMatchesActiveBlock(s, activeBlockId, trainingBlocks)
             ),
         ),
       );
     } else {
-      const result = await WorkoutTemplateService.setProgramSchedule(
-        form.id,
-        day,
-        absoluteSelectedWeek,
-        v,
-        false,
-        undefined,
-        activeBlockId ?? undefined,
-      );
-      if (!result) {
+      try {
+        await WorkoutTemplateService.setProgramSchedule({
+          programId: form.id,
+          programDay: day,
+          weekNumber: absoluteSelectedWeek,
+          templateId: v,
+          isOptional: false,
+        });
+      } catch (e: unknown) {
+        const msg =
+          e instanceof Error
+            ? e.message
+            : "Failed to save schedule. Please check if you have permission to edit this program.";
         addToast({
-          title: "Failed to save schedule. Please check if you have permission to edit this program.",
+          title: msg,
           variant: "destructive",
         });
         return;
-      }
-
-      if (selectedWeek === 1) {
-        const { error: copyError } = await supabase.rpc("copy_week_schedule", {
-          p_program_id: form.id,
-          p_source_week: 1,
-          p_total_weeks: form.duration_weeks,
-        });
-        if (copyError) {
-          addToast({
-            title: `Could not copy week 1 to other weeks: ${copyError.message}`,
-            variant: "destructive",
-          });
-        } else {
-          await WorkoutTemplateService.propagateAllScheduleSlotsToSnapshots(form.id);
-        }
       }
 
       const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
@@ -826,45 +808,42 @@ function EditProgramContent() {
               !(
                 (row.week_number || 1) === scheduleEditor.week &&
                 row.program_day === scheduleEditor.day &&
-                (row.training_block_id ?? null) === (scheduleEditor.blockId ?? null)
+                (TrainingBlockService.getBlockForWeekFromBlocks(
+                  trainingBlocks,
+                  row.week_number || 1,
+                )?.id ?? null) === (scheduleEditor.blockId ?? null)
               ),
           ),
         );
       } else {
-        const result = await WorkoutTemplateService.setProgramSchedule(
-          form.id,
-          scheduleEditor.day,
-          scheduleEditor.week,
-          scheduleEditor.templateId,
-          scheduleEditor.isOptional,
-          undefined,
-          scheduleEditor.blockId ?? undefined,
-        );
-        if (!result) {
+        try {
+          await WorkoutTemplateService.setProgramSchedule({
+            programId: form.id,
+            programDay: scheduleEditor.day,
+            weekNumber: scheduleEditor.week,
+            templateId: scheduleEditor.templateId,
+            isOptional: scheduleEditor.isOptional,
+          });
+        } catch (e: unknown) {
+          const msg =
+            e instanceof Error
+              ? e.message
+              : "Failed to save schedule. Please check your permissions.";
           addToast({
-            title: "Failed to save schedule. Please check your permissions.",
+            title: msg,
             variant: "destructive",
           });
           return;
         }
 
-        setSchedule((prev) => {
-          const filtered = prev.filter(
-            (row) =>
-              !(
-                (row.week_number || 1) === scheduleEditor.week &&
-                row.program_day === scheduleEditor.day &&
-                (row.training_block_id ?? null) === (scheduleEditor.blockId ?? null)
-              ),
-          );
-          return [...filtered, result];
-        });
+        const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
+        setSchedule(sched || []);
       }
       setScheduleEditor(null);
     } finally {
       setScheduleCellSaving(false);
     }
-  }, [form?.id, scheduleEditor, addToast]);
+  }, [form?.id, scheduleEditor, addToast, trainingBlocks]);
 
   const handleCopyFromWeekOne = useCallback(async () => {
     if (!form?.id) return;
@@ -1482,11 +1461,7 @@ function EditProgramContent() {
               {schedule.filter(
                 (s) =>
                   (s.week_number || 1) === absoluteSelectedWeek &&
-                  scheduleRowMatchesActiveBlock(
-                    s,
-                    activeBlockId,
-                    trainingBlocks.length,
-                  ),
+                  scheduleRowMatchesActiveBlock(s, activeBlockId, trainingBlocks),
               ).length === 0 ? (
                 <GlassCard elevation={1} className="fc-card-shell py-10 text-center">
                   <p className="text-sm text-[color:var(--fc-text-dim)]">
@@ -1529,7 +1504,11 @@ function EditProgramContent() {
                       .filter(
                         (s) =>
                           (s.week_number || 1) === absoluteSelectedWeek &&
-                          (!activeBlockId || s.training_block_id === activeBlockId),
+                          scheduleRowMatchesActiveBlock(
+                            s,
+                            activeBlockId,
+                            trainingBlocks,
+                          ),
                       )
                       .map((scheduleItem) => {
                         const template = templates.find(
@@ -1569,19 +1548,32 @@ function EditProgramContent() {
                       isFirstWeekOfBlock={selectedWeek === 1}
                       trainingBlockId={
                         activeBlockId ??
-                        selectedScheduleForProgression.training_block_id ??
+                        TrainingBlockService.getBlockForWeekFromBlocks(
+                          trainingBlocks,
+                          selectedScheduleForProgression.week_number ||
+                            absoluteSelectedWeek,
+                        )?.id ??
                         undefined
                       }
                       exercises={availableExercisesList as any}
                       templates={templates}
                       blockSchedules={schedule
-                        .filter(
-                          (s) =>
+                        .filter((s) => {
+                          const anchor =
+                            TrainingBlockService.getBlockForWeekFromBlocks(
+                              trainingBlocks,
+                              selectedScheduleForProgression.week_number ||
+                                absoluteSelectedWeek,
+                            )?.id ?? null;
+                          return (
                             s.program_day ===
                               selectedScheduleForProgression.program_day &&
-                            s.training_block_id ===
-                              selectedScheduleForProgression.training_block_id,
-                        )
+                            (TrainingBlockService.getBlockForWeekFromBlocks(
+                              trainingBlocks,
+                              s.week_number || 1,
+                            )?.id ?? null) === anchor
+                          );
+                        })
                         .map((s) => ({ id: s.id, week_number: s.week_number }))}
                       onUpdate={() => {
                         load().catch(console.error);
@@ -1590,12 +1582,20 @@ function EditProgramContent() {
                         // Auto-navigate to Week 2 of the block so the coach immediately
                         // sees the generated values without having to click manually.
                         const week2AbsoluteWeek = absoluteSelectedWeek + 1;
+                        const anchor =
+                          TrainingBlockService.getBlockForWeekFromBlocks(
+                            trainingBlocks,
+                            selectedScheduleForProgression.week_number ||
+                              absoluteSelectedWeek,
+                          )?.id ?? null;
                         const week2Schedule = schedule.find(
                           (s) =>
                             s.program_day ===
                               selectedScheduleForProgression.program_day &&
-                            s.training_block_id ===
-                              selectedScheduleForProgression.training_block_id &&
+                            (TrainingBlockService.getBlockForWeekFromBlocks(
+                              trainingBlocks,
+                              s.week_number || 1,
+                            )?.id ?? null) === anchor &&
                             s.week_number === week2AbsoluteWeek,
                         );
                         if (week2Schedule) {

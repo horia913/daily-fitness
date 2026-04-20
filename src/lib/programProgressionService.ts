@@ -1416,6 +1416,10 @@ export class ProgramProgressionService {
    * REQUIREMENT 2 & 6: Get progression rules for a program and week
    * Auto-populates from Week 1 if data doesn't exist
    */
+  /**
+   * @param trainingBlockId Logical block for this week — derive from
+   * training_blocks + week_number in the UI; do not use program_schedule.training_block_id.
+   */
   static async getProgressionRules(
     programId: string,
     weekNumber: number,

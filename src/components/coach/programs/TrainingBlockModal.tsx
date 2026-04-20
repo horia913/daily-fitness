@@ -35,6 +35,7 @@ const GOAL_SUGGESTED_PROFILE: Record<TrainingBlockGoal, ProgressionProfile> = {
   custom: "none",
 };
 import { TrainingBlockService } from "@/lib/trainingBlockService";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface TrainingBlockModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export function TrainingBlockModal({
   onDelete,
   onClose,
 }: TrainingBlockModalProps) {
+  const { addToast } = useToast();
   const { isDark, getSemanticColor } = useTheme();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -122,7 +124,6 @@ export function TrainingBlockModal({
           goal,
           custom_goal_label: goal === "custom" ? customGoalLabel.trim() || undefined : undefined,
           duration_weeks: durationWeeks,
-          block_order: nextBlockOrder,
           progression_profile: progressionProfile,
           notes: notes.trim() || undefined,
         });
@@ -146,13 +147,18 @@ export function TrainingBlockModal({
     }
     setDeleting(true);
     try {
-      const ok = await TrainingBlockService.deleteTrainingBlock(block.id);
-      if (ok) {
-        onDelete?.(block.id);
-        onClose();
-      }
-    } catch (err) {
+      await TrainingBlockService.deleteTrainingBlock(block.id);
+      onDelete?.(block.id);
+      onClose();
+    } catch (err: unknown) {
       console.error("[TrainingBlockModal] Delete failed:", err);
+      const raw = err instanceof Error ? err.message : String(err);
+      const title =
+        raw.includes("Cannot delete the last block") ||
+        raw.includes("last block of a program")
+          ? raw
+          : raw || "Could not delete training block.";
+      addToast({ title, variant: "destructive" });
     } finally {
       setDeleting(false);
     }

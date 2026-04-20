@@ -47,9 +47,9 @@ interface ProgramProgressionRulesEditorProps {
    */
   onApplied?: () => void;
   /**
-   * All program_schedule entries that share the same program_day and training_block_id as
-   * the currently selected schedule. Passed from the parent (which already has the full
-   * schedule loaded) to avoid re-querying Supabase inside the Apply handler.
+   * All program_schedule entries for the same program_day and logical training block as
+   * the selection (parent filters rows by week-derived block id; schedule.training_block_id
+   * is not authoritative).
    */
   blockSchedules?: Array<{ id: string; week_number: number }>;
 }
