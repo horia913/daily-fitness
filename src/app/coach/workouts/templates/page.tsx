@@ -21,20 +21,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   RefreshCw,
   Plus,
   Dumbbell,
   Grid3X3,
   List,
   Search,
-  Copy as CopyIcon,
-  Trash2,
-  X,
   ArrowLeft,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import WorkoutTemplateCard from "@/components/features/workouts/WorkoutTemplateCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { useToast } from "@/components/ui/toast-provider";
 
 export default function WorkoutTemplatesPage() {
@@ -332,33 +338,8 @@ export default function WorkoutTemplatesPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 min-h-screen p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="animate-pulse space-y-6">
-              <div className="fc-card-shell p-6">
-                <div
-                  className="h-8 rounded mb-4"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                ></div>
-                <div
-                  className="h-4 rounded w-2/3"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                ></div>
-              </div>
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="fc-card-shell p-6">
-                  <div
-                    className="h-24 rounded"
-                    style={{
-                      background: "var(--fc-surface-sunken)",
-                    }}
-                  ></div>
-                </div>
-              ))}
-            </div>
+          <div className="max-w-6xl mx-auto">
+            <PageSkeleton variant="list" />
           </div>
         </div>
       </AnimatedBackground>
@@ -402,7 +383,7 @@ export default function WorkoutTemplatesPage() {
               </div>
             </div>
             {templates.length > 0 && (
-              <p className="mt-1 text-sm text-gray-400">
+              <p className="mt-1 text-sm fc-text-dim">
                 {templates.length} template{templates.length !== 1 ? "s" : ""} ·{" "}
                 {Object.values(assignmentCountByTemplate).reduce((a, b) => a + b, 0)}{" "}
                 assignment
@@ -603,195 +584,135 @@ export default function WorkoutTemplatesPage() {
       </AnimatedBackground>
 
       {/* Assignment Modal */}
-      {showAssignModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{
-            background: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-lg w-full">
-            <div
-              className="p-6"
-              style={{
-                borderBottom: "1px solid var(--fc-surface-card-border)",
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold fc-text-primary">
-                  Assign Workout Template
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowAssignModal(false);
-                    setClientSearchQuery("");
-                    setSelectedClients([]);
-                  }}
-                  className="p-2 rounded-lg transition-all hover:scale-110"
-                  style={{
-                    background: "var(--fc-surface-sunken)",
-                  }}
-                >
-                  <X className="w-5 h-5 fc-text-primary" />
-                </button>
-              </div>
+      <Dialog
+        open={showAssignModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAssignModal(false);
+            setClientSearchQuery("");
+            setSelectedClients([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Workout Template</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Search clients by name or email..."
+                value={clientSearchQuery}
+                onChange={(e) => setClientSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
 
-            <div className="p-6">
-              {/* Search bar */}
-              <div className="mb-4">
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Search clients by name or email..."
-                    value={clientSearchQuery}
-                    onChange={(e) => setClientSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            {/* Selected count badge */}
+            {selectedClients.length > 0 && (
+              <div>
+                <span className="text-sm px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] text-[color:var(--fc-status-success)] border border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]">
+                  {selectedClients.length} client
+                  {selectedClients.length !== 1 ? "s" : ""} selected
+                </span>
               </div>
+            )}
 
-              {/* Selected count badge */}
-              {selectedClients.length > 0 && (
-                <div className="mb-3">
-                  <span
-                    className="text-sm px-3 py-1 rounded-full"
-                    style={{
-                      background: `${getSemanticColor("success").primary}20`,
-                      color: getSemanticColor("success").primary,
-                    }}
-                  >
-                    {selectedClients.length} client
-                    {selectedClients.length !== 1 ? "s" : ""} selected
-                  </span>
+            {/* Scrollable client list */}
+            <div className="space-y-2 max-h-[240px] overflow-y-auto">
+              {filteredClients.length === 0 ? (
+                <div className="text-center py-8 text-sm fc-text-dim">
+                  {clientSearchQuery.trim()
+                    ? "No clients found matching your search"
+                    : "No active clients available"}
                 </div>
-              )}
-
-              {/* Scrollable client list */}
-              <div className="space-y-3 max-h-[240px] overflow-y-auto mb-4">
-                {filteredClients.length === 0 ? (
-                  <div className="text-center py-8 text-sm fc-text-dim">
-                    {clientSearchQuery.trim()
-                      ? "No clients found matching your search"
-                      : "No active clients available"}
-                  </div>
-                ) : (
-                  filteredClients.map((c) => {
-                    const id = c.id || c.client_profile_id || c.client_id;
-                    const selected = selectedClients.includes(id);
-                    return (
-                      <div
-                        key={id}
-                        onClick={() =>
-                          setSelectedClients((prev) =>
-                            selected
-                              ? prev.filter((x) => x !== id)
-                              : [...prev, id]
-                          )
-                        }
-                        className="p-3 rounded-xl cursor-pointer transition-all"
-                        style={{
-                          background: selected
-                            ? `${getSemanticColor("success").primary}10`
-                            : "var(--fc-surface-sunken)",
-                          border: `2px solid ${
-                            selected
-                              ? getSemanticColor("success").primary
-                              : "var(--fc-surface-card-border)"
-                          }`,
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-semibold fc-text-primary">
-                              {c.profiles?.first_name || ""}{" "}
-                              {c.profiles?.last_name || ""}
-                            </div>
-                            <div className="text-sm fc-text-dim">
-                              {c.profiles?.email || ""}
-                            </div>
+              ) : (
+                filteredClients.map((c) => {
+                  const id = c.id || c.client_profile_id || c.client_id;
+                  const selected = selectedClients.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedClients((prev) =>
+                          selected
+                            ? prev.filter((x) => x !== id)
+                            : [...prev, id]
+                        )
+                      }
+                      className={`w-full text-left p-3 rounded-xl cursor-pointer transition-all border-2 ${
+                        selected
+                          ? "bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)] border-[color:var(--fc-status-success)]"
+                          : "fc-surface border-[color:var(--fc-surface-card-border)] hover:border-[color:var(--fc-glass-border)]"
+                      }`}
+                      aria-pressed={selected}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold fc-text-primary truncate">
+                            {c.profiles?.first_name || ""}{" "}
+                            {c.profiles?.last_name || ""}
                           </div>
-                          <div
-                            className="w-6 h-6 rounded flex items-center justify-center"
-                            style={{
-                              background: selected
-                                ? getSemanticColor("success").primary
-                                : "var(--fc-surface-sunken)",
-                            }}
-                          >
-                            {selected && (
-                              <svg
-                                className="w-4 h-4 text-white"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
+                          <div className="text-sm fc-text-dim truncate">
+                            {c.profiles?.email || ""}
                           </div>
                         </div>
+                        <div
+                          className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${
+                            selected
+                              ? "bg-[color:var(--fc-status-success)]"
+                              : "fc-surface border border-[color:var(--fc-surface-card-border)]"
+                          }`}
+                        >
+                          {selected && <Check className="w-4 h-4 text-white" />}
+                        </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <label className="text-sm font-medium fc-text-primary">
-                  Start date:
-                </label>
-                <Input
-                  type="date"
-                  value={assignStartDate}
-                  onChange={(e) => setAssignStartDate(e.target.value)}
-                />
-              </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
 
-            <div
-              className="p-4 flex items-center justify-end gap-3"
-              style={{
-                borderTop: "1px solid var(--fc-surface-card-border)",
-              }}
-            >
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowAssignModal(false);
-                  setClientSearchQuery("");
-                  setSelectedClients([]);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={selectedClients.length === 0}
-                onClick={submitAssign}
-                style={{
-                  background:
-                    selectedClients.length === 0
-                      ? undefined
-                      : getSemanticColor("success").gradient,
-                  boxShadow:
-                    selectedClients.length === 0
-                      ? undefined
-                      : `0 4px 12px ${getSemanticColor("success").primary}30`,
-                }}
-              >
-                Assign
-              </Button>
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium fc-text-primary whitespace-nowrap">
+                Start date:
+              </label>
+              <Input
+                type="date"
+                value={assignStartDate}
+                onChange={(e) => setAssignStartDate(e.target.value)}
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <button
+              type="button"
+              className="fc-btn fc-btn-ghost"
+              onClick={() => {
+                setShowAssignModal(false);
+                setClientSearchQuery("");
+                setSelectedClients([]);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={selectedClients.length === 0}
+              onClick={submitAssign}
+              className="fc-btn fc-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Assign
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

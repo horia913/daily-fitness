@@ -82,7 +82,7 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
     <button
       type="button"
       onClick={() => router.push(detailUrl)}
-      className="flex w-full min-h-[52px] items-center gap-3 py-3 pl-3 pr-1 text-left transition-colors hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500/50 border-l-2 border-l-[color:var(--fc-domain-workouts)] sm:pl-4"
+      className="flex w-full min-h-[52px] items-center gap-3 py-3 pl-3 pr-1 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--fc-accent-cyan)] border-l-2 border-l-[color:var(--fc-domain-workouts)] sm:pl-4"
     >
       <Calendar
         className="h-4 w-4 shrink-0 text-[color:var(--fc-text-dim)]"

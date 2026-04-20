@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -600,7 +601,7 @@ export default function GeneratorPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-w-0 overflow-x-hidden px-4 sm:px-6 py-4 pb-32 max-w-5xl mx-auto space-y-4">
+        <CoachPageShell widthVariant="default-5xl" className="px-4 py-4 pb-32 sm:px-6 space-y-4">
 
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
             <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">
@@ -615,7 +616,7 @@ export default function GeneratorPage() {
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-black/5 dark:border-white/5 pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-[color:var(--fc-glass-border)] pt-3">
             {stepLabels.map((label, i) => (
               <React.Fragment key={label}>
                 <div className="flex items-center gap-1.5">
@@ -640,7 +641,7 @@ export default function GeneratorPage() {
 
               {/* Plan name */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Plan name</Label>
+                <Label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">Plan name</Label>
                 <Input
                   value={planName}
                   onChange={(e) => setPlanName(e.target.value)}
@@ -651,7 +652,7 @@ export default function GeneratorPage() {
 
               {/* Daily calories */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Daily calories (kcal) *</Label>
+                <Label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">Daily calories (kcal) *</Label>
                 <Input
                   type="number"
                   min={800}
@@ -664,7 +665,7 @@ export default function GeneratorPage() {
 
               {/* Macro mode toggle */}
               <div className="space-y-2">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Macros</Label>
+                <Label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">Macros</Label>
                 <div className="flex flex-wrap gap-2">
                   {(["auto", "manual"] as const).map((mode) => (
                     <button
@@ -730,7 +731,7 @@ export default function GeneratorPage() {
               {/* Meals per day + options */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Meals / day</Label>
+                  <Label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">Meals / day</Label>
                   <select
                     value={mealCount}
                     onChange={(e) => setMealCount(Number(e.target.value))}
@@ -740,7 +741,7 @@ export default function GeneratorPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">Options / meal</Label>
+                  <Label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">Options / meal</Label>
                   <select
                     value={optionsPerMeal}
                     onChange={(e) => setOptionsPerMeal(Number(e.target.value))}
@@ -751,7 +752,7 @@ export default function GeneratorPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/5">
+              <div className="flex justify-end pt-2 border-t border-[color:var(--fc-glass-border)]">
                 <Button
                   size="sm"
                   onClick={() => setStep(2)}
@@ -1234,7 +1235,6 @@ export default function GeneratorPage() {
               )}
             </div>
           )}
-        </div>
 
         {/* ================================================================
             SWAP MODAL
@@ -1289,6 +1289,7 @@ export default function GeneratorPage() {
             </GlassCard>
           </div>
         )}
+      </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

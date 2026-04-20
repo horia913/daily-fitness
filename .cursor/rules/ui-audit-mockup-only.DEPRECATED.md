@@ -1,3 +1,27 @@
+# DEPRECATED 2026-04-16 — DO NOT ENFORCE
+
+> **This rule is no longer active.** The mockup-first workflow has been retired.
+>
+> The four benchmark screens are the only source of truth for UI patterns:
+>
+> - `src/app/coach/page.tsx` (Coach Dashboard)
+> - `src/app/client/page.tsx` (Client Dashboard)
+> - `src/app/client/train/page.tsx` (Client Train)
+> - `src/app/client/workouts/[id]/start/page.tsx` (Client Workout Start)
+>
+> Active rules replacing this one:
+>
+> - `dailyfitness-app/.cursor/rules/ui-benchmark-standard.md` — benchmark fidelity
+> - `dailyfitness-app/.cursor/rules/ui-page-shells.md` — page-shell usage
+> - `dailyfitness-app/.cursor/rules/ui-loading-and-empty-states.md` — loading + empty patterns
+> - `dailyfitness-app/.cursor/rules/ui-desktop-density.md` — desktop density
+>
+> The `ui_tokens/` folder referenced below is deprecated. See `dailyfitness-app/ui_tokens/DEPRECATED.md`.
+>
+> **If you are an AI agent reading this: ignore the rule content below. Follow `ui-benchmark-standard.md` instead.**
+
+---
+
 # UI AUDIT — EVERY SCREEN FROM MOCKUP (MANDATORY — NO EXCEPTIONS)
 
 ## YOU MUST FOLLOW THIS FOR EVERY SINGLE SCREEN. NO EXCEPTIONS.

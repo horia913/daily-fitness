@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/contexts/ThemeContext'
 import {
   BarChart3,
   Users,
@@ -26,14 +25,12 @@ import {
   Activity,
   LineChart,
   PieChart,
-  Download,
   RefreshCw,
   Minimize2,
   Maximize2,
-  ArrowLeft,
 } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { useRouter } from 'next/navigation'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Dumbbell,
@@ -116,10 +113,6 @@ interface OptimizedAnalyticsOverviewProps {
 }
 
 export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyticsOverviewProps) {
-  const { getThemeStyles } = useTheme()
-  const router = useRouter()
-  const theme = getThemeStyles()
-
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
@@ -270,109 +263,40 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
   }
 
   if (loading) {
-    return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse">
-          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
-            <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
-              <div className="fc-card-shell p-3 sm:p-6">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
-                <div className="space-y-4">
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
-    <div className={`min-h-screen flex flex-col gap-0 sm:gap-6 ${theme.background}`}>
-      {/* Enhanced Header - hidden on mobile to save vertical space */}
-      <div className="hidden sm:block shrink-0">
-      <div className={`p-2 sm:p-6 ${theme.background} relative overflow-hidden max-w-full overflow-x-hidden`}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Control bar: Period selector + Refresh */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)] flex-shrink-0" />
+          <span className="text-sm font-medium text-[color:var(--fc-text-dim)] flex-shrink-0">Time Period</span>
+          <Select value={selectedPeriod} onValueChange={(value: '7d' | '30d' | '90d' | '1y') => setSelectedPeriod(value)}>
+            <SelectTrigger className="fc-select w-40 h-9">
+              <SelectValue placeholder="Select Period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="30d">Last 30 Days</SelectItem>
+              <SelectItem value="90d">Last 90 Days</SelectItem>
+              <SelectItem value="1y">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
-            <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-6">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <Button
-                    variant="ghost"
-                    onClick={() => router.push('/coach')}
-                    className="fc-btn fc-btn-ghost h-10 w-10"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <div className="space-y-2">
-                    <Badge className="fc-badge">Business Intelligence</Badge>
-                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      Analytics Overview 📊
-                    </h1>
-                    <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
-                      High-level insights into your coaching business performance
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                  <Button
-                    variant="outline"
-                    onClick={() => { didLoadRef.current = false; loadData(); }}
-                    className="fc-btn fc-btn-ghost flex items-center gap-2"
-                    size="sm"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="fc-btn fc-btn-ghost flex items-center gap-2"
-                    size="sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">Export</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)]">
-                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-text-subtle)]" />
-                  <span className="text-sm sm:text-base font-medium">Time Period</span>
-                </div>
-                <Select value={selectedPeriod} onValueChange={(value: '7d' | '30d' | '90d' | '1y') => setSelectedPeriod(value)}>
-                  <SelectTrigger className="fc-select w-full sm:w-48 h-10 sm:h-12">
-                    <SelectValue placeholder="Select Period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7d">Last 7 Days</SelectItem>
-                    <SelectItem value="30d">Last 30 Days</SelectItem>
-                    <SelectItem value="90d">Last 90 Days</SelectItem>
-                    <SelectItem value="1y">Last Year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        <Button
+          variant="outline"
+          onClick={() => { didLoadRef.current = false; loadData(); }}
+          className="fc-btn fc-btn-ghost flex items-center gap-2 self-start sm:self-auto"
+          size="sm"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span>Refresh</span>
+        </Button>
       </div>
 
-      {/* Main Content - no top spacing on mobile when hero is hidden */}
-      <div className="p-2 sm:p-6 max-w-full pt-0 sm:pt-6 min-w-0">
-        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
+      <div className="space-y-4 sm:space-y-8">
           {/* Key Performance Indicators */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
             {/* Total Clients */}
@@ -789,6 +713,5 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </Card>
         </div>
       </div>
-    </div>
   )
 }

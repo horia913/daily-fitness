@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -9,7 +9,8 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FileQuestion } from "lucide-react";
 import {
   getChallengeDetails,
   getChallengeLeaderboard,
@@ -20,9 +21,11 @@ import {
 import { useToast } from "@/components/ui/toast-provider";
 import { ChallengeDetailPageBody } from "@/components/client/challenges/ChallengeDetailPageBody";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 function ChallengeDetailContent() {
   const params = useParams();
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
@@ -164,10 +167,7 @@ function ChallengeDetailContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-12 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
-              <div className="h-56 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -180,11 +180,11 @@ function ChallengeDetailContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
-              <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
-                {loadError || "Challenge not found"}
-              </p>
-              {loadError ? (
+            {loadError ? (
+              <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
+                <p className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
+                  {loadError}
+                </p>
                 <Button
                   type="button"
                   onClick={() => {
@@ -196,17 +196,16 @@ function ChallengeDetailContent() {
                 >
                   Retry
                 </Button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = "/client/challenges"; }}
-                  className="fc-btn fc-btn-secondary fc-press inline-flex"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Challenges
-                </button>
-              )}
-            </GlassCard>
+              </GlassCard>
+            ) : (
+              <EmptyState
+                icon={FileQuestion}
+                title="Challenge not found"
+                description="This challenge is no longer available."
+                actionLabel="Back to challenges"
+                onAction={() => router.push("/client/challenges")}
+              />
+            )}
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>

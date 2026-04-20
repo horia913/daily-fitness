@@ -3,6 +3,7 @@
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,12 @@ import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { usePageData } from "@/hooks/usePageData";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 export default function MealPlansPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { performanceSettings, isDark, getSemanticColor } = useTheme();
+  const { performanceSettings } = useTheme();
   const { addToast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -121,7 +123,7 @@ export default function MealPlansPage() {
     return mealPlans.filter(
       (plan) =>
         plan.name.toLowerCase().includes(query) ||
-        (plan.description && plan.description.toLowerCase().includes(query))
+        (plan.notes ?? plan.description ?? "").toLowerCase().includes(query)
     );
   }, [mealPlans, searchQuery]);
 
@@ -129,8 +131,7 @@ export default function MealPlansPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="max-w-7xl mx-auto min-w-0 overflow-x-hidden p-4 sm:p-6 space-y-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6 space-y-6">
             <Link
               href="/coach/nutrition"
               className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium"
@@ -142,14 +143,8 @@ export default function MealPlansPage() {
             <div className="fc-card-shell p-6 sm:p-10">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex items-start gap-4">
-                  <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: getSemanticColor("success").gradient,
-                      boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                    }}
-                  >
-                    <ChefHat className="w-7 h-7 text-white" />
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_18%,transparent)] text-[color:var(--fc-status-success)] shadow-[0_4px_12px_color-mix(in_srgb,var(--fc-status-success)_18%,transparent)]">
+                    <ChefHat className="h-7 w-7" aria-hidden />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
@@ -163,6 +158,7 @@ export default function MealPlansPage() {
 
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <Button
+                    type="button"
                     variant="ghost"
                     onClick={() => refetch()}
                     className="fc-btn fc-btn-ghost"
@@ -171,12 +167,9 @@ export default function MealPlansPage() {
                     Refresh
                   </Button>
                   <Button
+                    type="button"
                     onClick={() => router.push("/coach/nutrition/meal-plans/create")}
                     className="fc-btn fc-btn-primary"
-                    style={{
-                      background: getSemanticColor("success").gradient,
-                      boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                    }}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Meal Plan
@@ -193,10 +186,7 @@ export default function MealPlansPage() {
                     placeholder="Search by plan name…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 rounded-xl bg-transparent border-0 w-full fc-input"
-                    style={{
-                      color: isDark ? "#fff" : "#1A1A1A",
-                    }}
+                    className="pl-10 rounded-xl bg-transparent border-0 w-full fc-input text-[color:var(--fc-text-primary)]"
                   />
                 </div>
               </div>
@@ -204,19 +194,7 @@ export default function MealPlansPage() {
 
             {/* Meal Plans Grid */}
             {loading && mealPlans.length === 0 ? (
-              <GlassCard elevation={2} className="p-12">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded-xl w-1/4 backdrop-blur-sm"></div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="h-64 bg-[color:var(--fc-glass-highlight)] rounded-2xl backdrop-blur-sm"
-                      ></div>
-                    ))}
-                  </div>
-                </div>
-              </GlassCard>
+              <PageSkeleton variant="list" />
             ) : filteredMealPlans.length === 0 ? (
               <GlassCard elevation={2} className="p-12">
                 <EmptyState
@@ -264,8 +242,7 @@ export default function MealPlansPage() {
                 onComplete={handleAssignmentComplete}
               />
             )}
-          </div>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

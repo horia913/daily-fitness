@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -17,6 +17,7 @@ import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
 import type { TrainingBlock } from "@/types/trainingBlock";
 import { TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
@@ -134,11 +135,11 @@ function DayRowSubtitle({ day }: { day: DaySlot }) {
   if (!difficultyRaw && !metaText) return null;
 
   return (
-    <div className="flex min-w-0 w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] uppercase tracking-wider text-gray-500/80">
+    <div className="flex min-w-0 w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] uppercase tracking-wider fc-text-subtle">
       {difficultyRaw ? (
         <span
           className={cn(
-            "inline-flex shrink-0 items-center rounded border border-white/[0.06] bg-white/[0.04] px-1.5 py-0.5 font-medium leading-none",
+            "inline-flex shrink-0 items-center rounded border border-[color:var(--fc-glass-border)] fc-glass-soft px-1.5 py-0.5 font-medium leading-none",
             difficultyBadgeTextClass(difficultyRaw),
           )}
         >
@@ -147,8 +148,8 @@ function DayRowSubtitle({ day }: { day: DaySlot }) {
       ) : null}
       {metaText ? (
         <span className="min-w-0 truncate">
-          {difficultyRaw ? <span className="text-gray-500/80">· </span> : null}
-          <span className="text-gray-500">{metaText}</span>
+          {difficultyRaw ? <span className="fc-text-subtle">· </span> : null}
+          <span className="fc-text-dim">{metaText}</span>
         </span>
       ) : null}
     </div>
@@ -308,14 +309,14 @@ function ExpandedDaySkeletonRows() {
       {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
-          className="flex animate-pulse items-center justify-between gap-3 border-b border-white/[0.04] py-2 last:border-0"
+          className="flex animate-pulse items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] py-2 last:border-0"
         >
           <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-4 w-[55%] rounded bg-white/10" />
-            <div className="h-3 w-[40%] rounded bg-white/[0.06]" />
+            <div className="h-4 w-[55%] rounded bg-[color:var(--fc-glass-border)]" />
+            <div className="h-3 w-[40%] rounded bg-[color:var(--fc-glass-highlight)]" />
           </div>
           <div className="shrink-0">
-            <div className="h-6 w-16 rounded-md border border-white/5 bg-white/[0.06]" />
+            <div className="h-6 w-16 rounded-md border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]" />
           </div>
         </div>
       ))}
@@ -473,6 +474,7 @@ function buildBlockSections(
 
 function ProgramDetailsContent() {
   const params = useParams();
+  const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { performanceSettings } = useTheme();
   const [program, setProgram] = useState<Program | null>(null);
@@ -783,12 +785,7 @@ function ProgramDetailsContent() {
       <AnimatedBackground>
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="animate-pulse space-y-3">
-            <div className="h-8 w-28 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-6 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-          </div>
+          <PageSkeleton variant="dashboard" />
         </ClientPageShell>
       </AnimatedBackground>
     );
@@ -807,9 +804,7 @@ function ProgramDetailsContent() {
             />
             <Button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/train";
-              }}
+              onClick={() => router.push("/client/train")}
               variant="outline"
               className="w-full h-10 text-sm"
             >
@@ -829,17 +824,15 @@ function ProgramDetailsContent() {
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = "/client/train";
-            }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white hover:bg-white/[0.05]"
+            onClick={() => router.push("/client/train")}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-text-primary hover:bg-[color:var(--fc-glass-highlight)]"
             aria-label="Back to training"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-white tracking-tight mb-1 break-words">{program.name}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-1 break-words">{program.name}</h1>
+            <p className="text-sm fc-text-dim">
               <span className="tabular-nums">{program.duration_weeks}</span> weeks ·{" "}
               <span className="tabular-nums">{weekCountStat}</span> weeks ·{" "}
               <span className="tabular-nums">{workoutsPerWeekDisplay}</span> workouts/week
@@ -847,23 +840,23 @@ function ProgramDetailsContent() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-4">
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-4">
           <div className="flex items-center justify-between gap-1">
             <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold text-white tabular-nums">{weekCountStat}</p>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Weeks</p>
+              <p className="text-base font-semibold fc-text-primary tabular-nums">{weekCountStat}</p>
+              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Weeks</p>
             </div>
-            <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+            <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
             <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold text-white tabular-nums">{workoutsPerWeekDisplay}</p>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+              <p className="text-base font-semibold fc-text-primary tabular-nums">{workoutsPerWeekDisplay}</p>
+              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                 Workouts/wk
               </p>
             </div>
-            <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+            <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
             <div className="flex-1 min-w-0 text-center">
-              <p className="text-base font-semibold text-white tabular-nums">{totalWorkoutSlots}</p>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+              <p className="text-base font-semibold fc-text-primary tabular-nums">{totalWorkoutSlots}</p>
+              <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                 Total workouts
               </p>
             </div>
@@ -871,7 +864,7 @@ function ProgramDetailsContent() {
         </div>
 
         {blockSections.length > 0 ? (
-          <div className="sticky top-0 z-10 -mx-4 border-b border-white/[0.07] bg-transparent px-4 py-1.5">
+          <div className="sticky top-0 z-10 -mx-4 border-b border-[color:var(--fc-glass-border)] bg-transparent px-4 py-1.5">
             <div className="flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {blockSections.map((section) => {
                 const navKey = blockNavStableKey(section);
@@ -888,8 +881,8 @@ function ProgramDetailsContent() {
                     className={cn(
                       "shrink-0 appearance-none rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wider shadow-none ring-0 outline-none transition-colors",
                       active
-                        ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-300/90"
-                        : "border-white/[0.08] bg-white/[0.05] text-gray-400",
+                        ? "border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)]"
+                        : "border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim",
                     )}
                   >
                     BLOCK {section.displayBlockOrder} · {goalAbbrevForNavChip(section.block)}
@@ -901,11 +894,11 @@ function ProgramDetailsContent() {
         ) : null}
 
         {program.description ? (
-          <p className="mb-4 text-sm text-gray-400 leading-relaxed line-clamp-4">{program.description}</p>
+          <p className="mb-4 text-sm fc-text-dim leading-relaxed line-clamp-4">{program.description}</p>
         ) : null}
 
         {blockSections.length === 0 ? (
-          <p className="text-center text-sm text-gray-500 py-8">No schedule for this program yet.</p>
+          <p className="text-center text-sm fc-text-dim py-8">No schedule for this program yet.</p>
         ) : (
           <div className="mb-6">
             {blockSections.map((section, secIdx) => {
@@ -923,19 +916,19 @@ function ProgramDetailsContent() {
                   data-block-nav-key={navKey}
                   className={cn(secIdx === 0 ? "mt-0" : "mt-6", "mb-2 scroll-mt-16")}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                     BLOCK {section.displayBlockOrder} · {goalLine}
                   </p>
                   {section.block?.name ? (
-                    <p className="text-sm font-semibold text-white mt-0.5">{section.block.name}</p>
+                    <p className="text-sm font-semibold fc-text-primary mt-0.5">{section.block.name}</p>
                   ) : (
-                    <p className="text-sm font-semibold text-white mt-0.5">Program block</p>
+                    <p className="text-sm font-semibold fc-text-primary mt-0.5">Program block</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs fc-text-dim mt-0.5">
                     Weeks {weeksRange} · {durW} weeks
                   </p>
                   {section.block?.notes ? (
-                    <p className="text-xs text-gray-400 italic mt-1">{section.block.notes}</p>
+                    <p className="text-xs fc-text-dim italic mt-1">{section.block.notes}</p>
                   ) : null}
 
                   {section.weeks.map(({ weekNumber, days }) => {
@@ -943,7 +936,7 @@ function ProgramDetailsContent() {
                     return (
                       <div
                         key={`w-${weekNumber}`}
-                        className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-3 mt-3"
+                        className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-3 mt-3"
                       >
                         <button
                           type="button"
@@ -956,12 +949,12 @@ function ProgramDetailsContent() {
                           className="flex w-full items-center justify-between gap-2 text-left"
                           aria-expanded={weekOpen}
                         >
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/70 mb-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-0">
                             WEEK {weekNumber}
                           </span>
                           <ChevronDown
                             className={cn(
-                              "h-4 w-4 shrink-0 text-gray-500 transition-transform",
+                              "h-4 w-4 shrink-0 fc-text-dim transition-transform",
                               weekOpen && "rotate-180",
                             )}
                           />
@@ -974,7 +967,7 @@ function ProgramDetailsContent() {
                                 return (
                                   <div
                                     key={day.key}
-                                    className="flex items-center gap-4 py-3.5 border-b border-white/5 last:border-0"
+                                    className="flex items-center gap-4 py-3.5 border-b border-[color:var(--fc-glass-border)] last:border-0"
                                   >
                                     <div className="flex w-12 shrink-0 items-center justify-center">
                                       <span className="text-2xl font-light text-gray-700/60 tabular-nums leading-none">
@@ -982,7 +975,7 @@ function ProgramDetailsContent() {
                                       </span>
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-base font-medium italic text-gray-500">Rest day</p>
+                                      <p className="text-base font-medium italic fc-text-dim">Rest day</p>
                                     </div>
                                   </div>
                                 );
@@ -1011,13 +1004,13 @@ function ProgramDetailsContent() {
                               return (
                                 <div
                                   key={day.key}
-                                  className="border-b border-white/5 last:border-0"
+                                  className="border-b border-[color:var(--fc-glass-border)] last:border-0"
                                 >
                                   <div
                                     role="button"
                                     tabIndex={0}
                                     aria-expanded={expanded}
-                                    className="flex w-full cursor-pointer items-start gap-4 py-3.5 text-left transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-0"
+                                    className="flex w-full cursor-pointer items-start gap-4 py-3.5 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]/35 focus-visible:ring-offset-0"
                                     onClick={activateDayRow}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" || e.key === " ") {
@@ -1027,7 +1020,7 @@ function ProgramDetailsContent() {
                                     }}
                                   >
                                     <div className="flex w-12 shrink-0 flex-col items-center gap-1 pt-0.5">
-                                      <span className="text-2xl font-bold leading-none tracking-tight text-white/90 tabular-nums">
+                                      <span className="text-2xl font-bold leading-none tracking-tight fc-text-primary tabular-nums">
                                         {String(day.dayNumber).padStart(2, "0")}
                                       </span>
                                       <span
@@ -1041,10 +1034,10 @@ function ProgramDetailsContent() {
                                     </div>
                                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                                       <div className="flex items-baseline justify-between gap-2">
-                                        <span className="truncate text-base font-semibold tracking-tight text-white/95">
+                                        <span className="truncate text-base font-semibold tracking-tight fc-text-primary">
                                           {workoutName}
                                         </span>
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/5 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium tabular-nums text-gray-400">
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[color:var(--fc-glass-border)] fc-glass-soft px-2 py-0.5 text-[11px] font-medium tabular-nums fc-text-dim">
                                           <Clock className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
                                           {durationStr}
                                         </span>
@@ -1053,20 +1046,20 @@ function ProgramDetailsContent() {
                                     </div>
                                     <div className="ml-1 flex shrink-0 items-start justify-center pt-1.5">
                                       {expanded ? (
-                                        <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden />
+                                        <ChevronDown className="h-4 w-4 fc-text-dim" aria-hidden />
                                       ) : (
-                                        <ChevronRight className="h-4 w-4 text-gray-500" aria-hidden />
+                                        <ChevronRight className="h-4 w-4 fc-text-dim" aria-hidden />
                                       )}
                                     </div>
                                   </div>
 
                                   {expanded && day.templateId ? (
                                     <div className="mb-2 mt-2 pl-[3.75rem]">
-                                      <div className="ml-6 border-l border-white/5 pl-4">
+                                      <div className="ml-6 border-l border-[color:var(--fc-glass-border)] pl-4">
                                         {isLoadingBlocks || cachedBlocks === undefined ? (
                                           <ExpandedDaySkeletonRows />
                                         ) : cachedBlocks.length === 0 ? (
-                                          <p className="py-3 text-xs italic text-gray-500">
+                                          <p className="py-3 text-xs italic fc-text-dim">
                                             No exercises configured for this workout
                                           </p>
                                         ) : (
@@ -1075,18 +1068,18 @@ function ProgramDetailsContent() {
                                             .map((blk, bi) => (
                                               <div key={blk.id} className={cn(bi > 0 && "mt-3")}>
                                                 <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-400/70">
+                                                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/70">
                                                     {blk.set_name?.trim() ||
                                                       `Block ${blk.set_order ?? bi + 1}`}
                                                   </span>
                                                   {blk.set_type ? (
-                                                    <span className="inline-block rounded border border-white/5 bg-white/[0.04] px-1.5 py-0.5 text-[9px] uppercase text-gray-500">
+                                                    <span className="inline-block rounded border border-[color:var(--fc-glass-border)] fc-glass-soft px-1.5 py-0.5 text-[9px] uppercase fc-text-dim">
                                                       {(blk.set_type || "").replace(/_/g, " ")}
                                                     </span>
                                                   ) : null}
                                                 </div>
                                                 {blk.set_notes ? (
-                                                  <p className="mb-2 text-xs italic text-gray-500/80">
+                                                  <p className="mb-2 text-xs italic fc-text-subtle">
                                                     {blk.set_notes}
                                                   </p>
                                                 ) : null}
@@ -1094,24 +1087,24 @@ function ProgramDetailsContent() {
                                                   {collectExpandedExerciseRows(blk).map((row, ri) => (
                                                     <div
                                                       key={`${blk.id}-${ri}`}
-                                                      className="flex items-center justify-between gap-3 border-b border-white/[0.04] py-2 last:border-0"
+                                                      className="flex items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] py-2 last:border-0"
                                                     >
                                                       <div className="min-w-0 flex-1">
-                                                        <p className="text-sm tracking-tight text-white/90">
+                                                        <p className="text-sm tracking-tight fc-text-primary">
                                                           {row.name}
                                                         </p>
                                                         {row.notes ? (
-                                                          <p className="mt-0.5 line-clamp-1 text-[11px] italic text-gray-500">
+                                                          <p className="mt-0.5 line-clamp-1 text-[11px] italic fc-text-dim">
                                                             {row.notes}
                                                           </p>
                                                         ) : null}
                                                       </div>
                                                       <div className="flex shrink-0 flex-col items-end">
-                                                        <span className="inline-flex items-center rounded-md border border-white/5 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium tabular-nums text-gray-400">
+                                                        <span className="inline-flex items-center rounded-md border border-[color:var(--fc-glass-border)] fc-glass-soft px-2 py-0.5 text-[11px] font-medium tabular-nums fc-text-dim">
                                                           {row.prescription}
                                                         </span>
                                                         {row.weightLine ? (
-                                                          <span className="mt-0.5 text-right text-[10px] tabular-nums text-gray-500">
+                                                          <span className="mt-0.5 text-right text-[10px] tabular-nums fc-text-dim">
                                                             {row.weightLine}
                                                           </span>
                                                         ) : null}
@@ -1142,20 +1135,16 @@ function ProgramDetailsContent() {
         <div className="flex flex-col gap-2 mt-6">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = "/client/train";
-            }}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-base font-semibold text-white shadow-lg shadow-cyan-500/25 ring-1 ring-cyan-400/30 ring-inset transition-all active:scale-[0.98]"
+            onClick={() => router.push("/client/train")}
+            className="fc-btn fc-btn-primary fc-press flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold"
           >
             Go to Training
             <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
           </button>
           <button
             type="button"
-            onClick={() => {
-              window.history.back();
-            }}
-            className="h-11 w-full rounded-xl border border-white/15 bg-white/[0.04] text-sm font-medium text-gray-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+            onClick={() => router.back()}
+            className="fc-btn fc-btn-ghost fc-press h-11 w-full rounded-xl text-sm font-medium"
           >
             Back to Program
           </button>

@@ -499,8 +499,9 @@ export default function EnhancedClientWorkouts({
 
         if (programAssignment) {
           // ========================================================================
-          // NEW: Use program_progress as SOURCE OF TRUTH for next program workout
-          // This replaces the legacy program_day_assignments logic
+          // Current week/unlock is calendar-derived (computeCurrentProgramWeekForAssignment).
+          // program_progress is a cache/completion pointer; this replaces legacy
+          // program_day_assignments-based resolution.
           // ========================================================================
           const workoutInfo = await getCurrentWorkoutFromProgress(supabase, clientId);
           

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import {
@@ -10,6 +10,7 @@ import {
   PrimaryButton,
   SecondaryButton,
 } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
   ArrowLeft,
   CheckCircle,
@@ -128,6 +129,7 @@ interface BlockGroup {
 
 function WorkoutCompleteContent() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const assignmentId = params.id as string;
   const { addToast } = useToast();
@@ -883,7 +885,7 @@ function WorkoutCompleteContent() {
     // Idempotent: if assignment is already completed, just navigate
     if (assignment.status === "completed") {
       console.log("[COMPLETE-FLOW] navigating after completion (already completed)");
-      window.location.href = "/client/train";
+      router.push("/client/train");
       return;
     }
 
@@ -924,7 +926,7 @@ function WorkoutCompleteContent() {
 
       console.log("[COMPLETE-FLOW] API response", { status: "success" });
       console.log("[COMPLETE-FLOW] navigating after completion");
-      window.location.href = "/client/train";
+      router.push("/client/train");
     } catch (error) {
       console.log("[COMPLETE-FLOW] API response", { status: "error", error: (error as Error)?.message });
       console.error("❌ Error completing workout:", error);
@@ -1501,7 +1503,7 @@ function WorkoutCompleteContent() {
               <div className="h-20 w-20 rounded-full mx-auto bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-7 max-w-[200px] rounded-lg mx-auto bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-4 max-w-[120px] rounded mx-auto bg-[color:var(--fc-glass-highlight)]" />
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-2 mt-4">
+              <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 space-y-2 mt-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-12 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
                 ))}
@@ -1519,8 +1521,8 @@ function WorkoutCompleteContent() {
         <AnimatedBackground>
           <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
-              <p className="mb-1 text-sm text-gray-400">{loadError}</p>
-              <p className="mb-4 text-xs text-gray-500">Try again or return to your workouts.</p>
+              <p className="mb-1 text-sm fc-text-dim">{loadError}</p>
+              <p className="mb-4 text-xs fc-text-subtle">Try again or return to your workouts.</p>
               <div className="flex flex-wrap justify-center gap-3">
                 <PrimaryButton
                   onClick={() => {
@@ -1549,7 +1551,7 @@ function WorkoutCompleteContent() {
                 </PrimaryButton>
                 <SecondaryButton
                   className="w-auto"
-                  onClick={() => { window.location.href = "/client/train"; }}
+                  onClick={() => router.push("/client/train")}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Workouts
@@ -1568,14 +1570,14 @@ function WorkoutCompleteContent() {
         <AnimatedBackground>
           <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
-              <h3 className="text-sm text-gray-400 font-medium">Workout not found</h3>
-              <p className="mt-1 text-xs text-gray-500">
+              <h3 className="text-sm fc-text-dim font-medium">Workout not found</h3>
+              <p className="mt-1 text-xs fc-text-subtle">
                 This workout does not exist or you do not have access to it.
               </p>
               <div className="mt-6 flex justify-center">
                 <SecondaryButton
                   className="w-auto"
-                  onClick={() => { window.location.href = "/client/train"; }}
+                  onClick={() => router.push("/client/train")}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Workouts
@@ -1771,8 +1773,8 @@ function WorkoutCompleteContent() {
 
             {/* Session Highlights Card */}
             {(personalRecords.length > 0 || newAchievementsQueue.length > 0) && (
-              <div className="border-y border-white/5">
-                  <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
+              <div className="border-y border-[color:var(--fc-glass-border)]">
+                  <div className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                     <div
                       className="flex h-10 w-10 items-center justify-center rounded-xl"
                       style={{ background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan))" }}
@@ -1798,7 +1800,7 @@ function WorkoutCompleteContent() {
                       return (
                         <div
                           key={pr.id}
-                          className="flex items-center gap-3 border-b border-white/5 px-4 py-3"
+                          className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3"
                         >
                           <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: "var(--fc-status-warning)" }} />
                           <span className="text-sm font-semibold fc-text-primary truncate">{exerciseName}</span>
@@ -1814,7 +1816,7 @@ function WorkoutCompleteContent() {
                     {newAchievementsQueue.map((ach) => (
                       <div
                         key={ach.id}
-                        className="flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-b-0"
+                        className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3 last:border-b-0"
                       >
                         <span className="text-lg flex-shrink-0">{ach.icon}</span>
                         <span className="text-sm font-semibold fc-text-primary truncate">{ach.name}</span>
@@ -1834,8 +1836,8 @@ function WorkoutCompleteContent() {
             )}
 
             {personalRecords.length > 0 && (
-              <div className="border-y border-white/5">
-                <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
+              <div className="border-y border-[color:var(--fc-glass-border)]">
+                <div className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
                     <Trophy className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
                   </div>
@@ -1871,7 +1873,7 @@ function WorkoutCompleteContent() {
                     return (
                       <div
                         key={pr.id}
-                        className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3 last:border-b-0"
+                        className="flex items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3 last:border-b-0"
                       >
                         <div className="min-w-0">
                           <h4 className="text-sm font-semibold fc-text-primary truncate">
@@ -1894,7 +1896,7 @@ function WorkoutCompleteContent() {
             {programProgression &&
               (programProgression.current_week_number != null ||
                 programProgression.current_day_number != null) && (
-              <div className="border-b border-white/5 px-4 py-3">
+              <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                 <div className="mb-1 flex items-center gap-2">
                   <LayoutDashboard className="w-4 h-4" style={{ color: "var(--fc-accent-cyan)" }} />
                   <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">
@@ -1914,7 +1916,7 @@ function WorkoutCompleteContent() {
             )}
 
             {nextWorkout && (
-              <div className="border-b border-white/5 px-4 py-3">
+              <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold mb-1">
@@ -1944,7 +1946,7 @@ function WorkoutCompleteContent() {
                   }
                 />
 
-                <div className="flex flex-col border-y border-white/5">
+                <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
                   {blockGroups.map((block) => {
                     const isExpanded = expandedBlocks.has(block.set_entry_id);
                     const setCount = block.sets.length;
@@ -1961,12 +1963,12 @@ function WorkoutCompleteContent() {
                     return (
                       <div
                         key={block.set_entry_id}
-                        className="overflow-hidden border-b border-white/5 last:border-b-0"
+                        className="overflow-hidden border-b border-[color:var(--fc-glass-border)] last:border-b-0"
                       >
                         <button
                           type="button"
                           onClick={() => toggleBlock(block.set_entry_id)}
-                          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/[0.02]"
+                          className="w-full px-4 py-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-bold fc-text-dim" style={{ background: "var(--fc-surface-sunken)" }}>
@@ -1991,7 +1993,7 @@ function WorkoutCompleteContent() {
                           </div>
                         </button>
                         {isExpanded && (
-                          <div className="border-t border-white/5 px-4 pb-3 pt-3">
+                          <div className="border-t border-[color:var(--fc-glass-border)] px-4 pb-3 pt-3">
                             <div className="flex flex-col">
                               {block.sets.length === 0 ? (
                                 renderTemplateExercises(block, block.exerciseNames)
@@ -2011,7 +2013,7 @@ function WorkoutCompleteContent() {
                                   .map((set) => (
                                     <div
                                       key={set.id}
-                                      className="border-b border-white/5 py-2 pl-1 last:border-b-0"
+                                      className="border-b border-[color:var(--fc-glass-border)] py-2 pl-1 last:border-b-0"
                                     >
                                       {renderSetDisplay(
                                         set,
@@ -2038,7 +2040,7 @@ function WorkoutCompleteContent() {
             <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
               <div className="max-w-lg mx-auto">
                 <PrimaryButton
-                  onClick={() => { window.location.href = "/client"; }}
+                  onClick={() => router.push("/client")}
                   disabled={completing}
                   className="h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
                 >
@@ -2075,10 +2077,7 @@ export default function WorkoutComplete() {
         <ProtectedRoute>
           <AnimatedBackground>
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-              <div className="animate-pulse space-y-4">
-                <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>
         </ProtectedRoute>

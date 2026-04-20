@@ -14,6 +14,7 @@ import {
   getCompletedSlots,
   type ProgramScheduleSlot,
 } from './programStateService'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 export interface TrainPageRpcScheduleRow {
   id: string
@@ -46,8 +47,10 @@ export interface TrainPageRpcResponse {
   programName?: string | null
   programId?: string | null
   assignmentId?: string | null
-  /** Assignment created_at — used to compute current program week start for "completed this week" filter */
+  /** Assignment start date (server now returns start_date fallback, not created_at). */
   assignmentStartDate?: string | null
+  currentProgramWeek?: number | null
+  currentProgramWeekClamped?: boolean
   durationWeeks?: number | null
   progressionMode?: string | null
   coachUnlockedWeek?: number | null
@@ -56,6 +59,9 @@ export interface TrainPageRpcResponse {
   coachReviewDate?: string | null
   /** When RPC includes B.1 pause fields (camelCase or snake_case) */
   pauseStatus?: string | null
+  pauseAccumulatedDays?: number | null
+  pausedAt?: string | null
+  timezoneSnapshot?: string | null
   pauseReason?: string | null
   pause_status?: string | null
   pause_reason?: string | null
@@ -145,9 +151,18 @@ export async function rpcResponseToProgramWeekState(
 
   const assignmentForUnlock = {
     progression_mode: data.progressionMode ?? 'auto',
-    coach_unlocked_week: data.coachUnlockedWeek ?? null,
+    start_date: data.assignmentStartDate ?? null,
+    pause_accumulated_days:
+      data.pauseAccumulatedDays ?? 0,
+    pause_status: data.pauseStatus ?? data.pause_status ?? 'active',
+    paused_at: data.pausedAt ?? null,
+    timezone_snapshot: data.timezoneSnapshot ?? 'UTC',
+    duration_weeks: data.durationWeeks ?? null,
   }
-  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock)
+  const unlockedWeekMax =
+    (typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1)
+      ? data.currentProgramWeek
+      : computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock, assignmentForUnlock.timezone_snapshot)
   const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
@@ -163,25 +178,33 @@ export async function rpcResponseToProgramWeekState(
   // Use all-time completions since each program_schedule_id is unique per week.
   const progressionModeRaw = data.progressionMode ?? 'auto'
   let completedScheduleIdsCurrentWeek: Set<string>
+  const derivedWeek = computeCurrentProgramWeekForAssignment(
+    {
+      start_date: data.assignmentStartDate ?? null,
+      pause_accumulated_days: data.pauseAccumulatedDays ?? 0,
+      pause_status: data.pauseStatus ?? data.pause_status ?? null,
+      paused_at: data.pausedAt ?? null,
+      timezone_snapshot: data.timezoneSnapshot ?? 'UTC',
+      duration_weeks: data.durationWeeks ?? null,
+    },
+    data.timezoneSnapshot ?? 'UTC'
+  ).week
   if (progressionModeRaw === 'coach_managed') {
     completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
+  } else if (data.assignmentStartDate) {
+    const currentWeekStart = getWeekStartDate(data.assignmentStartDate, derivedWeek)
+    const currentWeekEnd = new Date(currentWeekStart)
+    currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
+    completedScheduleIdsCurrentWeek = new Set(
+      completedSlots
+        .filter((c) => {
+          const completedAt = new Date(c.completed_at)
+          return completedAt >= currentWeekStart && completedAt < currentWeekEnd
+        })
+        .map((c) => c.program_schedule_id)
+    )
   } else {
-    const assignmentStartDate = data.assignmentStartDate ?? null
-    if (assignmentStartDate) {
-      const currentWeekStart = getWeekStartDate(assignmentStartDate, unlockedWeekMax)
-      const currentWeekEnd = new Date(currentWeekStart)
-      currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
-      completedScheduleIdsCurrentWeek = new Set(
-        completedSlots
-          .filter((c) => {
-            const completedAt = new Date(c.completed_at)
-            return completedAt >= currentWeekStart && completedAt < currentWeekEnd
-          })
-          .map((c) => c.program_schedule_id)
-      )
-    } else {
-      completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
-    }
+    completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
   }
 
   const completedScheduleIds = completedScheduleIdsCurrentWeek

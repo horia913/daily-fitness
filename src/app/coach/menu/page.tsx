@@ -2,6 +2,7 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
   Dumbbell,
   Apple,
   BarChart3,
-  ClipboardCheck,
+  ShieldCheck,
   BookOpen,
   Layers,
   Library,
@@ -67,7 +68,7 @@ const SECTION_ANALYTICS = {
   title: "Analytics & Reports",
   items: [
     { title: "Analytics", description: "View client progress and reporting", icon: BarChart3, href: "/coach/analytics" },
-    { title: "Compliance Dashboard", description: "Follow-through and at-risk clients", icon: ClipboardCheck, href: "/coach/compliance" },
+    { title: "Compliance Dashboard", description: "Follow-through and at-risk clients", icon: ShieldCheck, href: "/coach/compliance" },
   ],
 };
 
@@ -102,12 +103,12 @@ export default function CoachMenu() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 pb-32 space-y-8">
+        <CoachPageShell widthVariant="data-7xl" className="px-4 sm:px-6 py-6 pb-32 space-y-8">
           <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
-                  <Users className="w-7 h-7" />
+                  <Users className="w-7 h-7" aria-hidden />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
@@ -137,7 +138,7 @@ export default function CoachMenu() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent)]">
-                            <Icon className="w-5 h-5" />
+                            <Icon className="w-5 h-5" aria-hidden />
                           </div>
                           <div className="min-w-0 flex-1">
                             <h3 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
@@ -160,7 +161,7 @@ export default function CoachMenu() {
             <>
               <section>
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-status-warning)] mb-3 px-1 flex items-center gap-2">
-                  <Settings className="w-3.5 h-3.5" />
+                  <Settings className="w-3.5 h-3.5" aria-hidden />
                   Admin only
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -170,7 +171,7 @@ export default function CoachMenu() {
                       <Link href={item.href} key={item.href}>
                         <div className="flex items-center gap-4 p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:opacity-90 transition-all">
                           <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
-                            <Icon className="w-5 h-5" />
+                            <Icon className="w-5 h-5" aria-hidden />
                           </div>
                           <div>
                             <h3 className="font-semibold text-[color:var(--fc-text-primary)]">{item.title}</h3>
@@ -184,8 +185,8 @@ export default function CoachMenu() {
               </section>
               <div className="flex justify-center">
                 <Link href="/admin">
-                  <Button className="fc-btn text-white" style={{ background: "var(--fc-status-warning)" }}>
-                    <Settings className="w-4 h-4 mr-2" />
+                  <Button className="fc-btn text-white bg-[color:var(--fc-status-warning)] hover:brightness-110">
+                    <Settings className="w-4 h-4 mr-2" aria-hidden />
                     Admin Panel
                   </Button>
                 </Link>
@@ -200,37 +201,37 @@ export default function CoachMenu() {
             <div className="flex flex-wrap gap-3">
               <Link href="/coach/clients">
                 <Button className="fc-btn fc-btn-secondary">
-                  <Users className="w-4 h-4 mr-2" />
+                  <Users className="w-4 h-4 mr-2" aria-hidden />
                   View All Clients
                 </Button>
               </Link>
               <Link href="/coach/training">
                 <Button className="fc-btn fc-btn-secondary">
-                  <Dumbbell className="w-4 h-4 mr-2" />
+                  <Dumbbell className="w-4 h-4 mr-2" aria-hidden />
                   Training
                 </Button>
               </Link>
               <Link href="/coach/workouts/templates">
                 <Button className="fc-btn fc-btn-secondary">
-                  <Layers className="w-4 h-4 mr-2" />
+                  <Layers className="w-4 h-4 mr-2" aria-hidden />
                   Workout Templates
                 </Button>
               </Link>
               <Link href="/coach/nutrition/meal-plans">
                 <Button className="fc-btn fc-btn-secondary">
-                  <Apple className="w-4 h-4 mr-2" />
+                  <Apple className="w-4 h-4 mr-2" aria-hidden />
                   Meal Plans
                 </Button>
               </Link>
               <Link href="/coach/profile">
                 <Button className="fc-btn fc-btn-secondary">
-                  <User className="w-4 h-4 mr-2" />
+                  <User className="w-4 h-4 mr-2" aria-hidden />
                   Profile
                 </Button>
               </Link>
             </div>
           </GlassCard>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

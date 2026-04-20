@@ -1484,9 +1484,7 @@ export class WorkoutTemplateService {
       }
       if (progressionMode) {
         insertPayload.progression_mode = progressionMode
-        if (progressionMode === 'coach_managed') {
-          insertPayload.coach_unlocked_week = 1
-        }
+        // coach_unlocked_week is no longer written; calendar unlock is authoritative.
       }
 
       let data: any = existing
@@ -1508,7 +1506,7 @@ export class WorkoutTemplateService {
           }
         if (progressionMode) {
           updatePayload.progression_mode = progressionMode
-          updatePayload.coach_unlocked_week = progressionMode === 'coach_managed' ? 1 : null
+          // coach_unlocked_week is no longer written; calendar unlock is authoritative.
         }
         const updateResponse = await supabase
           .from('program_assignments')
@@ -2226,8 +2224,9 @@ export class WorkoutTemplateService {
 
   static async getProgramProgress(clientId: string): Promise<ProgramAssignmentProgress | null> {
     try {
-      // REFACTORED: Read from canonical program_progress + program_assignments
-      // instead of legacy program_assignment_progress table
+      // REFACTORED: Read canonical program state from programStateService
+      // (calendar-derived current week + ledger/completion state) instead of
+      // legacy program_assignment_progress table.
       const { getProgramState } = await import('./programStateService')
       const state = await getProgramState(supabase, clientId)
 

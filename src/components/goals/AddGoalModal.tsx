@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,8 +77,6 @@ export function AddGoalModal({
     );
   }, [open, resolvedDefaultPillar]);
 
-  if (!open) return null;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !title || !targetValue) return;
@@ -133,129 +132,141 @@ export function AddGoalModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto fc-modal fc-card p-4 my-8"
-        onClick={(e) => e.stopPropagation()}
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md max-h-[90vh] overflow-y-auto gap-0 p-4 my-4 sm:my-8"
       >
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-              {pillarLabels[selectedPillar]} Goals
-            </span>
-            <h2 className="text-lg font-semibold fc-text-primary mt-2">
-              Add Goal
-            </h2>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 fc-press">
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label className="text-sm font-medium mb-2 block fc-text-subtle">Pillar</Label>
-            <select
-              value={selectedPillar}
-              onChange={(e) => {
-                const nextPillar = e.target.value as Pillar;
-                setSelectedPillar(nextPillar);
-                if (!GOAL_TYPE_OPTIONS[nextPillar].some((opt) => opt.value === goalType)) {
-                  setGoalType("");
-                }
-              }}
-              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="training">Training</option>
-              <option value="nutrition">Nutrition</option>
-              <option value="checkins">Check-ins</option>
-              <option value="lifestyle">Lifestyle</option>
-              <option value="general">General</option>
-            </select>
-          </div>
-
-          <div>
-            <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Title *</Label>
-            <Input
-              type="text"
-              placeholder="e.g., Run 5K, Hit 150g protein daily"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
-            />
-          </div>
-
-          <div>
-            <Label className="text-sm font-medium mb-2 block fc-text-subtle">Target *</Label>
-            <div className="flex flex-col gap-2">
-              <Input
-                type="number"
-                placeholder="Number"
-                value={targetValue}
-                onChange={(e) => setTargetValue(e.target.value)}
-                required
-                min={0}
-                step="0.01"
-                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
-              />
-              <Input
-                type="text"
-                placeholder="Unit (kg, reps, min, etc)"
-                value={targetUnit}
-                onChange={(e) => setTargetUnit(e.target.value)}
-                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
-              />
+        <div className="fc-modal fc-card">
+          <div className="flex justify-between items-center mb-6">
+            <div className="min-w-0 pr-2">
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                {pillarLabels[selectedPillar]} Goals
+              </span>
+              <DialogTitle className="text-lg font-semibold fc-text-primary mt-2">Add Goal</DialogTitle>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close"
+              className="h-8 w-8 fc-press shrink-0"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </Button>
           </div>
 
-          {GOAL_TYPE_OPTIONS[selectedPillar].length > 0 && (
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Type (optional)</Label>
+              <Label className="text-sm font-medium mb-2 block fc-text-subtle">Pillar</Label>
               <select
-                value={goalType}
-                onChange={(e) => setGoalType(e.target.value)}
+                value={selectedPillar}
+                onChange={(e) => {
+                  const nextPillar = e.target.value as Pillar;
+                  setSelectedPillar(nextPillar);
+                  if (!GOAL_TYPE_OPTIONS[nextPillar].some((opt) => opt.value === goalType)) {
+                    setGoalType("");
+                  }
+                }}
                 className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-sm"
               >
-                <option value="">—</option>
-                {GOAL_TYPE_OPTIONS[selectedPillar].map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                <option value="training">Training</option>
+                <option value="nutrition">Nutrition</option>
+                <option value="checkins">Check-ins</option>
+                <option value="lifestyle">Lifestyle</option>
+                <option value="general">General</option>
               </select>
             </div>
-          )}
 
-          <div>
-            <Label className="text-sm font-medium mb-2 block fc-text-subtle">Deadline (optional)</Label>
-            <Input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
-            />
-          </div>
+            <div>
+              <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Title *</Label>
+              <Input
+                type="text"
+                placeholder="e.g., Run 5K, Hit 150g protein daily"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
+              />
+            </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button
-              type="submit"
-              disabled={isSubmitting || !title || !targetValue}
-              className="flex-1 fc-btn fc-btn-primary fc-press"
-            >
-              {isSubmitting ? "Creating..." : "Create Goal"}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 fc-btn fc-btn-secondary fc-press">
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+            <div>
+              <Label className="text-sm font-medium mb-2 block fc-text-subtle">Target *</Label>
+              <div className="flex flex-col gap-2">
+                <Input
+                  type="number"
+                  placeholder="Number"
+                  value={targetValue}
+                  onChange={(e) => setTargetValue(e.target.value)}
+                  required
+                  min={0}
+                  step="0.01"
+                  className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                />
+                <Input
+                  type="text"
+                  placeholder="Unit (kg, reps, min, etc)"
+                  value={targetUnit}
+                  onChange={(e) => setTargetUnit(e.target.value)}
+                  className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                />
+              </div>
+            </div>
+
+            {GOAL_TYPE_OPTIONS[selectedPillar].length > 0 && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block fc-text-subtle">Goal Type (optional)</Label>
+                <select
+                  value={goalType}
+                  onChange={(e) => setGoalType(e.target.value)}
+                  className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">—</option>
+                  {GOAL_TYPE_OPTIONS[selectedPillar].map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block fc-text-subtle">Deadline (optional)</Label>
+              <Input
+                type="date"
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+                className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !title || !targetValue}
+                className="flex-1 fc-btn fc-btn-primary fc-press"
+              >
+                {isSubmitting ? "Creating..." : "Create Goal"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1 fc-btn fc-btn-secondary fc-press"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

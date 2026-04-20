@@ -4,6 +4,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
+import Link from "next/link";
 import {
   BookOpen,
   Layers,
@@ -86,53 +87,47 @@ export default function CoachTrainingHubPage() {
             </p>
           </header>
 
-          <nav className="flex flex-col border-y border-white/5" aria-label="Training">
+          <nav className="flex flex-col border-y border-[color:var(--fc-glass-border)]" aria-label="Training">
             {PRIMARY_LINKS.map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Link
                   key={item.href}
-                  type="button"
-                  className={`flex w-full min-h-[52px] items-center gap-4 border-b border-white/5 py-3 text-left transition-colors hover:bg-white/[0.02] ${item.accent}`}
-                  onClick={() => {
-                    window.location.href = item.href;
-                  }}
+                  href={item.href}
+                  className={`flex w-full min-h-[52px] items-center gap-4 border-b border-[color:var(--fc-glass-border)] py-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] ${item.accent}`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)] text-cyan-400">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-accent)]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="font-semibold fc-text-primary">{item.title}</h2>
                     <p className="mt-0.5 text-xs fc-text-dim">{item.description}</p>
                   </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-cyan-400/80" />
-                </button>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-[color:var(--fc-accent)]/80" />
+                </Link>
               );
             })}
           </nav>
 
           <div className="mt-8">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-accent)]/60">
               Organization
             </p>
-            <div className="flex flex-col border-y border-white/5">
+            <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
               {SECONDARY_LINKS.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <button
+                  <Link
                     key={item.href}
-                    type="button"
-                    className="flex w-full min-h-[48px] items-center justify-between border-b border-white/5 py-3 text-left text-sm font-medium text-cyan-400 transition-colors hover:bg-white/[0.02]"
-                    onClick={() => {
-                      window.location.href = item.href;
-                    }}
+                    href={item.href}
+                    className="flex w-full min-h-[48px] items-center justify-between border-b border-[color:var(--fc-glass-border)] py-3 text-left text-sm font-medium text-[color:var(--fc-accent)] transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
                     <span className="flex items-center gap-2">
                       <Icon className="h-4 w-4 opacity-80" />
                       {item.title}
                     </span>
                     <ChevronRight className="h-4 w-4 opacity-60" />
-                  </button>
+                  </Link>
                 );
               })}
             </div>

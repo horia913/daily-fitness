@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,11 +21,13 @@ import { supabase } from "@/lib/supabase";
 import { ArrowLeft } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useToast } from "@/components/ui/toast-provider";
+import { useRouter } from "next/navigation";
 
 function CreateProgramContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const { addToast } = useToast();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -95,7 +98,7 @@ function CreateProgramContent() {
       const created = await WorkoutTemplateService.createProgram(payload);
 
       if (created?.id) {
-        window.location.href = `/coach/programs/${created.id}/edit`;
+        router.push(`/coach/programs/${created.id}/edit`);
       } else {
         console.error("❌ Program creation failed: createProgram returned null");
         addToast({ title: "Failed to create program. Please check the console for details and try again.", variant: "destructive" });
@@ -111,8 +114,7 @@ function CreateProgramContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6 relative z-10 pb-32">
-        <main className="max-w-4xl mx-auto">
+      <CoachPageShell widthVariant="form-2xl" className="p-4 sm:p-6 pb-32">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2 mb-4">
             <h1 className="text-lg font-semibold fc-text-primary">
               Create program
@@ -122,39 +124,30 @@ function CreateProgramContent() {
               variant="ghost"
               size="sm"
               className="h-8 text-xs px-2 shrink-0"
-              onClick={() => (window.location.href = "/coach/programs")}
+              onClick={() => router.push("/coach/programs")}
             >
               <ArrowLeft className="w-3.5 h-3.5 mr-1" />
               Back
             </Button>
           </div>
 
-          <div className="border-t border-black/5 dark:border-white/5 pt-4 space-y-3">
+          <div className="border-t border-[color:var(--fc-glass-border)] pt-4 space-y-3">
               {/* Program Name */}
               <div>
-                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                <label className="text-xs font-medium uppercase tracking-wide fc-text-dim block mb-1">
                   Program name *
                 </label>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., 8-Week Strength Builder"
-                  className="h-9 text-sm"
-                  style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                    border: `1px solid ${
-                      isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                    }`,
-                    color: isDark ? "#fff" : "#1A1A1A",
-                  }}
+                  className="h-9 text-sm fc-input rounded-lg border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)]"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                <label className="text-xs font-medium uppercase tracking-wide fc-text-dim block mb-1">
                   Description
                 </label>
                 <Textarea
@@ -162,41 +155,21 @@ function CreateProgramContent() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the program goals, structure, and who it's designed for..."
                   rows={3}
-                  className="text-sm resize-none min-h-[4.5rem]"
-                  style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                    border: `1px solid ${
-                      isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                    }`,
-                    color: isDark ? "#fff" : "#1A1A1A",
-                  }}
+                  className="text-sm resize-none min-h-[4.5rem] fc-input rounded-lg border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)]"
                 />
               </div>
 
               {/* Difficulty & Duration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  <label className="text-xs font-medium uppercase tracking-wide fc-text-dim block mb-1">
                     Difficulty
                   </label>
                   <Select
                     value={difficulty}
                     onValueChange={(v) => setDifficulty(v as any)}
                   >
-                    <SelectTrigger
-                      className="h-9 text-sm"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.05)",
-                        border: `1px solid ${
-                          isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                        }`,
-                        color: isDark ? "#fff" : "#1A1A1A",
-                      }}
-                    >
+                    <SelectTrigger className="h-9 text-sm fc-input rounded-lg border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -208,7 +181,7 @@ function CreateProgramContent() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  <label className="text-xs font-medium uppercase tracking-wide fc-text-dim block mb-1">
                     Duration (weeks)
                   </label>
                   <Input
@@ -219,23 +192,14 @@ function CreateProgramContent() {
                     onChange={(e) =>
                       setDurationWeeks(parseInt(e.target.value || "1", 10))
                     }
-                    className="h-9 text-sm"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                      border: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                      }`,
-                      color: isDark ? "#fff" : "#1A1A1A",
-                    }}
+                    className="h-9 text-sm fc-input rounded-lg border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)]"
                   />
                 </div>
               </div>
 
               {/* Category */}
               <div>
-                <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                <label className="text-xs font-medium uppercase tracking-wide fc-text-dim block mb-1">
                   Category{" "}
                   <span className="normal-case text-[color:var(--fc-text-dim)] font-normal">
                     (optional)
@@ -253,18 +217,7 @@ function CreateProgramContent() {
                     }
                   }}
                 >
-                  <SelectTrigger
-                    className="h-9 text-sm"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                      border: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                      }`,
-                      color: isDark ? "#fff" : "#1A1A1A",
-                    }}
-                  >
+                  <SelectTrigger className="h-9 text-sm fc-input rounded-lg border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] text-[color:var(--fc-text-primary)]">
                     <SelectValue placeholder="Select category (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -282,34 +235,28 @@ function CreateProgramContent() {
                   </p>
                 )}
               </div>
-            <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-black/5 dark:border-white/5">
+            <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-[color:var(--fc-glass-border)]">
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 className="h-9 text-sm"
-                onClick={() => (window.location.href = "/coach/programs")}
+                onClick={() => router.push("/coach/programs")}
               >
                 Cancel
               </Button>
               <Button
+                type="button"
                 size="sm"
-                className="h-9 text-sm"
-                onClick={onSave}
+                className="h-9 text-sm fc-btn fc-btn-primary disabled:opacity-50"
+                onClick={() => void onSave()}
                 disabled={saving || !name.trim()}
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 2px 8px ${
-                    getSemanticColor("success").primary
-                  }28`,
-                  opacity: saving || !name.trim() ? 0.5 : 1,
-                }}
               >
                 {saving ? "Creating..." : "Create"}
               </Button>
             </div>
           </div>
-        </main>
-      </div>
+      </CoachPageShell>
     </AnimatedBackground>
   );
 }

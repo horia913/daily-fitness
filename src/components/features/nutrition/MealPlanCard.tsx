@@ -29,11 +29,31 @@ export default function MealPlanCard({
   const carbs = Math.round(mealPlan.computed_carbs ?? mealPlan.target_carbs ?? 0);
   const fat = Math.round(mealPlan.computed_fat ?? mealPlan.target_fat ?? 0);
 
+  const hasMacroTargets =
+    mealPlan.target_protein != null ||
+    mealPlan.target_carbs != null ||
+    mealPlan.target_fat != null;
+
   const eyebrow = `MEAL PLAN · ${mealCount} MEAL${mealCount !== 1 ? "S" : ""}`;
   const subtitle = hasComputed
     ? `${calories.toLocaleString()} kcal · ${protein}g P · ${carbs}g C · ${fat}g F`
-    : mealPlan.target_calories
-      ? `${mealPlan.target_calories.toLocaleString()} kcal target`
+    : mealPlan.target_calories != null || hasMacroTargets
+      ? [
+          mealPlan.target_calories != null
+            ? `${mealPlan.target_calories.toLocaleString()} kcal`
+            : null,
+          mealPlan.target_protein != null
+            ? `${Math.round(Number(mealPlan.target_protein))}g P`
+            : null,
+          mealPlan.target_carbs != null
+            ? `${Math.round(Number(mealPlan.target_carbs))}g C`
+            : null,
+          mealPlan.target_fat != null
+            ? `${Math.round(Number(mealPlan.target_fat))}g F`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : undefined;
 
   const body = (

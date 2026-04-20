@@ -5,8 +5,9 @@
  * controlRoomService directly. If confirmed unused, consider removing.
  *
  * Read-only Control Room API. Returns period, signals (program compliance %),
- * and exclusions. No writes; uses only program_assignments, program_schedule,
- * program_day_completions, program_progress.
+ * and exclusions. No writes; uses program_assignments, profiles,
+ * program_schedule, and program_day_completions. Current week is
+ * calendar-derived (computeCurrentProgramWeekForAssignment).
  */
 
 import { NextResponse } from 'next/server'

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,19 +18,17 @@ export default function CoachNutritionFoodsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="max-w-7xl mx-auto p-4 sm:p-6">
-            <Link
-              href="/coach/nutrition"
-              className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4"
-            >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              Back to Nutrition
-            </Link>
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+          <Link
+            href="/coach/nutrition"
+            className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            Back to Nutrition
+          </Link>
 
-            <OptimizedFoodDatabase coachId={user?.id || ""} />
-          </div>
-        </div>
+          <OptimizedFoodDatabase coachId={user?.id || ""} />
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

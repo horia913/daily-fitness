@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -14,6 +15,7 @@ import {
 import { LogPerformanceTestModal } from "@/components/client/LogPerformanceTestModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 type TestType = "1km_run" | "step_test";
 
@@ -98,6 +100,7 @@ function getHistoryTrend(
 }
 
 function PerformancePageContent() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -183,10 +186,7 @@ function PerformancePageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-36 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -197,12 +197,13 @@ function PerformancePageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <ClientPageShell className="max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden">
-        <div className="border-b border-white/5 mb-4 pb-4">
+        <div className="border-b border-[color:var(--fc-glass-border)] mb-4 pb-4">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
               type="button"
-              onClick={() => { window.location.href = "/client/progress"; }}
+              onClick={() => router.push("/client/progress")}
               className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
+              aria-label="Back to progress"
             >
               <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
             </button>
@@ -223,9 +224,15 @@ function PerformancePageContent() {
         </div>
 
         <main className="space-y-4">
-          <section className="flex flex-col gap-2">
+          <section
+            role="tablist"
+            aria-label="Performance test type"
+            className="flex flex-col gap-2"
+          >
             <button
               type="button"
+              role="tab"
+              aria-selected={selectedType === "1km_run"}
               onClick={() => setSelectedType("1km_run")}
               className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
                 selectedType === "1km_run"
@@ -235,7 +242,7 @@ function PerformancePageContent() {
             >
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
-                  <Timer className="w-3.5 h-3.5 text-blue-400" />
+                  <Timer className="w-3.5 h-3.5 text-[color:var(--fc-accent-cyan)]" aria-hidden />
                   1km run
                 </span>
                 {runTrendPercent !== null && runTests.length >= 2 && (
@@ -250,6 +257,8 @@ function PerformancePageContent() {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={selectedType === "step_test"}
               onClick={() => setSelectedType("step_test")}
               className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all ${
                 selectedType === "step_test"
@@ -259,7 +268,7 @@ function PerformancePageContent() {
             >
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="flex items-center gap-1.5 text-xs font-bold fc-text-primary">
-                  <HeartPulse className="w-3.5 h-3.5 text-red-400" />
+                  <HeartPulse className="w-3.5 h-3.5 text-[color:var(--fc-status-error)]" aria-hidden />
                   Step test
                 </span>
                 {stepTrendPercent !== null && stepTests.length >= 2 && (
@@ -282,7 +291,7 @@ function PerformancePageContent() {
             <div className="flex flex-col gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-widest">
+                  <span className="px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] text-[10px] font-bold uppercase tracking-widest">
                     Selected test
                   </span>
                   {latest && (
@@ -355,8 +364,8 @@ function PerformancePageContent() {
                       style={{
                         height: `${(isLast ? 1 : h) * 100}%`,
                         background: isLast
-                          ? "linear-gradient(to top, var(--fc-accent-blue), var(--fc-accent-cyan))"
-                          : "rgba(255,255,255,0.08)",
+                          ? "linear-gradient(to top, var(--fc-accent), var(--fc-accent-cyan))"
+                          : "var(--fc-glass-highlight)",
                         borderTop: isLast ? "2px solid var(--fc-accent-cyan)" : undefined,
                       }}
                     />
@@ -458,8 +467,9 @@ function PerformancePageContent() {
         </button>
       </ClientPageShell>
 
-      {showLogModal && user && (
+      {user && (
         <LogPerformanceTestModal
+          open={showLogModal}
           clientId={user.id}
           testType={selectedType}
           onClose={() => setShowLogModal(false)}

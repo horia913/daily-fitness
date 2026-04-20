@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } fr
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,6 +77,7 @@ function AnalyticsPageContent() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [workoutFrequency, setWorkoutFrequency] = useState<WorkoutFrequencyData[]>([]);
@@ -610,8 +612,8 @@ function AnalyticsPageContent() {
 
   const rangeChipBase =
     "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const rangeChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
-  const rangeChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+  const rangeChipActive = "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
+  const rangeChipInactive = "bg-[color:var(--fc-glass-highlight)] fc-text-dim border-[color:var(--fc-glass-border)]";
 
   return (
     <AnimatedBackground>
@@ -623,26 +625,24 @@ function AnalyticsPageContent() {
             <div className="flex items-start gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  window.location.href = "/client/progress";
-                }}
-                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-gray-400 hover:text-white transition-colors"
+                onClick={() => router.push("/client/progress")}
+                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim hover:fc-text-primary transition-colors"
                 aria-label="Back"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 shrink-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)] shrink-0">
                   <BarChart3 className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle block mb-0.5">
                     Performance
                   </span>
-                  <h1 className="text-xl font-bold tracking-tight text-white truncate">
-                    Analytics <span className="text-gray-500 font-normal">· Overview</span>
+                  <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
+                    Analytics <span className="fc-text-dim font-normal">· Overview</span>
                   </h1>
-                  <p className="text-xs text-gray-500 mt-0.5">Training insights for the range you select.</p>
+                  <p className="text-xs fc-text-dim mt-0.5">Training insights for the range you select.</p>
                 </div>
               </div>
             </div>
@@ -667,17 +667,15 @@ function AnalyticsPageContent() {
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   href="#strength-exercises"
-                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-semibold shrink-0"
+                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)] font-semibold shrink-0"
                 >
                   <Search className="mr-1 h-3.5 w-3.5" />
                   Exercises
                 </a>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/progress/personal-records";
-                  }}
-                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-white/10 bg-white/[0.04] text-gray-400 hover:text-white shrink-0"
+                  onClick={() => router.push("/client/progress/personal-records")}
+                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim hover:fc-text-primary shrink-0"
                 >
                   PRs
                 </button>
@@ -777,7 +775,7 @@ function AnalyticsPageContent() {
                   <h2 className="text-base font-semibold text-white tracking-tight">
                     Workout Frequency
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs fc-text-dim">
                     Last 5 weeks
                   </p>
                 </div>
@@ -835,7 +833,7 @@ function AnalyticsPageContent() {
                     <h2 className="text-base font-semibold text-white tracking-tight">
                       Avg Workout Duration
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs fc-text-dim">
                       This week: {durationTrend.thisWeekAvg} min (avg: {durationTrend.overallAvg} min)
                     </p>
                   </div>
@@ -884,7 +882,7 @@ function AnalyticsPageContent() {
                     <h2 className="text-base font-semibold text-white tracking-tight">
                       Strength Progress
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs fc-text-dim">
                       Estimated 1RM and progression over time
                     </p>
                   </div>
@@ -892,7 +890,7 @@ function AnalyticsPageContent() {
 
                 {topProgressions.length > 0 && (
                   <div>
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
                       Biggest Gains
                     </h3>
                     <div className="flex flex-col gap-4">
@@ -910,7 +908,7 @@ function AnalyticsPageContent() {
 
                 {compoundProgressions.length > 0 && (
                   <div className="fc-card-shell backdrop-blur-[8px] p-4">
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
                       Estimated 1RM — Compound Lifts
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
@@ -932,7 +930,7 @@ function AnalyticsPageContent() {
                 )}
 
                 <div id="strength-exercises">
-                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
                     All Exercises
                   </h3>
                   <div className="relative mb-3">
@@ -1040,7 +1038,7 @@ function AnalyticsPageContent() {
                   <h2 className="text-base font-semibold text-white tracking-tight">
                     Recovery Insight
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs fc-text-dim">
                     Training load vs recovery (last 4 weeks)
                   </p>
                 </div>
@@ -1163,7 +1161,7 @@ function AnalyticsPageContent() {
                   <h2 className="text-base font-semibold text-white tracking-tight">
                     Sleep vs Performance
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs fc-text-dim">
                     How rest affects your workouts (last 30 days)
                   </p>
                 </div>
@@ -1184,7 +1182,7 @@ function AnalyticsPageContent() {
                     <h2 className="text-base font-semibold text-white tracking-tight">
                       Body Composition
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs fc-text-dim">
                       Weight and body fat trends
                     </p>
                   </div>
@@ -1258,7 +1256,7 @@ function AnalyticsPageContent() {
                     <h2 className="text-base font-semibold text-white tracking-tight">
                       Body Composition
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs fc-text-dim">
                       Weight and body fat trends
                     </p>
                   </div>
@@ -1280,7 +1278,7 @@ function AnalyticsPageContent() {
                   <h2 className="text-base font-semibold text-white tracking-tight">
                     Goal Completion
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs fc-text-dim">
                     Track your goal achievements
                   </p>
                 </div>
@@ -1301,7 +1299,7 @@ function AnalyticsPageContent() {
                   <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     {goalCompletion.completed} of {goalCompletion.total}
                   </p>
-                  <p className="text-xs text-gray-500">goals completed</p>
+                  <p className="text-xs fc-text-dim">goals completed</p>
                 </div>
               </div>
             </div>
@@ -1320,7 +1318,7 @@ function AnalyticsPageContent() {
                   <h2 className="text-base font-semibold text-white tracking-tight">
                     Extra Activities
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs fc-text-dim">
                     Your logged activities beyond workouts
                   </p>
                 </div>
@@ -1375,7 +1373,7 @@ function AnalyticsPageContent() {
                                 {byWeek[w].minutes}
                               </span>
                               <div
-                                className="w-full rounded-t-md bg-gradient-to-t from-cyan-500 to-cyan-400 transition-all duration-500"
+                                className="w-full rounded-t-md bg-[color:var(--fc-accent)] transition-all duration-500"
                                 style={{ height: `${Math.max(pct, 4)}%` }}
                               />
                               <span className="text-[9px] fc-text-dim">{label}</span>
@@ -1400,7 +1398,7 @@ function AnalyticsPageContent() {
                               </span>
                               <div className="flex-1 h-2 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-cyan-500 transition-all duration-500"
+                                  className="h-full rounded-full bg-[color:var(--fc-accent)] transition-all duration-500"
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
@@ -1481,10 +1479,7 @@ export default function AnalyticsPage() {
         fallback={
           <AnimatedBackground>
             <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6">
-              <div className="animate-pulse space-y-3">
-                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>
         }

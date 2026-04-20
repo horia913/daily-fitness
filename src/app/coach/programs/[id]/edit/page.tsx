@@ -1,14 +1,26 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -23,12 +35,11 @@ import WorkoutTemplateService, {
 import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
-  TrendingUp,
   Target,
   Layers,
   Plus,
   Copy,
-  X,
+  Dumbbell,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
@@ -261,10 +272,11 @@ const getBlockSummary = (block: any): string => {
 
 function EditProgramContent() {
   const params = useParams();
+  const router = useRouter();
   const programId = useMemo(() => String(params?.id || ""), [params]);
   const { user } = useAuth();
   const { addToast } = useToast();
-  const { isDark, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
   const { exercises: availableExercises } = useExerciseLibrary(user?.id || "");
 
   const [loading, setLoading] = useState(true);
@@ -629,7 +641,7 @@ function EditProgramContent() {
         is_active: form.is_active,
         coach_id: form.coach_id,
       });
-      window.location.href = `/coach/programs/${form.id}`;
+      router.push(`/coach/programs/${form.id}`);
     } finally {
       setSaving(false);
     }
@@ -882,14 +894,9 @@ function EditProgramContent() {
   if (loading || !form) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen p-4 max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-          </div>
-        </div>
+        <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6">
+          <PageSkeleton variant="form" />
+        </CoachPageShell>
       </AnimatedBackground>
     );
   }
@@ -897,124 +904,123 @@ function EditProgramContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-4 relative z-10">
-          <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
-            <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate min-w-0">
-              Edit program
-            </h1>
+      <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6">
+        <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-accent)] flex items-center justify-center flex-shrink-0">
+                <Dumbbell className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
+                    Edit program
+                  </h1>
+                  {form.is_active ? (
+                    <Badge className="fc-badge bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)] border-[color:var(--fc-status-success)]/30">
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge className="fc-badge bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-dim)] border-[color:var(--fc-glass-border)]">
+                      Draft
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1 truncate">
+                  {form.name}
+                </p>
+              </div>
+            </div>
             <Button
               variant="ghost"
               size="sm"
-              className="fc-btn fc-btn-ghost h-8 shrink-0 text-xs px-2"
-              onClick={() => (window.location.href = "/coach/programs")}
+              className="fc-btn fc-btn-ghost shrink-0 self-start sm:self-auto"
+              onClick={() => router.push("/coach/programs")}
             >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              <ArrowLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
           </div>
-          <p className="text-xs text-[color:var(--fc-text-dim)] truncate -mt-1 mb-1">
-            {form.name}
-          </p>
+        </GlassCard>
 
-          {/* Training Block Header — goal/duration for single block, timeline for multi */}
-          {trainingBlocks.length > 0 && (
-            <TrainingBlockHeader
-              trainingBlocks={trainingBlocks}
-              activeBlockId={activeBlockId}
-              onSelectBlock={(id) => {
-                setActiveBlockId(id);
-                setSelectedWeek(1);
-                setSelectedScheduleForProgression(null);
-              }}
-              onAddBlock={() => {
-                setEditingBlock(null);
-                setShowBlockModal(true);
-              }}
-              onEditBlock={(block) => {
-                setEditingBlock(block);
-                setShowBlockModal(true);
-              }}
-              onDeleteBlock={handleDeleteBlockFromHeader}
-              onUpdateBlock={handleUpdateBlock}
-              onMoveBlock={handleMoveBlock}
-            />
-          )}
+        {/* Training Block Header — goal/duration for single block, timeline for multi */}
+        {trainingBlocks.length > 0 && (
+          <TrainingBlockHeader
+            trainingBlocks={trainingBlocks}
+            activeBlockId={activeBlockId}
+            onSelectBlock={(id) => {
+              setActiveBlockId(id);
+              setSelectedWeek(1);
+              setSelectedScheduleForProgression(null);
+            }}
+            onAddBlock={() => {
+              setEditingBlock(null);
+              setShowBlockModal(true);
+            }}
+            onEditBlock={(block) => {
+              setEditingBlock(block);
+              setShowBlockModal(true);
+            }}
+            onDeleteBlock={handleDeleteBlockFromHeader}
+            onUpdateBlock={handleUpdateBlock}
+            onMoveBlock={handleMoveBlock}
+          />
+        )}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("basic")}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                activeTab === "basic"
-                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
-                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
-              )}
-            >
-              Info
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("schedule")}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                activeTab === "schedule"
-                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
-                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
-              )}
-            >
-              Schedule
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("progression")}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                activeTab === "progression"
-                  ? "bg-[color:var(--fc-domain-workouts)]/25 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-domain-workouts)]/40"
-                  : "text-gray-400 hover:text-[color:var(--fc-text-primary)]",
-              )}
-            >
-              Progression
-            </button>
-          </div>
+        <div className="border-b border-[color:var(--fc-glass-border)] -mx-3 sm:mx-0 px-3 sm:px-0">
+          <nav
+            className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+            role="tablist"
+            aria-label="Program sections"
+          >
+            {[
+              { id: "basic" as const, label: "Info" },
+              { id: "schedule" as const, label: "Schedule" },
+              { id: "progression" as const, label: "Progression" },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "bg-transparent border-none cursor-pointer",
+                    "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 min-h-[44px] rounded-t-xl",
+                    "border-b-2 -mb-[1px]",
+                    isActive
+                      ? "text-[color:var(--fc-accent)] border-[color:var(--fc-accent)]"
+                      : "text-[color:var(--fc-text-dim)] border-transparent hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)]",
+                  )}
+                >
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
           {/* Tab Content */}
           {activeTab === "basic" && (
-            <div className="border-t border-black/5 dark:border-white/5 pt-4 mt-1">
-              <div className="space-y-3">
+            <div role="tabpanel" className="space-y-4">
+              <GlassCard elevation={1} className="fc-card-shell p-4 sm:p-6 space-y-4">
                 {/* Program Name */}
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
                     Program name *
                   </label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     className="h-9 text-sm"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                      border: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                      }`,
-                      color: isDark ? "#fff" : "#1A1A1A",
-                    }}
                   />
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label
-                    className="text-sm font-semibold block mb-1"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.9)"
-                        : "rgba(0,0,0,0.9)",
-                    }}
-                  >
+                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
                     Description
                   </label>
                   <Textarea
@@ -1023,23 +1029,14 @@ function EditProgramContent() {
                       setForm({ ...form, description: e.target.value })
                     }
                     rows={4}
-                    className="text-base resize-none"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                      border: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                      }`,
-                      color: isDark ? "#fff" : "#1A1A1A",
-                    }}
+                    className="text-sm resize-none"
                   />
                 </div>
 
                 {/* Difficulty & Duration */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
                       Difficulty
                     </label>
                     <Select
@@ -1048,47 +1045,27 @@ function EditProgramContent() {
                         setForm({ ...form, difficulty_level: v as any })
                       }
                     >
-                      <SelectTrigger
-                        className="h-9 text-sm"
-                        style={{
-                          background: isDark
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                          border: `1px solid ${
-                            isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                          }`,
-                          color: isDark ? "#fff" : "#1A1A1A",
-                        }}
-                      >
+                      <SelectTrigger className="h-9 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="beginner">Beginner</SelectItem>
-                        <SelectItem value="intermediate">
-                          Intermediate
-                        </SelectItem>
+                        <SelectItem value="intermediate">Intermediate</SelectItem>
                         <SelectItem value="advanced">Advanced</SelectItem>
                         <SelectItem value="athlete">Athlete</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                    <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
                       Duration (weeks)
                     </label>
                     {trainingBlocks.length > 1 ? (
-                      <div
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
-                        style={{
-                          background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-                          border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-                          color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                        }}
-                      >
-                        <Layers className="w-4 h-4 flex-shrink-0" style={{ color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)" }} />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)] min-h-9">
+                        <Layers className="w-4 h-4 flex-shrink-0 text-[color:var(--fc-text-dim)] opacity-60" />
                         <span>
                           {trainingBlocks.reduce((sum, b) => sum + b.duration_weeks, 0)} weeks
-                          <span className="ml-1.5 text-xs" style={{ color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)" }}>
+                          <span className="ml-1.5 text-xs text-[color:var(--fc-text-dim)] opacity-70">
                             (across {trainingBlocks.length} block{trainingBlocks.length !== 1 ? "s" : ""} — edit each block to adjust)
                           </span>
                         </span>
@@ -1105,15 +1082,7 @@ function EditProgramContent() {
                             duration_weeks: parseInt(e.target.value || "1", 10),
                           })
                         }
-                        style={{
-                          background: isDark
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                          border: `1px solid ${
-                            isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                          }`,
-                          color: isDark ? "#fff" : "#1A1A1A",
-                        }}
+                        className="h-9 text-sm"
                       />
                     )}
                   </div>
@@ -1121,9 +1090,9 @@ function EditProgramContent() {
 
                 {/* Category */}
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
                     Category{" "}
-                    <span className="normal-case text-[color:var(--fc-text-dim)] font-normal">
+                    <span className="normal-case text-[color:var(--fc-text-dim)] font-normal opacity-70">
                       (optional)
                     </span>
                   </label>
@@ -1146,18 +1115,7 @@ function EditProgramContent() {
                       }
                     }}
                   >
-                    <SelectTrigger
-                      className="h-9 text-sm"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.05)",
-                        border: `1px solid ${
-                          isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                        }`,
-                        color: isDark ? "#fff" : "#1A1A1A",
-                      }}
-                    >
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Select category (optional)" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1180,30 +1138,34 @@ function EditProgramContent() {
                 </div>
 
                 {/* Active Toggle */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-[color:var(--fc-glass-border)] pt-2">
+                  <div className="min-w-0">
+                    <span className="block text-sm font-medium text-[color:var(--fc-text-primary)]">
+                      Active
+                    </span>
+                    <p className="mt-0.5 text-xs text-[color:var(--fc-text-dim)]">
+                      Visible to clients and available for assignment.
+                    </p>
+                  </div>
+                  <Switch
                     checked={form.is_active}
-                    onChange={(e) =>
-                      setForm({ ...form, is_active: e.target.checked })
+                    onCheckedChange={(checked) =>
+                      setForm({ ...form, is_active: checked })
                     }
-                    className="w-4 h-4"
+                    className="shrink-0"
                   />
-                  <label className="text-sm text-[color:var(--fc-text-primary)]">
-                    Active (visible to clients)
-                  </label>
-                </div>
-              </div>
+                </label>
+              </GlassCard>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-black/5 dark:border-white/5">
+              <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    (window.location.href = `/coach/programs/${form.id}`)
+                    router.push(`/coach/programs/${form.id}`)
                   }
-                  className="h-9 text-sm"
+                  className="fc-btn fc-btn-ghost"
                 >
                   Cancel
                 </Button>
@@ -1211,7 +1173,7 @@ function EditProgramContent() {
                   size="sm"
                   onClick={onSave}
                   disabled={saving || !form.name.trim()}
-                  className="h-9 text-sm fc-btn bg-gradient-to-r from-cyan-500 to-cyan-400 text-white shadow-md shadow-cyan-500/20 hover:from-cyan-400 hover:to-cyan-300 disabled:opacity-50"
+                  className="fc-btn fc-btn-primary"
                 >
                   {saving ? "Saving..." : "Save"}
                 </Button>
@@ -1220,26 +1182,28 @@ function EditProgramContent() {
           )}
 
           {activeTab === "schedule" && (
-            <div className="space-y-3 max-w-6xl border-t border-black/5 dark:border-white/5 pt-4 mt-1">
-              <div className="flex min-h-9 max-h-11 items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold fc-text-primary truncate">
-                  Week-at-a-glance schedule
-                </h2>
+            <div role="tabpanel" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">
+                    Week-at-a-glance schedule
+                  </h2>
+                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
+                    Click any cell to assign a template, mark optional, or rest.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   size="sm"
-                  className="h-8 text-xs fc-btn fc-btn-secondary"
+                  className="fc-btn fc-btn-secondary shrink-0"
                   onClick={() => void handleCopyFromWeekOne()}
                 >
                   <Copy className="w-3.5 h-3.5 mr-1" />
                   Copy from week 1
                 </Button>
               </div>
-              <p className="text-xs text-[color:var(--fc-text-dim)] -mt-2">
-                Edit any week/day cell directly. Click a cell to assign template, optional flag, or rest.
-              </p>
 
-              <div className="border-t border-black/5 dark:border-white/5 pt-3 mt-2">
+              <div>
                 {(() => {
                   const effectiveBlocks =
                     trainingBlocks.length > 0
@@ -1269,13 +1233,13 @@ function EditProgramContent() {
 
                         return (
                           <section key={`${block.id}-${blockStart}`} className="space-y-2">
-                            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                               Block {idx + 1} · {(block.goal || "custom").replace(/_/g, " ")} (Weeks {blockStart}-{blockEnd})
                             </h3>
 
-                            <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03]">
+                            <div className="overflow-x-auto rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]">
                               <div className="min-w-[860px] p-2">
-                                <div className="grid grid-cols-[110px_repeat(7,minmax(110px,1fr))] gap-2 text-[10px] uppercase tracking-wide text-gray-400">
+                                <div className="grid grid-cols-[110px_repeat(7,minmax(110px,1fr))] gap-2 text-[10px] uppercase tracking-wide text-[color:var(--fc-text-dim)]">
                                   <div className="sticky left-0 z-20 rounded-md bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
                                     Week
                                   </div>
@@ -1284,13 +1248,13 @@ function EditProgramContent() {
                                       {d}
                                     </div>
                                   ))}
-                </div>
+                                </div>
 
                                 {blockRows.map((absoluteWeek) => (
                                   <React.Fragment key={`${block.id}-week-${absoluteWeek}`}>
-                                    <div className="sticky left-0 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
+                                    <div className="sticky left-0 z-10 flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
                                       <span className={cn("h-5 w-1 rounded-full", goalBarClassForGoal(block.goal))} />
-                                      <span className="text-xs font-semibold text-white">
+                                      <span className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                         Week {absoluteWeek}
                                       </span>
                                     </div>
@@ -1318,27 +1282,27 @@ function EditProgramContent() {
                                           }
                                           className={cn(
                                             "group min-h-[72px] rounded-lg border p-2 text-left transition-colors",
-                                            "hover:border-cyan-500/40 hover:bg-cyan-500/5",
+                                            "hover:border-[color:var(--fc-accent)]/40 hover:bg-[color:var(--fc-accent)]/5",
                                             isEmpty
-                                              ? "border-dashed border-white/20 bg-transparent"
-                                              : "border-white/10 bg-white/[0.04]",
+                                              ? "border-dashed border-[color:var(--fc-glass-border)] bg-transparent"
+                                              : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]",
                                           )}
                                         >
                                           {isEmpty ? (
-                                            <div className="h-full flex items-center justify-center text-gray-500">
-                                              <Plus className="w-4 h-4 opacity-50" />
+                                            <div className="h-full flex items-center justify-center text-[color:var(--fc-text-dim)] opacity-60">
+                                              <Plus className="w-4 h-4" />
                                             </div>
                                           ) : (
                                             <div className="space-y-1">
                                               <div className="flex items-center justify-between gap-2">
                                                 <span className={cn("inline-block w-2 h-2 rounded-full", goalDotClassForGoal(block.goal))} />
                                                 {cell?.is_optional ? (
-                                                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                                                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)]">
                                                     Opt
                                                   </span>
                                                 ) : null}
                                               </div>
-                                              <p className="text-xs font-semibold text-white truncate">
+                                              <p className="text-xs font-semibold text-[color:var(--fc-text-primary)] truncate">
                                                 {template?.name || (isRest ? "Rest" : "Optional")}
                                               </p>
                                             </div>
@@ -1358,111 +1322,117 @@ function EditProgramContent() {
                 })()}
               </div>
 
-              {scheduleEditor?.isOpen && (
-                <div className="fixed inset-0 z-[12000] flex items-center justify-center p-3">
-                  <button
-                    type="button"
-                    className="absolute inset-0 bg-black/50"
-                    onClick={() => setScheduleEditor(null)}
-                  />
-                  <div className="relative w-full max-w-sm rounded-xl border border-white/10 bg-[color:var(--fc-bg)] p-4 shadow-2xl">
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <h4 className="text-sm font-semibold text-white">
-                        Week {scheduleEditor.week} · {programDayLabel(scheduleEditor.day)}
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => setScheduleEditor(null)}
-                        className="p-1 rounded text-gray-400 hover:text-white"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+              <Dialog
+                open={!!scheduleEditor?.isOpen}
+                onOpenChange={(open) => {
+                  if (!open) setScheduleEditor(null);
+                }}
+              >
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {scheduleEditor
+                        ? `Week ${scheduleEditor.week} · ${programDayLabel(scheduleEditor.day)}`
+                        : ""}
+                    </DialogTitle>
+                  </DialogHeader>
 
-                    <Input
-                      value={scheduleEditor.search}
-                      onChange={(e) =>
-                        setScheduleEditor((prev) =>
-                          prev ? { ...prev, search: e.target.value } : prev,
-                        )
-                      }
-                      placeholder="Search templates..."
-                      className="h-9 text-sm mb-2"
-                    />
-
-                    <div className="max-h-56 overflow-y-auto rounded-lg border border-white/10 divide-y divide-white/5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setScheduleEditor((prev) =>
-                            prev ? { ...prev, templateId: "rest" } : prev,
-                          )
-                        }
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-sm hover:bg-white/[0.04]",
-                          scheduleEditor.templateId === "rest" ? "bg-cyan-500/10 text-cyan-300" : "text-gray-200",
-                        )}
-                      >
-                        Set as Rest
-                      </button>
-                      {templates
-                        .filter((t) =>
-                          t.name.toLowerCase().includes(scheduleEditor.search.toLowerCase()),
-                        )
-                        .map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() =>
-                              setScheduleEditor((prev) =>
-                                prev ? { ...prev, templateId: t.id } : prev,
-                              )
-                            }
-                            className={cn(
-                              "w-full text-left px-3 py-2 text-sm hover:bg-white/[0.04]",
-                              scheduleEditor.templateId === t.id ? "bg-cyan-500/10 text-cyan-300" : "text-gray-200",
-                            )}
-                          >
-                            {t.name}
-                          </button>
-                        ))}
-                    </div>
-
-                    <label className="mt-3 flex items-center gap-2 text-xs text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={scheduleEditor.isOptional}
+                  {scheduleEditor && (
+                    <div className="space-y-3">
+                      <Input
+                        value={scheduleEditor.search}
                         onChange={(e) =>
                           setScheduleEditor((prev) =>
-                            prev ? { ...prev, isOptional: e.target.checked } : prev,
+                            prev ? { ...prev, search: e.target.value } : prev,
                           )
                         }
+                        placeholder="Search templates..."
+                        className="h-9 text-sm"
                       />
-                      Mark optional
-                    </label>
 
-                    <div className="mt-4 flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        onClick={() => setScheduleEditor(null)}
-                        disabled={scheduleCellSaving}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        className="h-8 text-xs fc-btn fc-btn-primary"
-                        onClick={() => void saveScheduleEditor()}
-                        disabled={scheduleCellSaving}
-                      >
-                        {scheduleCellSaving ? "Saving..." : "Save"}
-                      </Button>
+                      <div className="max-h-56 overflow-y-auto rounded-lg border border-[color:var(--fc-glass-border)] divide-y divide-[color:var(--fc-glass-border)]">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setScheduleEditor((prev) =>
+                              prev ? { ...prev, templateId: "rest" } : prev,
+                            )
+                          }
+                          className={cn(
+                            "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[color:var(--fc-glass-highlight)]",
+                            scheduleEditor.templateId === "rest"
+                              ? "bg-[color:var(--fc-accent)]/10 text-[color:var(--fc-accent)]"
+                              : "text-[color:var(--fc-text-primary)]",
+                          )}
+                        >
+                          Set as Rest
+                        </button>
+                        {templates
+                          .filter((t) =>
+                            t.name.toLowerCase().includes(scheduleEditor.search.toLowerCase()),
+                          )
+                          .map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() =>
+                                setScheduleEditor((prev) =>
+                                  prev ? { ...prev, templateId: t.id } : prev,
+                                )
+                              }
+                              className={cn(
+                                "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[color:var(--fc-glass-highlight)]",
+                                scheduleEditor.templateId === t.id
+                                  ? "bg-[color:var(--fc-accent)]/10 text-[color:var(--fc-accent)]"
+                                  : "text-[color:var(--fc-text-primary)]",
+                              )}
+                            >
+                              {t.name}
+                            </button>
+                          ))}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <label
+                          htmlFor="schedule-optional-toggle"
+                          className="text-sm text-[color:var(--fc-text-primary)] cursor-pointer"
+                        >
+                          Mark optional
+                        </label>
+                        <Switch
+                          id="schedule-optional-toggle"
+                          checked={scheduleEditor.isOptional}
+                          onCheckedChange={(checked) =>
+                            setScheduleEditor((prev) =>
+                              prev ? { ...prev, isOptional: checked } : prev,
+                            )
+                          }
+                        />
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  )}
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="fc-btn fc-btn-ghost"
+                      onClick={() => setScheduleEditor(null)}
+                      disabled={scheduleCellSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="fc-btn fc-btn-primary"
+                      onClick={() => void saveScheduleEditor()}
+                      disabled={scheduleCellSaving}
+                    >
+                      {scheduleCellSaving ? "Saving..." : "Save"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {/* Program Volume Calculator */}
               {form && form.category && (
@@ -1485,16 +1455,16 @@ function EditProgramContent() {
           )}
 
           {activeTab === "progression" && (
-            <div className="space-y-3 max-w-4xl border-t border-black/5 dark:border-white/5 pt-4 mt-1">
-              <div className="flex flex-wrap items-center justify-between gap-2 min-h-9">
-                <h2 className="text-lg font-semibold fc-text-primary">
+            <div role="tabpanel" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base sm:text-lg font-semibold text-[color:var(--fc-text-primary)]">
                   Progression rules
                 </h2>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs rounded-lg border border-[color:var(--fc-glass-border)]"
+                    className="fc-btn fc-btn-ghost"
                   >
                     Skip
                   </Button>
@@ -1503,7 +1473,7 @@ function EditProgramContent() {
                       onClick={() => setShowProgressionSuggestions(true)}
                       variant="outline"
                       size="sm"
-                      className="h-8 text-xs rounded-lg"
+                      className="fc-btn fc-btn-secondary"
                     >
                       <Target className="w-3.5 h-3.5 mr-1" />
                       Suggestions
@@ -1521,15 +1491,15 @@ function EditProgramContent() {
                     trainingBlocks.length,
                   ),
               ).length === 0 ? (
-                <div className="py-6 text-center border-t border-black/5 dark:border-white/5">
-                  <p className="text-sm fc-text-dim">
+                <GlassCard elevation={1} className="fc-card-shell py-10 text-center">
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     No workouts for week {selectedWeek}. Use the Schedule tab first.
                   </p>
-                </div>
+                </GlassCard>
               ) : (
-                <div className="space-y-3 border-t border-black/5 dark:border-white/5 pt-3">
+                <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                    <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">
                       Week
                     </label>
                     <Select
@@ -1540,7 +1510,7 @@ function EditProgramContent() {
                         setSelectedScheduleForProgression(null);
                       }}
                     >
-                      <SelectTrigger className="w-28 h-9 text-sm rounded-lg [&>svg]:text-cyan-400">
+                      <SelectTrigger className="w-28 h-9 text-sm rounded-lg [&>svg]:text-[color:var(--fc-accent)]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-[10000]" position="popper">
@@ -1639,7 +1609,7 @@ function EditProgramContent() {
                       }}
                     />
                   ) : (
-                    <div className="text-center py-4 text-xs fc-text-dim border-t border-black/5 dark:border-white/5">
+                    <div className="text-center py-4 text-xs fc-text-dim border-t border-[color:var(--fc-glass-border)]">
                       Select a day to edit rules.
                     </div>
                   )}
@@ -1676,8 +1646,7 @@ function EditProgramContent() {
               }}
             />
           )}
-        </div>
-      </div>
+      </CoachPageShell>
     </AnimatedBackground>
   );
 }

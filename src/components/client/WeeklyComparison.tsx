@@ -56,7 +56,7 @@ export function WeeklyComparison({
 
   if (!current && !previous && wellnessThisWeek.length === 0 && wellnessLastWeek.length === 0) {
     return (
-      <div className="border-y border-white/5 px-4 py-3">
+      <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
         <h3 className="mb-3 text-lg font-semibold fc-text-primary">Comparison</h3>
         <p className="text-sm fc-text-dim">Complete a weekly check-in to see comparison.</p>
         <Link href="/client/progress/body-metrics" className="mt-2 inline-block text-sm font-medium fc-text-primary underline">
@@ -67,7 +67,7 @@ export function WeeklyComparison({
   }
 
   return (
-    <div className="border-y border-white/5 px-4 py-3">
+    <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
       <h3 className="mb-3 text-lg font-semibold fc-text-primary">Comparison</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[280px] border-collapse text-sm">

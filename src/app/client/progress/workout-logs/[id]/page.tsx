@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
@@ -122,6 +123,7 @@ interface BlockGroup {
 
 export default function WorkoutLogDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const workoutLogId = useMemo(() => String(params?.id || ""), [params?.id]);
@@ -504,7 +506,7 @@ export default function WorkoutLogDetailPage() {
               {set.dropset_percentage != null && set.dropset_percentage > 0 && (
                 <span className="ml-2 text-xs fc-text-dim">({set.dropset_percentage}% drop)</span>
               )}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -527,7 +529,7 @@ export default function WorkoutLogDetailPage() {
                   </span>
                 </>
               )}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -559,7 +561,7 @@ export default function WorkoutLogDetailPage() {
             <span className="fc-text-dim font-mono">{n}</span>
             <span className="font-medium fc-text-primary">
               {set.weight || 0} kg × {set.reps || 0}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </span>
           </div>
         );
@@ -578,7 +580,7 @@ export default function WorkoutLogDetailPage() {
               <span className="font-medium fc-text-primary">
                 {set.preexhaust_compound_weight || 0} kg × {set.preexhaust_compound_reps || 0}
               </span>
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -590,7 +592,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-medium fc-text-primary">
               {set.weight || 0} kg × {set.reps || 0}
               {set.cluster_number != null && <span className="ml-1 fc-text-dim text-xs">(cluster {set.cluster_number})</span>}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </span>
           </div>
         );
@@ -612,7 +614,7 @@ export default function WorkoutLogDetailPage() {
                   <span className="ml-1.5 text-xs fc-text-dim">(pause #{set.rest_pause_number || 1})</span>
                 </>
               )}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -626,7 +628,7 @@ export default function WorkoutLogDetailPage() {
               {set.emom_total_duration_sec != null && (
                 <span className="ml-2 text-xs fc-text-dim">({fmtSec(set.emom_total_duration_sec)})</span>
               )}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </span>
           </div>
         );
@@ -658,7 +660,7 @@ export default function WorkoutLogDetailPage() {
               {set.amrap_duration_seconds != null && (
                 <span className="ml-2 text-xs fc-text-dim">({fmtSec(set.amrap_duration_seconds)})</span>
               )}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -673,7 +675,7 @@ export default function WorkoutLogDetailPage() {
                 {set.weight || 0} kg × {set.fortime_total_reps || set.reps || 0}
               </span>
               {timeTaken && <span className="ml-2 text-xs fc-text-dim">(in {timeTaken})</span>}
-              {set.rpe != null && <span className="ml-2 text-amber-400 text-xs">RPE {set.rpe}</span>}
+              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
             </div>
           </div>
         );
@@ -686,7 +688,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-medium fc-text-primary">{set.weight || 0} kg</span>
             <span className="font-medium fc-text-primary">{set.reps || 0}</span>
             {set.rpe != null
-              ? <span className="text-amber-400 text-xs">RPE {set.rpe}</span>
+              ? <span className="fc-text-warning text-xs">RPE {set.rpe}</span>
               : <span />}
           </div>
         );
@@ -969,11 +971,7 @@ export default function WorkoutLogDetailPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-5 w-36 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-7 w-4/5 max-w-xs rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-48 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -989,9 +987,7 @@ export default function WorkoutLogDetailPage() {
             <div className="text-center py-8">
               <p className="text-sm fc-text-dim">Workout log not found</p>
               <Button
-                onClick={() => {
-                  window.location.href = "/client/progress/workout-logs";
-                }}
+                onClick={() => router.push("/client/progress/workout-logs")}
                 className="fc-btn fc-btn-secondary mt-3 h-10 text-sm"
               >
                 Back to Logs
@@ -1038,9 +1034,7 @@ export default function WorkoutLogDetailPage() {
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/progress/workout-logs";
-                  }}
+                  onClick={() => router.push("/client/progress/workout-logs")}
                   className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
                   aria-label="Back to logs"
                 >
@@ -1148,7 +1142,7 @@ export default function WorkoutLogDetailPage() {
 
             {personalRecords.length > 0 && (
               <div className="fc-card-shell fc-card-shell--warning p-3">
-                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5 font-bold fc-text-primary">
+                <h3 className="text-sm uppercase tracking-wider mb-2 flex items-center gap-1.5 font-bold fc-text-primary">
                   <Trophy className="w-4 h-4 text-[color:var(--fc-status-warning)] shrink-0" />
                   PRs this session
                 </h3>
@@ -1187,7 +1181,7 @@ export default function WorkoutLogDetailPage() {
             {isAbandoned && hasNoSets && (
               <div className="fc-card-shell p-4 text-center">
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 text-[color:var(--fc-text-subtle)]" />
-                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 font-bold fc-text-primary">Workout not completed</h3>
+                <h3 className="text-sm uppercase tracking-wider mb-2 font-bold fc-text-primary">Workout not completed</h3>
                 <p className="text-xs fc-text-dim">Started but not finished — no sets logged.</p>
               </div>
             )}
@@ -1195,7 +1189,7 @@ export default function WorkoutLogDetailPage() {
             {/* Exercise Breakdown — all expanded, card-per-exercise with table layout */}
             {!(isAbandoned && hasNoSets) && (
               <section className="space-y-3">
-                <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-2 font-bold flex items-center gap-2 px-0.5 fc-text-primary">
+                <h3 className="text-sm uppercase tracking-wider mb-2 font-bold flex items-center gap-2 px-0.5 fc-text-primary">
                   Exercises
                   <span className="h-px flex-1 bg-[color:var(--fc-glass-border)]" />
                 </h3>
@@ -1284,7 +1278,7 @@ export default function WorkoutLogDetailPage() {
                                 {/* View progression link */}
                                 <button
                                   type="button"
-                                  onClick={() => { window.location.href = `/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`; }}
+                                  onClick={() => router.push(`/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`)}
                                   className="mt-3 w-full text-left flex items-center justify-between p-3 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)] group transition-colors hover:border-[color:var(--fc-accent)]/40"
                                 >
                                   <span className="text-sm font-medium text-[color:var(--fc-accent)]">
@@ -1319,8 +1313,8 @@ export default function WorkoutLogDetailPage() {
             <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 z-50 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm">
               <div className="max-w-lg mx-auto w-full grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Button
-                  onClick={() => { window.location.href = "/client/progress/workout-logs"; }}
-                  className="fc-btn rounded-xl h-10 text-sm font-semibold gap-1.5 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0"
+                  onClick={() => router.push("/client/progress/workout-logs")}
+                  className="fc-btn rounded-xl h-10 text-sm font-semibold gap-1.5 bg-[color:var(--fc-status-error)] hover:opacity-90 text-[color:var(--fc-bg-base)] border-0"
                 >
                   <Repeat2 className="w-4 h-4" />
                   Repeat

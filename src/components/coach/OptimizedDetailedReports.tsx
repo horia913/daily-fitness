@@ -1,15 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   FileText, 
   Download,
@@ -22,7 +19,6 @@ import {
   Filter,
   Search,
   Plus,
-  ArrowLeft,
   ArrowRight,
   Eye,
   Share2,
@@ -46,7 +42,7 @@ import {
   Send,
   CheckCircle
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 
 interface ReportTemplate {
   id: string
@@ -88,10 +84,6 @@ interface OptimizedDetailedReportsProps {
 }
 
 export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedReportsProps) {
-  const { getThemeStyles, performanceSettings } = useTheme()
-  const router = useRouter()
-  const theme = getThemeStyles()
-
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('')
@@ -385,95 +377,39 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   const selectedTemplateData = reportTemplates.find(t => t.id === selectedTemplate)
 
   if (loading) {
-    return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse">
-          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
-              <div className="fc-card-shell p-3 sm:p-4 md:p-6">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
-                <div className="space-y-4">
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen">
-        {/* Enhanced Header — single padding level on mobile */}
-        <div className={`p-3 sm:p-4 md:p-6 ${theme.background} relative overflow-hidden`}>
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
-          </div>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Control bar: Preview toggle + Refresh */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
+        <Button
+          variant="outline"
+          onClick={() => setShowPreview(!showPreview)}
+          className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto"
+          size="sm"
+        >
+          <Eye className="w-4 h-4" />
+          {showPreview ? 'Hide Preview' : 'Show Preview'}
+        </Button>
+        <Button
+          variant="outline"
+          className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto"
+          size="sm"
+          onClick={() => {
+            if (coachId) {
+              didLoadRef.current = false
+              loadData()
+            }
+          }}
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
 
-          <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-card-shell sm:rounded-3xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <Button
-                      variant="ghost"
-                      onClick={() => router.push('/coach')}
-                      className="fc-btn fc-btn-ghost h-10 w-10 flex-shrink-0"
-                    >
-                      <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div className="space-y-1 sm:space-y-2 min-w-0">
-                      <Badge className="fc-badge">Report Builder</Badge>
-                      <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                        Detailed Reports 📋
-                      </h1>
-                      <p className="text-sm sm:text-base md:text-lg text-[color:var(--fc-text-dim)]">
-                        Generate professional client progress reports with comprehensive insights
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowPreview(!showPreview)}
-                      className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
-                    >
-                      <Eye className="w-4 h-4" />
-                      {showPreview ? 'Hide Preview' : 'Show Preview'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
-                      onClick={() => {
-                        if (coachId) {
-                          didLoadRef.current = false
-                          loadData()
-                        }
-                      }}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Refresh
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-      {/* Main Content — single padding level on mobile (p-3 = 24px total horizontal) */}
-      <div className="p-3 sm:p-4 md:p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
             {/* Report Configuration — reduced nesting: Card padding only on content */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6 md:space-y-8">
               {/* Client Selection */}
@@ -860,9 +796,6 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
             </div>
           </div>
-        </div>
       </div>
-      </div>
-    </AnimatedBackground>
   )
 }

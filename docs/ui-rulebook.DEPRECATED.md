@@ -1,3 +1,19 @@
+# DEPRECATED 2026-04-16
+
+> **This document is no longer authoritative.** It was built around the mockup-driven UI workflow that has been retired.
+>
+> The new source of truth for UI work is:
+>
+> - [`dailyfitness-app/docs/ui/95-STANDARD.md`](./ui/95-STANDARD.md) — the 9.5 Standard specification (extracted from the four benchmark screens)
+> - [`dailyfitness-app/.cursor/rules/ui-benchmark-standard.md`](../.cursor/rules/ui-benchmark-standard.md) — the benchmark-fidelity cursor rule
+> - [`dailyfitness-app/docs/ui/UI-UPLIFT-WORKFLOW.md`](./ui/UI-UPLIFT-WORKFLOW.md) — the current per-screen workflow
+>
+> **Specifically deprecated content below:** references to `ui_tokens/` as authoritative (that folder is now deprecated, see [`dailyfitness-app/ui_tokens/DEPRECATED.md`](../ui_tokens/DEPRECATED.md)), the "UX archetypes" classification system, and the "mockup is the source of truth" workflow.
+>
+> Content preserved for historical reference only. **Do not apply any of the rules below to new work.**
+
+---
+
 # UI Rulebook (System + Archetypes)
 
 This document extends `ui_tokens/fitcoach-ui-ux-rulebook.md` with UX archetypes and workflow rules.
@@ -59,4 +75,3 @@ Use only these sources for layout and component behavior:
 - `ui_tokens/form pattern screen.md`
 - `ui_tokens/component gallery.md`
 - `ui_tokens/override_hotspots.md`
-

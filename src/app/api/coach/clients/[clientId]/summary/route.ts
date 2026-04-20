@@ -18,14 +18,15 @@ import {
   buildWeekWorkoutDots,
 } from '@/lib/coachClientSummaryServer';
 import {
-  normalizeClientTimezone,
   addCalendarDaysYmd,
-  diffCalendarDaysYmd,
   zonedCalendarDateString,
-  zonedYmdFromIsoTimestamp,
   zonedDayInclusiveUtcBounds,
   mondayYmdOfZonedWeekContaining,
-} from '@/lib/clientZonedCalendar';
+} from '@/lib/programWeekCalendar';
+import {
+  computeCurrentProgramWeekForAssignment,
+  normalizeClientTimezone,
+} from '@/lib/programWeekCalendar';
 
 async function assertCoachHasClient(
   coachId: string,
@@ -112,29 +113,6 @@ function bucketByYmdRange(
   return null;
 }
 
-function computeProgramWeekForCalendarYmd(args: {
-  assignmentStartDate: string | null;
-  pauseAccumulatedDays: number | null | undefined;
-  pauseStatus: string | null | undefined;
-  pausedAt: string | null | undefined;
-  targetYmd: string;
-  clientTimezone: string;
-}): number {
-  const startRaw = typeof args.assignmentStartDate === 'string' ? args.assignmentStartDate.trim() : '';
-  const startYmd = startRaw.length >= 10 ? startRaw.slice(0, 10) : startRaw;
-  if (!startYmd) return 1;
-  const pauseAccum = Math.max(0, Number(args.pauseAccumulatedDays) || 0);
-  const effectiveStartYmd = addCalendarDaysYmd(startYmd, pauseAccum);
-  const pausedYmd =
-    args.pauseStatus === 'paused' && args.pausedAt
-      ? zonedYmdFromIsoTimestamp(args.pausedAt, args.clientTimezone)
-      : null;
-  const effectiveTargetYmd =
-    pausedYmd && args.targetYmd > pausedYmd ? pausedYmd : args.targetYmd;
-  const elapsed = Math.max(0, diffCalendarDaysYmd(effectiveStartYmd, effectiveTargetYmd));
-  return Math.floor(elapsed / 7) + 1;
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
@@ -198,7 +176,7 @@ export async function GET(
       getClientMetrics([clientId], supabaseAdmin),
       supabaseAdmin
         .from('program_assignments')
-        .select('id, program_id, name, duration_weeks, progression_mode, coach_unlocked_week, start_date, pause_status, paused_at, pause_accumulated_days')
+        .select('id, program_id, name, duration_weeks, start_date, timezone_snapshot, pause_status, paused_at, pause_accumulated_days')
         .eq('client_id', clientId)
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
@@ -329,8 +307,7 @@ export async function GET(
       name: string | null;
       start_date?: string | null;
       duration_weeks: number | null;
-      progression_mode?: string | null;
-      coach_unlocked_week?: number | null;
+      timezone_snapshot?: string | null;
       pause_status?: string | null;
       paused_at?: string | null;
       pause_accumulated_days?: number | null;
@@ -351,16 +328,21 @@ export async function GET(
     } | null = null;
 
     if (pa) {
-      const [{ data: wp }, { data: pp }] = await Promise.all([
+      const [{ data: wp }] = await Promise.all([
         supabaseAdmin.from('workout_programs').select('name').eq('id', pa.program_id).maybeSingle(),
-        supabaseAdmin
-          .from('program_progress')
-          .select('current_week_number')
-          .eq('program_assignment_id', pa.id)
-          .maybeSingle(),
       ]);
       const nm = (pa.name && pa.name.trim()) || wp?.name || 'Program';
-      const cw = pp?.current_week_number ?? metrics.programCurrentWeek;
+      const cw = computeCurrentProgramWeekForAssignment(
+        {
+          start_date: pa.start_date ?? null,
+          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+          pause_status: pa.pause_status ?? null,
+          paused_at: pa.paused_at ?? null,
+          timezone_snapshot: pa.timezone_snapshot ?? null,
+          duration_weeks: pa.duration_weeks ?? metrics.programDurationWeeks ?? null,
+        },
+        clientTz
+      ).week;
       const dw = pa.duration_weeks ?? metrics.programDurationWeeks;
       let programProgressPercent: number | null = null;
       if (
@@ -378,8 +360,8 @@ export async function GET(
         name: nm,
         currentWeek: cw,
         durationWeeks: dw,
-        progressionMode: pa.progression_mode ?? null,
-        coachUnlockedWeek: pa.coach_unlocked_week ?? null,
+        progressionMode: null,
+        coachUnlockedWeek: null,
         weekReviewNeeded: metrics.weekReviewNeeded === true,
         reviewWeekNumber: metrics.completedWeekNumber ?? null,
         behindOnWeeklyWorkouts: goal > 0 && cur < goal,
@@ -436,22 +418,30 @@ export async function GET(
     let plannedCurrentWeek = 0;
     let plannedPreviousWeek = 0;
     if (pa?.program_id) {
-      const currentProgramWeek = computeProgramWeekForCalendarYmd({
-        assignmentStartDate: pa.start_date ?? null,
-        pauseAccumulatedDays: pa.pause_accumulated_days ?? 0,
-        pauseStatus: pa.pause_status ?? null,
-        pausedAt: pa.paused_at ?? null,
-        targetYmd: currentWeekStart,
-        clientTimezone: clientTz,
-      });
-      const previousProgramWeek = computeProgramWeekForCalendarYmd({
-        assignmentStartDate: pa.start_date ?? null,
-        pauseAccumulatedDays: pa.pause_accumulated_days ?? 0,
-        pauseStatus: pa.pause_status ?? null,
-        pausedAt: pa.paused_at ?? null,
-        targetYmd: previousWeekStart,
-        clientTimezone: clientTz,
-      });
+      const currentProgramWeek = computeCurrentProgramWeekForAssignment(
+        {
+          start_date: pa.start_date ?? null,
+          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+          pause_status: pa.pause_status ?? null,
+          paused_at: pa.paused_at ?? null,
+          timezone_snapshot: pa.timezone_snapshot ?? null,
+          duration_weeks: pa.duration_weeks ?? null,
+        },
+        clientTz,
+        currentWeekStart
+      ).week;
+      const previousProgramWeek = computeCurrentProgramWeekForAssignment(
+        {
+          start_date: pa.start_date ?? null,
+          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+          pause_status: pa.pause_status ?? null,
+          paused_at: pa.paused_at ?? null,
+          timezone_snapshot: pa.timezone_snapshot ?? null,
+          duration_weeks: pa.duration_weeks ?? null,
+        },
+        clientTz,
+        previousWeekStart
+      ).week;
       const weekNumbers = [...new Set([currentProgramWeek, previousProgramWeek])];
       const scheduleRes = await supabaseAdmin
         .from('program_schedule')

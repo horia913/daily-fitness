@@ -205,20 +205,29 @@ export class MealPlanService {
   }
 
   static async createMealPlan(mealPlanData: Omit<MealPlan, 'id' | 'created_at' | 'updated_at' | 'actual_calories' | 'actual_protein' | 'actual_carbs' | 'actual_fat' | 'actual_fiber'>): Promise<MealPlan> {
-    // Start with minimal required fields
+    // DB column is `notes` (see schema inventory); UI may still send `description`.
     const insertData: Record<string, unknown> = {
       name: mealPlanData.name
     }
 
-    // Add optional fields only if they exist
-    if (mealPlanData.target_calories !== undefined) {
+    if (mealPlanData.target_calories !== undefined && mealPlanData.target_calories !== null) {
       insertData.target_calories = mealPlanData.target_calories
+    }
+    if (mealPlanData.target_protein !== undefined && mealPlanData.target_protein !== null) {
+      insertData.target_protein = mealPlanData.target_protein
+    }
+    if (mealPlanData.target_carbs !== undefined && mealPlanData.target_carbs !== null) {
+      insertData.target_carbs = mealPlanData.target_carbs
+    }
+    if (mealPlanData.target_fat !== undefined && mealPlanData.target_fat !== null) {
+      insertData.target_fat = mealPlanData.target_fat
     }
     if (mealPlanData.coach_id) {
       insertData.coach_id = mealPlanData.coach_id
     }
-    if (mealPlanData.difficulty_level) {
-      insertData.difficulty_level = mealPlanData.difficulty_level
+    const notesVal = mealPlanData.notes ?? mealPlanData.description
+    if (notesVal !== undefined && notesVal !== null && String(notesVal).trim() !== '') {
+      insertData.notes = String(notesVal).trim()
     }
     if (mealPlanData.is_active !== undefined) {
       insertData.is_active = mealPlanData.is_active
@@ -238,10 +247,29 @@ export class MealPlanService {
     return data
   }
 
-  static async updateMealPlan(id: string, updates: Partial<MealPlan>): Promise<MealPlan> {
+  static async updateMealPlan(
+    id: string,
+    updates: Partial<Omit<MealPlan, "target_protein" | "target_carbs" | "target_fat">> & {
+      target_protein?: number | null
+      target_carbs?: number | null
+      target_fat?: number | null
+    },
+  ): Promise<MealPlan> {
+    const payload: Record<string, unknown> = { ...updates }
+    if ('description' in payload) {
+      const d = payload.description
+      if (d === undefined) {
+        delete payload.description
+      } else {
+        const s = d === null ? "" : String(d).trim()
+        payload.notes = s === "" ? null : s
+        delete payload.description
+      }
+    }
+
     const { data, error } = await supabase
       .from('meal_plans')
-      .update(updates)
+      .update(payload)
       .eq('id', id)
       .select()
       .single()

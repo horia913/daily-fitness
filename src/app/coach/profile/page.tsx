@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -10,6 +11,13 @@ import { DatabaseService } from "@/lib/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
   User,
   Mail,
@@ -389,14 +399,9 @@ export default function CoachProfilePage() {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
-          <div className="min-h-screen pb-[100px] p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="animate-pulse">
-                <div className="h-8 rounded mb-4 bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-64 rounded bg-[color:var(--fc-glass-highlight)]" />
-              </div>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="form-2xl" className="p-6 pb-[100px]">
+            <PageSkeleton variant="form" />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -406,14 +411,13 @@ export default function CoachProfilePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="max-w-3xl mx-auto fc-page px-4 sm:px-6 pt-10 flex flex-col gap-8">
-            <nav className="flex items-center justify-between">
+        <CoachPageShell widthVariant="form-2xl" className="px-4 sm:px-6 pt-10 pb-32 flex flex-col gap-8">
+          <nav className="flex items-center justify-between">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => window.history.back()}
-                className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-white/10"
+                className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)]"
               >
                 <ArrowLeft className="w-6 h-6 fc-text-primary" />
               </Button>
@@ -440,8 +444,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                    <Camera className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-accent-purple)_22%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent-purple)_35%,transparent)]">
+                    <Camera className="w-7 h-7 text-[color:var(--fc-accent-purple)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Profile Picture</CardTitle>
@@ -465,8 +469,8 @@ export default function CoachProfilePage() {
                     )}
                     <div className="absolute -bottom-2 -right-2">
                       <label htmlFor="avatar-upload" className="cursor-pointer">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-all duration-300 shadow-lg hover:scale-110">
-                          <Camera className="w-5 h-5 text-white" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[color:var(--fc-status-info)] hover:opacity-90 transition-all duration-300 shadow-lg hover:scale-110">
+                          <Camera className="w-5 h-5 text-[color:var(--fc-bg-base)]" aria-hidden />
                         </div>
                         <input
                           id="avatar-upload"
@@ -493,8 +497,8 @@ export default function CoachProfilePage() {
                       <span>Max size: 5MB • JPG, PNG supported</span>
                     </div>
                     {uploadingImage && (
-                      <div className="flex items-center gap-2 mt-3 text-blue-600">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <div className="flex items-center gap-2 mt-3 fc-text-dim">
+                        <div className="w-4 h-4 border-2 border-[color:var(--fc-text-primary)] border-t-transparent rounded-full animate-spin" aria-hidden />
                         <span className="text-sm font-medium">Uploading...</span>
                       </div>
                     )}
@@ -613,8 +617,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                    <Bell className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-status-warning)_22%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-warning)_32%,transparent)]">
+                    <Bell className="w-7 h-7 text-[color:var(--fc-status-warning)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Notification Preferences</CardTitle>
@@ -626,7 +630,7 @@ export default function CoachProfilePage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                     <div className="flex items-center gap-3">
-                      <MessageCircle className="w-5 h-5 text-blue-600" />
+                      <MessageCircle className="w-5 h-5 text-[color:var(--fc-status-info)]" aria-hidden />
                       <div>
                         <p className="font-medium text-[color:var(--fc-text-primary)]">
                           Client Messages
@@ -636,25 +640,18 @@ export default function CoachProfilePage() {
                         </p>
                       </div>
                     </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.clientMessages}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          clientMessages: e.target.checked,
-                        }))
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
+                  <Switch
+                    checked={notifications.clientMessages}
+                    onCheckedChange={(checked) =>
+                      setNotifications((prev) => ({ ...prev, clientMessages: checked }))
+                    }
+                    aria-label="Client Messages notifications"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                   <div className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-green-600" />
+                    <BarChart3 className="w-5 h-5 fc-text-success" aria-hidden />
                     <div>
                       <p className="font-medium text-[color:var(--fc-text-primary)]">
                         Workout Completions
@@ -664,25 +661,18 @@ export default function CoachProfilePage() {
                       </p>
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.workoutCompletions}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          workoutCompletions: e.target.checked,
-                        }))
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
+                  <Switch
+                    checked={notifications.workoutCompletions}
+                    onCheckedChange={(checked) =>
+                      setNotifications((prev) => ({ ...prev, workoutCompletions: checked }))
+                    }
+                    aria-label="Workout Completions notifications"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                   <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-purple-600" />
+                    <Calendar className="w-5 h-5 text-[color:var(--fc-accent-purple)]" aria-hidden />
                     <div>
                       <p className="font-medium text-[color:var(--fc-text-primary)]">
                         Weekly Reports
@@ -692,20 +682,13 @@ export default function CoachProfilePage() {
                       </p>
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.weeklyReports}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          weeklyReports: e.target.checked,
-                        }))
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border-[color:var(--fc-glass-border)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
+                  <Switch
+                    checked={notifications.weeklyReports}
+                    onCheckedChange={(checked) =>
+                      setNotifications((prev) => ({ ...prev, weeklyReports: checked }))
+                    }
+                    aria-label="Weekly Reports notifications"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
@@ -720,20 +703,13 @@ export default function CoachProfilePage() {
                       </p>
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.systemUpdates}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          systemUpdates: e.target.checked,
-                        }))
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
+                  <Switch
+                    checked={notifications.systemUpdates}
+                    onCheckedChange={(checked) =>
+                      setNotifications((prev) => ({ ...prev, systemUpdates: checked }))
+                    }
+                    aria-label="System Updates notifications"
+                  />
                 </div>
               </div>
               </CardContent>
@@ -743,8 +719,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                    <Palette className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_32%,transparent)]">
+                    <Palette className="w-7 h-7 text-[color:var(--fc-accent-cyan)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">App Preferences</CardTitle>
@@ -797,8 +773,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                    <GraduationCap className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-domain-habits)_22%,transparent)] border border-[color-mix(in_srgb,var(--fc-domain-habits)_32%,transparent)]">
+                    <GraduationCap className="w-7 h-7 text-[color:var(--fc-domain-habits)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Professional Information</CardTitle>
@@ -877,8 +853,10 @@ export default function CoachProfilePage() {
                       {spec}
                       {editing && (
                         <button
+                          type="button"
                           onClick={() => removeSpecialization(spec)}
-                          className="ml-1 text-red-500 hover:text-red-700"
+                          className="ml-1 fc-text-error hover:opacity-80"
+                          aria-label={`Remove specialization ${spec}`}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -927,8 +905,10 @@ export default function CoachProfilePage() {
                       {cert}
                       {editing && (
                         <button
+                          type="button"
                           onClick={() => removeCertification(cert)}
-                          className="ml-1 text-red-500 hover:text-red-700"
+                          className="ml-1 fc-text-error hover:opacity-80"
+                          aria-label={`Remove certification ${cert}`}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -977,8 +957,10 @@ export default function CoachProfilePage() {
                       {lang}
                       {editing && (
                         <button
+                          type="button"
                           onClick={() => removeLanguage(lang)}
-                          className="ml-1 text-red-500 hover:text-red-700"
+                          className="ml-1 fc-text-error hover:opacity-80"
+                          aria-label={`Remove language ${lang}`}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1021,8 +1003,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
-                    <Shield className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-status-error)_15%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)]">
+                    <Shield className="w-7 h-7 text-[color:var(--fc-status-error)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Health Information</CardTitle>
@@ -1079,8 +1061,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-500 to-zinc-600 flex items-center justify-center">
-                    <Settings className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-text-subtle)_18%,transparent)] border border-[color:var(--fc-glass-border)]">
+                    <Settings className="w-7 h-7 fc-text-primary" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Account Information</CardTitle>
@@ -1102,7 +1084,7 @@ export default function CoachProfilePage() {
                             : "N/A"}
                         </div>
                       </div>
-                      <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+                      <Badge className="border border-[color-mix(in_srgb,var(--fc-status-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] fc-text-primary font-medium">
                         Active
                       </Badge>
                     </div>
@@ -1118,7 +1100,7 @@ export default function CoachProfilePage() {
                           Professional Coach
                         </div>
                       </div>
-                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
+                    <Badge className="border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] fc-text-primary font-medium">
                       Coach
                     </Badge>
                   </div>
@@ -1131,8 +1113,8 @@ export default function CoachProfilePage() {
             <Card className="fc-card-shell rounded-3xl overflow-hidden">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
-                    <Shield className="w-7 h-7 text-white" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--fc-domain-challenges)_18%,transparent)] border border-[color-mix(in_srgb,var(--fc-domain-challenges)_32%,transparent)]">
+                    <Shield className="w-7 h-7 text-[color:var(--fc-domain-challenges)]" aria-hidden />
                   </div>
                   <div>
                     <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Privacy & Security</CardTitle>
@@ -1145,7 +1127,7 @@ export default function CoachProfilePage() {
                   <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Lock className="w-5 h-5 text-blue-600" />
+                        <Lock className="w-5 h-5 text-[color:var(--fc-status-info)]" aria-hidden />
                         <div>
                           <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             Change Password
@@ -1169,7 +1151,7 @@ export default function CoachProfilePage() {
                   <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-green-600" />
+                        <Globe className="w-5 h-5 fc-text-success" aria-hidden />
                         <div>
                           <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             Privacy Policy
@@ -1189,7 +1171,7 @@ export default function CoachProfilePage() {
                   <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Trash2 className="w-5 h-5 text-red-600" />
+                        <Trash2 className="w-5 h-5 fc-text-error" aria-hidden />
                         <div>
                           <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             Delete Account
@@ -1200,8 +1182,9 @@ export default function CoachProfilePage() {
                         </div>
                       </div>
                       <Button
+                        type="button"
                         variant="outline"
-                        className="rounded-2xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        className="rounded-2xl border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] fc-text-error hover:bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)]"
                         onClick={() => setShowDeleteConfirm(true)}
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
@@ -1225,90 +1208,91 @@ export default function CoachProfilePage() {
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        </div>
+        </CoachPageShell>
 
-        {/* Password Change Modal */}
-        {showPasswordModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="fc-card-shell rounded-3xl p-6 w-full max-w-md">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">Change Password</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowPasswordModal(false);
-                    setPasswordData({ newPassword: '', confirmPassword: '' });
-                    setPasswordError('');
-                    setPasswordSuccess(false);
-                  }}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+        <Dialog
+          open={showPasswordModal}
+          onOpenChange={(open) => {
+            setShowPasswordModal(open);
+            if (!open) {
+              setPasswordData({ newPassword: "", confirmPassword: "" });
+              setPasswordError("");
+              setPasswordSuccess(false);
+            }
+          }}
+        >
+          <DialogContent className="max-w-md border border-[color:var(--fc-glass-border)]">
+            <DialogHeader>
+              <DialogTitle className="fc-text-primary">Change Password</DialogTitle>
+            </DialogHeader>
+
+            {passwordSuccess ? (
+              <div className="text-center py-6">
+                <CheckCircle className="w-16 h-16 mx-auto mb-4 fc-text-success" aria-hidden />
+                <p className="text-lg font-semibold fc-text-success">Password changed successfully!</p>
               </div>
-
-              {passwordSuccess ? (
-                <div className="text-center py-6">
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                  <p className="text-lg font-semibold text-green-600">Password changed successfully!</p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Enter new password"
+                    value={passwordData.newPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                    }
+                    className="mt-1"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      placeholder="Enter new password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="Confirm new password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {passwordError && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
-                      {passwordError}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        setShowPasswordModal(false);
-                        setPasswordData({ newPassword: '', confirmPassword: '' });
-                        setPasswordError('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={handlePasswordChange}
-                      disabled={changingPassword}
-                    >
-                      {changingPassword ? 'Changing...' : 'Change Password'}
-                    </Button>
-                  </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                    }
+                    className="mt-1"
+                  />
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+
+                {passwordError && (
+                  <div className="p-3 rounded-xl border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] fc-text-error text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                <DialogFooter className="gap-2 sm:gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="sm:flex-1"
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setPasswordData({ newPassword: "", confirmPassword: "" });
+                      setPasswordError("");
+                      setPasswordSuccess(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="fc-btn fc-btn-primary sm:flex-1"
+                    onClick={() => void handlePasswordChange()}
+                    disabled={changingPassword}
+                  >
+                    {changingPassword ? "Changing..." : "Change Password"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </AnimatedBackground>
     </ProtectedRoute>
   );

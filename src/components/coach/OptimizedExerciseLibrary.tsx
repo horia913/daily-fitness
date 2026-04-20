@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/contexts/ThemeContext'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { 
   Plus, 
   Search, 
@@ -19,7 +17,6 @@ import {
   Shield,
   Edit,
   Trash2,
-  ArrowLeft,
   RefreshCw,
   Play,
   Star,
@@ -31,7 +28,6 @@ import {
   Shuffle,
   Globe
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast-provider'
 import ExerciseForm from '@/components/ExerciseForm'
@@ -70,10 +66,7 @@ interface OptimizedExerciseLibraryProps {
 }
 
 export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryProps) {
-  const { getThemeStyles, performanceSettings } = useTheme()
   const { addToast } = useToast()
-  const router = useRouter()
-  const theme = getThemeStyles()
 
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [categories, setCategories] = useState<ExerciseCategory[]>([])
@@ -245,157 +238,105 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
   }
 
   if (loading) {
-    return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse">
-          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-6 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-card-shell p-6">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
-                <div className="space-y-4">
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="list" />
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen">
-        {/* Enhanced Header */}
-      <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-green-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach')}
-                className="fc-btn fc-btn-ghost h-10 w-10"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
-                  Exercise Library 💪
-                </h1>
-                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
-                  Manage your comprehensive exercise collection with visual richness
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={() => { didLoadRef.current = false; loadData(); }}
-                className="fc-btn fc-btn-ghost flex items-center gap-2"
-                size="sm"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-              <Button
-                onClick={() => setShowCreateForm(true)}
-                className="fc-btn fc-btn-primary flex items-center gap-2 flex-1 sm:flex-none"
-                size="sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="sm:hidden">Add</span>
-                <span className="hidden sm:inline">Add Exercise</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Stats Overview */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                    <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{exercises.length}</p>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Exercises</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                    <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      {exercises.filter(e => e.is_public).length}
-                    </p>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Public</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                    <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      {exercises.reduce((sum, e) => sum + (e.usage_count || 0), 0)}
-                    </p>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Usage</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      {(() => {
-                        const rated = exercises.filter(e => e.rating);
-                        return rated.length > 0
-                          ? (rated.reduce((sum, e) => sum + (e.rating || 0), 0) / rated.length).toFixed(1)
-                          : '--';
-                      })()}
-                    </p>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Rating</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Control bar: Refresh + Add Exercise CTA */}
+      <div className="flex items-center justify-end gap-2 sm:gap-3">
+        <Button
+          variant="outline"
+          onClick={() => { didLoadRef.current = false; loadData(); }}
+          className="fc-btn fc-btn-ghost flex items-center gap-2"
+          size="sm"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
+        <Button
+          onClick={() => setShowCreateForm(true)}
+          className="fc-btn fc-btn-primary flex items-center gap-2"
+          size="sm"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">Add Exercise</span>
+        </Button>
       </div>
 
-      {/* Main Content */}
-      <div className="p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      {/* KPI strip - preserved from hero */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+        <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{exercises.length}</p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Exercises</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                  {exercises.filter(e => e.is_public).length}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Public</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                  {exercises.reduce((sum, e) => sum + (e.usage_count || 0), 0)}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Usage</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="fc-card-shell hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                <Star className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                  {(() => {
+                    const rated = exercises.filter(e => e.rating);
+                    return rated.length > 0
+                      ? (rated.reduce((sum, e) => sum + (e.rating || 0), 0) / rated.length).toFixed(1)
+                      : '--';
+                  })()}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Rating</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main content */}
+      <div className="space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
           <Card className="fc-card-shell">
             <CardContent className="p-4 sm:p-6">
@@ -788,9 +729,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               title={videoPlayerExercise.name}
             />
           )}
-        </div>
       </div>
-      </div>
-    </AnimatedBackground>
+    </div>
   )
 }

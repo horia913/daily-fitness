@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageData } from "@/hooks/usePageData";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import CoachClientDailyReview, {
   type LatestCheckInJson,
   type NextScheduledJson,
@@ -73,19 +74,7 @@ export default function ClientDetailPage() {
   ]);
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-6xl px-4 lg:px-8 fc-page flex flex-col min-w-0 overflow-x-hidden">
-        <div className="animate-pulse space-y-4 py-2">
-          <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-24 rounded-xl bg-[color:var(--fc-glass-highlight)]"
-            />
-          ))}
-        </div>
-      </div>
-    );
+    return <PageSkeleton variant="list" />;
   }
 
   const c =

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -8,6 +9,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AchievementCard } from "@/components/ui/AchievementCard";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Award } from "lucide-react";
 import { AchievementService } from "@/lib/achievementService";
@@ -29,6 +31,7 @@ interface Achievement {
 }
 
 function AchievementsPageContent() {
+  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -195,8 +198,10 @@ function AchievementsPageContent() {
 
   const tabChipBase =
     "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const tabChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
-  const tabChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+  const tabChipActive =
+    "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
+  const tabChipInactive =
+    "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)] hover:fc-text-primary";
 
   return (
     <AnimatedBackground>
@@ -208,41 +213,39 @@ function AchievementsPageContent() {
           <div className="flex items-start gap-3 mb-4">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/progress";
-              }}
-              className="w-10 h-10 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-              aria-label="Back"
+              onClick={() => router.push("/client/progress")}
+              className="w-10 h-10 shrink-0 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft flex items-center justify-center fc-text-dim hover:fc-text-primary transition-colors"
+              aria-label="Back to Progress"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0 flex-1 pt-0.5">
-              <h1 className="text-xl font-bold text-white tracking-tight">Achievements</h1>
-              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              <h1 className="text-xl font-bold fc-text-primary tracking-tight">Achievements</h1>
+              <p className="text-xs fc-text-dim mt-1 leading-relaxed">
                 Milestones and progress across your training.
               </p>
             </div>
           </div>
 
           {/* Stat strip */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 flex items-stretch">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 flex items-stretch">
             <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums text-white">{unlockedCount}</span>
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+              <span className="text-base font-semibold tabular-nums fc-text-primary">{unlockedCount}</span>
+              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
                 Unlocked
               </span>
             </div>
-            <div className="w-px self-stretch min-h-8 bg-white/10" />
+            <div className="w-px self-stretch min-h-8 bg-[color:var(--fc-glass-border)]" />
             <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums text-white">{inProgressCount}</span>
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+              <span className="text-base font-semibold tabular-nums fc-text-primary">{inProgressCount}</span>
+              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
                 In progress
               </span>
             </div>
-            <div className="w-px self-stretch min-h-8 bg-white/10" />
+            <div className="w-px self-stretch min-h-8 bg-[color:var(--fc-glass-border)]" />
             <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums text-white">{lockedCount}</span>
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 text-center leading-tight">
+              <span className="text-base font-semibold tabular-nums fc-text-primary">{lockedCount}</span>
+              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
                 Locked
               </span>
             </div>
@@ -250,9 +253,9 @@ function AchievementsPageContent() {
 
           {/* Filters — reference chips, stacked sections (no lg: grid) */}
           <div className="space-y-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Status</p>
+            <p id="achievements-status-label" className="text-[10px] font-bold uppercase tracking-wider fc-text-dim">Status</p>
             <div className="-mx-4 px-4 mb-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex flex-wrap gap-2 min-w-min">
+              <div className="flex flex-wrap gap-2 min-w-min" role="tablist" aria-labelledby="achievements-status-label">
                 {(
                   [
                     ["all", "All"],
@@ -264,6 +267,8 @@ function AchievementsPageContent() {
                   <button
                     key={key}
                     type="button"
+                    role="tab"
+                    aria-selected={filterStatus === key}
                     onClick={() => setFilterStatus(key)}
                     className={cn(
                       tabChipBase,
@@ -276,9 +281,9 @@ function AchievementsPageContent() {
               </div>
             </div>
 
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Rarity</p>
+            <p id="achievements-rarity-label" className="text-[10px] font-bold uppercase tracking-wider fc-text-dim">Rarity</p>
             <div className="-mx-4 px-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex flex-wrap gap-2 min-w-min">
+              <div className="flex flex-wrap gap-2 min-w-min" role="tablist" aria-labelledby="achievements-rarity-label">
                 {(
                   [
                     "all",
@@ -292,6 +297,8 @@ function AchievementsPageContent() {
                   <button
                     key={rarity}
                     type="button"
+                    role="tab"
+                    aria-selected={filterRarity === rarity}
                     onClick={() => setFilterRarity(rarity)}
                     className={cn(
                       tabChipBase,
@@ -307,26 +314,22 @@ function AchievementsPageContent() {
 
           {loadError ? (
             <div className="py-8 px-4 text-center">
-              <p className="text-sm text-gray-400 mb-1">{loadError}</p>
-              <p className="text-xs text-gray-500 mb-4">Refresh the page or try again in a moment.</p>
+              <p className="text-sm fc-text-dim mb-1">{loadError}</p>
+              <p className="text-xs fc-text-subtle mb-4">Refresh the page or try again in a moment.</p>
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-6 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-6 text-sm font-medium fc-text-dim hover:fc-text-primary transition-colors"
               >
                 Retry
               </button>
             </div>
           ) : loading ? (
-            <div className="py-8 px-4 text-center">
-              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-cyan-400" />
-              <p className="mt-4 text-sm text-gray-400">Loading achievements…</p>
-              <p className="mt-1 text-xs text-gray-500">This may take a few seconds.</p>
-            </div>
+            <PageSkeleton variant="list" />
           ) : (
             <>
               {/* Single column at all widths — avoids tight 2-col at ~375px; AchievementCard unchanged */}
-              <div className="flex flex-col border-y border-white/5">
+              <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
                 {filteredAchievements.map((achievement) => (
                   <AchievementCard key={achievement.id} achievement={achievement} dense />
                 ))}
@@ -334,16 +337,16 @@ function AchievementsPageContent() {
 
               {filteredAchievements.length === 0 && (
                 <div className="py-8 px-4 text-center">
-                  <Award className="mx-auto mb-3 h-12 w-12 text-gray-600" aria-hidden />
-                  <p className="text-sm text-gray-400 mb-1">No achievements match these filters</p>
-                  <p className="text-xs text-gray-500 mb-4">Try widening status or rarity.</p>
+                  <Award className="mx-auto mb-3 h-12 w-12 fc-text-subtle" aria-hidden />
+                  <p className="text-sm fc-text-dim mb-1">No achievements match these filters</p>
+                  <p className="text-xs fc-text-subtle mb-4">Try widening status or rarity.</p>
                   <button
                     type="button"
                     onClick={() => {
                       setFilterRarity("all");
                       setFilterStatus("all");
                     }}
-                    className="inline-flex h-10 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-5 text-sm font-semibold text-cyan-300"
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] px-5 text-sm font-semibold text-[color:var(--fc-accent)]"
                   >
                     Reset filters
                   </button>

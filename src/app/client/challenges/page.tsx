@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -8,16 +9,26 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Trophy } from "lucide-react";
 import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges, type ChallengeParticipant } from "@/lib/challengeService";
 import { ChallengeCard } from "@/components/client/ChallengeCard";
-import { ChallengesPageShell } from "@/components/client/challenges/ChallengesPageShell";
 import { cn } from "@/lib/utils";
 import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/ui/toast-provider";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import Link from "next/link";
 
 function ChallengesPageContent() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
@@ -108,7 +119,7 @@ function ChallengesPageContent() {
   };
 
   const handleView = (challenge: Challenge) => {
-    window.location.href = `/client/challenges/${challenge.id}`;
+    router.push(`/client/challenges/${challenge.id}`);
   };
 
   const displayedChallenges = activeTab === "all"
@@ -124,17 +135,9 @@ function ChallengesPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-card-shell p-8">
-              <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                  <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
+            <PageSkeleton variant="dashboard" />
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -162,13 +165,91 @@ function ChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ChallengesPageShell
-        activeChallengesCount={activeChallenges.length}
-        invitedCount={invitedChallenges.length}
-        showInvitedTab={invitedChallenges.length > 0}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      >
+      <ClientPageShell className="max-w-lg px-4 pb-32 pt-6 space-y-4">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <nav className="flex items-center gap-2 text-xs fc-text-subtle mb-1 font-mono">
+              <Link href="/client/me" className="hover:fc-text-primary">
+                Me
+              </Link>
+              <span>/</span>
+              <span className="fc-text-primary">Challenges</span>
+            </nav>
+            <h1 className="text-xl font-bold tracking-tight fc-text-primary">
+              Challenges
+            </h1>
+            <p className="text-xs fc-text-dim mt-1">
+              Join challenges and compete with others.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="fc-glass-soft px-3 py-1.5 rounded-lg border border-[color:var(--fc-glass-border)] flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 fc-text-warning" />
+              <span className="font-mono text-xs font-bold fc-text-primary">
+                {activeChallenges.length} active
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[color:var(--fc-glass-border)] pb-2">
+          <div className="flex gap-4 overflow-x-auto pb-1 -mx-1 px-1 w-full min-w-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={cn(
+                "pb-1.5 text-xs font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "all"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              Browse all
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("my")}
+              className={cn(
+                "pb-1.5 text-xs font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "my"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              My challenges
+            </button>
+            {invitedChallenges.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("invited")}
+                className={cn(
+                  "pb-1.5 text-xs font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors flex items-center gap-2",
+                  activeTab === "invited"
+                    ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                    : "fc-text-subtle border-transparent hover:fc-text-primary"
+                )}
+              >
+                Invited
+                <span className="w-5 h-5 rounded-full bg-[color:var(--fc-accent-cyan)] text-white text-[10px] flex items-center justify-center font-bold">
+                  {invitedChallenges.length}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={cn(
+                "pb-1.5 text-xs font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "history"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              History
+            </button>
+          </div>
+        </div>
+
         {displayedChallenges.length === 0 ? (
           <GlassCard elevation={2} className="fc-card-shell p-6 text-center">
             <Trophy className="w-10 h-10 text-[color:var(--fc-text-subtle)] mx-auto mb-3 opacity-80" />
@@ -199,7 +280,7 @@ function ChallengesPageContent() {
               onView={handleView}
             />
             {displayedChallenges.length > 1 && (
-              <div className="flex flex-col divide-y divide-white/5 border-y border-white/5">
+              <div className="flex flex-col divide-y divide-[color:var(--fc-glass-border)] border-y border-[color:var(--fc-glass-border)]">
                 {displayedChallenges.slice(1).map((challenge) => (
                   <ChallengeCard
                     key={challenge.id}
@@ -214,78 +295,77 @@ function ChallengesPageContent() {
             )}
           </div>
         )}
-      </ChallengesPageShell>
+      </ClientPageShell>
 
-      {/* Join Modal for Recomp Challenges */}
-      {showJoinModal && selectedChallenge && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        >
-          <div
-            className="w-full max-w-md fc-card-shell border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6"
-          >
-            <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
-              Select Your Track
-            </h2>
-            <p className="text-sm text-[color:var(--fc-text-dim)] mb-6">
+      <Dialog
+        open={showJoinModal}
+        onOpenChange={(open) => !open && setShowJoinModal(false)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Your Track</DialogTitle>
+            <DialogDescription>
               Choose which recomp track you want to compete in
-            </p>
+            </DialogDescription>
+          </DialogHeader>
 
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <button
-                onClick={() => setSelectedTrack("fat_loss")}
-                className={cn(
-                  "p-4 rounded-xl text-left transition-all border",
-                  selectedTrack === "fat_loss"
-                    ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
-                    : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
-                )}
-              >
-                <p className="font-semibold text-[color:var(--fc-text-primary)] text-sm">
-                  Fat Loss Track
-                </p>
-                <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                  Reduce waist, maintain strength
-                </p>
-              </button>
+          <div className="grid grid-cols-2 gap-3 my-2">
+            <button
+              type="button"
+              onClick={() => setSelectedTrack("fat_loss")}
+              aria-pressed={selectedTrack === "fat_loss"}
+              className={cn(
+                "p-4 rounded-xl text-left transition-all border",
+                selectedTrack === "fat_loss"
+                  ? "border-[color:var(--fc-status-success)] bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)]"
+                  : "border-[color:var(--fc-glass-border)] fc-glass-soft hover:border-[color:var(--fc-glass-border-strong)]"
+              )}
+            >
+              <p className="font-semibold fc-text-primary text-sm">
+                Fat Loss Track
+              </p>
+              <p className="text-xs mt-1 fc-text-dim">
+                Reduce waist, maintain strength
+              </p>
+            </button>
 
-              <button
-                onClick={() => setSelectedTrack("muscle_gain")}
-                className={cn(
-                  "p-4 rounded-xl text-left transition-all border",
-                  selectedTrack === "muscle_gain"
-                    ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
-                    : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
-                )}
-              >
-                <p className="font-semibold text-[color:var(--fc-text-primary)] text-sm">
-                  Muscle Gain Track
-                </p>
-                <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
-                  Gain bodyweight multiples
-                </p>
-              </button>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setShowJoinModal(false)}
-                className="flex-1 fc-btn fc-btn-secondary"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => selectedTrack && handleJoin(selectedChallenge, selectedTrack)}
-                disabled={!selectedTrack || joining}
-                className="flex-1 fc-btn fc-btn-primary"
-              >
-                {joining ? "Joining..." : "Join Challenge"}
-              </Button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedTrack("muscle_gain")}
+              aria-pressed={selectedTrack === "muscle_gain"}
+              className={cn(
+                "p-4 rounded-xl text-left transition-all border",
+                selectedTrack === "muscle_gain"
+                  ? "border-[color:var(--fc-status-success)] bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)]"
+                  : "border-[color:var(--fc-glass-border)] fc-glass-soft hover:border-[color:var(--fc-glass-border-strong)]"
+              )}
+            >
+              <p className="font-semibold fc-text-primary text-sm">
+                Muscle Gain Track
+              </p>
+              <p className="text-xs mt-1 fc-text-dim">
+                Gain bodyweight multiples
+              </p>
+            </button>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowJoinModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedChallenge && selectedTrack && handleJoin(selectedChallenge, selectedTrack)}
+              disabled={!selectedTrack || joining}
+              className="fc-btn fc-btn-primary"
+            >
+              {joining ? "Joining…" : "Join Challenge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AnimatedBackground>
   );
 }

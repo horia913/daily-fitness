@@ -2,6 +2,7 @@
 
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -26,9 +27,8 @@ import { useRouter } from 'next/navigation'
 
 export default function AddClient() {
   const { user } = useAuth()
-  const { getThemeStyles, performanceSettings } = useTheme()
+  const { performanceSettings } = useTheme()
   const router = useRouter()
-  const theme = getThemeStyles()
 
   // Form state
   const [formData, setFormData] = useState({
@@ -266,7 +266,7 @@ export default function AddClient() {
               helperText="We'll generate a signup link with this email pre-filled"
             />
             <div className="space-y-1">
-              <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">
                 Invite expiry
               </label>
               <Select 
@@ -310,7 +310,7 @@ export default function AddClient() {
                   onClick={generateInviteLink}
                   disabled={loading}
                   size="sm"
-                  className={`${theme.primary} w-full h-9 text-sm`}
+                  className="fc-btn fc-btn-primary fc-press w-full h-9 text-sm"
                 >
                   {loading ? (
                     <>
@@ -336,7 +336,7 @@ export default function AddClient() {
                 <Button 
                   onClick={copyInviteLink}
                   size="sm"
-                  className={`${theme.primary} w-full h-9 text-sm`}
+                  className="fc-btn fc-btn-primary fc-press w-full h-9 text-sm"
                 >
                   {copied ? (
                     <>
@@ -353,7 +353,7 @@ export default function AddClient() {
                 <p className="text-xs text-[color:var(--fc-text-dim)]">
                   Share the link with your client. {formData.email}
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
                   <Button 
                     onClick={resetForm} 
                     variant="outline" 
@@ -365,7 +365,7 @@ export default function AddClient() {
                   <Button 
                     onClick={() => router.push('/coach/clients')} 
                     size="sm"
-                    className={`${theme.primary} flex-1 h-9 text-sm`}
+                    className="fc-btn fc-btn-primary fc-press flex-1 h-9 text-sm"
                   >
                     Clients
                   </Button>
@@ -384,7 +384,7 @@ export default function AddClient() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-4 pb-32 pt-4 sm:px-6 space-y-4">
+        <CoachPageShell widthVariant="form-2xl" className="px-4 pb-32 pt-4 sm:px-6 space-y-4">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
             <h1 className="text-lg font-semibold fc-text-primary truncate">
               Add client
@@ -402,7 +402,7 @@ export default function AddClient() {
 
           <div className="fc-card-shell rounded-xl border border-[color:var(--fc-glass-border)] p-4">
             <ProgressIndicator steps={steps} currentStep={currentStep} />
-            <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/5">
+            <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
               <h2 className="text-sm font-semibold fc-text-primary">{steps[currentStep - 1]?.title}</h2>
               <div className="space-y-3 mt-2">
                 {renderStepContent()}
@@ -429,15 +429,15 @@ export default function AddClient() {
           )}
 
           {error && (
-            <div className="fc-glass rounded-2xl border border-red-500/30 p-4">
+            <div className="fc-glass rounded-2xl border border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)] p-4">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
+                <AlertCircle className="w-5 h-5 text-[color:var(--fc-status-error)]" aria-hidden />
                 <span className="font-medium fc-text-primary">Error</span>
               </div>
               <p className="text-sm fc-text-dim mt-1">{error}</p>
             </div>
           )}
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   )

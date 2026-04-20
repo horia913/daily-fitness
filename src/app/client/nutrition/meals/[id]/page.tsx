@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
-import { ChevronLeft, Coffee, Apple, Utensils, Zap, Edit3, Trash2, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Edit3, Trash2, CheckCircle2 } from "lucide-react";
 
 interface MealItem {
   id: string;
@@ -37,38 +39,25 @@ interface Meal {
   meal_items?: MealItem[];
 }
 
-const getMealIcon = (mealType: string) => {
+/** Badge surface + border from design tokens (no raw Tailwind palette). */
+function getMealTypeBadgeClasses(mealType: string): string {
   switch (mealType) {
     case "breakfast":
-      return Coffee;
+      return "bg-[color-mix(in_srgb,var(--fc-status-warning)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)]";
     case "lunch":
-      return Apple;
+      return "bg-[color-mix(in_srgb,var(--fc-domain-meals)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-domain-meals)_35%,transparent)]";
     case "dinner":
-      return Utensils;
+      return "bg-[color-mix(in_srgb,var(--fc-accent-purple)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-accent-purple)_35%,transparent)]";
     case "snack":
-      return Zap;
+      return "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_35%,transparent)]";
     default:
-      return Utensils;
+      return "bg-[color-mix(in_srgb,var(--fc-text-subtle)_18%,transparent)] border-[color:var(--fc-glass-border)]";
   }
-};
-
-const getMealTypeColor = (mealType: string) => {
-  switch (mealType) {
-    case "breakfast":
-      return "bg-amber-500";
-    case "lunch":
-      return "bg-[color:var(--fc-domain-meals)]";
-    case "dinner":
-      return "bg-violet-500";
-    case "snack":
-      return "bg-[color:var(--fc-accent-cyan)]";
-    default:
-      return "bg-[color:var(--fc-text-subtle)]";
-  }
-};
+}
 
 export default function MealDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -218,22 +207,23 @@ export default function MealDetailPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
-            <div className="fc-card-shell p-4 text-center max-w-md text-sm">
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <div className="fc-card-shell p-4 text-center text-sm">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadMeal(); }} className="fc-btn fc-btn-primary">Retry</Button>
                 <Button
                   variant="outline"
                   className="fc-btn fc-btn-secondary"
-                  onClick={() => { window.location.href = "/client/nutrition"; }}
+                  onClick={() => router.push("/client/nutrition")}
                 >
                   <ChevronLeft className="w-4 h-4 mr-2" />
                   Back to Nutrition
                 </Button>
               </div>
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -245,11 +235,7 @@ export default function MealDetailPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-10 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-40 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -272,7 +258,7 @@ export default function MealDetailPage() {
               <div className="mt-4 flex justify-center">
                 <Button
                   className="fc-btn fc-btn-secondary h-10 text-sm"
-                  onClick={() => { window.location.href = "/client/nutrition"; }}
+                  onClick={() => router.push("/client/nutrition")}
                 >
                   Back to Nutrition
                 </Button>
@@ -284,8 +270,6 @@ export default function MealDetailPage() {
     );
   }
 
-  const Icon = getMealIcon(meal.meal_type);
-  const colorClass = getMealTypeColor(meal.meal_type);
   const mealItems = meal.meal_items ?? [];
   const mealTotals = mealItems.reduce(
     (acc, item) => {
@@ -315,7 +299,7 @@ export default function MealDetailPage() {
           <nav className="mb-2">
             <button
               type="button"
-              onClick={() => { window.location.href = "/client/nutrition"; }}
+              onClick={() => router.push("/client/nutrition")}
               className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-soft transition-colors"
               aria-label="Back"
             >
@@ -327,7 +311,12 @@ export default function MealDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-transparent to-transparent opacity-80" />
             <div className="absolute bottom-4 left-4 right-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className={`${getMealTypeColor(meal.meal_type)}/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${getMealTypeColor(meal.meal_type)}/30 text-[color:var(--fc-text-primary)]`}>
+                <span
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border text-[color:var(--fc-text-primary)]",
+                    getMealTypeBadgeClasses(meal.meal_type)
+                  )}
+                >
                   {meal.meal_type}
                 </span>
               </div>

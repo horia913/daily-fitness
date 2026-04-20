@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -25,8 +26,18 @@ export default function CreateMealPlanPage() {
   const [formData, setFormData] = useState({
     name: "",
     target_calories: "",
+    target_protein: "",
+    target_carbs: "",
+    target_fat: "",
     description: "",
   });
+
+  const parseOptionalMacro = (raw: string): number | undefined => {
+    const t = raw.trim();
+    if (!t) return undefined;
+    const n = Number.parseFloat(t);
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +54,12 @@ export default function CreateMealPlanPage() {
       const mealPlan = await MealPlanService.createMealPlan({
         name: formData.name,
         target_calories: formData.target_calories
-          ? parseInt(formData.target_calories)
+          ? parseInt(formData.target_calories, 10)
           : undefined,
+        target_protein: parseOptionalMacro(formData.target_protein),
+        target_carbs: parseOptionalMacro(formData.target_carbs),
+        target_fat: parseOptionalMacro(formData.target_fat),
+        description: formData.description.trim() || undefined,
         coach_id: user.id,
         is_active: true,
       });
@@ -64,7 +79,7 @@ export default function CreateMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="p-4 sm:p-6 pb-32 relative z-10 max-w-2xl mx-auto">
+        <CoachPageShell widthVariant="form-2xl" className="p-4 pb-32 sm:p-6">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2 mb-4">
             <h1 className="text-lg font-semibold fc-text-primary truncate">
               Create meal plan
@@ -83,10 +98,10 @@ export default function CreateMealPlanPage() {
 
           <form
             onSubmit={handleSubmit}
-            className="border-t border-black/5 dark:border-white/5 pt-4 space-y-3"
+            className="border-t border-[color:var(--fc-glass-border)] pt-4 space-y-3"
           >
             <div>
-              <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
                 Name *
               </Label>
               <Input
@@ -101,7 +116,7 @@ export default function CreateMealPlanPage() {
             </div>
 
             <div>
-              <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
                 Target calories (optional)
               </Label>
               <Input
@@ -118,22 +133,67 @@ export default function CreateMealPlanPage() {
               />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
+                  Target protein g (optional)
+                </Label>
+                <Input
+                  inputMode="decimal"
+                  value={formData.target_protein}
+                  onChange={(e) =>
+                    setFormData({ ...formData, target_protein: e.target.value })
+                  }
+                  placeholder="e.g., 150"
+                  className="mt-1 h-9 text-sm rounded-lg"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
+                  Target carbs g (optional)
+                </Label>
+                <Input
+                  inputMode="decimal"
+                  value={formData.target_carbs}
+                  onChange={(e) =>
+                    setFormData({ ...formData, target_carbs: e.target.value })
+                  }
+                  placeholder="e.g., 200"
+                  className="mt-1 h-9 text-sm rounded-lg"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
+                  Target fat g (optional)
+                </Label>
+                <Input
+                  inputMode="decimal"
+                  value={formData.target_fat}
+                  onChange={(e) =>
+                    setFormData({ ...formData, target_fat: e.target.value })
+                  }
+                  placeholder="e.g., 65"
+                  className="mt-1 h-9 text-sm rounded-lg"
+                />
+              </div>
+            </div>
+
             <div>
-              <Label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Description (optional)
+              <Label className="text-xs font-medium uppercase tracking-wide fc-text-dim">
+                Notes (optional)
               </Label>
               <Textarea
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                placeholder="Notes…"
+                placeholder="Coach-facing notes…"
                 rows={3}
                 className="mt-1 text-sm rounded-lg resize-none min-h-[4.5rem]"
               />
             </div>
 
-            <div className="flex gap-2 pt-3 border-t border-black/5 dark:border-white/5 mt-4">
+            <div className="flex gap-2 pt-3 border-t border-[color:var(--fc-glass-border)] mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -153,7 +213,7 @@ export default function CreateMealPlanPage() {
               </Button>
             </div>
           </form>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

@@ -22,7 +22,7 @@ function PhotosRedirectInner() {
   }, [searchParams]);
 
   return (
-    <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500">
+    <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm fc-text-dim">
       Redirecting…
     </div>
   );
@@ -31,7 +31,7 @@ function PhotosRedirectInner() {
 export default function ProgressPhotosRedirectPage() {
   return (
     <ProtectedRoute>
-      <Suspense fallback={<div className="p-6 text-center text-sm text-gray-500">Loading…</div>}>
+      <Suspense fallback={<div className="p-6 text-center text-sm fc-text-dim">Loading…</div>}>
         <PhotosRedirectInner />
       </Suspense>
     </ProtectedRoute>

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Trophy, ChevronDown, ArrowLeft, Dumbbell, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -56,6 +58,7 @@ function getExerciseIconClass(exerciseName: string, index: number): string {
 }
 
 export default function PersonalRecordsPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -254,7 +257,7 @@ export default function PersonalRecordsPage() {
                   setLoadError(null);
                   loadPersonalRecords();
                 }}
-                className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium hover:bg-cyan-400 transition-colors"
+                className="fc-btn fc-btn-primary fc-press h-10 px-5 text-sm"
               >
                 Retry
               </button>
@@ -271,12 +274,7 @@ export default function PersonalRecordsPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-24 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -301,10 +299,8 @@ export default function PersonalRecordsPage() {
           <header className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/progress";
-              }}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+              onClick={() => router.push("/client/progress")}
+              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
               aria-label="Back to progress"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -318,14 +314,14 @@ export default function PersonalRecordsPage() {
           </header>
 
           {backfilling ? (
-            <div className="py-6 text-center border-y border-white/5">
+            <div className="py-6 text-center border-y border-[color:var(--fc-glass-border)]">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-2" />
               <p className="text-sm fc-text-dim">Analyzing your workout history...</p>
             </div>
           ) : (prStats && prStats.totalPRs > 0) || totalRecords > 0 ? (
             <>
-              <section className="border-b border-white/5 pb-4">
-                <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+              <section className="border-b border-[color:var(--fc-glass-border)] pb-4">
+                <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
                   Overview
                 </p>
                 <p className="text-sm font-medium fc-text-primary leading-snug">{summaryLine}</p>
@@ -382,10 +378,10 @@ export default function PersonalRecordsPage() {
               </div>
 
               <section>
-                <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
                   Recent PRs
                 </p>
-                <div className="flex flex-col border-y border-white/5">
+                <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
                   {recentRecords.map((record) => {
                     const display =
                       record.weight > 0
@@ -394,7 +390,7 @@ export default function PersonalRecordsPage() {
                     return (
                       <div
                         key={record.id}
-                        className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 pl-1 pr-1 border-b border-white/5 last:border-0 text-left"
+                        className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 pl-1 pr-1 border-b border-[color:var(--fc-glass-border)] last:border-0 text-left"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold fc-text-primary truncate">
@@ -417,7 +413,7 @@ export default function PersonalRecordsPage() {
               </section>
 
               <div className="sticky top-0 z-10 -mx-1 py-2 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-sm px-1">
-                <label className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5 block">
+                <label className="text-sm uppercase tracking-wider fc-text-dim mb-1.5 block">
                   Filter
                 </label>
                 <Select
@@ -498,18 +494,18 @@ export default function PersonalRecordsPage() {
               )}
 
               {viewMode === "grouped" && (
-                <main className="flex flex-col border-y border-white/5">
+                <main className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
                   {groupedByExercise.map(({ exerciseName, records }, groupIdx) => {
                     const latest = records[0];
                     const isOpen = openGroup === exerciseName;
                     const iconClass = getExerciseIconClass(exerciseName, groupIdx);
 
                     return (
-                      <div key={exerciseName} className="border-b border-white/5 last:border-0">
+                      <div key={exerciseName} className="border-b border-[color:var(--fc-glass-border)] last:border-0">
                         <button
                           type="button"
                           onClick={() => setOpenGroup(isOpen ? null : exerciseName)}
-                          className="w-full flex items-center justify-between gap-2 py-2.5 pl-1 pr-1 text-left hover:bg-white/[0.02] transition-colors"
+                          className="w-full flex items-center justify-between gap-2 py-2.5 pl-1 pr-1 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <div
@@ -534,7 +530,7 @@ export default function PersonalRecordsPage() {
                           />
                         </button>
                         {isOpen && (
-                          <div className="pb-2 pl-1 space-y-1.5 border-t border-white/5 pt-2">
+                          <div className="pb-2 pl-1 space-y-1.5 border-t border-[color:var(--fc-glass-border)] pt-2">
                             {records.map((record) => (
                               <div
                                 key={record.id}
@@ -565,7 +561,7 @@ export default function PersonalRecordsPage() {
               )}
             </>
           ) : (
-            <div className="py-8 px-2 text-center border-y border-white/5">
+            <div className="py-8 px-2 text-center border-y border-[color:var(--fc-glass-border)]">
               <Trophy className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
               <p className="text-sm font-semibold fc-text-primary mb-1">No records yet</p>
               <p className="text-sm fc-text-dim mb-4">
@@ -573,9 +569,7 @@ export default function PersonalRecordsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  window.location.href = "/client/workouts";
-                }}
+                onClick={() => router.push("/client/workouts")}
                 className="fc-btn fc-btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm"
               >
                 <Dumbbell className="w-4 h-4" />

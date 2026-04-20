@@ -5,8 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
@@ -120,13 +122,9 @@ export default function EditWorkoutTemplatePage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="min-h-screen p-4">
+          <div className="min-h-screen p-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="fc-card-shell p-6">
-                <div className="animate-pulse">
-                  <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
-                </div>
-              </div>
+              <PageSkeleton variant="form" />
             </div>
           </div>
         </AnimatedBackground>
@@ -139,11 +137,17 @@ export default function EditWorkoutTemplatePage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="min-h-screen p-4">
+          <div className="min-h-screen p-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="fc-card-shell p-6">
-                <p className="text-[color:var(--fc-text-dim)]">Template not found.</p>
-              </div>
+              <EmptyState
+                icon={FileQuestion}
+                title="Template not found"
+                description="This template may have been deleted or moved."
+                action={{
+                  label: "Back to templates",
+                  onClick: () => router.push("/coach/workouts/templates"),
+                }}
+              />
             </div>
           </div>
         </AnimatedBackground>

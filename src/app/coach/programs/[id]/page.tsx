@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useParams } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
+import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService, {
@@ -68,9 +69,9 @@ function displayDaySlotForScheduleRow(s: any): number | null {
 
 function ProgramDetailsContent() {
   const params = useParams();
+  const router = useRouter();
   const programId = useMemo(() => String(params?.id || ""), [params]);
-  const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [program, setProgram] = useState<Program | null>(null);
   const [schedule, setSchedule] = useState<ProgramSchedule[]>([]);
@@ -171,14 +172,9 @@ function ProgramDetailsContent() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen p-4 max-w-5xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-          </div>
-        </div>
+        <CoachPageShell widthVariant="default-5xl" className="p-4">
+          <PageSkeleton variant="dashboard" />
+        </CoachPageShell>
       </AnimatedBackground>
     );
   }
@@ -188,16 +184,13 @@ function ProgramDetailsContent() {
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
-            <p
-              style={{
-                color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-              }}
-            >
+            <p className="fc-text-primary">
               Program not found.
             </p>
             <Button
               variant="ghost"
-              onClick={() => (window.location.href = "/coach/programs")}
+              type="button"
+              onClick={() => router.push("/coach/programs")}
               className="mt-4"
             >
               Back to Programs
@@ -247,25 +240,17 @@ function ProgramDetailsContent() {
     custom: "#8b5cf6",
   };
 
-  // Difficulty colors
-  const getDifficultyColor = (level: string) => {
-    switch (level) {
-      case "beginner":
-        return getSemanticColor("success");
-      case "intermediate":
-        return getSemanticColor("energy");
-      case "advanced":
-        return getSemanticColor("critical");
-      default:
-        return getSemanticColor("neutral");
-    }
-  };
+  const difficultyBadgeClass =
+    program.difficulty_level === "beginner"
+      ? "bg-[color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] text-[color:var(--fc-status-success)] border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]"
+      : program.difficulty_level === "intermediate"
+        ? "bg-[color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] text-[color:var(--fc-status-warning)] border-[color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)]"
+        : "bg-[color-mix(in_srgb,var(--fc-status-error)_15%,transparent)] text-[color:var(--fc-status-error)] border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)]";
 
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6 pb-32">
-        <div className="max-w-5xl mx-auto space-y-4 relative z-10">
+      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 space-y-4">
           <nav className="flex min-h-12 items-center justify-between gap-3">
             <Link
               href="/coach/programs"
@@ -286,12 +271,10 @@ function ProgramDetailsContent() {
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border"
-                  style={{
-                    background: `${getSemanticColor("critical").primary}15`,
-                    color: getSemanticColor("critical").primary,
-                    borderColor: `${getSemanticColor("critical").primary}30`,
-                  }}
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border",
+                    difficultyBadgeClass
+                  )}
                 >
                   {program.difficulty_level}
                 </span>
@@ -342,13 +325,23 @@ function ProgramDetailsContent() {
                         return (
                           <React.Fragment key={block.id}>
                             <button
+                              type="button"
                               onClick={() => { setActiveDetailBlockId(block.id); setSelectedWeek(1); }}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                              style={{
-                                background: isActive ? `${blockColor}22` : (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
-                                border: `1.5px solid ${isActive ? blockColor : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)")}`,
-                                color: isActive ? blockColor : (isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"),
-                              }}
+                              className={cn(
+                                "px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border-[1.5px]",
+                                isActive
+                                  ? "border-transparent"
+                                  : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim"
+                              )}
+                              style={
+                                isActive
+                                  ? {
+                                      background: `${blockColor}22`,
+                                      borderColor: blockColor,
+                                      color: blockColor,
+                                    }
+                                  : undefined
+                              }
                             >
                               {block.name} · Wks {startWeek}–{endWeek}
                             </button>
@@ -381,7 +374,7 @@ function ProgramDetailsContent() {
             </Link>
           </div>
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm fc-text-dim">
             {totalWeeks} week{totalWeeks !== 1 ? "s" : ""} · 0 clients ·{" "}
             {program.target_audience.replace(/_/g, " ")}
           </p>
@@ -395,21 +388,21 @@ function ProgramDetailsContent() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-cyan-400 hover:bg-cyan-500/10"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent-cyan)] hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]"
                 onClick={() => setSelectedWeek((prev) => Math.max(1, prev - 1))}
                 disabled={selectedWeek === 1}
                 aria-label="Previous week"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
-              <span className="text-lg font-bold rounded-xl px-4 py-1.5 bg-cyan-500/15 text-cyan-400 tabular-nums">
+              <span className="text-lg font-bold rounded-xl px-4 py-1.5 bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)] tabular-nums">
                 Week {selectedWeek} of {totalWeeks}
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-cyan-400 hover:bg-cyan-500/10"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-accent-cyan)] hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]"
                 onClick={() => setSelectedWeek((prev) => Math.min(totalWeeks, prev + 1))}
                 disabled={selectedWeek === totalWeeks}
                 aria-label="Next week"
@@ -430,14 +423,6 @@ function ProgramDetailsContent() {
                   ? templates[templateId]?.name || "Workout Day"
                   : "Rest Day";
                 const isRest = !scheduled;
-                const cardStyle = {
-                  background: isDark
-                    ? "rgba(255,255,255,0.05)"
-                    : "rgba(0,0,0,0.03)",
-                  border: isDark
-                    ? "1px solid rgba(255,255,255,0.1)"
-                    : "1px solid rgba(0,0,0,0.1)",
-                };
                 if (!isRest && templateId) {
                   const templateHref = "/coach/workouts/templates/" + templateId;
                   const accent = getCategoryAccent(
@@ -448,10 +433,9 @@ function ProgramDetailsContent() {
                       key={idx}
                       href={templateHref}
                       className={cn(
-                        "flex items-center justify-between gap-3 rounded-xl p-4 min-h-[52px] cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)] border border-transparent border-l-2 hover:border-[color:var(--fc-glass-border)] group",
+                        "flex items-center justify-between gap-3 rounded-xl p-4 min-h-[52px] cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] border-l-2 hover:border-[color:var(--fc-glass-border)] group",
                         accent.border
                       )}
-                      style={cardStyle}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -463,46 +447,26 @@ function ProgramDetailsContent() {
                           >
                             <Dumbbell className={cn("w-4 h-4", accent.text)} />
                           </div>
-                          <span
-                            className="text-sm font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                          <span className="text-sm font-semibold fc-text-primary">
                             {label}
                           </span>
                         </div>
-                        <div
-                          className="text-sm truncate group-hover:text-cyan-400 transition-colors"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.8)"
-                              : "rgba(0,0,0,0.8)",
-                          }}
-                        >
+                        <div className="text-sm truncate fc-text-dim transition-colors group-hover:text-[color:var(--fc-accent-cyan)]">
                           {templateName}
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 shrink-0 text-cyan-400/80 group-hover:text-cyan-400" aria-hidden />
+                      <ChevronRight className="w-4 h-4 shrink-0 text-[color:color-mix(in_srgb,var(--fc-accent-cyan)_80%,transparent)] transition-colors group-hover:text-[color:var(--fc-accent-cyan)]" aria-hidden />
                     </Link>
                   );
                 }
                 return (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 rounded-xl p-4 min-h-[52px] bg-slate-700/40 border border-slate-600/50"
+                    className="flex items-center gap-3 rounded-xl p-4 min-h-[52px] bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Coffee
-                        className="w-5 h-5 shrink-0"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.3)"
-                            : "rgba(0,0,0,0.3)",
-                        }}
-                      />
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <Coffee className="w-5 h-5 shrink-0 fc-text-dim" aria-hidden />
+                      <span className="text-sm font-semibold fc-text-primary">
                         {label}
                       </span>
                     </div>
@@ -522,8 +486,7 @@ function ProgramDetailsContent() {
             )}
           </div>
           </section>
-        </div>
-      </div>
+        </CoachPageShell>
     </AnimatedBackground>
   );
 }

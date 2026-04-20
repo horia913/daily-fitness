@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Activity,
   Clock,
@@ -109,51 +109,46 @@ export function LogActivityModal({
     (typeof ACTIVITY_META)[ActivityType],
   ][];
 
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm"
-      style={{ paddingBottom: "5rem" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        className="fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col overflow-hidden"
-        style={{
-          animation: "modalSlideIn 0.3s ease-out",
-          maxWidth: "min(92vw, 28rem)",
-          maxHeight: "min(80vh, calc(100vh - 7rem))",
-        }}
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-[min(92vw,28rem)] max-h-[min(80vh,calc(100vh-7rem))] translate-y-[-52%] gap-0 p-0 flex flex-col overflow-hidden rounded-3xl border border-[color:var(--fc-glass-border-strong)] shadow-2xl fc-card-shell pb-20 sm:pb-6"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[color:var(--fc-glass-border)] shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-              <Activity className="w-5 h-5 text-cyan-500" />
+          <div className="flex items-center gap-3 min-w-0 pr-2">
+            <div className="w-10 h-10 rounded-xl bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" aria-hidden />
             </div>
-            <div>
-              <h2 className="text-lg font-bold fc-text-primary">
+            <div className="min-w-0">
+              <DialogTitle className="text-lg font-bold fc-text-primary">
                 {editingActivity ? "Edit Activity" : "Log Activity"}
-              </h2>
-              <p className="text-xs fc-text-dim">
-                Track your extra training
-              </p>
+              </DialogTitle>
+              <p className="text-xs fc-text-dim">Track your extra training</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-xl fc-text-dim hover:fc-text-primary transition-colors"
+            aria-label="Close"
+            className="p-2 rounded-xl fc-text-dim hover:fc-text-primary transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
           {/* Activity Type Grid */}
           <div>
             <label className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5" aria-hidden />
               Activity Type
             </label>
             <div className="grid grid-cols-4 gap-1.5 mt-1.5">
@@ -165,7 +160,7 @@ export function LogActivityModal({
                   className={cn(
                     "flex flex-col items-center gap-1 p-2 rounded-xl border transition-all duration-150",
                     activityType === type
-                      ? "border-cyan-500 bg-cyan-500/10 shadow-sm"
+                      ? "border-[color:var(--fc-accent-cyan)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] shadow-sm"
                       : "border-[color:var(--fc-glass-border)] fc-surface hover:opacity-80"
                   )}
                 >
@@ -197,7 +192,7 @@ export function LogActivityModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold fc-text-dim mb-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <Clock className="w-3 h-3" aria-hidden />
                 Duration (min)
               </label>
               <Input
@@ -211,7 +206,7 @@ export function LogActivityModal({
             </div>
             <div>
               <label className="text-xs font-semibold fc-text-dim mb-1 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
+                <MapPin className="w-3 h-3" aria-hidden />
                 Distance (km)
               </label>
               <Input
@@ -229,7 +224,7 @@ export function LogActivityModal({
           {/* Intensity Selector */}
           <div>
             <label className="text-xs font-semibold fc-text-dim mb-1.5 flex items-center gap-1">
-              <Zap className="w-3 h-3" />
+              <Zap className="w-3 h-3" aria-hidden />
               Intensity
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -242,7 +237,7 @@ export function LogActivityModal({
                     className={cn(
                       "flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-medium transition-all",
                       intensity === key
-                        ? "border-cyan-500 bg-cyan-500/10 fc-text-primary"
+                        ? "border-[color:var(--fc-accent-cyan)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] fc-text-primary"
                         : "border-[color:var(--fc-glass-border)] fc-surface fc-text-dim hover:opacity-80"
                     )}
                   >
@@ -260,7 +255,7 @@ export function LogActivityModal({
           {/* Date Picker */}
           <div>
             <label className="text-xs font-semibold fc-text-dim mb-1 flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
+              <Calendar className="w-3 h-3" aria-hidden />
               Date
             </label>
             <Input
@@ -275,7 +270,7 @@ export function LogActivityModal({
           {/* Notes */}
           <div>
             <label className="text-xs font-semibold fc-text-dim mb-1 flex items-center gap-1">
-              <FileText className="w-3 h-3" />
+              <FileText className="w-3 h-3" aria-hidden />
               Notes (optional)
             </label>
             <textarea
@@ -283,7 +278,7 @@ export function LogActivityModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="How did it go?"
               rows={2}
-              className="w-full rounded-xl px-3 py-2 text-sm fc-surface border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-dim resize-none focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full rounded-xl px-3 py-2 text-sm fc-surface border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-dim resize-none focus:outline-none focus:border-[color:var(--fc-accent-cyan)] transition-colors"
             />
           </div>
         </div>
@@ -305,21 +300,7 @@ export function LogActivityModal({
             {saving ? "Saving..." : editingActivity ? "Update" : "Log Activity"}
           </Button>
         </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes modalSlideIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95) translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-      `}</style>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }

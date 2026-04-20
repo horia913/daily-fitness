@@ -28,6 +28,7 @@ import { useCoachClient } from '@/contexts/CoachClientContext'
 import { cn } from '@/lib/utils'
 import { getCategoryAccent } from '@/lib/workoutCategoryColors'
 import type { AdherenceTier } from '@/lib/coachWorkoutAdherence'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 function sessionAdherenceTierClass(tier: AdherenceTier | null | undefined) {
   if (tier === 'green') return 'text-emerald-400'
@@ -66,6 +67,10 @@ interface ProgramAssignment {
   created_at: string
   progression_mode?: string | null
   coach_unlocked_week?: number | null
+  pause_status?: string | null
+  paused_at?: string | null
+  pause_accumulated_days?: number | null
+  timezone_snapshot?: string | null
   workout_programs?: {
     id?: string
     name: string
@@ -439,7 +444,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             progressionMode:
               ap.progressionMode ?? active.progression_mode ?? 'auto',
             coachUnlockedWeek:
-              ap.coachUnlockedWeek ?? active.coach_unlocked_week ?? null,
+              ap.coachUnlockedWeek ?? null,
             displayWeek: dw,
             requiredCount: ap.requiredSlotsThisWeek ?? 0,
             completedCount: ap.completedRequiredThisWeek ?? 0,
@@ -449,12 +454,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             weekScheduleSlots: slots,
           })
         } else {
-          const [progRes, schedRes, compRes] = await Promise.all([
-            supabase
-              .from('program_progress')
-              .select('current_week_number')
-              .eq('program_assignment_id', active.id)
-              .maybeSingle(),
+          const [schedRes, compRes] = await Promise.all([
             supabase
               .from('program_schedule')
               .select('id, week_number, is_optional, day_of_week')
@@ -466,14 +466,17 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           ])
 
           const mode = active.progression_mode ?? 'auto'
-          const progressWeek =
-            (progRes.data as { current_week_number?: number } | null)
-              ?.current_week_number ?? null
-          const unlocked = active.coach_unlocked_week ?? null
-          const displayWeek =
-            mode === 'coach_managed' && unlocked != null
-              ? unlocked
-              : progressWeek ?? 1
+          const displayWeek = computeCurrentProgramWeekForAssignment(
+            {
+              start_date: active.start_date ?? null,
+              pause_accumulated_days: active.pause_accumulated_days ?? 0,
+              pause_status: active.pause_status ?? null,
+              paused_at: active.paused_at ?? null,
+              timezone_snapshot: active.timezone_snapshot ?? null,
+              duration_weeks: active.workout_programs?.duration_weeks ?? null,
+            },
+            active.timezone_snapshot ?? 'UTC'
+          ).week
 
           const schedule = (schedRes.data || []) as {
             id: string
@@ -532,7 +535,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
             programId: active.program_id,
             programName: active.workout_programs?.name || 'Program',
             progressionMode: mode,
-            coachUnlockedWeek: unlocked,
+            coachUnlockedWeek: null,
             displayWeek,
             requiredCount: weekSlots.length,
             completedCount,

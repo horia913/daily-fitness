@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -83,6 +84,7 @@ interface MealOptionDisplay {
 
 function NutritionDashboardContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
 
@@ -704,8 +706,8 @@ function NutritionDashboardContent() {
 
   const fuelChipBase =
     "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const fuelChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
-  const fuelChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+  const fuelChipActive = "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
+  const fuelChipInactive = "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)]";
 
   return (
     <AnimatedBackground>
@@ -713,8 +715,8 @@ function NutritionDashboardContent() {
       <ClientPageShell className="max-w-lg mx-auto flex flex-col gap-6 overflow-x-hidden px-4 pb-32 pt-6">
         {mealsLoadError && !loadingMeals && (
           <div className="py-8 px-4 text-center">
-            <p className="text-sm text-gray-400 mb-1">{mealsLoadError}</p>
-            <p className="text-xs text-gray-500 mb-4">Tap retry to reload today&apos;s plan.</p>
+            <p className="text-sm fc-text-dim mb-1">{mealsLoadError}</p>
+            <p className="text-xs fc-text-subtle mb-4">Tap retry to reload today&apos;s plan.</p>
             <SecondaryButton onClick={() => runMealsLoad()}>Retry</SecondaryButton>
           </div>
         )}
@@ -723,7 +725,7 @@ function NutritionDashboardContent() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-xl border border-white/10 bg-white/[0.04] p-3 animate-pulse space-y-2"
+                className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 animate-pulse space-y-2"
               >
                 <div className="h-3 rounded w-1/2 bg-white/10" />
                 <div className="h-16 rounded-lg bg-white/10" />
@@ -760,28 +762,24 @@ function NutritionDashboardContent() {
               <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/nutrition/foods/create";
-                  }}
+                  onClick={() => router.push("/client/nutrition/foods/create")}
                   className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
                 >
                   Add food
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/progress/nutrition";
-                  }}
+                  onClick={() => router.push("/client/progress/nutrition")}
                   className="text-sm fc-text-dim hover:fc-text-primary transition-colors min-h-[44px] px-1"
                 >
                   History
                 </button>
               </div>
             </div>
-            <div className="py-8 px-4 text-center rounded-xl border border-white/10 bg-white/[0.04]">
-              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-gray-600" aria-hidden />
-              <p className="text-sm text-gray-400 mb-1">No meal plan</p>
-              <p className="text-xs text-gray-500">Ask your coach to assign a meal plan.</p>
+            <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
+              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 fc-text-subtle" aria-hidden />
+              <p className="text-sm fc-text-dim mb-1">No meal plan</p>
+              <p className="text-xs fc-text-dim">Ask your coach to assign a meal plan.</p>
             </div>
           </>
         ) : (
@@ -814,18 +812,14 @@ function NutritionDashboardContent() {
               <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/nutrition/foods/create";
-                  }}
+                  onClick={() => router.push("/client/nutrition/foods/create")}
                   className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline min-h-[44px] px-1"
                 >
                   Add food
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/progress/nutrition";
-                  }}
+                  onClick={() => router.push("/client/progress/nutrition")}
                   className="text-sm fc-text-dim hover:fc-text-primary transition-colors min-h-[44px] px-1"
                 >
                   History
@@ -838,7 +832,7 @@ function NutritionDashboardContent() {
               <section>
                 <label
                   htmlFor="fuel-plan-picker"
-                  className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 block"
+                  className="text-[10px] font-bold uppercase tracking-wider fc-text-dim mb-2 block"
                 >
                   Today&apos;s plan
                 </label>
@@ -849,7 +843,7 @@ function NutritionDashboardContent() {
                     const id = e.target.value;
                     if (id) handlePlanSelect(id);
                   }}
-                  className="w-full h-11 min-h-[44px] px-3 rounded-lg border border-white/10 bg-white/[0.04] text-sm font-medium text-white appearance-none cursor-pointer"
+                  className="w-full h-11 min-h-[44px] px-3 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft text-sm font-medium fc-text-primary appearance-none cursor-pointer"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
                     backgroundRepeat: "no-repeat",
@@ -873,7 +867,7 @@ function NutritionDashboardContent() {
             )}
 
             {/* FuelHeader: plan name, date, progress ring, daily macros */}
-            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <section className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h2 className="text-base font-semibold fc-text-primary">
@@ -896,11 +890,11 @@ function NutritionDashboardContent() {
                     </span>
                   </p>
                   <p className="text-xs fc-text-dim">
-                    <span className="text-cyan-400 font-medium">P {Math.round(nutritionData.protein.consumed)}g</span>
+                    <span className="font-medium text-[color:var(--fc-macro-protein,var(--fc-accent-cyan))]">P {Math.round(nutritionData.protein.consumed)}g</span>
                     {" · "}
-                    <span className="text-amber-400 font-medium">C {Math.round(nutritionData.carbs.consumed)}g</span>
+                    <span className="font-medium text-[color:var(--fc-macro-carbs,#fbbf24)]">C {Math.round(nutritionData.carbs.consumed)}g</span>
                     {" · "}
-                    <span className="text-emerald-400 font-medium">F {Math.round(nutritionData.fat.consumed)}g</span>
+                    <span className="font-medium text-[color:var(--fc-macro-fat,#34d399)]">F {Math.round(nutritionData.fat.consumed)}g</span>
                     {nutritionData.protein.goal != null && (
                       <span className="fc-text-dim">
                         {" "}
@@ -914,19 +908,19 @@ function NutritionDashboardContent() {
                         label: "Protein",
                         cur: nutritionData.protein.consumed,
                         goal: nutritionData.protein.goal,
-                        bar: "bg-gradient-to-r from-cyan-600 to-cyan-400",
+                        bar: "bg-[color:var(--fc-macro-protein,var(--fc-accent-cyan))]",
                       },
                       {
                         label: "Carbs",
                         cur: nutritionData.carbs.consumed,
                         goal: nutritionData.carbs.goal,
-                        bar: "bg-gradient-to-r from-amber-600 to-amber-400",
+                        bar: "bg-[color:var(--fc-macro-carbs,#fbbf24)]",
                       },
                       {
                         label: "Fat",
                         cur: nutritionData.fat.consumed,
                         goal: nutritionData.fat.goal,
-                        bar: "bg-gradient-to-r from-emerald-600 to-emerald-400",
+                        bar: "bg-[color:var(--fc-macro-fat,#34d399)]",
                       },
                     ].map((row) => {
                       const g = row.goal && row.goal > 0 ? row.goal : 0;
@@ -954,13 +948,13 @@ function NutritionDashboardContent() {
             </section>
 
             {/* Water — compact strip: label + progress, then glasses + Add (mobile-first) */}
-            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <section className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="text-sm font-medium fc-text-primary flex items-center gap-1.5">
                     <Droplet className="w-4 h-4 text-[color:var(--fc-accent-cyan)]" />
                     Water
                   </span>
-                  <span className="text-sm font-mono text-cyan-500 dark:text-cyan-400 shrink-0">
+                  <span className="text-sm font-mono text-[color:var(--fc-accent-cyan)] shrink-0">
                     {nutritionData.water.ml.toLocaleString()} / {nutritionData.water.goalMl > 0 ? nutritionData.water.goalMl.toLocaleString() : "—"} mL
                   </span>
                 </div>
@@ -1001,7 +995,7 @@ function NutritionDashboardContent() {
 
             {/* Meal cards — full width, proper padding for mobile */}
             {hasMealsInPlan && (
-              <section className="flex w-full min-w-0 flex-col divide-y divide-white/5 border-y border-white/5">
+              <section className="flex w-full min-w-0 flex-col divide-y divide-[color:var(--fc-glass-border)] border-y border-[color:var(--fc-glass-border)]">
                 {meals.map((meal) => {
                   const displayMeal = {
                     id: meal.id,
@@ -1023,12 +1017,8 @@ function NutritionDashboardContent() {
                       onMarkComplete={handleMarkComplete}
                       onUndo={() => handleUndo(meal.id)}
                       onAddPhoto={handleAddPhoto}
-                      onOpenMealDetails={() => {
-                        window.location.href = `/client/nutrition/meals/${meal.id}`;
-                      }}
-                      onFoodClick={(foodId) => {
-                        window.location.href = `/client/nutrition/foods/${foodId}`;
-                      }}
+                      onOpenMealDetails={() => router.push(`/client/nutrition/meals/${meal.id}`)}
+                      onFoodClick={(foodId) => router.push(`/client/nutrition/foods/${foodId}`)}
                     />
                   );
                 })}
@@ -1037,41 +1027,41 @@ function NutritionDashboardContent() {
 
             {hasActivePlan && hasMealsInPlan === false && !loadingMeals && (
               <div className="py-8 px-4 text-center">
-                <p className="text-sm text-gray-400">No meals in this plan yet.</p>
-                <p className="text-xs text-gray-500 mt-1">Your coach can add meals to this plan.</p>
+                <p className="text-sm fc-text-dim">No meals in this plan yet.</p>
+                <p className="text-xs fc-text-subtle mt-1">Your coach can add meals to this plan.</p>
               </div>
             )}
 
-            <p className="text-xs text-gray-500 text-center py-2">
+            <p className="text-xs fc-text-subtle text-center py-2">
               All portions are for raw/uncooked ingredients.
             </p>
 
             {/* Nutrition Trends — collapsible (single shell) */}
-            <section className="w-full rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
+            <section className="w-full rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft overflow-hidden">
               <button
                 type="button"
                 onClick={() => setNutritionTrendsOpen((o) => !o)}
                 className={cn(
                   "w-full p-4 flex items-center justify-between gap-3 text-left",
-                  nutritionTrendsOpen && "border-b border-white/10"
+                  nutritionTrendsOpen && "border-b border-[color:var(--fc-glass-border)]"
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-cyan-400" />
-                  <span className="text-base font-semibold text-white tracking-tight">Nutrition trends</span>
+                  <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent)]" />
+                  <span className="text-base font-semibold fc-text-primary tracking-tight">Nutrition trends</span>
                 </div>
-                {nutritionTrendsOpen ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+                {nutritionTrendsOpen ? <ChevronUp className="w-5 h-5 fc-text-dim" /> : <ChevronDown className="w-5 h-5 fc-text-dim" />}
               </button>
               {nutritionTrendsOpen && (
                 <div className="p-4">
                   {nutritionTrends.length === 0 ? (
                     <div className="py-6 px-2 text-center">
-                      <p className="text-sm text-gray-400">Start logging meals to see trends.</p>
-                      <p className="text-xs text-gray-500 mt-1">Your last 30 days will appear here.</p>
+                      <p className="text-sm fc-text-dim">Start logging meals to see trends.</p>
+                      <p className="text-xs fc-text-subtle mt-1">Your last 30 days will appear here.</p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Metric</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">Metric</p>
                       <div className="-mx-1 px-1 mb-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         <div className="flex flex-wrap gap-2 min-w-min">
                           {(["calories", "protein", "carbs", "fat"] as const).map((m) => (
@@ -1096,12 +1086,12 @@ function NutritionDashboardContent() {
                           const height = (val / maxVal) * 100;
                           const barClass =
                             nutritionTrendsMetric === "calories"
-                              ? "bg-blue-500/70 dark:bg-blue-400/70"
+                              ? "bg-[color:var(--fc-accent)]/70"
                               : nutritionTrendsMetric === "protein"
-                                ? "bg-cyan-500/70 dark:bg-cyan-400/70"
+                                ? "bg-[color:var(--fc-macro-protein,var(--fc-accent-cyan))]/70"
                                 : nutritionTrendsMetric === "carbs"
-                                  ? "bg-amber-500/70 dark:bg-amber-400/70"
-                                  : "bg-emerald-500/70 dark:bg-emerald-400/70";
+                                  ? "bg-[color:var(--fc-macro-carbs,#fbbf24)]/70"
+                                  : "bg-[color:var(--fc-macro-fat,#34d399)]/70";
                           return (
                             <div key={day.date} className="flex-1 min-w-0 flex flex-col items-center" title={`${day.date}: ${val}`}>
                               <div
@@ -1112,7 +1102,7 @@ function NutritionDashboardContent() {
                           );
                         })}
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs fc-text-subtle mt-2">
                         Last 30 days · {nutritionTrendsMetric === "calories" ? "kcal" : "g"}
                       </p>
                       {(() => {
@@ -1122,7 +1112,7 @@ function NutritionDashboardContent() {
                           : 0;
                         const target = nutritionTrendsMetric === "calories" ? nutritionTrendsTarget : null;
                         return (
-                          <p className="text-sm text-gray-300 mt-1">
+                          <p className="text-sm fc-text-dim mt-1">
                             This week avg: {weekAvg.toLocaleString()}{nutritionTrendsMetric === "calories" ? " cal" : " g"}
                             {target != null && nutritionTrendsMetric === "calories" && ` (target: ${target.toLocaleString()})`}
                           </p>
@@ -1139,28 +1129,28 @@ function NutritionDashboardContent() {
         {/* Goals section — always at bottom for header scroll target */}
         <section ref={goalsSectionRef} id="fuel-goals-section">
           {nutritionGoals.length === 0 ? (
-            <div className="py-8 px-4 text-center rounded-xl border border-white/10 bg-white/[0.04]">
+            <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
               <span className="text-2xl block mb-2" aria-hidden>
                 🎯
               </span>
-              <p className="text-sm text-gray-400 mb-1">Set your goals</p>
-              <p className="text-xs text-gray-500 mb-4 max-w-sm mx-auto leading-relaxed">
+              <p className="text-sm fc-text-dim mb-1">Set your goals</p>
+              <p className="text-xs fc-text-subtle mb-4 max-w-sm mx-auto leading-relaxed">
                 Track nutrition, hydration, and wellness goals to stay on top of your progress.
               </p>
               <Button
                 onClick={() => setShowAddGoalModal(true)}
-                className="min-h-[44px] px-6 rounded-lg border border-cyan-500/30 bg-cyan-500/15 text-cyan-300 font-semibold hover:bg-cyan-500/25"
+                className="min-h-[44px] px-6 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)] font-semibold hover:bg-[color-mix(in_srgb,var(--fc-accent)_25%,transparent)]"
               >
                 + Set up my goals
               </Button>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <h3 className="text-base font-semibold text-white tracking-tight">
+                <h3 className="text-base font-semibold fc-text-primary tracking-tight">
                   Goals
                   {nutritionGoals.length > 0 && (
-                    <span className="text-gray-500 font-normal ml-1 text-sm">
+                    <span className="fc-text-subtle font-normal ml-1 text-sm">
                       ·{" "}
                       {Math.round(
                         nutritionGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / nutritionGoals.length
@@ -1171,10 +1161,8 @@ function NutritionDashboardContent() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/goals";
-                  }}
-                  className="text-sm font-medium text-cyan-400 hover:underline min-h-[44px] px-1"
+                  onClick={() => router.push("/client/goals")}
+                  className="text-sm font-medium text-[color:var(--fc-accent)] hover:underline min-h-[44px] px-1"
                 >
                   Manage
                 </button>
@@ -1188,7 +1176,7 @@ function NutritionDashboardContent() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAddGoalModal(true)}
-                className="w-full mt-3 min-h-11 h-11 rounded-lg border-cyan-500/30 text-cyan-300 bg-cyan-500/5 hover:bg-cyan-500/15"
+                className="w-full mt-3 min-h-11 h-11 rounded-lg border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] text-[color:var(--fc-accent)] bg-[color-mix(in_srgb,var(--fc-accent)_5%,transparent)] hover:bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)]"
               >
                 + Add goal
               </Button>

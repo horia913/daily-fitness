@@ -1,18 +1,20 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { BarChart3, ClipboardCheck, TrendingUp, FileText } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { BarChart3, ClipboardCheck, ShieldCheck, TrendingUp, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const analyticsTabs = [
   { href: '/coach/analytics', label: 'Overview', icon: BarChart3 },
   { href: '/coach/adherence', label: 'Adherence', icon: ClipboardCheck },
+  { href: '/coach/compliance', label: 'Compliance', icon: ShieldCheck },
   { href: '/coach/progress', label: 'Progress', icon: TrendingUp },
   { href: '/coach/reports', label: 'Reports', icon: FileText },
 ]
 
 export default function AnalyticsNav() {
   const pathname = usePathname()
+  const router = useRouter()
 
   return (
     <div className="border-b border-[color:var(--fc-glass-border)] mb-4 sm:mb-6 -mx-4 sm:mx-0 px-4 sm:px-0">
@@ -29,7 +31,7 @@ export default function AnalyticsNav() {
             <button
               key={tab.href}
               type="button"
-              onClick={() => { window.location.href = tab.href; }}
+              onClick={() => router.push(tab.href)}
               className={cn(
                 'bg-transparent border-none cursor-pointer',
                 'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 min-h-[44px] rounded-t-xl',

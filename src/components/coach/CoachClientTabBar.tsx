@@ -1,12 +1,13 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Dumbbell,
   Utensils,
   TrendingUp,
+  ClipboardCheck,
   User,
   ArrowLeft,
 } from "lucide-react";
@@ -49,9 +50,9 @@ function buildTabs(clientId: string): TabDef[] {
       isActive: (pathname) => pathname.startsWith(`${base}/meals`),
     },
     {
-      label: "Progress",
+      label: "Check-ins",
       href: `${base}/progress`,
-      icon: TrendingUp,
+      icon: ClipboardCheck,
       isActive: (pathname) => pathname.startsWith(`${base}/progress`),
     },
     {
@@ -69,32 +70,29 @@ const TAB_SHORT_LABEL: Record<string, string> = {
   Training: "Train",
   Stats: "Stats",
   Nutrition: "Meals",
-  Progress: "Prog",
+  "Check-ins": "Checks",
   Profile: "Prof",
 };
 
 export default function CoachClientTabBar({ clientId }: { clientId: string }) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const tabs = buildTabs(clientId);
 
   return (
-    <div
-      className="sticky top-0 z-20 mb-4 sm:mb-6 -mx-4 sm:mx-0 px-2 sm:px-0 pt-1 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-md border-b border-[color:var(--fc-glass-border)]"
-    >
+    <div className="sticky top-0 z-20 -mx-1 mb-4 sm:mx-0 sm:mb-6">
       <nav
-        className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide min-h-[44px] items-stretch"
+        className="flex min-h-[44px] items-stretch gap-0.5 overflow-x-auto rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-surface-card)_88%,transparent)] px-1 py-1 shadow-[0_1px_0_var(--fc-surface-card-border)] backdrop-blur-md scrollbar-hide sm:gap-1"
         role="tablist"
         aria-label="Client sections"
       >
         <button
           type="button"
           aria-label="Back to client list"
-          onClick={() => {
-            window.location.href = "/coach/clients";
-          }}
-          className="flex items-center justify-center px-2 sm:px-3 py-3 rounded-t-xl border-b-2 border-transparent text-gray-400 hover:text-gray-300 hover:border-[color:var(--fc-glass-border)] flex-shrink-0 min-h-[44px] min-w-[44px]"
+          onClick={() => router.push("/coach/clients")}
+          className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl px-2 fc-text-dim transition-colors hover:bg-[color:var(--fc-glass-highlight)] hover:fc-text-primary sm:px-3"
         >
-          <ArrowLeft className="w-5 h-5" aria-hidden />
+          <ArrowLeft className="h-5 w-5" aria-hidden />
         </button>
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -104,16 +102,12 @@ export default function CoachClientTabBar({ clientId }: { clientId: string }) {
               key={tab.href}
               type="button"
               aria-label={tab.label}
-              onClick={() => {
-                window.location.href = tab.href;
-              }}
+              onClick={() => router.push(tab.href)}
               className={cn(
-                "bg-transparent border-none cursor-pointer",
-                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 min-h-[44px] rounded-t-xl",
-                "border-b-2 -mb-px",
+                "flex min-h-[44px] shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-transparent px-2 py-2.5 text-sm font-medium transition-colors sm:gap-2 sm:px-4",
                 active
-                  ? "text-cyan-400 font-medium border-cyan-400"
-                  : "text-gray-400 border-transparent hover:text-gray-300 hover:border-[color:var(--fc-glass-border)]"
+                  ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_45%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_12%,transparent)] font-semibold text-[color:var(--fc-accent-cyan)]"
+                  : "fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] hover:fc-text-primary",
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" aria-hidden />

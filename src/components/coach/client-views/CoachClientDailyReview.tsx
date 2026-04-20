@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCoachClient } from "@/contexts/CoachClientContext";
 import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
 import { Mail, Dumbbell, TrendingUp, Trophy, Heart, Smile } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
+import GlassCard from "@/components/ui/GlassCard";
 import { attentionCardSurfaceStyle } from "@/lib/coachClientAttention";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
 import { deltaTone, adherenceTierFromPercent } from "@/lib/coachWorkoutAdherence";
@@ -122,19 +125,17 @@ type Props = {
 };
 
 function tierColor(tier: "green" | "amber" | "red" | null) {
-  if (tier === "green") return "text-emerald-400";
-  if (tier === "amber") return "text-amber-400";
-  if (tier === "red") return "text-red-400";
-  return "text-gray-400";
+  if (tier === "green") return "text-[color:var(--fc-status-success)]";
+  if (tier === "amber") return "text-[color:var(--fc-status-warning)]";
+  if (tier === "red") return "text-[color:var(--fc-status-error)]";
+  return "text-[color:var(--fc-text-dim)]";
 }
 
-function fmtDelta(n: number | null, suffix = "", lowerBetter = false): string {
+function fmtDelta(n: number | null, suffix = "", _lowerBetter = false): string {
   if (n === null || Number.isNaN(n)) return "";
-  if (n === 0) return " ±0" + suffix;
+  if (n === 0) return ` ±0${suffix}`;
   const sign = n > 0 ? "+" : "";
-  const tone = deltaTone(n, lowerBetter);
-  const emoji = tone === "green" ? "🟢" : tone === "red" ? "🔴" : "⚪";
-  return ` (${sign}${n}${suffix}) ${emoji}`;
+  return ` (${sign}${n}${suffix})`;
 }
 
 export default function CoachClientDailyReview({
@@ -152,6 +153,7 @@ export default function CoachClientDailyReview({
 }: Props) {
   const { clientName } = useCoachClient();
   const { addToast } = useToast();
+  const router = useRouter();
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const attentionLine =
@@ -199,7 +201,8 @@ export default function CoachClientDailyReview({
     if (delta === 0) {
       return {
         text: "—",
-        className: "bg-white/5 text-gray-400 border border-white/10",
+        className:
+          "border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-dim)]",
       };
     }
     const sign = delta > 0 ? "+" : "";
@@ -207,12 +210,14 @@ export default function CoachClientDailyReview({
     if (tone === "green") {
       return {
         text: `${sign}${delta}`,
-        className: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
+        className:
+          "border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] text-[color:var(--fc-status-success)]",
       };
     }
     return {
       text: `${sign}${delta}`,
-      className: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
+      className:
+        "border border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-warning)_12%,transparent)] text-[color:var(--fc-status-warning)]",
     };
   };
 
@@ -237,37 +242,74 @@ export default function CoachClientDailyReview({
     currentWeek.checkIns.daily.avgMood == null
   );
 
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+
   return (
-    <div
-      className="mx-auto w-full max-w-6xl px-4 lg:px-8 fc-page flex flex-col min-w-0 gap-3 pb-6"
-      style={{ gap: "var(--fc-gap-sections)" }}
-    >
-      {attentionLine && (
-        <div
-          className="rounded-lg border border-white/5 px-3 py-2 text-xs sm:text-sm"
-          style={attentionCardSurfaceStyle(attention.level)}
-        >
-          <span className="fc-text-primary line-clamp-2">{attentionLine}</span>
+    <div className="fc-page mx-auto flex min-w-0 w-full max-w-6xl flex-col gap-[var(--fc-gap-sections)] pb-8">
+      <GlassCard elevation={2} className="fc-card-shell flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-accent)_14%,transparent)] text-sm font-bold text-[color:var(--fc-accent)]"
+            aria-hidden
+          >
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)] sm:text-2xl">
+              {name}
+            </h1>
+            {email ? (
+              <p className="mt-0.5 truncate text-sm text-[color:var(--fc-text-dim)]">{email}</p>
+            ) : (
+              <p className="mt-0.5 text-sm text-[color:var(--fc-text-dim)]">No email on file</p>
+            )}
+          </div>
         </div>
+        {trainedToday ? (
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] px-3 py-1 text-xs font-medium text-[color:var(--fc-status-success)]">
+            Trained today
+          </span>
+        ) : (
+          <span className="inline-flex w-fit items-center rounded-full border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-3 py-1 text-xs font-medium text-[color:var(--fc-text-dim)]">
+            No session logged today
+          </span>
+        )}
+      </GlassCard>
+
+      {attentionLine && (
+        <GlassCard
+          elevation={2}
+          className="fc-card-shell !p-3 text-xs sm:!p-4 sm:text-sm"
+          surfaceStyle={attentionCardSurfaceStyle(attention.level)}
+        >
+          <span className="line-clamp-3 text-[color:var(--fc-text-primary)]">{attentionLine}</span>
+        </GlassCard>
       )}
 
-      <section className="border-t border-white/5 pt-3">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60 mb-2">
+      <GlassCard elevation={2} className="fc-card-shell space-y-4 p-4 sm:p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
           Today
         </h2>
         {trainedToday && todayWorkout ? (
-          <div className="space-y-1 text-sm">
+          <div className="space-y-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-emerald-400">✅</span>
-              <span className="font-medium text-white">{todayWorkout.workoutName}</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-[color:var(--fc-status-success)]" aria-hidden>
+                ●
+              </span>
+              <span className="font-semibold text-[color:var(--fc-text-primary)]">{todayWorkout.workoutName}</span>
+              <span className="text-xs text-[color:var(--fc-text-dim)]">
                 {todayWorkout.durationMinutes != null ? `${todayWorkout.durationMinutes} min` : "—"}
                 {todayWorkout.totalSets != null ? ` · ${todayWorkout.totalSets} sets` : ""}
               </span>
             </div>
             <div className="text-xs sm:text-sm">
-              <span className="text-gray-400">Volume: </span>
-              <span className="text-white">
+              <span className="text-[color:var(--fc-text-dim)]">Volume: </span>
+              <span className="text-[color:var(--fc-text-primary)] tabular-nums">
                 {todayWorkout.totalVolume != null
                   ? `${Math.round(Number(todayWorkout.totalVolume)).toLocaleString()} kg`
                   : "—"}
@@ -275,11 +317,12 @@ export default function CoachClientDailyReview({
               {todayWorkout.volumeDeltaKg != null && (
                 <span
                   className={cn(
+                    "tabular-nums",
                     todayWorkout.volumeDeltaKg > 0
-                      ? "text-emerald-400"
+                      ? "text-[color:var(--fc-status-success)]"
                       : todayWorkout.volumeDeltaKg < 0
-                        ? "text-red-400"
-                        : "text-gray-400"
+                        ? "text-[color:var(--fc-status-error)]"
+                        : "text-[color:var(--fc-text-dim)]",
                   )}
                 >
                   {todayWorkout.volumeDeltaKg > 0 ? " +" : " "}
@@ -289,111 +332,123 @@ export default function CoachClientDailyReview({
             </div>
             {todayWorkout.adherencePercent != null && (
               <div className="text-xs sm:text-sm">
-                <span className="text-gray-400">Target: </span>
-                <span className={tierColor(adherenceTier)}>
+                <span className="text-[color:var(--fc-text-dim)]">Target: </span>
+                <span className={cn("font-medium", tierColor(adherenceTier))}>
                   {Math.round(todayWorkout.adherencePercent)}% sets on target
                   {adherenceTier === "green"
-                    ? " ✅"
+                    ? " · On target"
                     : adherenceTier === "amber"
-                      ? " ⚠️"
-                      : " 🔴"}
+                      ? " · Close"
+                      : " · Below target"}
                 </span>
               </div>
             )}
-            <button
-              type="button"
-              className="text-xs text-cyan-400 hover:underline text-left pt-1"
-              onClick={() => {
-                window.location.href = `/coach/clients/${clientId}/workout-logs/${todayWorkout.logId}`;
-              }}
+            <Link
+              href={`/coach/clients/${clientId}/workout-logs/${todayWorkout.logId}`}
+              className="inline-flex text-xs font-medium text-[color:var(--fc-accent)] hover:underline"
             >
               View full log →
-            </button>
+            </Link>
           </div>
         ) : (
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center gap-2 text-gray-400">
-              <span className="text-gray-500">⚪</span>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)]">
+              <span className="text-[color:var(--fc-text-subtle)]" aria-hidden>
+                ○
+              </span>
               <span>No workout logged today</span>
             </div>
             {nextScheduledWorkout && (
-              <p className="text-xs text-gray-500">
-                Next scheduled: {nextScheduledWorkout.dayName} — {nextScheduledWorkout.workoutName}
+              <p className="text-xs text-[color:var(--fc-text-dim)]">
+                Next scheduled: <span className="text-[color:var(--fc-text-primary)]">{nextScheduledWorkout.dayName}</span>{" "}
+                — {nextScheduledWorkout.workoutName}
               </p>
             )}
           </div>
         )}
-      </section>
+      </GlassCard>
 
-      <section className="border-t border-white/5 pt-3">
-        <h2 className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
-          This Week
-        </h2>
+      <GlassCard elevation={2} className="fc-card-shell space-y-4 p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+            This week
+          </h2>
+          {currentWeek ? (
+            <p className="text-xs text-[color:var(--fc-text-dim)]">
+              Mon {formatRangeDate(currentWeek.weekStart)} — Sun {formatRangeDate(currentWeek.weekEnd)}
+            </p>
+          ) : null}
+        </div>
         {currentWeek ? (
           <>
-            <p className="mb-3 text-xs text-gray-500">
-              Mon {formatRangeDate(currentWeek.weekStart)} - Sun {formatRangeDate(currentWeek.weekEnd)}
-            </p>
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] p-4">
               {!weeklyReview?.hasActiveAssignment ? (
-                <p className="text-xs text-gray-400">
-                  No active program - workouts/volume/PRs are zero
+                <p className="text-xs text-[color:var(--fc-text-dim)]">
+                  No active program — workout and volume stats stay at zero until you assign one.
                 </p>
               ) : (
                 <>
                   {weekJustStarted && (
-                    <p className="mb-3 text-xs text-gray-500">Week just started</p>
+                    <p className="mb-3 text-xs text-[color:var(--fc-text-dim)]">Week just started</p>
                   )}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {[
                       {
                         key: "workouts",
-                        icon: <Dumbbell className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        icon: <Dumbbell className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
                         value: `${currentWeek.workouts.completed}/${currentWeek.workouts.planned}`,
                         label: "Workouts",
                         delta: hasPreviousWeekData
                           ? deltaBadge(currentWeek.workouts.completed, previousWeek?.workouts.completed ?? null)
                           : null,
-                        onClick: () => { window.location.href = `/coach/clients/${clientId}/workout-logs`; },
+                        onClick: () => {
+                          router.push(`/coach/clients/${clientId}/workout-logs`);
+                        },
                         sub: null as string | null,
                       },
                       {
                         key: "volume",
-                        icon: <TrendingUp className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        icon: <TrendingUp className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
                         value: formatVolume(currentWeek.volume.totalKg),
                         label: "Volume",
                         delta: hasPreviousWeekData
                           ? deltaBadge(Math.round(currentWeek.volume.totalKg), Math.round(previousWeek?.volume.totalKg ?? 0))
                           : null,
-                        onClick: () => { window.location.href = `/coach/clients/${clientId}/stats`; },
+                        onClick: () => {
+                          router.push(`/coach/clients/${clientId}/stats`);
+                        },
                         sub: null as string | null,
                       },
                       {
                         key: "prs",
-                        icon: <Trophy className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        icon: <Trophy className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
                         value: `${currentWeek.prs.count}`,
                         label: "PRs",
                         delta: hasPreviousWeekData
                           ? deltaBadge(currentWeek.prs.count, previousWeek?.prs.count ?? null)
                           : null,
-                        onClick: () => { window.location.href = `/coach/clients/${clientId}/stats`; },
+                        onClick: () => {
+                          router.push(`/coach/clients/${clientId}/stats`);
+                        },
                         sub: null as string | null,
                       },
                       {
                         key: "checkins",
-                        icon: <Heart className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                        icon: <Heart className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
                         value: `${currentWeek.checkIns.daily.submitted}/7`,
                         label: "Check-ins",
                         delta: hasPreviousWeekData
                           ? deltaBadge(currentWeek.checkIns.daily.submitted, previousWeek?.checkIns.daily.submitted ?? null)
                           : null,
-                        onClick: () => { window.location.href = `/coach/clients/${clientId}/check-ins`; },
+                        onClick: () => {
+                          router.push(`/coach/clients/${clientId}/check-ins`);
+                        },
                         sub: `Wkly: ${currentWeek.checkIns.scheduled.submitted ? "done" : "pending"}`,
                       },
                       ...(currentWeek.checkIns.daily.avgMood != null
                         ? [{
                             key: "mood",
-                            icon: <Smile className="h-3.5 w-3.5 text-cyan-400/80" aria-hidden />,
+                            icon: <Smile className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
                             value: `${Math.round(currentWeek.checkIns.daily.avgMood * 10) / 10}/10`,
                             label: "Avg mood",
                             delta: hasPreviousWeekData
@@ -404,7 +459,9 @@ export default function CoachClientDailyReview({
                                     : null
                                 )
                               : null,
-                            onClick: () => { window.location.href = `/coach/clients/${clientId}/check-ins`; },
+                            onClick: () => {
+                              router.push(`/coach/clients/${clientId}/check-ins`);
+                            },
                             sub: null as string | null,
                           }]
                         : []),
@@ -413,12 +470,16 @@ export default function CoachClientDailyReview({
                         key={tile.key}
                         type="button"
                         onClick={tile.onClick}
-                        className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-left hover:bg-white/[0.06] transition-colors min-h-[96px]"
+                        className="min-h-[96px] rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-sunken)] p-3 text-left transition-colors hover:border-[color:var(--fc-accent)] hover:bg-[color:var(--fc-glass-highlight)]"
                       >
                         <div className="mb-2">{tile.icon}</div>
-                        <p className="text-xl font-bold tabular-nums text-white">{tile.value}</p>
-                        <p className="text-[10px] uppercase tracking-wider text-gray-500">{tile.label}</p>
-                        {tile.sub ? <p className="mt-1 text-[10px] text-gray-400">{tile.sub}</p> : null}
+                        <p className="text-xl font-bold tabular-nums text-[color:var(--fc-text-primary)]">{tile.value}</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-[color:var(--fc-text-dim)]">
+                          {tile.label}
+                        </p>
+                        {tile.sub ? (
+                          <p className="mt-1 text-[10px] text-[color:var(--fc-text-dim)]">{tile.sub}</p>
+                        ) : null}
                         {tile.delta ? (
                           <span className={`mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ${tile.delta.className}`}>
                             {tile.delta.text}
@@ -432,49 +493,53 @@ export default function CoachClientDailyReview({
             </div>
           </>
         ) : (
-          <p className="text-xs text-gray-500">Weekly review unavailable</p>
+          <p className="text-xs text-[color:var(--fc-text-dim)]">Weekly review unavailable</p>
         )}
-      </section>
+      </GlassCard>
 
-      <section className="border-t border-white/5 pt-3">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60 mb-2">
-          Check-in
+      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
+          Latest check-in
         </h2>
         {latestCheckIn ? (
-          <div className="text-xs sm:text-sm space-y-1 text-gray-300">
+          <div className="space-y-1 text-xs sm:text-sm leading-relaxed text-[color:var(--fc-text-primary)]">
             <p>
-              <span className="text-gray-400">Sleep </span>
-              <span className="text-white">
+              <span className="text-[color:var(--fc-text-dim)]">Sleep </span>
+              <span className="font-medium tabular-nums">
                 {latestCheckIn.sleepHours != null ? `${latestCheckIn.sleepHours}h` : "—"}
               </span>
               {latestCheckIn.sleepDelta != null && (
                 <span
                   className={cn(
-                    latestCheckIn.sleepDelta >= 0 ? "text-emerald-400" : "text-red-400"
+                    "tabular-nums",
+                    latestCheckIn.sleepDelta >= 0
+                      ? "text-[color:var(--fc-status-success)]"
+                      : "text-[color:var(--fc-status-error)]",
                   )}
                 >
                   {fmtDelta(latestCheckIn.sleepDelta, "h")}
                 </span>
               )}
-              <span className="text-gray-400"> · Stress </span>
-              <span className="text-white">
+              <span className="text-[color:var(--fc-text-dim)]"> · Stress </span>
+              <span className="font-medium tabular-nums">
                 {latestCheckIn.stressLevel != null ? `${latestCheckIn.stressLevel}/10` : "—"}
               </span>
               {latestCheckIn.stressDelta != null && (
                 <span
                   className={cn(
+                    "tabular-nums",
                     deltaTone(latestCheckIn.stressDelta, true) === "green"
-                      ? "text-emerald-400"
+                      ? "text-[color:var(--fc-status-success)]"
                       : deltaTone(latestCheckIn.stressDelta, true) === "red"
-                        ? "text-red-400"
-                        : "text-gray-400"
+                        ? "text-[color:var(--fc-status-error)]"
+                        : "text-[color:var(--fc-text-dim)]",
                   )}
                 >
                   {fmtDelta(latestCheckIn.stressDelta, "", true)}
                 </span>
               )}
-              <span className="text-gray-400"> · Soreness </span>
-              <span className="text-white">
+              <span className="text-[color:var(--fc-text-dim)]"> · Soreness </span>
+              <span className="font-medium tabular-nums">
                 {latestCheckIn.sorenessLevel != null
                   ? `${latestCheckIn.sorenessLevel}/10`
                   : "—"}
@@ -482,11 +547,12 @@ export default function CoachClientDailyReview({
               {latestCheckIn.sorenessDelta != null && (
                 <span
                   className={cn(
+                    "tabular-nums",
                     deltaTone(latestCheckIn.sorenessDelta, true) === "green"
-                      ? "text-emerald-400"
+                      ? "text-[color:var(--fc-status-success)]"
                       : deltaTone(latestCheckIn.sorenessDelta, true) === "red"
-                        ? "text-red-400"
-                        : "text-gray-400"
+                        ? "text-[color:var(--fc-status-error)]"
+                        : "text-[color:var(--fc-text-dim)]",
                   )}
                 >
                   {fmtDelta(latestCheckIn.sorenessDelta, "", true)}
@@ -495,28 +561,28 @@ export default function CoachClientDailyReview({
             </p>
           </div>
         ) : (
-          <p className="text-xs text-gray-500">No check-in yet</p>
+          <p className="text-xs text-[color:var(--fc-text-dim)]">No check-in yet</p>
         )}
-      </section>
+      </GlassCard>
 
-      <section className="border-t border-white/5 pt-3">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60 mb-2">
+      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
           Program
         </h2>
         {program ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-white font-medium truncate">{program.name}</span>
+              <span className="truncate font-medium text-[color:var(--fc-text-primary)]">{program.name}</span>
               {program.currentWeek != null && program.durationWeeks != null && (
-                <span className="text-xs text-gray-400 shrink-0">
+                <span className="shrink-0 text-xs text-[color:var(--fc-text-dim)]">
                   W{program.currentWeek}/{program.durationWeeks}
                 </span>
               )}
             </div>
             {program.programProgressPercent != null && (
-              <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--fc-glass-border)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                  className="h-full rounded-full bg-[color:var(--fc-accent)]"
                   style={{ width: `${program.programProgressPercent}%` }}
                 />
               </div>
@@ -524,31 +590,31 @@ export default function CoachClientDailyReview({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="text-xs font-medium text-cyan-400 hover:underline"
+                className="text-xs font-medium text-[color:var(--fc-accent)] hover:underline"
                 onClick={() => setReviewOpen(true)}
               >
                 Review week →
               </button>
               {program.behindOnWeeklyWorkouts ? (
-                <span className="text-xs text-amber-400">Behind schedule ⚠️</span>
+                <span className="text-xs font-medium text-[color:var(--fc-status-warning)]">Behind schedule</span>
               ) : (
-                <span className="text-xs text-emerald-400">On track</span>
+                <span className="text-xs font-medium text-[color:var(--fc-status-success)]">On track</span>
               )}
             </div>
           </div>
         ) : (
-          <p className="text-xs text-gray-500">No active program</p>
+          <p className="text-xs text-[color:var(--fc-text-dim)]">No active program</p>
         )}
-      </section>
+      </GlassCard>
 
-      <section className="border-t border-white/5 pt-3">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60 mb-2">
+      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
           Nutrition
         </h2>
         {nutrition ? (
-          <p className="text-xs sm:text-sm text-gray-300">
+          <p className="text-xs sm:text-sm text-[color:var(--fc-text-primary)]">
             {nutrition.planName ? (
-              <span className="text-white font-medium">{nutrition.planName}</span>
+              <span className="font-medium text-[color:var(--fc-text-primary)]">{nutrition.planName}</span>
             ) : null}
             {nutrition.planName ? " · " : ""}
             {nutrition.compliance7dPct != null
@@ -557,18 +623,18 @@ export default function CoachClientDailyReview({
             {` · ${nutrition.mealsLoggedToday} meal${nutrition.mealsLoggedToday === 1 ? "" : "s"} logged today`}
           </p>
         ) : (
-          <p className="text-xs text-gray-500">No meal plan</p>
+          <p className="text-xs text-[color:var(--fc-text-dim)]">No meal plan</p>
         )}
-      </section>
+      </GlassCard>
 
-      <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-cyan-400 hover:bg-white/5 min-h-[44px]"
+          className="fc-btn fc-btn-secondary inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-medium"
           onClick={openEmail}
         >
-          <Mail className="w-4 h-4" />
-          Email
+          <Mail className="h-4 w-4" aria-hidden />
+          Email client
         </button>
       </div>
 

@@ -8,17 +8,19 @@ import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Plus, Users, Calendar } from "lucide-react";
-import Link from "next/link";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
+import { Trophy, Plus, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Challenge, getAllChallenges } from "@/lib/challengeService";
 import { CreateChallengeModal } from "@/components/coach/CreateChallengeModal";
+import { cn } from "@/lib/utils";
 
 function CoachChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
-  const { getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
   const { addToast } = useToast();
   const router = useRouter();
 
@@ -62,11 +64,17 @@ function CoachChallengesPageContent() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    if (status === "active") return getSemanticColor("success").primary;
-    if (status === "draft") return getSemanticColor("neutral").primary;
-    if (status === "completed") return getSemanticColor("trust").primary;
-    return getSemanticColor("critical").primary;
+  const challengeStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "active":
+        return "border border-[color-mix(in_srgb,var(--fc-status-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_22%,transparent)] fc-text-primary";
+      case "draft":
+        return "border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim";
+      case "completed":
+        return "border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_18%,transparent)] fc-text-primary";
+      default:
+        return "border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] fc-text-primary";
+    }
   };
 
   const filteredChallenges = filterStatus === "all"
@@ -78,16 +86,9 @@ function CoachChallengesPageContent() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-              </div>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6">
+            <PageSkeleton variant="dashboard" />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -99,7 +100,7 @@ function CoachChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 max-w-screen-xl mx-auto px-6 md:px-10 py-8 pb-32 space-y-12">
+      <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-8 sm:space-y-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -133,14 +134,6 @@ function CoachChallengesPageContent() {
                 size="sm"
                 onClick={() => setFilterStatus(status as any)}
                 className={filterStatus === status ? "fc-btn fc-btn-primary" : "fc-btn fc-btn-ghost"}
-                style={
-                  filterStatus === status
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                      }
-                    : {}
-                }
               >
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </Button>
@@ -151,7 +144,7 @@ function CoachChallengesPageContent() {
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-semibold uppercase tracking-wider fc-text-dim flex items-center gap-2">
-              <Trophy className="w-5 h-5" style={{ color: getSemanticColor("energy").primary }} />
+              <Trophy className="w-5 h-5 text-[color:var(--fc-status-warning)]" aria-hidden />
               Active Now
             </h2>
             {activeCount > 0 && (
@@ -196,15 +189,10 @@ function CoachChallengesPageContent() {
                         boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
                       }}
                     >
-                      <Trophy className="w-6 h-6 text-white" />
+                      <Trophy className="w-6 h-6 text-[color:var(--fc-bg-base)]" aria-hidden />
                     </div>
                   </div>
-                  <Badge
-                    style={{
-                      background: getStatusColor(challenge.status),
-                      color: "#fff",
-                    }}
-                  >
+                  <Badge className={cn("font-semibold capitalize", challengeStatusBadgeClass(challenge.status))}>
                     {challenge.status}
                   </Badge>
                 </div>
@@ -234,6 +222,7 @@ function CoachChallengesPageContent() {
         </section>
 
         <Button
+          type="button"
           onClick={() => setCreateModalOpen(true)}
           className="fixed bottom-8 right-8 z-50 h-14 w-14 rounded-2xl fc-btn-primary shadow-lg"
           size="icon"
@@ -252,7 +241,7 @@ function CoachChallengesPageContent() {
           }}
           coachId={user?.id ?? ""}
         />
-      </div>
+      </CoachPageShell>
     </AnimatedBackground>
   );
 }

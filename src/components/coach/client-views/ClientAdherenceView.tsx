@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { getPeriodBounds } from '@/lib/metrics/period'
 import { getNutritionCompliance } from '@/lib/metrics/nutrition'
 import { getClientNutritionGoals, getNutritionComplianceTrend } from '@/lib/nutritionLogService'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 interface ClientAdherenceViewProps {
   clientId: string
@@ -32,7 +33,7 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
         const [assignmentsRes, mealPlanRes, goalsRes] = await Promise.all([
           supabase
             .from('program_assignments')
-            .select('id, program_id')
+            .select('id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
             .eq('client_id', clientId)
             .eq('status', 'active')
             .limit(1),
@@ -64,12 +65,22 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
         )
 
         if (assignment && !cancelled) {
-          const { data: progress } = await supabase
-            .from('program_progress')
-            .select('current_week_number')
-            .eq('program_assignment_id', assignment.id)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('timezone')
+            .eq('id', clientId)
             .single()
-          const weekNum = progress?.current_week_number ?? 1
+          const { week: weekNum } = computeCurrentProgramWeekForAssignment(
+            {
+              start_date: assignment.start_date ?? null,
+              duration_weeks: assignment.duration_weeks ?? null,
+              pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+              pause_status: assignment.pause_status ?? null,
+              paused_at: assignment.paused_at ?? null,
+              timezone_snapshot: assignment.timezone_snapshot ?? null,
+            },
+            profile?.timezone ?? 'UTC'
+          )
           const { data: slots } = await supabase
             .from('program_schedule')
             .select('id, is_optional, day_of_week')

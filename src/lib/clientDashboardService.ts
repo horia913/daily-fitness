@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
 
 export interface DashboardStats {
   streak: number;
@@ -27,7 +28,7 @@ async function getActiveProgramCtx(
 ): Promise<ActiveProgramCtx | null> {
   const { data: pa, error: paErr } = await sb
     .from('program_assignments')
-    .select('id, program_id')
+    .select('id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -36,16 +37,27 @@ async function getActiveProgramCtx(
 
   if (paErr || !pa?.id || !pa.program_id) return null;
 
-  const { data: pp } = await sb
-    .from('program_progress')
-    .select('current_week_number')
-    .eq('program_assignment_id', pa.id)
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('timezone')
+    .eq('id', clientId)
     .maybeSingle();
+  const { week: calendarWeek } = computeCurrentProgramWeekForAssignment(
+    {
+      start_date: pa.start_date ?? null,
+      duration_weeks: pa.duration_weeks ?? null,
+      pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+      pause_status: pa.pause_status ?? null,
+      paused_at: pa.paused_at ?? null,
+      timezone_snapshot: pa.timezone_snapshot ?? null,
+    },
+    (profile as { timezone?: string | null } | null)?.timezone ?? 'UTC'
+  );
 
   return {
     paId: pa.id,
     programId: pa.program_id,
-    ppWeek: pp?.current_week_number ?? 1,
+    ppWeek: calendarWeek,
   };
 }
 

@@ -1,120 +1,106 @@
 "use client";
 
-import { useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useTheme } from "@/contexts/ThemeContext";
-import {
-  Utensils,
-  Plus,
-  ChefHat,
-  Apple,
-  Users,
-  Wand2,
-} from "lucide-react";
+import { Utensils, ChefHat, Users, Wand2, Apple, Plus } from "lucide-react";
 import Link from "next/link";
 
+const NUTRITION_SECTIONS = [
+  {
+    title: "Meal Plans",
+    description: "Create and manage meal plan templates",
+    icon: ChefHat,
+    href: "/coach/nutrition/meal-plans",
+  },
+  {
+    title: "Generator",
+    description: "Auto-generate meal plans with macro targets",
+    icon: Wand2,
+    href: "/coach/nutrition/generator",
+  },
+  {
+    title: "Food Database",
+    description: "Manage foods and nutrition data",
+    icon: Utensils,
+    href: "/coach/nutrition/foods",
+  },
+  {
+    title: "Assignments",
+    description: "Track and manage client assignments",
+    icon: Users,
+    href: "/coach/nutrition/assignments",
+  },
+  {
+    title: "Create Meal Plan",
+    description: "Start a new meal plan from scratch",
+    icon: Plus,
+    href: "/coach/nutrition/meal-plans/create",
+  },
+];
+
 export default function CoachNutritionPage() {
-  const { performanceSettings, getSemanticColor } = useTheme();
-
-  const nutritionHubLinks = [
-    { label: "Meal Plans", href: "/coach/nutrition/meal-plans", icon: ChefHat, current: false },
-    { label: "Generator", href: "/coach/nutrition/generator", icon: Wand2, current: false },
-    { label: "Create Meal Plan", href: "/coach/nutrition/meal-plans/create", icon: Plus, current: false },
-    { label: "Meals", href: "/coach/meals", icon: Utensils, current: false },
-  ];
-
-  const manageCards = [
-    { label: "Meal Plans", href: "/coach/nutrition/meal-plans", icon: ChefHat },
-    { label: "Generator", href: "/coach/nutrition/generator", icon: Wand2 },
-    { label: "Food Database", href: "/coach/nutrition/foods", icon: Utensils },
-    { label: "Assignments", href: "/coach/nutrition/assignments", icon: Users },
-  ];
+  const { performanceSettings } = useTheme();
 
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="mx-auto max-w-7xl p-6">
-            <header className="mb-6 border-b border-white/5 pb-4">
-              <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">Nutrition</h1>
-              <p className="mt-1 text-sm text-[color:var(--fc-text-dim)]">
-                Meal plans, meals, and client nutrition tools
-              </p>
-            </header>
-
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-text-dim)]">
-              Quick links
-            </p>
-            <nav className="mb-8 flex flex-col border-y border-white/5" aria-label="Nutrition quick links">
-              {nutritionHubLinks.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex min-h-[48px] items-center gap-3 border-b border-white/5 py-3 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                      style={{ background: `${getSemanticColor("success").primary}20` }}
-                    >
-                      <Icon className="h-4 w-4" style={{ color: getSemanticColor("success").primary }} />
-                    </div>
-                    <span className="truncate text-sm font-medium text-[color:var(--fc-text-primary)]">
-                      {item.label}
-                    </span>
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="mb-3 flex items-center gap-3">
-              <div className="rounded-lg bg-[color:var(--fc-aurora-green)]/20 p-2">
-                <Apple className="h-6 w-6 text-[color:var(--fc-accent-green)]" />
+        <CoachPageShell widthVariant="data-7xl" className="px-4 sm:px-6 py-6 pb-32 space-y-8">
+          <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                  <Apple className="w-7 h-7" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                    Nutrition
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                    Meal plans, food database, and client nutrition tools.
+                  </p>
+                </div>
               </div>
-              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                What do you want to manage?
-              </h2>
             </div>
+          </GlassCard>
 
-            <nav className="flex flex-col border-y border-white/5" aria-label="Nutrition management">
-              {manageCards.map((item) => {
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-text-dim)] mb-3 px-1">
+              What do you want to manage?
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {NUTRITION_SECTIONS.map((item) => {
                 const Icon = item.icon;
-                const sub =
-                  item.label === "Meal Plans"
-                    ? "Create and manage meal plan templates"
-                    : item.label === "Generator"
-                      ? "Auto-generate meal plans with macro targets"
-                      : item.label === "Food Database"
-                        ? "Manage foods and nutrition data"
-                        : "Track and manage client assignments";
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex min-h-[52px] items-center gap-3 border-b border-white/5 py-3 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                      style={{ background: `${getSemanticColor("trust").primary}20` }}
+                  <Link href={item.href} key={item.href}>
+                    <GlassCard
+                      elevation={2}
+                      className="fc-card-shell p-5 h-full transition-all hover:scale-[1.02] hover:shadow-xl"
                     >
-                      <Icon className="h-5 w-5" style={{ color: getSemanticColor("trust").primary }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                        {item.label}
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent)]">
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-[color:var(--fc-text-dim)] mt-0.5 line-clamp-2">
+                            {item.description}
+                          </p>
+                        </div>
                       </div>
-                      <div className="line-clamp-1 text-xs text-[color:var(--fc-text-dim)]">{sub}</div>
-                    </div>
+                    </GlassCard>
                   </Link>
                 );
               })}
-            </nav>
-          </div>
-        </div>
+            </div>
+          </section>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

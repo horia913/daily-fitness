@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { withTimeout } from "@/lib/withTimeout";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,7 +61,8 @@ const categoryColors = [
 ];
 
 function CategoriesHubContent() {
-  const { isDark, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") === "exercises" ? "exercises" : "workouts";
 
@@ -238,69 +242,65 @@ function CategoriesHubContent() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
-          <div className="max-w-5xl mx-auto space-y-8">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 md:p-8">
+          <div className="space-y-6">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/coach/training";
-              }}
-              className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4"
+              onClick={() => router.push("/coach/training")}
+              className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Back to Training
             </button>
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
+                <nav className="flex items-center gap-2 text-sm fc-text-dim mb-3 font-mono uppercase tracking-widest">
                   Coach <ArrowRight className="w-3 h-3 inline" /> Management
                 </nav>
                 <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">Categories</h1>
-                <p className="text-lg fc-text-dim">Workout template tags and exercise library groupings.</p>
+                <p className="text-base fc-text-dim">Workout template tags and exercise library groupings.</p>
               </div>
               {activeTab === "workouts" && (
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(true)}
-                  className="fc-btn fc-btn-primary px-8 rounded-2xl h-14 font-bold flex items-center justify-center gap-3 shrink-0"
+                  className="fc-btn fc-btn-primary px-6 rounded-2xl h-12 font-semibold flex items-center justify-center gap-2 shrink-0"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-5 h-5" />
                   New Category
                 </button>
               )}
             </header>
 
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-fit flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = "/coach/categories?tab=workouts";
-                  }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "workouts" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
-                >
-                  Workout categories
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = "/coach/categories?tab=exercises";
-                  }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "exercises" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
-                >
-                  Exercise categories
-                </button>
-              </div>
+            <div
+              role="tablist"
+              aria-label="Category type"
+              className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-fit flex-wrap"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "workouts"}
+                onClick={() => router.push("/coach/categories?tab=workouts", { scroll: false })}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "workouts" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
+              >
+                Workout categories
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "exercises"}
+                onClick={() => router.push("/coach/categories?tab=exercises", { scroll: false })}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${activeTab === "exercises" ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
+              >
+                Exercise categories
+              </button>
             </div>
 
             {activeTab === "exercises" ? (
               <CoachExerciseCategoriesPanel />
             ) : loading ? (
-              <div className="rounded-2xl p-8 fc-surface animate-pulse">
-                <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             ) : (
               <>
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -315,11 +315,8 @@ function CategoriesHubContent() {
               </div>
             </div>
 
-              {/* Enhanced Categories Grid */}
-              <div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                style={{ gap: "20px" }}
-              >
+              {/* Categories Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredCategories.map((category) => {
                   const IconComponent =
                     categoryIcons[
@@ -328,75 +325,32 @@ function CategoriesHubContent() {
                   return (
                     <div
                       key={category.id}
-                      className="group fc-card-shell p-6 overflow-hidden transition-all duration-300"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "scale(1.02)";
-                        e.currentTarget.style.boxShadow = isDark
-                          ? "0 8px 24px rgba(0, 0, 0, 0.6)"
-                          : "0 4px 16px rgba(0, 0, 0, 0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "scale(1)";
-                        e.currentTarget.style.boxShadow = isDark
-                          ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                          : "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
+                      className="group fc-card-shell p-6 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                     >
-                      <div style={{ paddingBottom: "16px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                marginBottom: "12px",
-                              }}
-                            >
+                      <div className="pb-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
                               <div
-                                style={{
-                                  width: "56px",
-                                  height: "56px",
-                                  borderRadius: "18px",
-                                  backgroundColor: category.color + "20",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
+                                className="w-14 h-14 rounded-[18px] flex items-center justify-center shrink-0"
+                                style={{ backgroundColor: category.color + "20" }}
                               >
                                 <IconComponent
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    color: category.color,
-                                  }}
+                                  className="w-8 h-8"
+                                  style={{ color: category.color }}
                                 />
                               </div>
-                              <div style={{ flex: 1 }}>
-                                <h3
-                                  className="text-lg font-semibold fc-text-primary mb-1 leading-snug group-hover:text-purple-600 transition-colors m-0"
-                                >
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-lg font-semibold fc-text-primary mb-1 leading-snug group-hover:text-[color:var(--fc-accent)] transition-colors m-0 truncate">
                                   {category.name}
                                 </h3>
-                                <p className="text-sm font-normal fc-text-dim m-0 leading-normal">
+                                <p className="text-sm font-normal fc-text-dim m-0 leading-normal line-clamp-2">
                                   {category.description}
                                 </p>
                               </div>
                             </div>
 
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                              }}
-                            >
+                            <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 fc-text-dim">
                                 <Activity className="w-4 h-4 text-[color:var(--fc-status-success)]" />
                                 <span className="text-sm font-medium">
@@ -412,48 +366,24 @@ function CategoriesHubContent() {
                         </div>
                       </div>
 
-                      <div
-                        style={{
-                          paddingTop: "16px",
-                          borderTop: `1px solid ${
-                            isDark ? "#2A2A2A" : "#E5E7EB"
-                          }`,
-                        }}
-                      >
-                        <div style={{ display: "flex", gap: "8px" }}>
+                      <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
+                        <div className="flex gap-2">
                           <button
                             onClick={() => {
                               setEditingCategory(category);
                               setShowCreateForm(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary cursor-pointer transition-all duration-200"
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "var(--fc-accent-primary)";
-                              e.currentTarget.style.borderColor = "var(--fc-accent-primary)";
-                              e.currentTarget.style.color = "white";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "transparent";
-                              e.currentTarget.style.borderColor = "";
-                              e.currentTarget.style.color = "";
-                            }}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary hover:bg-[color:var(--fc-accent-primary)] hover:border-[color:var(--fc-accent-primary)] hover:text-white transition-colors duration-200"
                           >
-                            <Edit style={{ width: "16px", height: "16px" }} />
+                            <Edit className="w-4 h-4" />
                             Edit
                           </button>
                           <button
                             onClick={() => deleteCategory(category.id)}
-                            className="flex items-center justify-center py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent text-[color:var(--fc-status-error)] cursor-pointer transition-all duration-200"
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "color-mix(in srgb, var(--fc-status-error) 20%, transparent)";
-                              e.currentTarget.style.borderColor = "var(--fc-status-error)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "transparent";
-                              e.currentTarget.style.borderColor = "";
-                            }}
+                            className="flex items-center justify-center py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent text-[color:var(--fc-status-error)] hover:border-[color:var(--fc-status-error)] hover:bg-[color-mix(in_srgb,var(--fc-status-error)_20%,transparent)] transition-colors duration-200"
+                            aria-label="Delete category"
                           >
-                            <Trash2 style={{ width: "16px", height: "16px" }} />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -462,43 +392,29 @@ function CategoriesHubContent() {
                 })}
               </div>
 
-              {/* Enhanced Empty State */}
+              {/* Empty State */}
               {filteredCategories.length === 0 && (
-                <div className="fc-surface rounded-2xl p-12 text-center">
-                  <div
-                    className="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-[18px] shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                    }}
-                  >
-                    <Layers className="w-12 h-12 text-white" />
-                  </div>
-                  <h3 className="text-3xl font-bold fc-text-primary m-0 mb-4 leading-tight">
-                    {categories.length === 0
+                <EmptyState
+                  icon={Layers}
+                  title={
+                    categories.length === 0
                       ? "No categories yet"
-                      : "No categories found"}
-                  </h3>
-                  <p className="text-base font-normal fc-text-dim mx-auto mb-8 max-w-[448px] leading-normal m-0">
-                    {categories.length === 0
+                      : "No categories found"
+                  }
+                  description={
+                    categories.length === 0
                       ? "Start organizing your workout templates by creating your first category."
-                      : "Try adjusting your search criteria."}
-                  </p>
-                  <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-primary)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "scale(1.05)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
-                  >
-                    <Plus className="w-5 h-5" />
-                    Create Category
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
-                </div>
+                      : "Try adjusting your search criteria."
+                  }
+                  action={
+                    categories.length === 0
+                      ? {
+                          label: "Create Category",
+                          onClick: () => setShowCreateForm(true),
+                        }
+                      : undefined
+                  }
+                />
               )}
 
               {/* Category Form Modal */}
@@ -519,7 +435,7 @@ function CategoriesHubContent() {
               </>
             )}
           </div>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );
@@ -529,13 +445,9 @@ function CategoriesHubFallback() {
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
-        <div className="min-h-screen p-6 max-w-7xl mx-auto">
-          <div className="rounded-2xl p-8 fc-surface animate-pulse">
-            <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
-            <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
-          </div>
-        </div>
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 md:p-8">
+          <PageSkeleton variant="dashboard" />
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

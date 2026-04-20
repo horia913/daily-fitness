@@ -9,6 +9,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -206,7 +207,7 @@ function ClientCard({
         )}
       </div>
       {/* Coach note */}
-      <div className="mt-2 pt-2 border-t border-white/10">
+      <div className="mt-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
         {editingNote ? (
           <div className="flex gap-1">
             <input
@@ -216,7 +217,7 @@ function ClientCard({
               onBlur={saveNote}
               onKeyDown={(e) => e.key === "Enter" && saveNote()}
               placeholder="Note for this client..."
-              className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded px-2 py-1 text-[color:var(--fc-text-primary)]"
+              className="flex-1 min-w-0 text-xs bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded px-2 py-1 text-[color:var(--fc-text-primary)]"
               autoFocus
             />
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={saveNote}>
@@ -248,7 +249,7 @@ function ClientCard({
         )}
         {hasSession && (
           <>
-            <Button size="sm" className="text-xs bg-cyan-600 hover:bg-cyan-700" onClick={onLogSet} disabled={!status.activeSession?.workoutLogId}>
+            <Button size="sm" className="text-xs fc-btn fc-btn-primary fc-press" onClick={onLogSet} disabled={!status.activeSession?.workoutLogId}>
               <Dumbbell className="h-3.5 w-3.5 mr-1" />
               Log Set
             </Button>
@@ -259,7 +260,7 @@ function ClientCard({
           </>
         )}
         {!hasSession && hasNextWorkout && (
-          <Button size="sm" className="text-xs bg-cyan-600 hover:bg-cyan-700" onClick={onStartWorkout} disabled={startLoading}>
+          <Button size="sm" className="text-xs fc-btn fc-btn-primary fc-press" onClick={onStartWorkout} disabled={startLoading}>
             {startLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
             Start Workout
           </Button>
@@ -320,7 +321,7 @@ function ViewDetailPanel({
       <div className="flex-1 overflow-y-auto p-4">
         {loading && (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-[color:var(--fc-accent)]" />
           </div>
         )}
         {error && (
@@ -333,14 +334,14 @@ function ViewDetailPanel({
             </p>
             <p className="font-medium text-[color:var(--fc-text-primary)]">{data.workout_name}</p>
             {data.blocks.map((block) => (
-              <div key={block.id} className="p-3 rounded-lg bg-white/5">
+              <div key={block.id} className="p-3 rounded-lg bg-[color:var(--fc-glass-highlight)]">
                 <p className="text-xs font-medium text-[color:var(--fc-text-dim)] mb-2">
                   {block.block_name ?? block.set_name ?? (block.block_type ?? block.set_type ?? "").replace(/_/g, " ")} · {block.exercises.length} exercise(s)
                 </p>
                 <ul className="space-y-1">
                   {block.exercises.map((ex) => (
                     <li key={ex.id} className="flex items-center gap-2 text-sm text-[color:var(--fc-text-primary)]">
-                      <Dumbbell className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                      <Dumbbell className="h-3.5 w-3.5 text-[color:var(--fc-accent)] shrink-0" />
                       {ex.exercise_name}
                       {(ex.sets || ex.reps) && (
                         <span className="text-xs text-[color:var(--fc-text-dim)]">
@@ -359,7 +360,7 @@ function ViewDetailPanel({
           <p className="text-sm text-[color:var(--fc-text-dim)]">No active program.</p>
         )}
         {!loading && !error && data?.status === "completed" && (
-          <p className="text-sm text-green-400">Program completed.</p>
+          <p className="text-sm fc-text-success">Program completed.</p>
         )}
       </div>
     </div>
@@ -469,26 +470,31 @@ function QuickLogModal({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="fc-card-shell p-4 w-full max-w-md flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md gap-0 p-4 flex flex-col overflow-hidden sm:max-w-md"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Log Set — {clientName}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
+        <div className="flex items-center justify-between mb-4 gap-2 shrink-0">
+          <DialogTitle className="text-lg font-semibold text-[color:var(--fc-text-primary)] p-0 m-0 text-left">
+            Log Set — {clientName}
+          </DialogTitle>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="h-5 w-5" aria-hidden />
           </Button>
         </div>
         {loading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-[color:var(--fc-accent)]" aria-hidden />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 min-h-0 overflow-y-auto max-h-[min(60vh,24rem)]">
             <div>
               <label className="text-xs font-medium text-[color:var(--fc-text-dim)] block mb-1">Exercise</label>
               <select
@@ -502,7 +508,7 @@ function QuickLogModal({
                   const opt = exerciseOptions.find((o) => `${o.blockId}:${o.exerciseId}` === v);
                   setSelected(opt ?? null);
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+                className="w-full bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
               >
                 <option value="">Select exercise</option>
                 {exerciseOptions.map((o) => (
@@ -522,7 +528,7 @@ function QuickLogModal({
                   placeholder="0"
                   step="0.5"
                   min="0"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+                  className="w-full bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
                 />
               </div>
               <div>
@@ -534,26 +540,27 @@ function QuickLogModal({
                   placeholder="0"
                   step="1"
                   min="1"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
+                  className="w-full bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-lg px-3 py-2 text-[color:var(--fc-text-primary)]"
                 />
               </div>
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={onClose}>
+            <div className="flex gap-2 pt-2 shrink-0">
+              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+                type="button"
+                className="flex-1 fc-btn fc-btn-primary fc-press"
                 onClick={handleSubmit}
                 disabled={submitting || !selected}
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log Set"}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "Log Set"}
               </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -606,24 +613,29 @@ function AddClientModal({
     onClose();
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="fc-card-shell p-4 w-full max-w-md max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md max-h-[min(80vh,36rem)] gap-0 p-4 flex flex-col overflow-hidden sm:max-w-md"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Add clients to console</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
+        <div className="flex items-center justify-between mb-4 gap-2 shrink-0">
+          <DialogTitle className="text-lg font-semibold text-[color:var(--fc-text-primary)] p-0 m-0 text-left">
+            Add clients to console
+          </DialogTitle>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="h-5 w-5" aria-hidden />
           </Button>
         </div>
         <p className="text-xs text-[color:var(--fc-text-dim)] mb-2">Select up to {MAX_CONSOLE_CLIENTS} clients.</p>
         {loading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-[color:var(--fc-accent)]" aria-hidden />
           </div>
         ) : (
           <ul className="flex-1 overflow-y-auto space-y-1 mb-4">
@@ -640,28 +652,28 @@ function AddClientModal({
                     onClick={() => !disabled && toggle(c.client_id)}
                     disabled={disabled}
                     className={`w-full flex items-center gap-2 p-2 rounded-lg text-left text-sm ${
-                      isSelected ? "bg-cyan-500/20 border border-cyan-500/40" : "hover:bg-white/5 border border-transparent"
+                      isSelected ? "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)]" : "hover:bg-[color:var(--fc-glass-highlight)] border border-transparent"
                     } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <User className="h-4 w-4 shrink-0 text-[color:var(--fc-text-dim)]" />
                     <span className="text-[color:var(--fc-text-primary)] truncate">{name}</span>
-                    {isSelected && <CheckCircle className="h-4 w-4 text-cyan-400 shrink-0" />}
+                    {isSelected && <CheckCircle className="h-4 w-4 text-[color:var(--fc-accent)] shrink-0" />}
                   </button>
                 </li>
               );
             })}
           </ul>
         )}
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+        <div className="flex gap-2 shrink-0 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
             Cancel
           </Button>
-          <Button className="flex-1" onClick={handleSave}>
+          <Button type="button" className="flex-1" onClick={handleSave}>
             Save
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -901,7 +913,7 @@ function GymConsoleContent() {
                     if (!status) {
                       return (
                         <GlassCard key={clientId} elevation={1} className="fc-card-shell p-4 min-h-[200px] flex items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
+                          <Loader2 className="h-6 w-6 animate-spin text-[color:var(--fc-accent)]" />
                         </GlassCard>
                       );
                     }

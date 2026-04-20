@@ -2,8 +2,10 @@
  * Control Room Service (read-only)
  *
  * Computes coach-wide signals for the Control Room home.
- * Uses ONLY whitelisted tables: program_assignments, program_schedule,
- * program_day_completions, program_progress. No workout_assignments, no workout_logs.
+ * Uses ONLY whitelisted tables: program_assignments, profiles, program_schedule,
+ * program_day_completions. Current week is calendar-derived via
+ * computeCurrentProgramWeekForAssignment; no program_progress week reads.
+ * No workout_assignments, no workout_logs.
  *
  * Active program selection invariant: per client, program_assignments where
  * status='active' and client_id=:id, order by updated_at desc, limit 1.
@@ -13,6 +15,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 export interface ControlRoomPeriod {
   startUtc: string
@@ -81,6 +84,12 @@ interface ResolvedAssignment {
   assignmentId: string
   programId: string
   clientId: string
+  startDate: string | null
+  durationWeeks: number | null
+  pauseAccumulatedDays: number | null
+  pauseStatus: string | null
+  pausedAt: string | null
+  timezoneSnapshot: string | null
 }
 
 /**
@@ -88,7 +97,18 @@ interface ResolvedAssignment {
  * Invariant: order by updated_at desc, take first; exclude if updated_at null or tie.
  */
 function resolveOneAssignmentPerClient(
-  rows: { id: string; client_id: string; program_id: string; updated_at: string | null }[]
+  rows: {
+    id: string
+    client_id: string
+    program_id: string
+    updated_at: string | null
+    start_date: string | null
+    duration_weeks: number | null
+    pause_accumulated_days: number | null
+    pause_status: string | null
+    paused_at: string | null
+    timezone_snapshot: string | null
+  }[]
 ): { assignments: ResolvedAssignment[]; exclusions: ControlRoomExclusions } {
   const byClient = new Map<string, typeof rows>()
   for (const r of rows) {
@@ -115,7 +135,17 @@ function resolveOneAssignmentPerClient(
       exclusions.reasons[clientId] = 'no_active_assignment_or_updated_at_null_or_tied'
       continue
     }
-    assignments.push({ assignmentId: first.id, programId: first.program_id, clientId })
+    assignments.push({
+      assignmentId: first.id,
+      programId: first.program_id,
+      clientId,
+      startDate: first.start_date ?? null,
+      durationWeeks: first.duration_weeks ?? null,
+      pauseAccumulatedDays: first.pause_accumulated_days ?? 0,
+      pauseStatus: first.pause_status ?? null,
+      pausedAt: first.paused_at ?? null,
+      timezoneSnapshot: first.timezone_snapshot ?? null,
+    })
   }
   return { assignments, exclusions }
 }
@@ -141,7 +171,7 @@ export async function getControlRoomResult(
 
   const { data: assignmentRows, error: assignErr } = await supabase
     .from('program_assignments')
-    .select('id, client_id, program_id, updated_at')
+    .select('id, client_id, program_id, updated_at, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot')
     .in('client_id', clientIds)
     .eq('status', 'active')
     .order('updated_at', { ascending: false })
@@ -166,15 +196,18 @@ export async function getControlRoomResult(
   const assignmentIds = assignments.map((a) => a.assignmentId)
   const programIds = [...new Set(assignments.map((a) => a.programId))]
 
+  const { data: profileRows } = await supabase
+    .from('profiles')
+    .select('id, timezone')
+    .in('id', clientIds)
+  const timezoneByClientId = new Map(
+    (profileRows ?? []).map((p) => [p.id as string, (p as { timezone?: string | null }).timezone ?? null])
+  )
+
   const [
-    { data: progressRows },
     { data: scheduleRows },
     { data: completionRows },
   ] = await Promise.all([
-    supabase
-      .from('program_progress')
-      .select('program_assignment_id, current_week_number')
-      .in('program_assignment_id', assignmentIds),
     supabase
       .from('program_schedule')
       .select('id, program_id, week_number, day_number, is_optional')
@@ -188,10 +221,20 @@ export async function getControlRoomResult(
   ])
 
   const progressMap = new Map<string, number>()
-  for (const r of progressRows ?? []) {
-    if (r.current_week_number != null) {
-      progressMap.set(r.program_assignment_id, r.current_week_number)
-    }
+  for (const assignment of assignments) {
+    const tzFallback = timezoneByClientId.get(assignment.clientId) ?? 'UTC'
+    const { week } = computeCurrentProgramWeekForAssignment(
+      {
+        start_date: assignment.startDate,
+        duration_weeks: assignment.durationWeeks,
+        pause_accumulated_days: assignment.pauseAccumulatedDays,
+        pause_status: assignment.pauseStatus,
+        paused_at: assignment.pausedAt,
+        timezone_snapshot: assignment.timezoneSnapshot,
+      },
+      tzFallback
+    )
+    progressMap.set(assignment.assignmentId, week)
   }
 
   const scheduleByProgram = new Map<string, { id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }[]>()
@@ -216,7 +259,10 @@ export async function getControlRoomResult(
     const completedIds = completedByAssignment.get(a.assignmentId) ?? new Set()
     const nextSlot = slots.find((s) => !completedIds.has(s.id)) ?? null
     const referenceSlot = nextSlot ?? slots[slots.length - 1]
-    const currentWeek = progressMap.get(a.assignmentId) ?? referenceSlot?.week_number ?? 1
+    const currentWeek =
+      progressMap.get(a.assignmentId) ??
+      referenceSlot?.week_number ??
+      1
 
     const slotsThisWeek = (scheduleByProgram.get(a.programId) ?? []).filter((s) => s.week_number === currentWeek)
     const requiredSlotsThisWeek = slotsThisWeek.filter((s) => !s.is_optional)

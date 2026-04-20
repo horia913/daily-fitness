@@ -146,7 +146,7 @@ export function WellnessTrendsCard({
 
   if (!hasEnoughData) {
     return (
-      <div className="border-y border-white/5 px-4 py-3">
+      <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
         <h3 className="mb-2 text-base font-semibold fc-text-primary">Wellness Trends</h3>
         <p className="text-sm fc-text-dim">Not enough data yet — keep checking in!</p>
       </div>
@@ -163,7 +163,7 @@ export function WellnessTrendsCard({
 
   if (mode === "week_only") {
     return (
-      <div className="border-y border-white/5 px-4 py-3">
+      <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
         <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[240px] border-collapse text-sm">
@@ -213,7 +213,7 @@ export function WellnessTrendsCard({
       ];
 
   return (
-    <div className="border-y border-white/5 px-4 py-3">
+    <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
       <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[320px] border-collapse text-sm">

@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { AnimatedEntry } from "@/components/ui/AnimatedEntry";
+import { CoachPageShell } from "@/components/coach-ui";
 import {
   Users,
   Dumbbell,
@@ -196,7 +197,7 @@ function CoachDashboardContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-5xl fc-page min-w-0 overflow-x-hidden px-4 sm:px-6">
+      <CoachPageShell widthVariant="benchmark-5xl" className="px-4 sm:px-6">
         {/* ===== HEADER ===== */}
         <AnimatedEntry delay={0} animation="fade-up">
           <header className="flex items-center justify-between mb-6">
@@ -602,7 +603,7 @@ function CoachDashboardContent() {
             </AnimatedEntry>
           </>
         )}
-      </div>
+      </CoachPageShell>
 
     </AnimatedBackground>
   );

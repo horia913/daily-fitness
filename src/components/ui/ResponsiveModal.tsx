@@ -13,6 +13,8 @@ interface ResponsiveModalProps {
   icon?: React.ReactNode
   showHeader?: boolean
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl'
+  /** Cap modal height; content scrolls inside. Omit tall empty shells when content is short. */
+  maxHeight?: string
   actions?: React.ReactNode
   gradientFrame?: boolean
 }
@@ -26,6 +28,7 @@ export default function ResponsiveModal({
   icon,
   showHeader = true,
   maxWidth = '5xl',
+  maxHeight = 'min(88vh, calc(100vh - 2rem))',
   actions,
   gradientFrame = false
 }: ResponsiveModalProps) {
@@ -54,32 +57,31 @@ export default function ResponsiveModal({
       {gradientFrame ? (
         <div className="rounded-3xl p-[1px] shadow-2xl" style={{ background: 'var(--fc-domain-workouts)' }}>
           <div 
-            className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
+            className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex max-h-full flex-col overflow-hidden transform transition-all duration-300 ease-out"
             style={{
               animation: 'modalSlideIn 0.3s ease-out',
               maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
-              height: 'min(88vh, calc(100vh - 4rem))',
-              maxHeight: 'min(88vh, calc(100vh - 4rem))'
+              maxHeight,
             }}
           >
         {/* Header */}
         {showHeader && (
-          <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} rounded-t-3xl px-4 py-3 sm:px-6 sm:py-4 flex-shrink-0`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 {icon && (
                   <div className={`p-3 rounded-2xl ${isDark ? 'bg-slate-700' : 'bg-gradient-to-br from-purple-100 to-orange-100'}`} style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {icon}
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   {title && (
-                    <h2 className="text-2xl font-bold fc-text-primary mb-1">
+                    <h2 className="text-lg font-semibold leading-tight fc-text-primary sm:text-xl">
                       {title}
                     </h2>
                   )}
                   {subtitle && (
-                    <p className="text-sm fc-text-dim mt-1">
+                    <p className="mt-0.5 truncate text-xs fc-text-dim sm:text-sm">
                       {subtitle}
                     </p>
                   )}
@@ -99,7 +101,7 @@ export default function ResponsiveModal({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           {children}
         </div>
 
@@ -113,32 +115,31 @@ export default function ResponsiveModal({
         </div>
       ) : (
         <div 
-          className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
+          className="fc-modal relative fc-card-shell shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex max-h-full flex-col overflow-hidden transform transition-all duration-300 ease-out"
           style={{
             animation: 'modalSlideIn 0.3s ease-out',
             maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
-            height: 'min(88vh, calc(100vh - 4rem))',
-            maxHeight: 'min(88vh, calc(100vh - 4rem))'
+            maxHeight,
           }}
         >
           {/* Header */}
           {showHeader && (
-            <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className={`sticky top-0 ${theme.card} fc-card-shell border-b ${theme.border} rounded-t-3xl px-4 py-3 sm:px-6 sm:py-4 flex-shrink-0`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   {icon && (
                     <div className="p-3 rounded-2xl fc-icon-tile fc-icon-workouts flex items-center justify-center w-14 h-14">
                       {icon}
                     </div>
                   )}
-                  <div>
+                  <div className="min-w-0">
                     {title && (
-                      <h2 className="text-2xl font-bold fc-text-primary mb-1">
+                      <h2 className="text-lg font-semibold leading-tight fc-text-primary sm:text-xl">
                         {title}
                       </h2>
                     )}
                     {subtitle && (
-                      <p className="text-sm fc-text-dim mt-1">
+                      <p className="mt-0.5 truncate text-xs fc-text-dim sm:text-sm">
                         {subtitle}
                       </p>
                     )}
@@ -158,7 +159,7 @@ export default function ResponsiveModal({
           )}
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
             {children}
           </div>
 

@@ -5,17 +5,25 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MealPlanService, MealPlan, Meal } from "@/lib/mealPlanService";
 import MealCreator from "@/components/coach/MealCreator";
 import MealOptionEditor from "@/components/coach/MealOptionEditor";
-import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import { ArrowLeft, Plus, ChefHat, Edit, Settings2, X, Zap } from "lucide-react";
+import { ArrowLeft, Plus, ChefHat, Edit, Settings2, Zap } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -23,8 +31,7 @@ export default function MealPlanDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { getThemeStyles, performanceSettings } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const mealPlanId = params.id as string;
 
@@ -250,16 +257,9 @@ export default function MealPlanDetailPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto">
-              <GlassCard elevation={2} className="fc-card-shell p-8">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
-                  <div className="h-64 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-                </div>
-              </GlassCard>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6">
+            <PageSkeleton variant="dashboard" />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -270,18 +270,16 @@ export default function MealPlanDetailPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto">
-              <GlassCard elevation={2} className="fc-card-shell p-10 text-center">
-                <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
-                  Meal Plan Not Found
-                </h2>
-                <Link href="/coach/nutrition">
-                  <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
-                </Link>
-              </GlassCard>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6">
+            <GlassCard elevation={2} className="fc-card-shell p-10 text-center">
+              <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
+                Meal Plan Not Found
+              </h2>
+              <Link href="/coach/nutrition">
+                <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
+              </Link>
+            </GlassCard>
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -291,9 +289,8 @@ export default function MealPlanDetailPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="p-4 sm:p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 sm:p-6 space-y-6">
+          <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
               <ArrowLeft className="w-4 h-4 shrink-0" />
               Back to Nutrition
             </Link>
@@ -319,16 +316,37 @@ export default function MealPlanDetailPage() {
                     </Link>
                   </div>
                   <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-                    {mealPlan.description || "No description"}
+                    {mealPlan.notes ?? mealPlan.description ?? "No notes"}
                   </p>
                   {mealPlan.target_calories && (
                     <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
                       Target: {mealPlan.target_calories} calories
                     </p>
                   )}
+                  {(mealPlan.target_protein != null ||
+                    mealPlan.target_carbs != null ||
+                    mealPlan.target_fat != null) && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {mealPlan.target_protein != null && (
+                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-domain-meals)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-domain-meals)_12%,transparent)] text-[color:var(--fc-domain-meals)]">
+                          P {Math.round(Number(mealPlan.target_protein))}g
+                        </span>
+                      )}
+                      {mealPlan.target_carbs != null && (
+                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-status-info)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] text-[color:var(--fc-status-info)]">
+                          C {Math.round(Number(mealPlan.target_carbs))}g
+                        </span>
+                      )}
+                      {mealPlan.target_fat != null && (
+                        <span className="text-xs font-medium rounded-lg px-2.5 py-1 border border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-warning)_12%,transparent)] text-[color:var(--fc-status-warning)]">
+                          F {Math.round(Number(mealPlan.target_fat))}g
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {/* Raw portions notice — shown for generated plans */}
                   {(mealPlan as any).generated_config && (
-                    <p className="text-xs mt-2 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium w-fit">
+                    <p className="text-xs mt-2 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] fc-text-success font-medium w-fit">
                       🥩 All portions are for <strong>raw / uncooked</strong> ingredients
                     </p>
                   )}
@@ -353,11 +371,11 @@ export default function MealPlanDetailPage() {
                 </div>
                 <div className="grid grid-cols-5 gap-2">
                   {[
-                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent)]",    unit: "" },
-                    { label: "Protein", value: dailyTotals.protein,  color: "text-green-500",                   unit: "g" },
-                    { label: "Carbs",   value: dailyTotals.carbs,    color: "text-blue-500",                    unit: "g" },
-                    { label: "Fat",     value: dailyTotals.fat,      color: "text-yellow-500",                  unit: "g" },
-                    { label: "Fiber",   value: dailyTotals.fiber,    color: "text-purple-500",                  unit: "g" },
+                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent)]",       unit: "" },
+                    { label: "Protein", value: dailyTotals.protein,  color: "text-[color:var(--fc-domain-meals)]", unit: "g" },
+                    { label: "Carbs",   value: dailyTotals.carbs,    color: "text-[color:var(--fc-status-info)]",  unit: "g" },
+                    { label: "Fat",     value: dailyTotals.fat,      color: "text-[color:var(--fc-status-warning)]", unit: "g" },
+                    { label: "Fiber",   value: dailyTotals.fiber,    color: "text-[color:var(--fc-accent-purple)]", unit: "g" },
                   ].map(({ label, value, color, unit }) => (
                     <div key={label} className="text-center p-2.5 fc-surface rounded-xl border border-[color:var(--fc-surface-card-border)]">
                       <div className={`text-base font-bold ${color}`}>
@@ -378,6 +396,7 @@ export default function MealPlanDetailPage() {
             {/* Actions */}
             <div className="flex gap-3">
               <Button
+                type="button"
                 onClick={() => setShowMealCreator(true)}
                 className="fc-btn fc-btn-primary"
               >
@@ -387,17 +406,18 @@ export default function MealPlanDetailPage() {
             </div>
 
             {/* Meals List */}
-            <div className={`${theme.card} ${theme.shadow} rounded-3xl p-6`}>
+            <div className="fc-card-shell rounded-3xl p-6 border border-[color:var(--fc-surface-card-border)]">
               {meals.length === 0 ? (
                 <div className="text-center py-12">
-                  <ChefHat className="w-16 h-16 mx-auto text-slate-400 mb-4" />
-                  <h3 className={`text-lg font-semibold ${theme.text} mb-2`}>
+                  <ChefHat className="w-16 h-16 mx-auto fc-text-dim mb-4" aria-hidden />
+                  <h3 className="text-lg font-semibold fc-text-primary mb-2">
                     No meals added yet
                   </h3>
-                  <p className={`${theme.textSecondary} mb-6`}>
+                  <p className="fc-text-dim mb-6">
                     Start building your meal plan by adding individual meals.
                   </p>
                   <Button
+                    type="button"
                     onClick={() => setShowMealCreator(true)}
                     className="fc-btn fc-btn-primary"
                   >
@@ -408,98 +428,81 @@ export default function MealPlanDetailPage() {
               ) : (
                 <div className="space-y-4">
                   {meals.map((meal, index) => {
-                    // Different gradient backgrounds for meal cards
-                    const mealGradients = [
-                      "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/20",
-                      "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/20",
-                      "bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/10 dark:to-violet-900/20",
-                      "bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/10 dark:to-amber-900/20",
-                    ];
-                    const mealGradientClass =
-                      mealGradients[index % mealGradients.length];
+                    const stripeClass =
+                      index % 2 === 0
+                        ? "bg-[color:var(--fc-glass-highlight)]"
+                        : "bg-[color:var(--fc-surface)]";
 
                     return (
                       <Card
                         key={(meal as any).id || index}
-                        className={`${mealGradientClass} ${theme.shadow} rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-md hover:shadow-lg transition-shadow duration-200`}
+                        className={`rounded-xl border border-[color:var(--fc-glass-border)] shadow-sm hover:shadow-md transition-shadow duration-200 ${stripeClass}`}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               {(meal as any).name && (
-                                <h3 className={`font-semibold ${theme.text} text-lg mb-2`}>
+                                <h3 className="font-semibold fc-text-primary text-lg mb-2">
                                   {(meal as any).name}
                                 </h3>
                               )}
                               <div className="flex items-center gap-3 mb-3">
-                                <Badge className="bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/50">
+                                <Badge className="border border-[color-mix(in_srgb,var(--fc-status-info)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-info)_12%,transparent)] fc-text-primary font-medium capitalize">
                                   {meal.meal_type}
                                 </Badge>
                                 {meal.day_of_week && (
                                   <Badge
                                     variant="outline"
-                                    className="text-xs border-slate-300 dark:border-slate-600"
+                                    className="text-xs border-[color:var(--fc-glass-border)] fc-text-dim"
                                   >
                                     Day {meal.day_of_week}
                                   </Badge>
                                 )}
                               </div>
                               <div className="grid grid-cols-5 gap-3 text-sm mb-3">
-                                <div className="text-center p-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg">
-                                  <div className={`font-bold ${theme.text}`}>
+                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
+                                  <div className="font-bold fc-text-primary">
                                     {Math.round(meal.total_calories)}
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
+                                  <div className="text-xs fc-text-dim">
                                     Calories
                                   </div>
                                 </div>
-                                <div className="text-center p-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg">
-                                  <div className="font-bold text-green-600 dark:text-green-400">
+                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
+                                  <div className="font-bold text-[color:var(--fc-domain-meals)]">
                                     {Math.round(meal.total_protein)}g
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
+                                  <div className="text-xs fc-text-dim">
                                     Protein
                                   </div>
                                 </div>
-                                <div className="text-center p-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg">
-                                  <div className="font-bold text-blue-600 dark:text-blue-400">
+                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
+                                  <div className="font-bold text-[color:var(--fc-status-info)]">
                                     {Math.round(meal.total_carbs)}g
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
+                                  <div className="text-xs fc-text-dim">
                                     Carbs
                                   </div>
                                 </div>
-                                <div className="text-center p-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg">
-                                  <div className="font-bold text-yellow-600 dark:text-yellow-400">
+                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
+                                  <div className="font-bold text-[color:var(--fc-status-warning)]">
                                     {Math.round(meal.total_fat)}g
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
+                                  <div className="text-xs fc-text-dim">
                                     Fat
                                   </div>
                                 </div>
-                                <div className="text-center p-2 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg">
-                                  <div className="font-bold text-purple-600 dark:text-purple-400">
+                                <div className="text-center p-2 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]">
+                                  <div className="font-bold text-[color:var(--fc-accent-purple)]">
                                     {Math.round(meal.total_fiber)}g
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
+                                  <div className="text-xs fc-text-dim">
                                     Fiber
                                   </div>
                                 </div>
                               </div>
                               <div className="mt-3">
-                                <p
-                                  className={`text-sm ${theme.textSecondary} mb-2`}
-                                >
+                                <p className="text-sm fc-text-dim mb-2">
                                   {meal.items.length} food item
                                   {meal.items.length !== 1 ? "s" : ""}
                                 </p>
@@ -508,14 +511,12 @@ export default function MealPlanDetailPage() {
                                     {meal.items.map((item, itemIndex) => (
                                       <div
                                         key={itemIndex}
-                                        className="flex items-center justify-between text-xs bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-lg p-2 border border-slate-200/40 dark:border-slate-600/40"
+                                        className="flex items-center justify-between text-xs fc-surface rounded-lg p-2 border border-[color:var(--fc-glass-border)]"
                                       >
-                                        <span
-                                          className={`${theme.text} font-medium`}
-                                        >
+                                        <span className="fc-text-primary font-medium">
                                           {item.food?.name || "Unknown Food"}
                                         </span>
-                                        <span className={theme.textSecondary}>
+                                        <span className="fc-text-dim">
                                           {item.quantity}g
                                         </span>
                                       </div>
@@ -523,17 +524,19 @@ export default function MealPlanDetailPage() {
                                   </div>
                                 )}
                               </div>
-                              
-                              {/* Edit Options Button */}
+
                               {(meal as any).id && (
-                                <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                                <div className="mt-4 pt-3 border-t border-[color:var(--fc-glass-border)]">
                                   <Button
+                                    type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setEditingMealOptions({ 
-                                      id: (meal as any).id, 
-                                      name: (meal as any).name || meal.meal_type 
-                                    })}
+                                    onClick={() =>
+                                      setEditingMealOptions({
+                                        id: (meal as any).id,
+                                        name: (meal as any).name || meal.meal_type,
+                                      })
+                                    }
                                     className="w-full justify-center gap-2 rounded-lg"
                                   >
                                     <Settings2 className="w-4 h-4" />
@@ -550,8 +553,7 @@ export default function MealPlanDetailPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
 
       {/* Meal Creator Modal */}
@@ -563,35 +565,26 @@ export default function MealPlanDetailPage() {
         />
       )}
 
-      {/* Meal Options Editor Modal */}
-      {editingMealOptions && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) { setEditingMealOptions(null); loadMeals(); } }}
-        >
-          <div className={`${theme.card} fc-card-shell rounded-3xl border ${theme.border} max-w-3xl max-h-[90vh] w-full overflow-hidden`}>
-            {/* Modal Header */}
-            <div className={`sticky top-0 ${theme.card} fc-glass border-b ${theme.border} px-6 py-4 flex items-center justify-between`}>
-              <div>
-                <h2 className={`text-xl font-bold ${theme.text}`}>
-                  Meal Options
-                </h2>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  {editingMealOptions.name}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setEditingMealOptions(null); loadMeals(); }}
-                className="h-10 w-10 rounded-xl"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-            
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+      <Dialog
+        open={!!editingMealOptions}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingMealOptions(null);
+            void loadMeals();
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col gap-0 border border-[color:var(--fc-glass-border)] p-0">
+          <DialogHeader className="fc-glass border-b border-[color:var(--fc-glass-border)] px-6 py-4 text-left">
+            <DialogTitle className="fc-text-primary">Meal Options</DialogTitle>
+            {editingMealOptions && (
+              <DialogDescription className="fc-text-dim">
+                {editingMealOptions.name}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          {editingMealOptions && (
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
               <MealOptionEditor
                 mealId={editingMealOptions.id}
                 mealPlanId={mealPlanId}
@@ -603,9 +596,9 @@ export default function MealPlanDetailPage() {
                 }}
               />
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }

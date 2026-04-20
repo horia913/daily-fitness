@@ -9,6 +9,7 @@ import { getLogRange, getCheckinStreak } from "./wellnessService";
 import { dbToUiScale } from "./wellnessService";
 import { getClientCheckInConfig } from "./checkInConfigService";
 import { getNutritionComplianceTrend } from "./nutritionLogService";
+import { computeCurrentProgramWeekForAssignment } from "./programWeekCalendar";
 
 export interface ReportData {
   cover: {
@@ -110,6 +111,7 @@ export async function getReportData(
     checkinStreak,
     checkInConfig,
     assignmentRes,
+    profileRes,
     workoutLogsRes,
     prsRes,
     mealPlanRes,
@@ -125,12 +127,13 @@ export async function getReportData(
     getClientCheckInConfig(clientId),
     supabase
       .from("program_assignments")
-      .select("id, program_id, duration_weeks")
+      .select("id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot")
       .eq("client_id", clientId)
       .eq("status", "active")
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase.from("profiles").select("timezone").eq("id", clientId).maybeSingle(),
     supabase
       .from("workout_logs")
       .select("id, completed_at")
@@ -205,12 +208,17 @@ export async function getReportData(
       .eq("id", assignment.program_id)
       .single();
     programName = programRow?.name ?? null;
-    const { data: progress } = await supabase
-      .from("program_progress")
-      .select("current_week_number")
-      .eq("program_assignment_id", assignment.id)
-      .single();
-    const weekNum = progress?.current_week_number ?? 1;
+    const { week: weekNum } = computeCurrentProgramWeekForAssignment(
+      {
+        start_date: assignment.start_date ?? null,
+        duration_weeks: assignment.duration_weeks ?? null,
+        pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+        pause_status: assignment.pause_status ?? null,
+        paused_at: assignment.paused_at ?? null,
+        timezone_snapshot: assignment.timezone_snapshot ?? null,
+      },
+      (profileRes.data as { timezone?: string | null } | null)?.timezone ?? 'UTC'
+    );
     const totalWeeks = assignment.duration_weeks ?? 12;
     programWeekOfTotal = `Week ${weekNum} of ${totalWeeks}`;
   }

@@ -360,11 +360,11 @@ export function CheckInHistory({
       {recentLogs.length > 0 && (
         <ClientGlassCard className="p-6">
           <h3 className="text-lg font-semibold fc-text-primary mb-4">Recent Entries</h3>
-          <div className="flex flex-col border-y border-white/5 -mx-2">
+          <div className="flex flex-col border-y border-[color:var(--fc-glass-border)] -mx-2">
             {recentLogs.map((log) => (
               <div
                 key={log.id}
-                className="cursor-pointer border-b border-white/5 px-2 py-3 last:border-b-0 transition-colors hover:bg-white/[0.02]"
+                className="cursor-pointer border-b border-[color:var(--fc-glass-border)] px-2 py-3 last:border-b-0 transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                 onClick={() => handleDateClick(log.log_date)}
               >
                 <div className="flex items-center justify-between mb-2">

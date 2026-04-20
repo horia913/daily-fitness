@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -63,6 +64,7 @@ import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
 import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { withTimeout } from "@/lib/withTimeout";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
 const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string; icon: LucideIcon }[] = [
   { id: "training", label: "Training", emoji: "🏋️", icon: Dumbbell },
@@ -257,6 +259,7 @@ const PRESET_GOALS: PresetGoal[] = [
 ];
 
 export default function ClientGoals() {
+  const router = useRouter();
   const { addToast } = useToast();
   const { user } = useAuth();
   const { performanceSettings, isDark, getSemanticColor } = useTheme();
@@ -1145,12 +1148,7 @@ export default function ClientGoals() {
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
           <div className="p-4">
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-3 overflow-x-hidden">
-              <div className="animate-pulse space-y-3">
-                <div className="h-7 bg-[color:var(--fc-glass-highlight)] rounded-lg w-40" />
-                <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-2/3" />
-                <div className="h-20 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
-                <div className="h-28 bg-[color:var(--fc-glass-highlight)] rounded-xl" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </div>
         </div>
@@ -1163,8 +1161,8 @@ export default function ClientGoals() {
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
           <ClientPageShell className="max-w-lg mx-auto w-full px-4 pb-32 pt-6">
-            <div className="py-8 px-4 text-center rounded-xl border border-white/10 bg-white/[0.04]">
-              <p className="text-sm text-gray-400 mb-3">{loadError}</p>
+            <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
+              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary h-10 text-sm">
                 Retry
               </Button>
@@ -1196,13 +1194,13 @@ export default function ClientGoals() {
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden space-y-4">
             {/* Header */}
             <header>
-              <h1 className="text-xl font-bold text-white tracking-tight mb-4">My Goals</h1>
+              <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-4">My Goals</h1>
               <div className="flex items-center justify-between gap-2 -mt-2 mb-1">
                 <p className="text-sm fc-text-dim min-w-0">Set and track goals by pillar.</p>
                 <button
                   type="button"
-                  onClick={() => { window.location.href = "/client/goals/history"; }}
-                  className="shrink-0 text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
+                  onClick={() => router.push("/client/goals/history")}
+                  className="shrink-0 text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
                 >
                   History
                 </button>
@@ -1210,32 +1208,32 @@ export default function ClientGoals() {
             </header>
 
             {/* Overall stats */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
               <div className="flex items-center justify-between gap-1">
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">{stats.total}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Total</p>
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">{stats.total}</p>
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Total</p>
                 </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">{goalStatsFromService.active}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Active</p>
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">{goalStatsFromService.active}</p>
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Active</p>
                 </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">{stats.completed}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Completed</p>
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">{stats.completed}</p>
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Completed</p>
                 </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">{goalStatsFromService.overallAdherence}%</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Adherence</p>
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">{goalStatsFromService.overallAdherence}%</p>
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">Adherence</p>
                 </div>
               </div>
             </div>
 
             {/* Status and Sort chips */}
-            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <section className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
               <button
                 type="button"
                 onClick={() => setFiltersOpen((prev) => !prev)}
@@ -1243,17 +1241,17 @@ export default function ClientGoals() {
                 aria-expanded={filtersOpen}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] fc-text-subtle">
                     Filters
                   </span>
                   {activeFilterCount > 0 ? (
-                    <span className="text-[10px] text-cyan-400/70">
+                    <span className="text-[10px] text-[color:var(--fc-accent)]/70">
                       {activeFilterCount} active
                     </span>
                   ) : null}
                 </div>
                 <ChevronDown
-                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
+                  className={`w-4 h-4 fc-text-dim transition-transform duration-200 ${
                     filtersOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -1262,7 +1260,7 @@ export default function ClientGoals() {
               {filtersOpen ? (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-2">Status</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2">Status</p>
                     <div className="flex flex-wrap gap-2">
                       {(
                         [
@@ -1281,8 +1279,8 @@ export default function ClientGoals() {
                             onClick={() => setFilterStatus(option.value)}
                             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
                               isActive
-                                ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
-                                : "border-white/10 bg-white/[0.03] text-gray-400 hover:text-gray-300"
+                                ? "border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)]"
+                                : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
                             }`}
                           >
                             {option.label}
@@ -1292,7 +1290,7 @@ export default function ClientGoals() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-2">Sort</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2">Sort</p>
                     <div className="flex flex-wrap gap-2">
                       {(
                         [
@@ -1310,8 +1308,8 @@ export default function ClientGoals() {
                             onClick={() => setSortBy(option.value)}
                             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
                               isActive
-                                ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
-                                : "border-white/10 bg-white/[0.03] text-gray-400 hover:text-gray-300"
+                                ? "border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)]"
+                                : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
                             }`}
                           >
                             {option.label}
@@ -1331,26 +1329,26 @@ export default function ClientGoals() {
               const count = pillarStat?.count ?? 0;
               const adherence = pillarStat?.adherence ?? 0;
               return (
-                <section key={pillarId} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                  <p className="text-[10px] uppercase tracking-wider text-cyan-300/70 mb-1">{label} pillar</p>
+                <section key={pillarId} className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-1">{label} pillar</p>
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight text-white">
+                    <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight fc-text-primary">
                       <PillarIcon className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--fc-accent-primary)" }} />
                       <span className="truncate">{label}</span>
                     </h2>
                     {count > 0 ? (
-                      <span className="shrink-0 text-xs tabular-nums text-gray-500">
+                      <span className="shrink-0 text-xs tabular-nums fc-text-dim">
                         {count} · {adherence}%
                       </span>
                     ) : null}
                   </div>
                     {pillarGoalsList.length === 0 ? (
                       <div className="py-8 px-4 text-center">
-                        <p className="text-sm text-gray-400 mb-1">No goals in this pillar yet.</p>
+                        <p className="text-sm fc-text-dim mb-1">No goals in this pillar yet.</p>
                         <button
                           type="button"
                           onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
+                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
                         >
                           + Add {label} Goal
                         </button>
@@ -1372,7 +1370,7 @@ export default function ClientGoals() {
                         <button
                           type="button"
                           onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="text-xs font-semibold uppercase tracking-wider text-cyan-400 hover:text-cyan-300"
+                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
                         >
                           + Add {label} Goal
                         </button>
@@ -1396,16 +1394,16 @@ export default function ClientGoals() {
             )}
 
             {/* Completed goals: collapsible */}
-            <section className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
+            <section className="overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
               <button
                 type="button"
                 onClick={() => setCompletedSectionOpen((o) => !o)}
-                className="w-full flex items-center justify-between py-3 px-4 hover:bg-white/[0.03] transition-colors text-left"
+                className="w-full flex items-center justify-between py-3 px-4 hover:bg-[color:var(--fc-glass-highlight)] transition-colors text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-cyan-300/70">Archive</p>
-                  <h3 className="text-sm font-semibold text-white tracking-tight">Completed goals</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">{completedGoalsList.length} completed</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80">Archive</p>
+                  <h3 className="text-sm font-semibold fc-text-primary tracking-tight">Completed goals</h3>
+                  <p className="text-xs fc-text-dim mt-0.5">{completedGoalsList.length} completed</p>
                 </div>
                 <ChevronDown className={`w-5 h-5 shrink-0 fc-text-subtle transition-transform duration-300 ${completedSectionOpen ? "rotate-180" : ""}`} />
               </button>
@@ -1413,7 +1411,7 @@ export default function ClientGoals() {
                 <div className="px-4 pb-4 pt-0 space-y-3">
                   {completedGoalsList.length === 0 ? (
                     <div className="py-8 px-4 text-center">
-                      <p className="text-sm text-gray-400">No completed goals yet.</p>
+                      <p className="text-sm fc-text-dim">No completed goals yet.</p>
                     </div>
                   ) : (
                     filteredAndSortedGoals(completedGoalsList).map((goal) => (
@@ -1466,7 +1464,7 @@ export default function ClientGoals() {
                             setShowPresetSelection(false);
                             setSelectedPreset(null);
                           }}
-                          className="absolute top-4 right-4 rounded-lg p-1 text-gray-400 hover:text-white transition-colors"
+                          className="absolute top-4 right-4 rounded-lg p-1 fc-text-dim hover:fc-text-primary transition-colors"
                           aria-label="Close"
                         >
                           <X className="w-5 h-5" />

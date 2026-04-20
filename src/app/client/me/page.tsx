@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -98,7 +99,7 @@ export default function MePage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-2xl font-bold text-white">
+                    <span className="text-2xl font-bold text-[color:var(--fc-bg-base)]">
                       {userName.charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -114,15 +115,14 @@ export default function MePage() {
               </div>
             </div>
 
-            <nav className="flex flex-col border-y border-white/5" aria-label="Account">
+            <nav className="flex flex-col border-y border-[color:var(--fc-glass-border)]" aria-label="Account">
               {NAV_CARDS.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <button
+                  <Link
                     key={`${card.href}-${card.title}`}
-                    type="button"
-                    onClick={() => { window.location.href = card.href; }}
-                    className="w-full text-left flex min-h-[52px] items-center gap-4 border-b border-white/5 py-3 last:border-b-0 transition-colors hover:bg-white/[0.02]"
+                    href={card.href}
+                    className="w-full text-left flex min-h-[52px] items-center gap-4 border-b border-[color:var(--fc-glass-border)] py-3 last:border-b-0 transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)]">
                       <Icon className="h-5 w-5 fc-text-primary" />
@@ -138,7 +138,7 @@ export default function MePage() {
                       )}
                     </div>
                     <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
-                  </button>
+                  </Link>
                 );
               })}
             </nav>

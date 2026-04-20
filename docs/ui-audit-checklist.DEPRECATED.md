@@ -1,3 +1,17 @@
+# DEPRECATED 2026-04-16
+
+> **This document is no longer authoritative.** It was built around the mockup-driven UI audit workflow that has been retired. The entire "Screens that lack a mockup" concept and "aligned to X mockup" status model are superseded.
+>
+> The new source of truth for UI work is:
+>
+> - [`dailyfitness-app/docs/ui/95-STANDARD.md`](./ui/95-STANDARD.md) — the 9.5 Standard specification (extracted from the four benchmark screens)
+> - [`dailyfitness-app/docs/ui/audit-grades-2026-04-16.md`](./ui/audit-grades-2026-04-16.md) — the fresh per-screen tier list (replaces this checklist)
+> - [`dailyfitness-app/docs/ui/screen-inventory.md`](./ui/screen-inventory.md) — current screen inventory with target shells
+>
+> Content preserved for historical reference only. **Do not apply any status from below to new work** — many rows reference routes that no longer exist (`/client/sessions`, `/client/clipcards`, `/client/achievements`, `/coach/sessions`, `/coach/availability`, `/coach/scheduling`, `/coach/clipcards`, `/coach/bulk-assignments`, `/coach/notifications`, `/coach/achievements`) or mockup files in the now-deprecated `ui_tokens/` folder.
+
+---
+
 # UI Audit Checklist
 
 Track status for Full UI Audit plan. Build runs after each phase; no git operations.

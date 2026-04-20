@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -18,6 +19,7 @@ import {
 import { NutritionComplianceChart } from "@/components/progress/NutritionComplianceChart";
 import type { NutritionComplianceDay } from "@/lib/nutritionLogService";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -83,6 +85,7 @@ function formatNumber(value: number, digits = 0) {
 
 export default function NutritionPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
 
@@ -606,7 +609,7 @@ export default function NutritionPage() {
               <Button
                 disabled={uploadingMealId === meal.id}
                 onClick={() => handleUpload(meal.id)}
-                className="w-full flex items-center justify-center gap-2 text-white fc-btn fc-btn-primary"
+                className="w-full flex items-center justify-center gap-2 fc-btn fc-btn-primary"
               >
                 {uploadingMealId === meal.id ? (
                   <>
@@ -632,15 +635,9 @@ export default function NutritionPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-card-shell p-4">
-              <div className="animate-pulse space-y-3">
-                <div className="h-6 rounded bg-[color:var(--fc-glass-highlight)] w-1/3" />
-                <div className="h-4 rounded bg-[color:var(--fc-glass-highlight)] w-1/2" />
-                <div className="h-24 rounded bg-[color:var(--fc-glass-highlight)]" />
-              </div>
-            </div>
-          </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">
+            <PageSkeleton variant="dashboard" />
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -656,7 +653,8 @@ export default function NutritionPage() {
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <button
                   type="button"
-                  onClick={() => { window.location.href = "/client/progress"; }}
+                  onClick={() => router.push("/client/progress")}
+                  aria-label="Back to progress"
                   className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
                 >
                   <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />

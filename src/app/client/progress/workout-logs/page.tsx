@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
@@ -72,6 +74,7 @@ function formatDurationLabel(totalMinutes: number): string {
 }
 
 export default function WorkoutLogsPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -392,7 +395,7 @@ export default function WorkoutLogsPage() {
                   setError(null);
                   loadWorkoutLogs();
                 }}
-                className="px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm font-medium hover:bg-cyan-400 transition-colors"
+                className="fc-btn fc-btn-primary fc-press h-10 px-5 text-sm"
               >
                 Retry
               </button>
@@ -409,13 +412,7 @@ export default function WorkoutLogsPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-8 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-4 w-full rounded bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-10 w-full rounded-full bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-14 w-full rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="list" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -430,10 +427,8 @@ export default function WorkoutLogsPage() {
           <header className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/progress";
-              }}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+              onClick={() => router.push("/client/progress")}
+              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
               aria-label="Back to progress"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -444,8 +439,8 @@ export default function WorkoutLogsPage() {
           </header>
 
           {workoutLogs.length > 0 && (
-            <section className="mb-4 border-b border-white/5 pb-4">
-              <p className="text-sm uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+            <section className="mb-4 border-b border-[color:var(--fc-glass-border)] pb-4">
+              <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
                 This month
               </p>
               <p className="text-sm font-medium fc-text-primary leading-snug">
@@ -453,9 +448,7 @@ export default function WorkoutLogsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  window.location.href = "/client/progress/personal-records";
-                }}
+                onClick={() => router.push("/client/progress/personal-records")}
                 className="mt-2 text-left text-xs font-medium fc-text-primary hover:opacity-80 bg-transparent border-0 p-0 cursor-pointer"
               >
                 View PRs →
@@ -464,14 +457,17 @@ export default function WorkoutLogsPage() {
           )}
 
           {workoutLogs.length > 0 && (
-            <nav
-              className="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1.5 bg-[color:var(--fc-bg-base)]/90 py-2 backdrop-blur-sm px-1"
+            <div
+              role="tablist"
               aria-label="Time range"
+              className="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1.5 bg-[color:var(--fc-bg-base)]/90 py-2 backdrop-blur-sm px-1"
             >
               {(["all", "this_month", "this_week"] as const).map((key) => (
                 <button
                   key={key}
                   type="button"
+                  role="tab"
+                  aria-selected={timeFilter === key}
                   onClick={() => setTimeFilter(key)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors border ${
                     timeFilter === key
@@ -482,11 +478,11 @@ export default function WorkoutLogsPage() {
                   {key === "all" ? "All time" : key === "this_month" ? "This month" : "This week"}
                 </button>
               ))}
-            </nav>
+            </div>
           )}
 
           {filteredLogs.length === 0 ? (
-            <div className="py-8 px-2 text-center border-y border-white/5">
+            <div className="py-8 px-2 text-center border-y border-[color:var(--fc-glass-border)]">
               <FileText className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
               <p className="text-sm font-semibold fc-text-primary mb-1">
                 {workoutLogs.length === 0 ? "No workouts yet" : "No workouts in this range"}
@@ -498,7 +494,7 @@ export default function WorkoutLogsPage() {
               </p>
             </div>
           ) : (
-            <div className="flex flex-col border-y border-white/5">
+            <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
               {filteredLogs.map((log) => (
                 <WorkoutLogCard key={log.id} log={log} />
               ))}

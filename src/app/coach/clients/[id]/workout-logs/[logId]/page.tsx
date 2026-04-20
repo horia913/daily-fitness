@@ -12,6 +12,7 @@ import {
   type ExerciseAdherenceBlock,
 } from "@/lib/coachWorkoutAdherence";
 import { cn } from "@/lib/utils";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 function fmtNum(n: number | null | undefined, suffix = ""): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
@@ -19,9 +20,9 @@ function fmtNum(n: number | null | undefined, suffix = ""): string {
 }
 
 function cellTone(o: CellOutcome): string {
-  if (o === "green") return "text-emerald-400";
-  if (o === "red") return "text-red-400";
-  return "text-gray-400";
+  if (o === "green") return "fc-text-success";
+  if (o === "red") return "fc-text-error";
+  return "fc-text-dim";
 }
 
 function fmtSec(s: number | null | undefined): string {
@@ -46,7 +47,7 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
   if (block.displayVariant === "speed_work" && block.speedIntervals?.length) {
     return (
       <div className="overflow-x-auto">
-        <p className="text-[11px] text-gray-500 px-3 py-2 border-b border-white/5">
+        <p className="text-[11px] fc-text-dim px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
           {block.prescribedSpeedIntervals != null &&
           block.prescribedSpeedDistanceM != null
             ? `Prescribed: ${block.prescribedSpeedIntervals}×${block.prescribedSpeedDistanceM}m per interval`
@@ -54,7 +55,7 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
           {block.speedConsistencyPct != null ? (
             <span className="ml-2">
               · Consistency:{" "}
-              <span className="text-cyan-400/90 font-medium tabular-nums">
+              <span className="font-medium tabular-nums text-[color:var(--fc-accent-cyan)]">
                 {block.speedConsistencyPct}%
               </span>
             </span>
@@ -62,7 +63,7 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
         </p>
         <table className="w-full text-xs sm:text-sm">
           <thead>
-            <tr className="border-b border-white/5 fc-text-dim text-left">
+            <tr className="border-b border-[color:var(--fc-glass-border)] fc-text-dim text-left">
               <th className="py-2 px-3 font-medium">Interval</th>
               <th className="py-2 px-3 font-medium">Time</th>
               <th className="py-2 px-3 font-medium">RPE</th>
@@ -72,9 +73,9 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
             {block.speedIntervals.map((row, idx) => (
               <tr
                 key={`sp-${block.exerciseId}-${row.setNumber}-${idx}`}
-                className="border-b border-white/5 last:border-b-0"
+                className="border-b border-[color:var(--fc-glass-border)] last:border-b-0"
               >
-                <td className="py-2 px-3 tabular-nums text-white">
+                <td className="py-2 px-3 tabular-nums fc-text-primary">
                   {row.setNumber}
                 </td>
                 <td className="py-2 px-3 tabular-nums">
@@ -143,7 +144,7 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs sm:text-sm">
         <thead>
-          <tr className="border-b border-white/5 fc-text-dim text-left">
+          <tr className="border-b border-[color:var(--fc-glass-border)] fc-text-dim text-left">
             <th className="py-2 px-3 font-medium">Set</th>
             <th className="py-2 px-3 font-medium">Weight</th>
             <th className="py-2 px-3 font-medium">Reps</th>
@@ -154,9 +155,9 @@ function renderAdherenceBlock(block: ExerciseAdherenceBlock) {
           {block.sets.map((s, idx) => (
             <tr
               key={`${block.exerciseId}-${s.setNumber}-${idx}`}
-              className="border-b border-white/5 last:border-b-0"
+              className="border-b border-[color:var(--fc-glass-border)] last:border-b-0"
             >
-              <td className="py-2 px-3 tabular-nums text-white">
+              <td className="py-2 px-3 tabular-nums fc-text-primary">
                 {s.setNumber}
               </td>
               <td className="py-2 px-3">
@@ -260,7 +261,9 @@ export default function CoachClientWorkoutLogDetailPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm fc-text-dim py-8">Loading…</p>
+        <div className="fc-card-shell p-6 sm:p-8">
+          <PageSkeleton variant="form" />
+        </div>
       ) : error || !payload || !log ? (
         <p className="text-sm fc-text-error py-4">{error || "Not found"}</p>
       ) : (
@@ -341,10 +344,10 @@ export default function CoachClientWorkoutLogDetailPage() {
                     <span
                       className={cn(
                         payload.volumeDeltaKg > 0
-                          ? "text-emerald-400"
+                          ? "fc-text-success"
                           : payload.volumeDeltaKg < 0
-                            ? "text-red-400"
-                            : "text-gray-400"
+                            ? "fc-text-error"
+                            : "fc-text-dim"
                       )}
                     >
                       {payload.volumeDeltaKg > 0 ? "+" : ""}
@@ -360,10 +363,10 @@ export default function CoachClientWorkoutLogDetailPage() {
                     <span
                       className={cn(
                         payload.setsDelta > 0
-                          ? "text-emerald-400"
+                          ? "fc-text-success"
                           : payload.setsDelta < 0
-                            ? "text-red-400"
-                            : "text-gray-400"
+                            ? "fc-text-error"
+                            : "fc-text-dim"
                       )}
                     >
                       {payload.setsDelta > 0 ? "+" : ""}
@@ -378,16 +381,16 @@ export default function CoachClientWorkoutLogDetailPage() {
           </dl>
 
           {adherence && adherence.totalPrescribedSets > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/70 mb-2">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-accent-cyan)] opacity-80 mb-2">
                 Workout adherence
               </h2>
               <p className="text-sm fc-text-primary">
                 <span
                   className={cn(
-                    tier === "green" && "text-emerald-400",
-                    tier === "amber" && "text-amber-400",
-                    tier === "red" && "text-red-400"
+                    tier === "green" && "fc-text-success",
+                    tier === "amber" && "fc-text-warning",
+                    tier === "red" && "fc-text-error"
                   )}
                 >
                   {adherence.adherencePercent != null
@@ -405,7 +408,7 @@ export default function CoachClientWorkoutLogDetailPage() {
 
           {adherence && adherence.exerciseBlocks.length > 0 && (
             <div className="space-y-6">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-cyan-400/60">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-accent-cyan)] opacity-75">
                 Set-by-set (prescribed vs actual)
               </h2>
               {adherence.exerciseBlocks.map((block) => (
@@ -413,11 +416,11 @@ export default function CoachClientWorkoutLogDetailPage() {
                   key={`${block.exerciseId}-${block.blockTypeLabel}`}
                   className="rounded-xl border border-[color:var(--fc-glass-border)] overflow-hidden"
                 >
-                  <div className="px-3 py-2 bg-white/[0.03] border-b border-white/5">
+                  <div className="px-3 py-2 bg-[color:var(--fc-glass-highlight)] border-b border-[color:var(--fc-glass-border)]">
                     <p className="text-sm font-semibold fc-text-primary">
                       {block.exerciseName ?? block.exerciseId}
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
+                    <p className="text-[11px] fc-text-dim mt-0.5">
                       {block.blockTypeLabel} · Target: {block.prescribedSummary}
                     </p>
                   </div>

@@ -34,6 +34,7 @@ import { BodyMeasurement } from "@/lib/measurementService";
 import type { NewlyUnlockedAchievement } from "@/lib/achievementService";
 import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
 import {
   getPhotosForDate,
@@ -625,7 +626,7 @@ function BodyMetricsPageContent() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
             <div className="py-6 text-center">
-              <p className="mb-3 text-sm text-gray-400">{loadError}</p>
+              <p className="mb-3 text-sm fc-text-dim">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
             </div>
           </ClientPageShell>
@@ -640,11 +641,7 @@ function BodyMetricsPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-            <div className="animate-pulse space-y-3">
-              <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-40 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-48 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -653,8 +650,8 @@ function BodyMetricsPageContent() {
 
   const tabChipBase =
     "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const tabChipActive = "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
-  const tabChipInactive = "bg-white/[0.03] text-gray-400 border-white/10";
+  const tabChipActive = "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
+  const tabChipInactive = "bg-[color:var(--fc-glass-highlight)] fc-text-dim border-[color:var(--fc-glass-border)]";
 
   return (
     <AnimatedBackground>
@@ -664,17 +661,15 @@ function BodyMetricsPageContent() {
         <div className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = progressBackHref(fromCheckIns);
-            }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]"
+            onClick={() => router.push(progressBackHref(fromCheckIns))}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft"
             aria-label="Go back"
           >
-            <ArrowLeft className="h-4 w-4 text-white" />
+            <ArrowLeft className="h-4 w-4 fc-text-primary" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-white tracking-tight">Body Metrics</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-xl font-bold fc-text-primary tracking-tight">Body Metrics</h1>
+            <p className="text-sm fc-text-subtle">
               {latestDate ? (
                 <>Updated {formatTimeAgo(latestDate)}</>
               ) : (
@@ -774,19 +769,19 @@ function BodyMetricsPageContent() {
             goalCards.push(
               <div
                 key={goal.id}
-                className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-2 last:mb-0"
+                className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-2 last:mb-0"
               >
                 <div className="mb-2 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-gray-500" />
-                  <span className="font-semibold text-white">{goal.title}</span>
+                  <Target className="w-4 h-4 fc-text-subtle" />
+                  <span className="font-semibold fc-text-primary">{goal.title}</span>
                 </div>
                 {latest == null ? (
-                  <p className="text-sm text-gray-500">Log your first measurement to track progress toward your goal.</p>
+                  <p className="text-sm fc-text-subtle">Log your first measurement to track progress toward your goal.</p>
                 ) : (
                   <>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-500">Current {label}</span>
-                      <span className="tabular-nums font-semibold text-white">{current != null ? (label === "Body fat" ? `${current.toFixed(1)}%` : `${current.toFixed(1)} ${label === "Weight" ? "kg" : "cm"}`) : "—"}</span>
+                      <span className="fc-text-subtle">Current {label}</span>
+                      <span className="tabular-nums font-semibold fc-text-primary">{current != null ? (label === "Body fat" ? `${current.toFixed(1)}%` : `${current.toFixed(1)} ${label === "Weight" ? "kg" : "cm"}`) : "—"}</span>
                     </div>
                     <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                       <div
@@ -797,7 +792,7 @@ function BodyMetricsPageContent() {
                     {reached ? (
                       <p className="text-sm font-medium text-emerald-300 mt-2">Goal reached!</p>
                     ) : remaining != null ? (
-                      <p className="text-sm text-gray-500 mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
+                      <p className="text-sm fc-text-subtle mt-2">{remaining} {label === "Weight" ? "kg" : label === "Body fat" ? "%" : "cm"} to go</p>
                     ) : null}
                   </>
                 )}
@@ -806,7 +801,7 @@ function BodyMetricsPageContent() {
           }
           return goalCards.length > 0 ? (
             <section className="mb-4 space-y-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-2">Goal progress</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-2">Goal progress</h2>
               <div>{goalCards}</div>
             </section>
           ) : null;
@@ -814,25 +809,25 @@ function BodyMetricsPageContent() {
 
         {/* Nutrition vs Body Composition insight — only if nutrition goals + ≥2 body metrics in 30d */}
         {activeTab === "overview" && nutritionVsBodyInsight && (
-          <section className="mb-4 space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <section className="mb-4 space-y-2 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Activity className="h-4 w-4 text-cyan-400" />
-              <h2 className="text-sm font-semibold text-white">Nutrition &amp; body composition</h2>
-              <span className="text-xs text-gray-500">Last 30 days</span>
+              <Activity className="h-4 w-4 text-[color:var(--fc-accent)]" />
+              <h2 className="text-sm font-semibold fc-text-primary">Nutrition &amp; body composition</h2>
+              <span className="text-xs fc-text-dim">Last 30 days</span>
             </div>
-            <p className="text-sm text-gray-300">{nutritionVsBodyInsight.message}</p>
+            <p className="text-sm fc-text-dim">{nutritionVsBodyInsight.message}</p>
           </section>
         )}
 
         {activeTab === "overview" && metrics.length === 0 && (
           <div className="py-8 px-4 text-center">
-            <Scale className="mx-auto mb-3 h-10 w-10 text-gray-600" aria-hidden />
-            <p className="text-sm text-gray-400">No measurements yet</p>
-            <p className="mt-1 text-xs text-gray-500">Log your first measurement to start tracking</p>
+            <Scale className="mx-auto mb-3 h-10 w-10 fc-text-subtle" aria-hidden />
+            <p className="text-sm fc-text-dim">No measurements yet</p>
+            <p className="mt-1 text-xs fc-text-dim">Log your first measurement to start tracking</p>
             <button
               type="button"
               onClick={() => setShowLogModal(true)}
-              className="mt-4 flex h-11 w-full max-w-xs mx-auto items-center justify-center rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25"
+              className="fc-btn fc-btn-primary fc-press mt-4 flex h-11 w-full max-w-xs mx-auto items-center justify-center rounded-lg px-4 text-sm font-semibold"
             >
               Log today
             </button>
@@ -842,31 +837,31 @@ function BodyMetricsPageContent() {
         {activeTab === "overview" && metrics.length > 0 && (
           <main className="space-y-4">
             {/* Last vs current comparison */}
-            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Body check-in</h2>
+            <section className="space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Body check-in</h2>
               {previous && daysSincePrevious != null && (
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs fc-text-dim mb-2">
                   Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
                 </p>
               )}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[280px] border-collapse text-white">
+                <table className="w-full min-w-[280px] border-collapse fc-text-primary">
                   <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
+                    <tr className="border-b border-[color:var(--fc-glass-border)]">
+                      <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider fc-text-subtle"></th>
                       {previous && (
                         <>
-                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
-                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>
-                          <th className="py-2 pl-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Change</th>
+                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
+                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider fc-text-subtle">Current</th>
+                          <th className="py-2 pl-2 text-right text-[10px] font-bold uppercase tracking-wider fc-text-subtle">Change</th>
                         </>
                       )}
-                      {!previous && <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>}
+                      {!previous && <th className="px-2 py-2 text-right text-[10px] font-bold uppercase tracking-wider fc-text-subtle">Current</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-white/10">
-                      <td className="py-2 pr-3 text-sm font-medium text-gray-200">Weight</td>
+                    <tr className="border-b border-[color:var(--fc-glass-border)]">
+                      <td className="py-2 pr-3 text-sm font-medium fc-text-primary">Weight</td>
                       {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
                       <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
                       {previous && (
@@ -880,8 +875,8 @@ function BodyMetricsPageContent() {
                       )}
                     </tr>
                     {(latest?.body_fat_percentage != null || previous?.body_fat_percentage != null) && (
-                      <tr className="border-b border-white/10">
-                        <td className="py-2 pr-3 text-sm font-medium text-gray-200">Body fat</td>
+                      <tr className="border-b border-[color:var(--fc-glass-border)]">
+                        <td className="py-2 pr-3 text-sm font-medium fc-text-primary">Body fat</td>
                         {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.body_fat_percentage ?? "—")}%</td>}
                         <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.body_fat_percentage ?? "—")}%</td>
                         {previous && (
@@ -896,8 +891,8 @@ function BodyMetricsPageContent() {
                       </tr>
                     )}
                     {(latest?.muscle_mass_kg != null || previous?.muscle_mass_kg != null) && (
-                      <tr className="border-b border-white/10">
-                        <td className="py-2 pr-3 text-sm font-medium text-gray-200">Muscle mass</td>
+                      <tr className="border-b border-[color:var(--fc-glass-border)]">
+                        <td className="py-2 pr-3 text-sm font-medium fc-text-primary">Muscle mass</td>
                         {previous && <td className="px-2 py-2 text-right tabular-nums text-sm">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
                         <td className="px-2 py-2 text-right tabular-nums text-sm font-semibold">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
                         {previous && (
@@ -922,22 +917,22 @@ function BodyMetricsPageContent() {
                 const maxW = Math.max(...sparkData.map((x) => x.weight));
                 const range = maxW - minW || 1;
                 return (
-                  <div className="mt-3 border-t border-white/10 pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Weight trend (last 3 months)</p>
+                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Weight trend (last 3 months)</p>
                     <div className="flex h-10 items-end gap-0.5">
                       {sparkData.map((m, i) => {
                         const h = ((m.weight - minW) / range) * 100;
                         return (
                           <div
                             key={`${m.date}-${i}`}
-                            className="flex-1 min-w-[4px] rounded-t bg-cyan-500/50"
+                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent)]/50"
                             style={{ height: `${Math.max(h, 4)}%` }}
                             title={`${m.weight.toFixed(1)} kg · ${new Date(m.date).toLocaleDateString()}`}
                           />
                         );
                       })}
                     </div>
-                    <div className="flex justify-between mt-1 text-[10px] text-gray-500 tabular-nums">
+                    <div className="flex justify-between mt-1 text-[10px] fc-text-subtle tabular-nums">
                       <span>{sparkData[0]?.weight.toFixed(1)} kg</span>
                       <span>{sparkData[sparkData.length - 1]?.weight.toFixed(1)} kg</span>
                     </div>
@@ -945,10 +940,8 @@ function BodyMetricsPageContent() {
                       <p className="mt-2 text-sm">
                         <button
                           type="button"
-                          className="text-cyan-400 hover:underline"
-                          onClick={() => {
-                            window.location.href = "/client/nutrition";
-                          }}
+                          className="text-[color:var(--fc-accent)] hover:underline"
+                          onClick={() => router.push("/client/nutrition")}
                         >
                           How&apos;s your nutrition?
                         </button>
@@ -971,24 +964,24 @@ function BodyMetricsPageContent() {
                 ].filter((r) => r.prev != null || r.curr != null);
                 if (rows.length === 0) return null;
                 return (
-                  <div className="mt-3 border-t border-white/10 pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Measurements</p>
+                  <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Measurements</p>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[240px] text-sm text-white">
+                      <table className="w-full min-w-[240px] text-sm fc-text-primary">
                         <thead>
-                          <tr className="border-b border-white/10">
-                            <th className="text-left py-2 pr-2 text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
-                            {previous && <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>}
-                            <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Current</th>
-                            <th className="text-right py-2 pl-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Change</th>
+                          <tr className="border-b border-[color:var(--fc-glass-border)]">
+                            <th className="text-left py-2 pr-2 text-[10px] font-bold uppercase tracking-wider fc-text-subtle"></th>
+                            {previous && <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>}
+                            <th className="text-right py-2 px-2 text-[10px] font-bold uppercase tracking-wider fc-text-subtle">Current</th>
+                            <th className="text-right py-2 pl-2 text-[10px] font-bold uppercase tracking-wider fc-text-subtle">Change</th>
                           </tr>
                         </thead>
                         <tbody>
                           {rows.map((r) => {
                             const change = r.prev != null && r.curr != null ? r.curr - r.prev : null;
                             return (
-                              <tr key={r.label} className="border-b border-white/10">
-                                <td className="py-2 pr-2 text-gray-200">{r.label}</td>
+                              <tr key={r.label} className="border-b border-[color:var(--fc-glass-border)]">
+                                <td className="py-2 pr-2 fc-text-primary">{r.label}</td>
                                 <td className="text-right py-2 px-2 tabular-nums">{r.prev != null ? `${r.prev} cm` : "—"}</td>
                                 <td className="text-right py-2 px-2 tabular-nums font-semibold">{r.curr != null ? `${r.curr} cm` : "—"}</td>
                                 <td className="text-right py-2 pl-2 tabular-nums">
@@ -1008,26 +1001,26 @@ function BodyMetricsPageContent() {
 
               {/* Progress photos comparison — tap opens Photos tab */}
               {(latestDatePhotos.length > 0 || previousDatePhotos.length > 0) && (
-                <div className="mt-3 border-t border-white/10 pt-3">
+                <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
                   <button
                     type="button"
                     onClick={() => setTab("photos")}
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.02] p-3 text-left transition-colors hover:bg-white/[0.06]"
+                    className="w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                       Progress photos
                     </p>
-                    <p className="mb-2 text-xs text-gray-500">Tap to open Photos</p>
+                    <p className="mb-2 text-xs fc-text-dim">Tap to open Photos</p>
                     <div className="flex flex-wrap items-end gap-3">
                       {previous && previousDatePhotos.length > 0 && (
                         <div className="flex flex-col gap-1">
-                          <p className="text-[10px] text-gray-500">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · previous</p>
+                          <p className="text-[10px] fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · previous</p>
                           <img src={previousDatePhotos[0].url} alt="Previous" className="h-20 w-14 rounded-lg object-cover bg-white/5 sm:h-24 sm:w-16 pointer-events-none" />
                         </div>
                       )}
                       {latest && latestDatePhotos.length > 0 && (
                         <div className="flex flex-col gap-1">
-                          <p className="text-[10px] text-gray-500">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · current</p>
+                          <p className="text-[10px] fc-text-subtle">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · current</p>
                           <img src={latestDatePhotos[0].url} alt="Current" className="h-20 w-14 rounded-lg object-cover bg-white/5 sm:h-24 sm:w-16 pointer-events-none" />
                         </div>
                       )}
@@ -1040,7 +1033,7 @@ function BodyMetricsPageContent() {
             <button
               type="button"
               onClick={() => setShowLogModal(true)}
-              className="flex h-11 w-full items-center justify-center rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25"
+              className="fc-btn fc-btn-primary fc-press flex h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold"
             >
               Log today
             </button>
@@ -1048,15 +1041,15 @@ function BodyMetricsPageContent() {
         )}
 
         {activeTab === "weight-bf" && metrics.length > 0 && (
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-3">
+                <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
                     Weight &amp; body fat
                   </p>
                   <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-                    <span className="text-2xl font-bold text-white tabular-nums">
+                    <span className="text-2xl font-bold fc-text-primary tabular-nums">
                       {currentWeight > 0 ? currentWeight.toFixed(1) : "—"}
                     </span>
-                    <span className="text-sm text-gray-400">kg</span>
+                    <span className="text-sm fc-text-dim">kg</span>
                     {previous != null && weightChange !== 0 && (
                       <span
                         className={cn(
@@ -1097,7 +1090,7 @@ function BodyMetricsPageContent() {
                                 <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0 relative h-full">
                                   {metric.bodyFat != null && heightBF > 0 && (
                                     <div
-                                      className="absolute w-2 h-2 rounded-full bg-emerald-400 border border-white/20 z-10"
+                                      className="absolute w-2 h-2 rounded-full bg-emerald-400 border border-[color:var(--fc-glass-border)] z-10"
                                       style={{
                                         bottom: `calc(${Math.max(heightBF, 2)}% + 2rem)`,
                                       }}
@@ -1113,10 +1106,10 @@ function BodyMetricsPageContent() {
                                     }}
                                   />
                                   <div className="mt-2 text-center truncate w-full">
-                                    <p className="text-xs font-semibold text-white truncate tabular-nums">
+                                    <p className="text-xs font-semibold fc-text-primary truncate tabular-nums">
                                       {metric.weight.toFixed(1)}
                                     </p>
-                                    <p className="text-[10px] text-gray-500 truncate">
+                                    <p className="text-[10px] fc-text-subtle truncate">
                                       {new Date(metric.date).toLocaleDateString("en-US", {
                                         month: "short",
                                         day: "numeric",
@@ -1128,7 +1121,7 @@ function BodyMetricsPageContent() {
                             })}
                           </div>
                           {metrics.some((m) => m.bodyFat != null) && (
-                            <div className="flex items-center gap-3 mt-4 text-xs text-gray-500">
+                            <div className="flex items-center gap-3 mt-4 text-xs fc-text-dim">
                               <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[color:var(--fc-status-error)] to-[color:var(--fc-accent-blue)]" />
                                 <span>Weight</span>
@@ -1143,7 +1136,7 @@ function BodyMetricsPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-center py-8 text-sm text-gray-500">Not enough data to show chart</p>
+                    <p className="text-center py-8 text-sm fc-text-subtle">Not enough data to show chart</p>
                   )}
                 </div>
         )}
@@ -1268,8 +1261,8 @@ function BodyMetricsPageContent() {
                       if (comparisons.length === 0) return null;
 
                       return (
-                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-2">
-                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+                        <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-2">
+                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
                             Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -1280,12 +1273,12 @@ function BodyMetricsPageContent() {
                             {comparisons.map((comp) => (
                               <div
                                 key={comp.label}
-                                className="rounded-lg border border-white/10 bg-white/[0.04] p-3"
+                                className="rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft p-3"
                               >
-                                <p className="text-[10px] uppercase tracking-wider text-gray-500">{comp.label}</p>
-                                <p className="text-base font-semibold text-white tabular-nums mt-1">
+                                <p className="text-[10px] uppercase tracking-wider fc-text-subtle">{comp.label}</p>
+                                <p className="text-base font-semibold fc-text-primary tabular-nums mt-1">
                                   {comp.currentValue.toFixed(1)}{" "}
-                                  <span className="text-xs font-normal text-gray-400">cm</span>
+                                  <span className="text-xs font-normal fc-text-dim">cm</span>
                                 </p>
                                 {comp.change !== 0 && (
                                   <span
@@ -1319,7 +1312,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Waist"
                               measurements={fullMeasurements}
                               getValue={(m) => m.waist_circumference ?? null}
@@ -1335,7 +1328,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Hips"
                               measurements={fullMeasurements}
                               getValue={(m) => m.hips_circumference ?? null}
@@ -1351,7 +1344,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Torso/Chest"
                               measurements={fullMeasurements}
                               getValue={(m) => m.torso_circumference ?? null}
@@ -1369,7 +1362,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Arms"
                               measurements={fullMeasurements}
                               getValue={(m) => m.left_arm_circumference ?? null}
@@ -1389,7 +1382,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Thighs"
                               measurements={fullMeasurements}
                               getValue={(m) => m.left_thigh_circumference ?? null}
@@ -1409,7 +1402,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Calves"
                               measurements={fullMeasurements}
                               getValue={(m) => m.left_calf_circumference ?? null}
@@ -1427,7 +1420,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Muscle mass"
                               measurements={fullMeasurements}
                               getValue={(m) => m.muscle_mass_kg ?? null}
@@ -1443,7 +1436,7 @@ function BodyMetricsPageContent() {
                         <div className="overflow-x-auto">
                           <div className="min-w-[520px]">
                             <MeasurementMiniChart
-                              className="rounded-xl border border-white/10 bg-white/[0.04] shadow-none"
+                              className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft shadow-none"
                               title="Visceral fat"
                               measurements={fullMeasurements}
                               getValue={(m) => m.visceral_fat_level ?? null}
@@ -1457,28 +1450,28 @@ function BodyMetricsPageContent() {
                   </div>
                 ) : (
                   <div className="py-8 px-4 text-center">
-                    <Ruler className="mx-auto mb-3 h-10 w-10 text-gray-600" aria-hidden />
-                    <p className="text-sm text-gray-400">No measurement data available</p>
-                    <p className="mt-1 text-xs text-gray-500">Log a check-in with circumferences to see charts here.</p>
+                    <Ruler className="mx-auto mb-3 h-10 w-10 fc-text-subtle" aria-hidden />
+                    <p className="text-sm fc-text-dim">No measurement data available</p>
+                    <p className="mt-1 text-xs fc-text-dim">Log a check-in with circumferences to see charts here.</p>
                   </div>
                 )
         )}
 
         {activeTab === "weight-bf" && metrics.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-500">
+          <p className="py-8 text-center text-sm fc-text-subtle">
             No weight data yet. Log a measurement from Overview or use Log today.
           </p>
         )}
 
         {activeTab === "history" && metrics.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-500">No entries yet. Log a measurement to see history here.</p>
+          <p className="py-8 text-center text-sm fc-text-subtle">No entries yet. Log a measurement to see history here.</p>
         )}
 
         {activeTab === "history" && metrics.length > 0 && (
-            <div className="flex flex-col border-t border-white/10 pt-4">
+            <div className="flex flex-col border-t border-[color:var(--fc-glass-border)] pt-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Log history</h3>
-                <ListFilter className="h-4 w-4 text-gray-500" />
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Log history</h3>
+                <ListFilter className="h-4 w-4 fc-text-subtle" />
               </div>
               <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
                 {historyNewestFirst.map((metric, index) => {
@@ -1499,10 +1492,10 @@ function BodyMetricsPageContent() {
                   return (
                     <div
                       key={metric.date}
-                      className="rounded-xl border border-white/10 bg-white/[0.04] p-3"
+                      className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-white tracking-tight">
+                        <p className="text-sm font-semibold fc-text-primary tracking-tight">
                           {d.toLocaleDateString("en-US", {
                             weekday: "short",
                             month: "short",
@@ -1511,7 +1504,7 @@ function BodyMetricsPageContent() {
                           })}
                         </p>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span className="text-sm font-semibold text-white tabular-nums">
+                          <span className="text-sm font-semibold fc-text-primary tabular-nums">
                             {metric.weight.toFixed(1)} kg
                           </span>
                           {delta !== null && delta !== 0 && (
@@ -1535,25 +1528,25 @@ function BodyMetricsPageContent() {
                         </div>
                       </div>
                       {subtitle != null && (
-                        <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+                        <p className="text-xs fc-text-dim mt-1">{subtitle}</p>
                       )}
                       {full?.notes?.trim() && (
-                        <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-words">{full.notes.trim()}</p>
+                        <p className="text-xs fc-text-dim mt-1 whitespace-pre-wrap break-words">{full.notes.trim()}</p>
                       )}
                     </div>
                   );
                 })}
               </div>
-              <p className="mt-3 border-t border-white/10 pt-2 text-center text-xs text-gray-500">
+              <p className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-2 text-center text-xs fc-text-dim">
                 {metrics.length} entr{metrics.length === 1 ? "y" : "ies"} total
               </p>
             </div>
         )}
 
         {activeTab === "photos" && user && (
-          <div className="space-y-4 border-t border-white/10 pt-4">
+          <div className="space-y-4 border-t border-[color:var(--fc-glass-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Photos</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Photos</p>
               {photoTimeline.length >= 2 && (
                 <button
                   type="button"
@@ -1566,14 +1559,14 @@ function BodyMetricsPageContent() {
               )}
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70 mb-3">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
                 Today&apos;s photos
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {photoSlots.map((slot) => (
                   <div key={slot.type} className="flex flex-col">
-                    <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-dashed border-white/10 bg-white/[0.02]">
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-dashed border-[color:var(--fc-glass-border)] fc-glass-soft">
                       {slot.preview ? (
                         <>
                           <img src={slot.preview} alt="" className="h-full w-full object-cover" />
@@ -1594,7 +1587,7 @@ function BodyMetricsPageContent() {
                         </>
                       ) : (
                         <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1">
-                          <Camera className="h-6 w-6 text-gray-500" />
+                          <Camera className="h-6 w-6 fc-text-subtle" />
                           <input
                             type="file"
                             accept="image/*"
@@ -1605,7 +1598,7 @@ function BodyMetricsPageContent() {
                         </label>
                       )}
                     </div>
-                    <p className="mt-1.5 text-center text-[10px] uppercase tracking-wider text-gray-500">
+                    <p className="mt-1.5 text-center text-[10px] uppercase tracking-wider fc-text-subtle">
                       {slot.label}
                     </p>
                   </div>
@@ -1613,23 +1606,23 @@ function BodyMetricsPageContent() {
               </div>
               <div className="mt-3 space-y-3">
                 <div>
-                  <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Weight (kg) — optional</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider fc-text-dim">Weight (kg) — optional</label>
                   <input
                     type="number"
                     step="0.1"
                     value={photoUploadWeight}
                     onChange={(e) => setPhotoUploadWeight(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
                     placeholder="From latest log"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Notes — optional</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider fc-text-dim">Notes — optional</label>
                   <input
                     type="text"
                     value={photoUploadNotes}
                     onChange={(e) => setPhotoUploadNotes(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
                     placeholder="Add notes"
                   />
                 </div>
@@ -1638,7 +1631,7 @@ function BodyMetricsPageContent() {
                 type="button"
                 onClick={() => void handleSavePhotos()}
                 disabled={photoSaving || !photoSlots.some((s) => s.file || s.existingPhoto)}
-                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+                className="fc-btn fc-btn-primary fc-press mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:opacity-50"
               >
                 {photoSaving ? (
                   <>
@@ -1656,14 +1649,14 @@ function BodyMetricsPageContent() {
 
             {photoTimeline.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">Timeline</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Timeline</p>
                 {photoTimeline.map((entry) => {
                   const isExpanded = photoTimelineSelectedDate === entry.date;
                   const photos = isExpanded ? photoTimelineSelectedPhotos : [];
                   return (
                     <div
                       key={entry.date}
-                      className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-3"
+                      className="overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3"
                     >
                       <button
                         type="button"
@@ -1675,34 +1668,34 @@ function BodyMetricsPageContent() {
                         className="flex w-full items-center justify-between text-left"
                       >
                         <div>
-                          <p className="text-sm font-semibold text-white">{formatPhotoDateLong(entry.date)}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-sm font-semibold fc-text-primary">{formatPhotoDateLong(entry.date)}</p>
+                          <p className="text-xs fc-text-dim">
                             {entry.types.length} photo{entry.types.length !== 1 ? "s" : ""}
                             {entry.weight_kg != null && ` · ${entry.weight_kg.toFixed(1)} kg`}
                           </p>
                         </div>
                         <ChevronRight
                           className={cn(
-                            "h-5 w-5 shrink-0 text-gray-500 transition-transform",
+                            "h-5 w-5 shrink-0 fc-text-subtle transition-transform",
                             isExpanded && "rotate-90"
                           )}
                         />
                       </button>
                       {photoTimelineLoading && isExpanded && (
-                        <p className="mt-2 text-xs text-gray-500">Loading…</p>
+                        <p className="mt-2 text-xs fc-text-dim">Loading…</p>
                       )}
                       {isExpanded && photos.length > 0 && (
-                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[color:var(--fc-glass-border)] pt-3">
                           {(["front", "side", "back"] as PhotoType[]).map((type) => {
                             const photo = photos.find((p) => p.photo_type === type);
                             return (
                               <div key={type}>
-                                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">{type}</p>
+                                <p className="mb-1 text-[10px] uppercase tracking-wider fc-text-subtle">{type}</p>
                                 {photo ? (
                                   <button
                                     type="button"
                                     onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
-                                    className="block w-full overflow-hidden rounded-lg border border-white/10"
+                                    className="block w-full overflow-hidden rounded-lg border border-[color:var(--fc-glass-border)]"
                                   >
                                     <img
                                       src={photo.photo_url}
@@ -1711,7 +1704,7 @@ function BodyMetricsPageContent() {
                                     />
                                   </button>
                                 ) : (
-                                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-gray-500">
+                                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-[color:var(--fc-glass-border)] text-xs fc-text-subtle">
                                     —
                                   </div>
                                 )}
@@ -1732,7 +1725,7 @@ function BodyMetricsPageContent() {
         <button
           type="button"
           onClick={() => setShowLogModal(true)}
-          className="absolute bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-lg shadow-cyan-500/30"
+          className="fc-btn fc-btn-primary fc-press absolute bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl"
           aria-label="Log metrics"
         >
           <Plus className="w-8 h-8" />
@@ -1785,15 +1778,15 @@ function BodyMetricsPageContent() {
       {comparisonMode && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black text-white">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-            <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 flex flex-col gap-4 border-b border-[color:var(--fc-glass-border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-semibold">Photo comparison</h2>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400">Before</span>
+                  <span className="text-sm fc-text-dim">Before</span>
                   <select
                     value={comparisonDate1 || ""}
                     onChange={(e) => setComparisonDate1(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white"
+                    className="rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] px-3 py-2 text-sm fc-text-primary"
                   >
                     {photoTimeline.map((entry) => (
                       <option key={entry.date} value={entry.date}>
@@ -1803,11 +1796,11 @@ function BodyMetricsPageContent() {
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400">After</span>
+                  <span className="text-sm fc-text-dim">After</span>
                   <select
                     value={comparisonDate2 || ""}
                     onChange={(e) => setComparisonDate2(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white"
+                    className="rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] px-3 py-2 text-sm fc-text-primary"
                   >
                     {photoTimeline.map((entry) => (
                       <option key={entry.date} value={entry.date}>
@@ -1822,7 +1815,7 @@ function BodyMetricsPageContent() {
                     setComparisonMode(false);
                     setComparisonPhotos(null);
                   }}
-                  className="ml-auto flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]"
+                  className="ml-auto flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]"
                   aria-label="Close comparison"
                 >
                   <X className="h-5 w-5" />
@@ -1832,11 +1825,11 @@ function BodyMetricsPageContent() {
 
             {comparisonPhotos ? (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+                <div className="rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 sm:p-6">
                   <h3 className="mb-4 text-base font-semibold">
                     {comparisonDate1 ? formatPhotoDateLong(comparisonDate1) : ""}
                     {comparisonPhotos.before[0]?.weight_kg != null && (
-                      <span className="ml-2 text-sm font-normal text-gray-400">
+                      <span className="ml-2 text-sm font-normal fc-text-dim">
                         ({comparisonPhotos.before[0].weight_kg.toFixed(1)} kg)
                       </span>
                     )}
@@ -1846,17 +1839,17 @@ function BodyMetricsPageContent() {
                       const photo = comparisonPhotos.before.find((p) => p.photo_type === type);
                       return (
                         <div key={type}>
-                          <p className="mb-2 text-sm capitalize text-gray-400">{type}</p>
+                          <p className="mb-2 text-sm capitalize fc-text-dim">{type}</p>
                           {photo ? (
                             <button
                               type="button"
                               onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
-                              className="block w-full overflow-hidden rounded-xl border border-white/10"
+                              className="block w-full overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)]"
                             >
                               <img src={photo.photo_url} alt="" className="w-full object-cover" />
                             </button>
                           ) : (
-                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-white/20 text-gray-500">
+                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-[color:var(--fc-glass-border)] fc-text-subtle">
                               No {type} photo
                             </div>
                           )}
@@ -1865,11 +1858,11 @@ function BodyMetricsPageContent() {
                     })}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+                <div className="rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 sm:p-6">
                   <h3 className="mb-4 text-base font-semibold">
                     {comparisonDate2 ? formatPhotoDateLong(comparisonDate2) : ""}
                     {comparisonPhotos.after[0]?.weight_kg != null && (
-                      <span className="ml-2 text-sm font-normal text-gray-400">
+                      <span className="ml-2 text-sm font-normal fc-text-dim">
                         ({comparisonPhotos.after[0].weight_kg.toFixed(1)} kg)
                       </span>
                     )}
@@ -1879,17 +1872,17 @@ function BodyMetricsPageContent() {
                       const photo = comparisonPhotos.after.find((p) => p.photo_type === type);
                       return (
                         <div key={type}>
-                          <p className="mb-2 text-sm capitalize text-gray-400">{type}</p>
+                          <p className="mb-2 text-sm capitalize fc-text-dim">{type}</p>
                           {photo ? (
                             <button
                               type="button"
                               onClick={() => setFullscreenPhotoUrl(photo.photo_url)}
-                              className="block w-full overflow-hidden rounded-xl border border-white/10"
+                              className="block w-full overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)]"
                             >
                               <img src={photo.photo_url} alt="" className="w-full object-cover" />
                             </button>
                           ) : (
-                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-white/20 text-gray-500">
+                            <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-[color:var(--fc-glass-border)] fc-text-subtle">
                               No {type} photo
                             </div>
                           )}
@@ -1941,10 +1934,7 @@ export default function BodyMetricsPage() {
         fallback={
           <AnimatedBackground>
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-              <div className="animate-pulse space-y-3">
-                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>
         }

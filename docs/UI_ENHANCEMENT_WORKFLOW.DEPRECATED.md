@@ -1,3 +1,30 @@
+# DEPRECATED 2026-04-16
+
+> **This document is no longer authoritative.** It was built around the "train page V2 prototype" benchmark and the `ui_tokens/` mockup folder, both of which have been retired.
+>
+> The new source of truth for UI work is:
+>
+> - [`dailyfitness-app/docs/ui/95-STANDARD.md`](./ui/95-STANDARD.md) — the 9.5 Standard specification (extracted from the four benchmark screens: `/client`, `/client/train`, `/client/workouts/[id]/start`, `/coach`)
+> - [`dailyfitness-app/.cursor/rules/ui-benchmark-standard.md`](../.cursor/rules/ui-benchmark-standard.md) — the benchmark-fidelity rule
+> - [`dailyfitness-app/docs/ui/UI-UPLIFT-WORKFLOW.md`](./ui/UI-UPLIFT-WORKFLOW.md) — the current per-screen workflow
+>
+> **Not all content below is wrong.** Several technical sections remain accurate and are referenced by the new `95-STANDARD.md`:
+> - Icon systems (`exerciseIconMap.ts`, `foodIconMap.ts`, activity emojis) — **still valid**
+> - Anti-patterns table (raw div backgrounds, position fixed inside transform parents, hardcoded colors, auto-dismiss celebrations) — **still valid**
+> - Celebration modal rules (portal, no auto-dismiss) — **still valid**
+> - Color-coded status table (completed/today/missed/upcoming/rest) — **still valid**
+> - Rest day personality and micro-copy guidance — **still valid**
+>
+> **Specifically deprecated:**
+> - Archetype classification workflow (Step 1 "Classify archetype")
+> - "V2 prototype" references
+> - Screen priority order (Phase 1–4 in section 5)
+> - Any reference to `ui_tokens/` as authoritative
+>
+> Content preserved for historical reference only.
+
+---
+
 # UI Enhancement Workflow & Rulebook
 
 **Purpose:** Single source of truth for upgrading all app screens with the visual enhancements validated in the train page V2 prototype. Every screen update MUST follow this document.

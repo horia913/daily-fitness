@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -57,7 +58,6 @@ const HUB_NAV_ITEMS: {
   iconClass: string;
   getBadge?: (stats: ProgressStats) => string | null;
 }[] = [
-  { href: "/client/progress/analytics", title: "Analytics", description: "Volume and intensity trends", icon: BarChart3, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]", getBadge: () => null },
   { href: "/client/progress/workout-logs", title: "Workout History", description: "View past workouts and training volume", icon: FileText, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]", getBadge: (s) => (s.totalWorkouts > 0 ? `${s.totalWorkouts} total` : null) },
   { href: "/client/progress/performance", title: "Performance tests", description: "Benchmarks and tests", icon: Timer, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-workouts)_10%,transparent)] text-[color:var(--fc-domain-workouts)] border border-[color-mix(in_srgb,var(--fc-domain-workouts)_20%,transparent)]", getBadge: () => null },
   { href: "/client/progress/body-metrics", title: "Body metrics", description: "Weight and measurements", icon: Scale, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)] text-[color:var(--fc-status-success)] border border-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)]", getBadge: (s) => (s.currentWeight != null ? "Logged" : null) },
@@ -70,6 +70,7 @@ const HUB_NAV_ITEMS: {
 ];
 
 function ProgressHubContent() {
+  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
 
@@ -150,11 +151,11 @@ function ProgressHubContent() {
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
           <div className="py-6 px-4 text-center">
             <AlertTriangle
-              className="w-7 h-7 mx-auto mb-3 text-gray-500"
+              className="w-7 h-7 mx-auto mb-3 fc-text-dim"
               strokeWidth={1.5}
               aria-hidden
             />
-            <p className="text-sm text-gray-400 mb-4">{loadError}</p>
+            <p className="text-sm fc-text-dim mb-4">{loadError}</p>
             <button
               type="button"
               onClick={() => loadProgressData()}
@@ -173,21 +174,20 @@ function ProgressHubContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
       <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-        <header className="mb-4 flex items-start justify-between gap-3 border-b border-white/5 pb-4">
+        <header className="mb-4 flex items-start justify-between gap-3 border-b border-[color:var(--fc-glass-border)] pb-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-white tracking-tight">
+            <h1 className="text-xl font-bold fc-text-primary tracking-tight">
               Progress Hub
             </h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm fc-text-dim">
               Insights into your physical progress
             </p>
           </div>
           <button
             type="button"
-            onClick={() => {
-              window.location.href = "/client/profile";
-            }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 text-gray-400 transition-colors hover:text-white"
+            onClick={() => router.push("/client/profile")}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-text-dim transition-colors hover:fc-text-primary"
+            aria-label="Open profile"
           >
             <Settings className="h-5 w-5" />
           </button>
@@ -195,76 +195,76 @@ function ProgressHubContent() {
 
         {/* This month — scannable snapshot + weekly bars */}
         <section className="mb-6">
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]">
                 This month
               </span>
-              <span className="text-xs text-gray-500">{hub.monthYearLabel}</span>
+              <span className="text-xs fc-text-dim">{hub.monthYearLabel}</span>
             </div>
 
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-3xl font-bold text-white tabular-nums">
+              <span className="text-3xl font-bold fc-text-primary tabular-nums">
                 {loading ? "—" : hub.workouts}
               </span>
-              <span className="text-sm text-gray-400">workouts</span>
+              <span className="text-sm fc-text-dim">workouts</span>
             </div>
 
             <div className="grid grid-cols-5 gap-2 mb-4">
               <div className="flex flex-col items-center gap-1 min-w-0">
-                <Dumbbell className="w-4 h-4 text-cyan-400/80 shrink-0" aria-hidden />
-                <span className="text-sm font-semibold text-white tabular-nums text-center leading-tight">
+                <Dumbbell className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
+                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
                   {loading ? "—" : hub.workouts}
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 text-center leading-tight">
+                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
                   Workouts
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1 min-w-0">
-                <Clock className="w-4 h-4 text-cyan-400/80 shrink-0" aria-hidden />
-                <span className="text-sm font-semibold text-white tabular-nums text-center leading-tight">
+                <Clock className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
+                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
                   {loading ? "—" : formatMonthHubHours(hub.totalDurationMinutes)}
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 text-center leading-tight">
+                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
                   Hours
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1 min-w-0">
-                <TrendingUp className="w-4 h-4 text-cyan-400/80 shrink-0" aria-hidden />
-                <span className="text-sm font-semibold text-white tabular-nums text-center leading-tight">
+                <TrendingUp className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
+                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
                   {loading ? "—" : formatMonthHubVolume(hub.volumeKg)}
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 text-center leading-tight">
+                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
                   Volume
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1 min-w-0">
-                <Trophy className="w-4 h-4 text-cyan-400/80 shrink-0" aria-hidden />
-                <span className="text-sm font-semibold text-white tabular-nums text-center leading-tight">
+                <Trophy className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
+                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
                   {loading ? "—" : hub.newPRs > 0 ? hub.newPRs : "—"}
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 text-center leading-tight">
+                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
                   New PRs
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1 min-w-0">
-                <Flame className="w-4 h-4 text-cyan-400/80 shrink-0" aria-hidden />
-                <span className="text-sm font-semibold text-white tabular-nums text-center leading-tight">
+                <Flame className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
+                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
                   {loading ? "—" : hub.streakDays}
                 </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 text-center leading-tight">
+                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
                   Streak
                 </span>
               </div>
             </div>
 
             {!loading && hub.workouts === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">
+              <p className="text-sm fc-text-dim text-center py-6">
                 No workouts logged this month yet
               </p>
             ) : (
               <div className="mt-2">
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-gray-500 mb-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] fc-text-dim mb-1">
                   Workouts per week
                 </p>
                 <div className="flex justify-between gap-1">
@@ -276,10 +276,10 @@ function ProgressHubContent() {
                       const isCurrent = i === hub.currentWeekIndex;
                       const isPast = i < hub.currentWeekIndex;
                       const barBg = isCurrent
-                        ? "bg-cyan-400"
+                        ? "bg-[color:var(--fc-accent)]"
                         : isPast
-                          ? "bg-cyan-500/60"
-                          : "bg-cyan-500/25";
+                          ? "bg-[color-mix(in_srgb,var(--fc-accent)_60%,transparent)]"
+                          : "bg-[color-mix(in_srgb,var(--fc-accent)_25%,transparent)]";
                       const hPx = loading
                         ? 12
                         : Math.max(4, (count / maxC) * barMaxPx);
@@ -291,7 +291,7 @@ function ProgressHubContent() {
                           className="flex flex-col items-center flex-1 min-w-0"
                           title={title}
                         >
-                          <span className="text-[10px] font-bold tabular-nums text-white mb-1">
+                          <span className="text-[10px] font-bold tabular-nums fc-text-primary mb-1">
                             {countDisplay}
                           </span>
                           <div className="w-full min-h-16 flex flex-col justify-end">
@@ -299,13 +299,13 @@ function ProgressHubContent() {
                               className={cn(
                                 "w-full rounded-t-sm transition-colors",
                                 loading
-                                  ? "bg-white/10 animate-pulse"
+                                  ? "bg-[color:var(--fc-glass-highlight)] animate-pulse"
                                   : barBg
                               )}
                               style={{ height: `${hPx}px` }}
                             />
                           </div>
-                          <span className="text-[9px] uppercase text-white mt-0.5">
+                          <span className="text-[9px] uppercase fc-text-primary mt-0.5">
                             W{i + 1}
                           </span>
                         </div>
@@ -320,21 +320,21 @@ function ProgressHubContent() {
 
         {/* Quick stats — single horizontal strip (activity hub pattern) */}
         <section className="mb-6">
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
             <div className="flex items-center justify-between gap-1">
               <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold text-white tabular-nums">
+                <p className="text-base font-semibold fc-text-primary tabular-nums">
                   {loading
                     ? "—"
                     : `${stats.weeklyWorkouts.completed}/${stats.weeklyWorkouts.goal || 0}`}
                 </p>
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                   This week
                 </p>
               </div>
-              <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+              <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
               <div className="flex-1 min-w-0 text-center px-0.5">
-                <p className="text-base font-semibold text-white">
+                <p className="text-base font-semibold fc-text-primary">
                   {loading ? (
                     "—"
                   ) : stats.volumeThisWeek >= 1000 ? (
@@ -346,11 +346,11 @@ function ProgressHubContent() {
                       <span className="tabular-nums">
                         {Math.round(stats.volumeThisWeek).toLocaleString()}
                       </span>
-                      <span className="text-white/90"> kg</span>
+                      <span className="fc-text-primary"> kg</span>
                     </>
                   )}
                 </p>
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5 leading-tight">
+                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5 leading-tight">
                   Volume
                   {!loading && stats.volumeLastWeek > 0
                     ? stats.volumeThisWeek > stats.volumeLastWeek
@@ -361,23 +361,23 @@ function ProgressHubContent() {
                     : ""}
                 </p>
               </div>
-              <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+              <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
               <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold text-white tabular-nums">
+                <p className="text-base font-semibold fc-text-primary tabular-nums">
                   {loading ? "—" : stats.personalRecords}
                 </p>
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                   PRs
                 </p>
               </div>
               {stats.bestLeaderboardRank != null && (
                 <>
-                  <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                  <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                   <div className="flex-1 min-w-0 text-center">
-                    <p className="text-base font-semibold text-white tabular-nums">
+                    <p className="text-base font-semibold fc-text-primary tabular-nums">
                       {loading ? "—" : `#${stats.bestLeaderboardRank}`}
                     </p>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                    <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                       Best rank
                     </p>
                   </div>
@@ -387,8 +387,28 @@ function ProgressHubContent() {
           </div>
         </section>
 
+        {/* Promoted entry to full analytics (mobile-friendly single tap) */}
+        <section className="mb-6">
+          <button
+            type="button"
+            onClick={() => router.push("/client/progress/analytics")}
+            className="flex w-full min-h-[56px] items-center gap-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] active:opacity-90"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]">
+              <BarChart3 className="h-5 w-5" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold fc-text-primary">Full analytics</h2>
+              <p className="text-xs fc-text-dim mt-0.5">
+                Charts, strength, volume, and wellness trends
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" aria-hidden />
+          </button>
+        </section>
+
         {/* Hub links — flat rows */}
-        <section className="mb-6 flex flex-col divide-y divide-white/5">
+        <section className="mb-6 flex flex-col divide-y divide-[color:var(--fc-glass-border)]">
           {HUB_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const badge = item.getBadge?.(stats) ?? null;
@@ -396,10 +416,10 @@ function ProgressHubContent() {
               <button
                 key={item.href}
                 type="button"
-                onClick={() => { window.location.href = item.href; }}
+                onClick={() => router.push(item.href)}
                 className="block w-full text-left"
               >
-                <div className="flex min-h-[52px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-white/[0.02] active:bg-white/[0.04]">
+                <div className="flex min-h-[52px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-[color:var(--fc-glass-highlight)] active:fc-glass-soft">
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.iconClass}`}
                   >
@@ -416,13 +436,13 @@ function ProgressHubContent() {
                     </div>
                     <p className="line-clamp-1 text-xs fc-text-dim">{item.description}</p>
                   </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-gray-500" />
+                  <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
                 </div>
               </button>
             );
           })}
           <div className="flex min-h-[52px] items-center gap-3 py-2.5 opacity-80">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-gray-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim">
               <Download className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
@@ -431,7 +451,7 @@ function ProgressHubContent() {
                 Share your progress with your coach
               </p>
             </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-gray-500" />
+            <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
           </div>
         </section>
 

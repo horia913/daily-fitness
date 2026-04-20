@@ -1,22 +1,24 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CoachHabitsLibraryPage } from '@/components/coach/CoachHabitsLibraryPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
+import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Card, CardContent } from '@/components/ui/card'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Checkbox } from '@/components/ui/checkbox'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { 
   Target,
@@ -28,7 +30,6 @@ import {
   Trash2,
   CheckCircle,
   Clock,
-  TrendingUp,
   Calendar,
   RefreshCw,
   Zap,
@@ -37,8 +38,7 @@ import {
   Heart,
   Dumbbell,
   Apple,
-  Ruler,
-  TrendingDown
+  Ruler
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -106,9 +106,9 @@ const nutrientOptions = [
 ]
 
 function CoachGoalsContent() {
-  const { isDark, getThemeStyles, performanceSettings } = useTheme()
+  const { performanceSettings } = useTheme()
   const { addToast } = useToast()
-  const theme = getThemeStyles()
+  const router = useRouter()
   
   const [goals, setGoals] = useState<Goal[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -400,11 +400,23 @@ function CoachGoalsContent() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Active</Badge>
+        return (
+          <Badge className="bg-[color-mix(in_srgb,var(--fc-status-info)_15%,transparent)] text-[color:var(--fc-status-info)] border border-[color-mix(in_srgb,var(--fc-status-info)_30%,transparent)]">
+            Active
+          </Badge>
+        )
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Completed</Badge>
+        return (
+          <Badge className="bg-[color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] text-[color:var(--fc-status-success)] border border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]">
+            Completed
+          </Badge>
+        )
       case 'paused':
-        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">Paused</Badge>
+        return (
+          <Badge className="fc-glass-soft fc-text-dim border border-[color:var(--fc-glass-border)]">
+            Paused
+          </Badge>
+        )
       default:
         return <Badge>{status}</Badge>
     }
@@ -447,15 +459,9 @@ function CoachGoalsContent() {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
-          <div className="min-h-screen pb-24 bg-[color:var(--fc-bg-page)]">
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
-              <div className="rounded-2xl p-8 bg-[color:var(--fc-glass-highlight)] animate-pulse">
-                <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
-              </div>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+            <PageSkeleton variant="dashboard" />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -465,9 +471,8 @@ function CoachGoalsContent() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="px-6 pt-10">
-            <div className="max-w-7xl mx-auto space-y-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+          <div className="space-y-6">
               <GlassCard elevation={2} className="fc-card-shell p-6 md:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-4">
@@ -483,21 +488,25 @@ function CoachGoalsContent() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-full md:w-auto shrink-0">
+                  <div
+                    role="tablist"
+                    aria-label="Goals or Habits"
+                    className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-full md:w-auto shrink-0"
+                  >
                     <button
                       type="button"
-                      onClick={() => {
-                        window.location.href = '/coach/goals'
-                      }}
+                      role="tab"
+                      aria-selected={true}
+                      onClick={() => router.push('/coach/goals', { scroll: false })}
                       className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-glass-soft fc-text-primary"
                     >
                       Goals
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        window.location.href = '/coach/goals?tab=habits'
-                      }}
+                      role="tab"
+                      aria-selected={false}
+                      onClick={() => router.push('/coach/goals?tab=habits', { scroll: false })}
                       className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-text-dim hover:fc-text-primary"
                     >
                       Habits
@@ -548,14 +557,10 @@ function CoachGoalsContent() {
             </GlassCard>
 
             <div className="flex flex-wrap gap-3">
-              <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
-                <DialogTrigger asChild>
-                  <Button variant="fc-primary">
-                    <Plus className="w-5 h-5 mr-2" />
-                    Create Goal
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
+              <Button variant="fc-primary" onClick={() => setShowCreateGoal(true)}>
+                <Plus className="w-5 h-5 mr-2" />
+                Create Goal
+              </Button>
               <Button variant="fc-ghost" onClick={loadData}>
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Refresh
@@ -563,58 +568,58 @@ function CoachGoalsContent() {
             </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="rounded-2xl p-6 fc-surface mb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Target className="w-8 h-8 text-white" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)]">
+                    <Target className="w-7 h-7" />
                   </div>
                   <div>
                     <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.length}</p>
                     <p className="text-sm font-normal fc-text-dim">Total Goals</p>
                   </div>
                 </div>
-              </div>
-              <div className="rounded-2xl p-6 fc-surface mb-5">
+              </GlassCard>
+              <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Clock className="w-8 h-8 text-white" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-status-info)_18%,transparent)] text-[color:var(--fc-status-info)]">
+                    <Clock className="w-7 h-7" />
                   </div>
                   <div>
                     <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.filter(g => g.status === 'active').length}</p>
                     <p className="text-sm font-normal fc-text-dim">Active</p>
                   </div>
                 </div>
-              </div>
-              <div className="rounded-2xl p-6 fc-surface mb-5">
+              </GlassCard>
+              <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #4CAF50 0%, #81C784 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle className="w-8 h-8 text-white" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-status-success)_18%,transparent)] text-[color:var(--fc-status-success)]">
+                    <CheckCircle className="w-7 h-7" />
                   </div>
                   <div>
                     <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.filter(g => g.status === 'completed').length}</p>
                     <p className="text-sm font-normal fc-text-dim">Completed</p>
                   </div>
                 </div>
-              </div>
-              <div className="rounded-2xl p-6 fc-surface mb-5">
+              </GlassCard>
+              <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #F093FB 0%, #F5576C 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users className="w-8 h-8 text-white" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent-secondary,var(--fc-accent))_18%,transparent)] text-[color:var(--fc-accent-secondary,var(--fc-accent))]">
+                    <Users className="w-7 h-7" />
                   </div>
                   <div>
                     <p className="text-3xl font-extrabold fc-text-primary leading-tight">{clients.length}</p>
                     <p className="text-sm font-normal fc-text-dim">Active Clients</p>
                   </div>
                 </div>
-              </div>
+              </GlassCard>
             </div>
 
             {/* Goals List */}
             <div className="space-y-6">
-              <h2 className={`text-2xl font-bold ${theme.text} flex items-center gap-3`}>
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <Target className="w-6 h-6 text-white" />
+              <h2 className="text-2xl font-bold fc-text-primary flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)]">
+                  <Target className="w-5 h-5" />
                 </div>
                 Client Goals
               </h2>
@@ -631,48 +636,48 @@ function CoachGoalsContent() {
                   {filteredGoals.map(goal => {
                     const progress = calculateProgress(goal.current_value, goal.target_value)
                     return (
-                      <div key={goal.id} className="rounded-2xl p-6 fc-surface mb-5">
+                      <GlassCard key={goal.id} elevation={1} className="group p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg">
                           <div className="space-y-4">
                             <div className="flex items-start justify-between">
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)] shrink-0">
                                     {getMetricIcon(goal.metric_type)}
                                   </div>
-                                  <div className="flex-1">
-                                    <h3 className={`text-lg font-bold ${theme.text} group-hover:text-purple-600 transition-colors`}>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-bold fc-text-primary truncate group-hover:text-[color:var(--fc-accent)] transition-colors">
                                       {goal.title}
                                     </h3>
                                     {goal.client && (
-                                      <p className={`text-sm ${theme.textSecondary}`}>
+                                      <p className="text-sm fc-text-dim truncate">
                                         {goal.client.first_name} {goal.client.last_name}
                                       </p>
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 {goal.auto_track && (
                                   <div className="flex items-center gap-1 mb-2">
-                                    <Zap className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">Auto-tracking</span>
+                                    <Zap className="w-3 h-3 text-[color:var(--fc-status-success)]" />
+                                    <span className="text-xs text-[color:var(--fc-status-success)] font-medium">Auto-tracking</span>
                                   </div>
                                 )}
 
                                 {/* Show what's being tracked */}
                                 {goal.selected_exercises && goal.selected_exercises.length > 0 && (
-                                  <div className={`text-xs ${theme.textSecondary} bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg mb-2`}>
+                                  <div className="text-xs fc-text-dim fc-glass-soft border border-[color:var(--fc-glass-border)] p-2 rounded-lg mb-2">
                                     <Dumbbell className="w-3 h-3 inline mr-1" />
                                     Tracking: {goal.selected_exercises.length} exercise(s)
                                   </div>
                                 )}
                                 {goal.selected_body_parts && goal.selected_body_parts.length > 0 && (
-                                  <div className={`text-xs ${theme.textSecondary} bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg mb-2`}>
+                                  <div className="text-xs fc-text-dim fc-glass-soft border border-[color:var(--fc-glass-border)] p-2 rounded-lg mb-2">
                                     <Ruler className="w-3 h-3 inline mr-1" />
                                     Tracking: {goal.selected_body_parts.join(', ')}
                                   </div>
                                 )}
                                 {goal.selected_nutrients && goal.selected_nutrients.length > 0 && (
-                                  <div className={`text-xs ${theme.textSecondary} bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg mb-2`}>
+                                  <div className="text-xs fc-text-dim fc-glass-soft border border-[color:var(--fc-glass-border)] p-2 rounded-lg mb-2">
                                     <Apple className="w-3 h-3 inline mr-1" />
                                     Tracking: {goal.selected_nutrients.join(', ')}
                                   </div>
@@ -681,15 +686,15 @@ function CoachGoalsContent() {
                                 {/* Progress Bar */}
                                 <div className="space-y-2 mb-3">
                                   <div className="flex justify-between text-sm">
-                                    <span className={theme.textSecondary}>Progress</span>
-                                    <span className={`font-bold ${theme.text}`}>{progress}%</span>
+                                    <span className="fc-text-dim">Progress</span>
+                                    <span className="font-bold fc-text-primary">{progress}%</span>
                                   </div>
                                   <Progress value={progress} className="h-2" />
                                   <div className="flex justify-between text-xs">
-                                    <span className={theme.textSecondary}>
+                                    <span className="fc-text-dim">
                                       Current: {goal.current_value} {goal.unit}
                                     </span>
-                                    <span className={theme.textSecondary}>
+                                    <span className="fc-text-dim">
                                       Target: {goal.target_value} {goal.unit}
                                     </span>
                                   </div>
@@ -697,26 +702,26 @@ function CoachGoalsContent() {
 
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className={`${theme.textSecondary} text-sm flex items-center gap-1`}>
+                                    <span className="fc-text-dim text-sm flex items-center gap-1">
                                       <Calendar className="w-4 h-4" />
                                       {new Date(goal.target_date).toLocaleDateString()}
                                     </span>
                                     {getStatusBadge(goal.status)}
                                   </div>
                                   {goal.description && (
-                                    <p className={`text-sm ${theme.textSecondary} line-clamp-2 mt-2`}>
+                                    <p className="text-sm fc-text-dim line-clamp-2 mt-2">
                                       {goal.description}
                                     </p>
                                   )}
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex gap-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditGoal(goal)}
-                                className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"
+                                className="flex-1 rounded-xl"
                               >
                                 <Edit className="w-4 h-4 mr-1" />
                                 Edit
@@ -725,13 +730,14 @@ function CoachGoalsContent() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => deleteGoal(goal.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+                                className="rounded-xl text-[color:var(--fc-status-error)] hover:bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)] hover:border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)]"
+                                aria-label="Delete goal"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
-                      </div>
+                      </GlassCard>
                     )
                   })}
                 </div>
@@ -740,20 +746,18 @@ function CoachGoalsContent() {
 
             {/* Create Goal Modal */}
             <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
-              <DialogContent className="rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden fc-surface">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <DialogHeader className="space-y-3">
-                    <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Create Goal</DialogTitle>
-                    <DialogDescription className={`text-base ${theme.textSecondary} leading-relaxed`}>
-                      Set a fitness goal that will auto-track from app data
-                    </DialogDescription>
-                  </DialogHeader>
-                </div>
-                <div className="space-y-4 p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 220px)' }}>
-                  <div>
-                    <Label htmlFor="client" className={`${theme.text}`}>Select Client</Label>
+              <DialogContent className="max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Create Goal</DialogTitle>
+                  <DialogDescription>
+                    Set a fitness goal that will auto-track from app data
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 overflow-y-auto pr-1 -mr-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="client">Select Client</Label>
                     <Select value={goalForm.client_id} onValueChange={(value) => setGoalForm(prev => ({ ...prev, client_id: value }))}>
-                      <SelectTrigger className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                      <SelectTrigger id="client">
                         <Users className="w-4 h-4 mr-2" />
                         <SelectValue placeholder="Choose a client..." />
                       </SelectTrigger>
@@ -767,10 +771,10 @@ function CoachGoalsContent() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="metric_type" className={`${theme.text}`}>What to Track?</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="metric_type">What to Track?</Label>
                     <Select value={goalForm.metric_type} onValueChange={handleMetricTypeChange}>
-                      <SelectTrigger className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                      <SelectTrigger id="metric_type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -779,7 +783,7 @@ function CoachGoalsContent() {
                             <div className="flex flex-col">
                               <span>{metric.label}</span>
                               {metric.autoTrackable && (
-                                <span className="text-xs text-green-600 dark:text-green-400">
+                                <span className="text-xs text-[color:var(--fc-status-success)]">
                                   Auto-tracks from {metric.source}
                                 </span>
                               )}
@@ -792,26 +796,24 @@ function CoachGoalsContent() {
 
                   {/* Exercise Selection */}
                   {goalForm.metric_type === 'exercise_pr' && (
-                    <div>
-                      <Label className={`${theme.text} mb-2 block`}>Select Exercise(s) to Track</Label>
-                      <div className={`max-h-48 overflow-y-auto border-2 ${theme.border} rounded-xl p-3 space-y-2`}>
+                    <div className="space-y-1.5">
+                      <Label>Select Exercise(s) to Track</Label>
+                      <div className="max-h-48 overflow-y-auto border border-[color:var(--fc-glass-border)] rounded-xl p-3 space-y-2 fc-surface">
                         {exercises.map(exercise => (
                           <div key={exercise.id} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               id={`ex-${exercise.id}`}
                               checked={goalForm.selected_exercises.includes(exercise.id)}
-                              onChange={() => toggleExercise(exercise.id)}
-                              className="w-4 h-4 rounded"
+                              onCheckedChange={() => toggleExercise(exercise.id)}
                             />
-                            <Label htmlFor={`ex-${exercise.id}`} className={`${theme.text} cursor-pointer flex-1`}>
+                            <Label htmlFor={`ex-${exercise.id}`} className="cursor-pointer flex-1 font-normal">
                               {exercise.name}
-                              <span className={`text-xs ${theme.textSecondary} ml-2`}>({exercise.category})</span>
+                              <span className="text-xs fc-text-dim ml-2">({exercise.category})</span>
                             </Label>
                           </div>
                         ))}
                       </div>
-                      <p className={`text-xs ${theme.textSecondary} mt-2`}>
+                      <p className="text-xs fc-text-dim">
                         Selected: {goalForm.selected_exercises.length} exercise(s)
                       </p>
                     </div>
@@ -819,25 +821,23 @@ function CoachGoalsContent() {
 
                   {/* Body Part Selection */}
                   {goalForm.metric_type === 'body_measurement' && (
-                    <div>
-                      <Label className={`${theme.text} mb-2 block`}>Select Body Measurement(s) to Track</Label>
+                    <div className="space-y-1.5">
+                      <Label>Select Body Measurement(s) to Track</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {bodyPartOptions.map(bodyPart => (
                           <div key={bodyPart.value} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               id={`bp-${bodyPart.value}`}
                               checked={goalForm.selected_body_parts.includes(bodyPart.value)}
-                              onChange={() => toggleBodyPart(bodyPart.value)}
-                              className="w-4 h-4 rounded"
+                              onCheckedChange={() => toggleBodyPart(bodyPart.value)}
                             />
-                            <Label htmlFor={`bp-${bodyPart.value}`} className={`${theme.text} cursor-pointer text-sm`}>
+                            <Label htmlFor={`bp-${bodyPart.value}`} className="cursor-pointer text-sm font-normal">
                               {bodyPart.label} ({bodyPart.unit})
                             </Label>
                           </div>
                         ))}
                       </div>
-                      <p className={`text-xs ${theme.textSecondary} mt-2`}>
+                      <p className="text-xs fc-text-dim">
                         Selected: {goalForm.selected_body_parts.length} measurement(s)
                       </p>
                     </div>
@@ -845,37 +845,35 @@ function CoachGoalsContent() {
 
                   {/* Nutrient Selection */}
                   {goalForm.metric_type === 'daily_nutrition' && (
-                    <div>
-                      <Label className={`${theme.text} mb-2 block`}>Select Nutrient(s) to Track</Label>
+                    <div className="space-y-1.5">
+                      <Label>Select Nutrient(s) to Track</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {nutrientOptions.map(nutrient => (
                           <div key={nutrient.value} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               id={`nut-${nutrient.value}`}
                               checked={goalForm.selected_nutrients.includes(nutrient.value)}
-                              onChange={() => toggleNutrient(nutrient.value)}
-                              className="w-4 h-4 rounded"
+                              onCheckedChange={() => toggleNutrient(nutrient.value)}
                             />
-                            <Label htmlFor={`nut-${nutrient.value}`} className={`${theme.text} cursor-pointer text-sm`}>
+                            <Label htmlFor={`nut-${nutrient.value}`} className="cursor-pointer text-sm font-normal">
                               {nutrient.label} ({nutrient.unit})
                             </Label>
                           </div>
                         ))}
                       </div>
-                      <p className={`text-xs ${theme.textSecondary} mt-2`}>
+                      <p className="text-xs fc-text-dim">
                         Selected: {goalForm.selected_nutrients.length} nutrient(s)
                       </p>
                     </div>
                   )}
 
                   {goalForm.auto_track && (
-                    <div className={`p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800`}>
+                    <div className="p-4 rounded-xl bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]">
                       <div className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                        <Zap className="w-5 h-5 text-[color:var(--fc-status-success)] mt-0.5 shrink-0" />
                         <div>
-                          <p className={`text-sm font-semibold ${theme.text} mb-1`}>Auto-Tracking Enabled</p>
-                          <p className={`text-xs ${theme.textSecondary}`}>
+                          <p className="text-sm font-semibold fc-text-primary mb-1">Auto-Tracking Enabled</p>
+                          <p className="text-xs fc-text-dim">
                             Progress will update automatically from: <strong>{metricOptions.find(m => m.value === goalForm.metric_type)?.source}</strong>
                           </p>
                         </div>
@@ -883,75 +881,71 @@ function CoachGoalsContent() {
                     </div>
                   )}
 
-                  <div>
-                    <Label htmlFor="title" className={`${theme.text}`}>Goal Title</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title">Goal Title</Label>
                     <Input
                       id="title"
                       value={goalForm.title}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
                       placeholder={metricOptions.find(m => m.value === goalForm.metric_type)?.label || "e.g., Lose 10kg"}
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="description" className={`${theme.text}`}>Description (Optional)</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="description">Description (Optional)</Label>
                     <Textarea
                       id="description"
                       value={goalForm.description}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Add personalized notes..."
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       rows={2}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="current_value" className={`${theme.text}`}>Current Value</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="current_value">Current Value</Label>
                       <Input
                         id="current_value"
                         type="number"
                         step="0.1"
                         value={goalForm.current_value}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, current_value: parseFloat(e.target.value) || 0 }))}
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="target_value" className={`${theme.text}`}>Target Value</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="target_value">Target Value</Label>
                       <Input
                         id="target_value"
                         type="number"
                         step="0.1"
                         value={goalForm.target_value}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, target_value: parseFloat(e.target.value) || 0 }))}
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="target_date" className={`${theme.text}`}>Target Date</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="target_date">Target Date</Label>
                     <Input
                       id="target_date"
                       type="date"
                       value={goalForm.target_date}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, target_date: e.target.value }))}
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                     />
                   </div>
                 </div>
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                  <Button 
-                    onClick={createGoal} 
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg"
+                <div className="flex gap-2 pt-4 border-t border-[color:var(--fc-glass-border)]">
+                  <Button
+                    onClick={createGoal}
+                    variant="fc-primary"
+                    className="flex-1"
                     disabled={!goalForm.client_id || !goalForm.title || !goalForm.target_date}
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Create Goal
                   </Button>
-                  <Button variant="outline" onClick={() => setShowCreateGoal(false)} className={`${theme.border} ${theme.text} rounded-xl`}>
+                  <Button variant="outline" onClick={() => setShowCreateGoal(false)}>
                     Cancel
                   </Button>
                 </div>
@@ -960,70 +954,64 @@ function CoachGoalsContent() {
 
             {/* Edit Goal Modal */}
             <Dialog open={showEditGoal} onOpenChange={setShowEditGoal}>
-              <DialogContent className="rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[85vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden fc-surface">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <DialogHeader className="space-y-3">
-                    <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Edit Goal</DialogTitle>
-                    <DialogDescription className={`text-base ${theme.textSecondary} leading-relaxed`}>
-                      Update goal details and track progress
-                    </DialogDescription>
-                  </DialogHeader>
-                </div>
-                <div className="space-y-4 p-6 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
-                  <div>
-                    <Label htmlFor="edit-title" className={`${theme.text}`}>Goal Title</Label>
+              <DialogContent className="max-w-[600px] max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Edit Goal</DialogTitle>
+                  <DialogDescription>
+                    Update goal details and track progress
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 overflow-y-auto pr-1 -mr-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-title">Goal Title</Label>
                     <Input
                       id="edit-title"
                       value={goalForm.title}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="edit-description" className={`${theme.text}`}>Description (Optional)</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-description">Description (Optional)</Label>
                     <Textarea
                       id="edit-description"
                       value={goalForm.description}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       rows={2}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="edit-current_value" className={`${theme.text}`}>Current Value</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-current_value">Current Value</Label>
                       <Input
                         id="edit-current_value"
                         type="number"
                         step="0.1"
                         value={goalForm.current_value}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, current_value: parseFloat(e.target.value) || 0 }))}
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       />
                       {selectedGoal?.auto_track && (
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">Auto-updates from app</p>
+                        <p className="text-xs text-[color:var(--fc-status-success)]">Auto-updates from app</p>
                       )}
                     </div>
-                    <div>
-                      <Label htmlFor="edit-target_value" className={`${theme.text}`}>Target Value</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-target_value">Target Value</Label>
                       <Input
                         id="edit-target_value"
                         type="number"
                         step="0.1"
                         value={goalForm.target_value}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, target_value: parseFloat(e.target.value) || 0 }))}
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="edit-status" className={`${theme.text}`}>Status</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-status">Status</Label>
                       <Select value={goalForm.status} onValueChange={(value: any) => setGoalForm(prev => ({ ...prev, status: value }))}>
-                        <SelectTrigger className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                        <SelectTrigger id="edit-status">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1033,35 +1021,34 @@ function CoachGoalsContent() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="edit-target_date" className={`${theme.text}`}>Target Date</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-target_date">Target Date</Label>
                       <Input
                         id="edit-target_date"
                         type="date"
                         value={goalForm.target_date}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, target_date: e.target.value }))}
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                       />
                     </div>
                   </div>
                 </div>
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                  <Button 
-                    onClick={updateGoal} 
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg"
+                <div className="flex gap-2 pt-4 border-t border-[color:var(--fc-glass-border)]">
+                  <Button
+                    onClick={updateGoal}
+                    variant="fc-primary"
+                    className="flex-1"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Update Goal
                   </Button>
-                  <Button variant="outline" onClick={() => setShowEditGoal(false)} className={`${theme.border} ${theme.text} rounded-xl`}>
+                  <Button variant="outline" onClick={() => setShowEditGoal(false)}>
                     Cancel
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-        </div>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   )
@@ -1079,9 +1066,9 @@ function GoalsHabitsHubFallback() {
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
-        <div className="min-h-screen p-6 max-w-7xl mx-auto">
-          <div className="rounded-2xl p-8 bg-[color:var(--fc-glass-highlight)] animate-pulse min-h-[12rem]" />
-        </div>
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+          <PageSkeleton variant="dashboard" />
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   )

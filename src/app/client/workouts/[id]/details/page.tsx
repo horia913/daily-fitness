@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
   MoreHorizontal,
@@ -17,6 +17,7 @@ import { fetchPersonalRecords } from "@/lib/personalRecords";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { withTimeout } from "@/lib/withTimeout";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 
@@ -249,6 +250,7 @@ const safeParse = (value: unknown) => {
 
 export default function WorkoutDetailsPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { isDark } = useTheme();
   const [assignment, setAssignment] = useState<AssignmentInfo | null>(null);
   const [blocks, setBlocks] = useState<StructuredBlock[]>([]);
@@ -744,26 +746,15 @@ export default function WorkoutDetailsPage() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-          <div className="pt-6 space-y-6 max-w-3xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="fc-skeleton w-9 h-9 rounded-full" />
-              <div className="fc-skeleton h-3 w-24 rounded" />
-              <div className="flex-1" />
-              <div className="fc-skeleton w-9 h-9 rounded-full" />
-            </div>
-            <div className="space-y-3">
-              <div className="fc-skeleton h-4 w-20 rounded" />
-              <div className="fc-skeleton h-10 w-3/4 rounded" />
-              <div className="fc-skeleton h-16 w-full rounded-2xl" />
-            </div>
-            <div className="fc-skeleton h-16 w-full rounded-2xl" />
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="fc-skeleton h-20 w-full rounded-2xl" />
-              ))}
-            </div>
-          </div>
+        <div className="relative fc-app-bg isolate">
+          <ClientPageShell className="min-h-screen pb-32">
+            <main
+              className="max-w-3xl mx-auto pt-6 pb-40"
+              style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}
+            >
+              <PageSkeleton variant="dashboard" />
+            </main>
+          </ClientPageShell>
         </div>
       </AnimatedBackground>
     );
@@ -793,7 +784,7 @@ export default function WorkoutDetailsPage() {
                 </Button>
                 <Button
                   variant="fc-secondary"
-                  onClick={() => { window.location.href = "/client/train"; }}
+                  onClick={() => router.push("/client/train")}
                   className="gap-2 fc-btn"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -1386,7 +1377,8 @@ export default function WorkoutDetailsPage() {
           {/* Navigation */}
           <nav className="flex justify-between items-center mb-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
             <button
-              onClick={() => { window.location.href = "/client/train"; }}
+              onClick={() => router.push("/client/train")}
+              aria-label="Back to train"
               className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95"
             >
               <ChevronLeft className="w-5 h-5 fc-text-primary" />
@@ -1454,7 +1446,7 @@ export default function WorkoutDetailsPage() {
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim mb-6">
               Workout Content
             </h2>
-            <div className="flex flex-col border-y border-white/5">
+            <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
               {blocks.map((block, blockIndex) => {
                 const isExpanded = expandedExercises.has(block.id);
                 const badgeColor = getBlockTypeBadgeColor(block.blockType);
@@ -1463,10 +1455,10 @@ export default function WorkoutDetailsPage() {
                 return (
                   <div
                     key={block.id}
-                    className={`exercise-item border-b border-white/5 last:border-b-0 ${isExpanded ? "active" : ""}`}
+                    className={`exercise-item border-b border-[color:var(--fc-glass-border)] last:border-b-0 ${isExpanded ? "active" : ""}`}
                     onClick={() => toggleExercise(block.id)}
                   >
-                    <div className="cursor-pointer overflow-hidden transition-colors hover:bg-white/[0.02]">
+                    <div className="cursor-pointer overflow-hidden transition-colors hover:bg-[color:var(--fc-glass-highlight)]">
                     <div
                       className="flex items-center justify-between px-4 py-3"
                     >
@@ -1554,7 +1546,7 @@ export default function WorkoutDetailsPage() {
                       <ChevronDown className="rotate-icon w-5 h-5 fc-text-dim" />
                     </div>
                     {isExpanded && (
-                      <div className="border-t border-white/5 px-4 pb-3 pt-3">
+                      <div className="border-t border-[color:var(--fc-glass-border)] px-4 pb-3 pt-3">
                         {/* Block Notes */}
                         {block.notes && (
                           <div
@@ -1597,7 +1589,7 @@ export default function WorkoutDetailsPage() {
                         )}
 
                         {/* Exercises in Block */}
-                        <div className="flex flex-col border-t border-white/5">
+                        <div className="flex flex-col border-t border-[color:var(--fc-glass-border)]">
                           {block.exercises.map((exercise, exerciseIndex) => {
                             const previousBest = getPreviousBest(exercise.name);
                             const exerciseBadgeColor = getBlockTypeBadgeColor(
@@ -1607,7 +1599,7 @@ export default function WorkoutDetailsPage() {
                             return (
                               <div
                                 key={exercise.id}
-                                className="flex flex-col gap-3 border-b border-white/5 py-3 transition-all duration-200 last:border-b-0"
+                                className="flex flex-col gap-3 border-b border-[color:var(--fc-glass-border)] py-3 transition-all duration-200 last:border-b-0"
                               >
                                 <div className="flex items-start gap-3">
                                   <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold font-mono text-xs fc-text-dim flex-shrink-0" style={{ background: "var(--fc-surface-card)" }}>
@@ -1766,7 +1758,7 @@ export default function WorkoutDetailsPage() {
           <div className="max-w-3xl mx-auto">
             <PrimaryButton
               className="h-14 rounded-2xl gap-3 text-base uppercase tracking-wider"
-              onClick={() => { window.location.href = `/client/workouts/${assignment.id}/start`; }}
+              onClick={() => router.push(`/client/workouts/${assignment.id}/start`)}
             >
               <Play className="w-5 h-5 fill-current" />
               Begin Workout

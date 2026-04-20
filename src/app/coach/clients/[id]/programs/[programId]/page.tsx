@@ -29,6 +29,7 @@ import { WeekReviewModal } from '@/components/coach/WeekReviewModal'
 import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import {
   getAssignmentSchedule,
   getProgramScheduleSlotsForAssignment,
@@ -41,6 +42,7 @@ import {
   zonedCalendarDateString,
   zonedYmdFromIsoTimestamp,
 } from '@/lib/clientZonedCalendar'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 interface ProgramAssignment {
   id: string
@@ -57,6 +59,7 @@ interface ProgramAssignment {
   paused_at?: string | null
   pause_reason?: string | null
   pause_accumulated_days?: number | null
+  timezone_snapshot?: string | null
   workout_programs?: {
     id: string
     name: string
@@ -323,8 +326,19 @@ function ClientProgramDetailsContent() {
   }
 
   const reviewWeekNumber =
-    progress?.current_week_number ??
-    (progress?.current_week_index != null ? progress.current_week_index + 1 : 1)
+    assignment
+      ? computeCurrentProgramWeekForAssignment(
+          {
+            start_date: assignment.start_date ?? null,
+            pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+            pause_status: assignment.pause_status ?? null,
+            paused_at: assignment.paused_at ?? null,
+            timezone_snapshot: assignment.timezone_snapshot ?? null,
+            duration_weeks: assignment.workout_programs?.duration_weeks ?? null,
+          },
+          clientTz
+        ).week
+      : 1
 
   const pausedDaysSoFar =
     assignment?.paused_at && clientTz
@@ -437,13 +451,7 @@ function ClientProgramDetailsContent() {
   if (loading) {
     return (
       <div className="fc-page max-w-7xl mx-auto w-full">
-        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 rounded-xl bg-[color:var(--fc-glass-highlight)] w-1/3"></div>
-            <div className="h-4 rounded-xl bg-[color:var(--fc-glass-highlight)] w-2/3"></div>
-            <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
-          </div>
-        </div>
+        <PageSkeleton variant="dashboard" />
       </div>
     )
   }
@@ -610,10 +618,7 @@ function ClientProgramDetailsContent() {
             <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
               <p className="text-sm fc-text-dim">Current Week</p>
               <p className="text-2xl font-bold fc-text-primary">
-                {progress?.current_week_number ??
-                  ((progress as { current_week_index?: number } | null)?.current_week_index != null
-                    ? (progress as { current_week_index: number }).current_week_index + 1
-                    : '—')}
+                {reviewWeekNumber}
               </p>
             </div>
             <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
@@ -670,7 +675,7 @@ function ClientProgramDetailsContent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="fc-btn fc-btn-secondary w-full sm:w-auto text-gray-400 border-gray-600 hover:bg-white/5"
+                  className="fc-btn fc-btn-secondary w-full sm:w-auto"
                   onClick={() => setPauseModalOpen(true)}
                 >
                   <Pause className="w-4 h-4 mr-2 inline" aria-hidden />
@@ -696,8 +701,7 @@ function ClientProgramDetailsContent() {
           clientId={clientId}
           durationWeeks={program.duration_weeks || 1}
           defaultWeek={
-            progress?.current_week_number ??
-            (progress?.current_week_index != null ? progress.current_week_index + 1 : 1)
+            reviewWeekNumber
           }
         />
 
@@ -715,7 +719,7 @@ function ClientProgramDetailsContent() {
             <Calendar className="w-5 h-5 fc-text-workouts" />
             Client schedule
           </h2>
-          <div className="flex items-start gap-2 text-xs text-gray-400 mb-4">
+          <div className="flex items-start gap-2 text-xs fc-text-dim mb-4">
             <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" aria-hidden />
             <p>
               Editing this client&apos;s program affects only{' '}
@@ -741,7 +745,7 @@ function ClientProgramDetailsContent() {
                 ))}
                 {gridWeeks.map((weekNum) => (
                   <React.Fragment key={weekNum}>
-                    <div className="flex items-center font-semibold fc-text-primary pr-2 py-1 border-t border-white/5 pt-2">
+                    <div className="flex items-center font-semibold fc-text-primary pr-2 py-1 border-t border-[color:var(--fc-glass-border)] pt-2">
                       W{weekNum}
                     </div>
                     {[1, 2, 3, 4, 5, 6, 7].map((programDay) => {
@@ -752,7 +756,7 @@ function ClientProgramDetailsContent() {
                         return (
                           <div
                             key={`${weekNum}-${programDay}`}
-                            className="min-h-[76px] rounded-lg border border-dashed border-white/10 bg-white/[0.02] flex items-center justify-center fc-text-subtle"
+                            className="min-h-[76px] rounded-lg border border-dashed border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]/40 flex items-center justify-center fc-text-subtle"
                           >
                             —
                           </div>
@@ -776,25 +780,25 @@ function ClientProgramDetailsContent() {
                           className={cn(
                             'relative rounded-lg border p-2 text-left min-h-[76px] transition-colors',
                             snap.is_customized
-                              ? 'border-cyan-500/40 bg-cyan-500/10'
-                              : 'border-white/10 bg-white/[0.04]',
-                            isCompleted && 'ring-1 ring-emerald-500/20',
-                            'hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40'
+                              ? 'border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)]'
+                              : 'border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]',
+                            isCompleted && 'ring-1 ring-[color-mix(in_srgb,var(--fc-status-success)_22%,transparent)]',
+                            'hover:bg-[color:var(--fc-glass-highlight)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)]'
                           )}
                         >
                           {snap.is_customized && (
-                            <span className="absolute top-1 right-1 z-[1] px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300">
+                            <span className="absolute top-1 right-1 z-[1] px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)]">
                               Edited
                             </span>
                           )}
                           {isCompleted && (
                             <span className="absolute top-1 left-1 z-[1]" title="Completed (client)">
-                              <CheckCircle className="w-3.5 h-3.5 text-emerald-400" aria-hidden />
+                              <CheckCircle className="w-3.5 h-3.5 fc-text-success" aria-hidden />
                             </span>
                           )}
                           {isSkipped && !isCompleted && (
                             <span className="absolute bottom-1 right-1 z-[1]" title="Skipped">
-                              <SkipForward className="w-3 h-3 text-amber-400" aria-hidden />
+                              <SkipForward className="w-3 h-3 fc-text-warning" aria-hidden />
                             </span>
                           )}
                           <div
@@ -853,7 +857,7 @@ function ClientProgramDetailsContent() {
                       <div>
                         <button
                           type="button"
-                          className="w-full text-left text-sm py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 fc-text-primary mb-2"
+                          className="w-full text-left text-sm py-2 px-3 rounded-lg border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] fc-text-primary mb-2"
                           onClick={() =>
                             void runSnapshotPatch({
                               day_type: 'rest',
@@ -868,7 +872,7 @@ function ClientProgramDetailsContent() {
                         {editingSnapshot.is_customized && (
                           <button
                             type="button"
-                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-200 mb-2"
+                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)] mb-2"
                             onClick={() => void runSnapshotPatch({ reset_to_template: true })}
                             disabled={snapshotSaveBusy}
                           >
@@ -876,7 +880,7 @@ function ClientProgramDetailsContent() {
                           </button>
                         )}
                         {masterHasOptionalDays && (
-                          <p className="text-[11px] fc-text-subtle border border-white/5 rounded-lg p-2 mb-2">
+                          <p className="text-[11px] fc-text-subtle border border-[color:var(--fc-glass-border)] rounded-lg p-2 mb-2">
                             Optional days are defined on the master program template. Per-client optional flags are
                             not stored on snapshot rows yet.
                           </p>
@@ -886,7 +890,7 @@ function ClientProgramDetailsContent() {
                           value={templateSearch}
                           onChange={(e) => setTemplateSearch(e.target.value)}
                           placeholder="Filter by name…"
-                          className="bg-white/5 border-white/10"
+                          className="bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]"
                         />
                       </div>
                       <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
@@ -894,7 +898,7 @@ function ClientProgramDetailsContent() {
                           <button
                             key={t.id}
                             type="button"
-                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 fc-text-primary flex justify-between gap-2"
+                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] fc-text-primary flex justify-between gap-2"
                             disabled={snapshotSaveBusy}
                             onClick={() =>
                               void runSnapshotPatch({
@@ -918,7 +922,7 @@ function ClientProgramDetailsContent() {
                         !completedLock &&
                         assignment?.status !== 'completed' &&
                         assignment?.status !== 'cancelled' && (
-                          <div className="pt-2 border-t border-white/10">
+                          <div className="pt-2 border-t border-[color:var(--fc-glass-border)]">
                             <button
                               type="button"
                               className="text-xs fc-text-subtle hover:fc-text-warning flex items-center gap-1"

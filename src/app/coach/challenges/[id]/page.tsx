@@ -7,11 +7,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Users, Calendar, CheckCircle, XCircle, Video, Clock, MoreVertical } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Trophy, Users, Calendar, CheckCircle, XCircle, Video, Clock, MoreVertical, FileQuestion } from "lucide-react";
 import Link from "next/link";
 import { getChallengeDetails, getChallengeParticipants, getPendingVideoSubmissions, reviewVideoSubmission, startChallenge, finalizeChallenge, inviteParticipants, updateChallenge, getChallengeScoringCategories, ChallengeVideoSubmission } from "@/lib/challengeService";
 import { notifyChallengeInvitation, notifyChallengeStarted } from "@/lib/notificationHelpers";
@@ -232,12 +246,9 @@ function CoachChallengeDetailContent() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-              <div className="h-96 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
-            </div>
-          </div>
+          <CoachPageShell widthVariant="default-5xl" className="px-4 py-8">
+            <PageSkeleton variant="list" />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -248,13 +259,17 @@ function CoachChallengeDetailContent() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <GlassCard elevation={2} className="p-12">
-              <div className="text-center">
-                <p className="text-[color:var(--fc-text-primary)]">Challenge not found</p>
-              </div>
-            </GlassCard>
-          </div>
+          <CoachPageShell widthVariant="default-5xl" className="px-4 py-8">
+            <EmptyState
+              icon={FileQuestion}
+              title="Challenge not found"
+              description="This challenge may have been deleted or you don't have access to it."
+              action={{
+                label: "Back to Challenges",
+                onClick: () => { window.location.href = "/coach/challenges"; },
+              }}
+            />
+          </CoachPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -281,7 +296,15 @@ function CoachChallengeDetailContent() {
             <div>
               <h1 className="text-xl font-bold tracking-tight fc-text-primary">Challenge Detail</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${challenge.status === "active" ? "bg-emerald-500 animate-pulse" : challenge.status === "completed" ? "bg-blue-500" : "bg-gray-500"}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    challenge.status === "active"
+                      ? "bg-[color:var(--fc-status-success)] animate-pulse"
+                      : challenge.status === "completed"
+                      ? "bg-[color:var(--fc-status-info)]"
+                      : "bg-[color:var(--fc-text-subtle)]"
+                  }`}
+                />
                 <span className="text-sm fc-text-dim font-medium uppercase tracking-wider">{challenge.status}</span>
               </div>
             </div>
@@ -293,7 +316,11 @@ function CoachChallengeDetailContent() {
               </Button>
             )}
             {challenge.status === "active" && (
-              <Button onClick={() => setShowEndConfirm(true)} variant="outline" className="rounded-xl border-red-500/50 text-red-600">
+              <Button
+                onClick={() => setShowEndConfirm(true)}
+                variant="outline"
+                className="rounded-xl border-[color-mix(in_srgb,var(--fc-status-error)_50%,transparent)] text-[color:var(--fc-status-error)] hover:bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)]"
+              >
                 End Challenge
               </Button>
             )}
@@ -303,46 +330,105 @@ function CoachChallengeDetailContent() {
           </div>
         </header>
 
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="fc-card-shell p-6 rounded-2xl max-w-md w-full border border-[color:var(--fc-glass-border)]">
-              <h3 className="text-lg font-bold fc-text-primary mb-4">Edit challenge</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium fc-text-primary block mb-1">Description</label>
-                  <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] p-2 text-sm min-h-[80px]" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium fc-text-primary block mb-1">End date</label>
-                  <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className="w-full rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] p-2 text-sm" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium fc-text-primary block mb-1">Max participants (optional)</label>
-                  <input type="number" min={0} value={editMaxParticipants} onChange={(e) => setEditMaxParticipants(e.target.value)} className="w-full rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] p-2 text-sm" placeholder="Unlimited" />
-                </div>
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit challenge</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="edit-challenge-description"
+                  className="text-sm font-medium fc-text-primary block"
+                >
+                  Description
+                </label>
+                <Textarea
+                  id="edit-challenge-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="min-h-[80px]"
+                />
               </div>
-              <div className="flex gap-2 justify-end mt-6">
-                <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                <Button onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</Button>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="edit-challenge-end-date"
+                  className="text-sm font-medium fc-text-primary block"
+                >
+                  End date
+                </label>
+                <Input
+                  id="edit-challenge-end-date"
+                  type="date"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="edit-challenge-max-participants"
+                  className="text-sm font-medium fc-text-primary block"
+                >
+                  Max participants (optional)
+                </label>
+                <Input
+                  id="edit-challenge-max-participants"
+                  type="number"
+                  min={0}
+                  value={editMaxParticipants}
+                  onChange={(e) => setEditMaxParticipants(e.target.value)}
+                  placeholder="Unlimited"
+                />
               </div>
             </div>
-          </div>
-        )}
+            <DialogFooter>
+              <button
+                type="button"
+                className="fc-btn fc-btn-ghost"
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="fc-btn fc-btn-primary"
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        {showEndConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="fc-card-shell p-6 rounded-2xl max-w-sm w-full border border-[color:var(--fc-glass-border)]">
-              <p className="text-[color:var(--fc-text-primary)] font-semibold mb-2">End this challenge?</p>
-              <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">This will finalize rankings and announce results. This cannot be undone.</p>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowEndConfirm(false)}>Cancel</Button>
-                <Button onClick={handleEndChallenge} disabled={finalizing} className="bg-red-600 hover:bg-red-700">{finalizing ? "Ending…" : "End Challenge"}</Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <Dialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>End this challenge?</DialogTitle>
+              <DialogDescription>
+                This will finalize rankings and announce results. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <button
+                type="button"
+                className="fc-btn fc-btn-ghost"
+                onClick={() => setShowEndConfirm(false)}
+              >
+                Cancel
+              </button>
+              <Button
+                onClick={handleEndChallenge}
+                disabled={finalizing}
+                className="bg-[color:var(--fc-status-error)] hover:bg-[color-mix(in_srgb,var(--fc-status-error)_85%,black)] text-white"
+              >
+                {finalizing ? "Ending…" : "End Challenge"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+        <CoachPageShell widthVariant="default-5xl" className="px-6 py-8 space-y-8">
           <GlassCard elevation={2} className="fc-card-shell p-6 rounded-2xl">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-2xl font-bold fc-text-primary">{challenge.name}</h2>
@@ -363,8 +449,8 @@ function CoachChallengeDetailContent() {
               </div>
             </div>
             {challenge.status === "active" && end < today && (
-              <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <p className="text-sm font-semibold text-amber-600">Challenge end date has passed. Finalize results to close this challenge.</p>
+              <div className="mb-4 p-4 rounded-xl bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)]">
+                <p className="text-sm font-semibold text-[color:var(--fc-status-warning)]">Challenge end date has passed. Finalize results to close this challenge.</p>
                 <Button onClick={() => setShowEndConfirm(true)} size="sm" className="mt-2">Finalize results</Button>
               </div>
             )}
@@ -381,17 +467,29 @@ function CoachChallengeDetailContent() {
               <h3 className="text-lg font-bold fc-text-primary mb-2">Invite clients</h3>
               <p className="text-sm fc-text-dim mb-4">Select clients to invite to this private challenge.</p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {coachClients.filter((c) => !participants.some((p: any) => p.client_id === c.id)).map((client) => (
-                  <label key={client.id} className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={inviteSelected.includes(client.id)}
-                      onChange={(e) => setInviteSelected((prev) => e.target.checked ? [...prev, client.id] : prev.filter((id) => id !== client.id))}
-                      className="rounded"
-                    />
-                    <span className="text-sm fc-text-primary">{client.name}</span>
-                  </label>
-                ))}
+                {coachClients.filter((c) => !participants.some((p: any) => p.client_id === c.id)).map((client) => {
+                  const isChecked = inviteSelected.includes(client.id);
+                  return (
+                    <label
+                      key={client.id}
+                      htmlFor={`invite-client-${client.id}`}
+                      className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer hover:border-[color:var(--fc-accent)] transition-colors"
+                    >
+                      <Checkbox
+                        id={`invite-client-${client.id}`}
+                        checked={isChecked}
+                        onCheckedChange={(checked) =>
+                          setInviteSelected((prev) =>
+                            checked
+                              ? [...prev, client.id]
+                              : prev.filter((id) => id !== client.id)
+                          )
+                        }
+                      />
+                      <span className="text-sm fc-text-primary">{client.name}</span>
+                    </label>
+                  );
+                })}
                 {coachClients.filter((c) => !participants.some((p: any) => p.client_id === c.id)).length === 0 && (
                   <p className="text-sm fc-text-subtle">All your clients are already invited or joined.</p>
                 )}
@@ -448,12 +546,13 @@ function CoachChallengeDetailContent() {
                       )}
 
                       <div className="mt-3">
-                        <textarea
+                        <Textarea
                           placeholder="Review notes (optional)"
                           value={reviewNotes[submission.id] || ''}
                           onChange={(e) => setReviewNotes((prev) => ({ ...prev, [submission.id]: e.target.value }))}
-                          className="w-full rounded-xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] p-2 text-sm text-[color:var(--fc-text-primary)] mb-2"
+                          className="mb-2"
                           rows={2}
+                          aria-label="Review notes"
                         />
                         <div className="flex gap-2">
                           <Button
@@ -547,7 +646,7 @@ function CoachChallengeDetailContent() {
                           {profileNames[participant.client_id] ?? "Participant"}
                         </p>
                         {participant.status === "invited" && (
-                          <p className="text-xs text-amber-600">Invited</p>
+                          <p className="text-xs text-[color:var(--fc-status-warning)]">Invited</p>
                         )}
                         {participant.selected_track && (
                           <p className="text-xs text-[color:var(--fc-text-subtle)]">
@@ -571,7 +670,7 @@ function CoachChallengeDetailContent() {
             </div>
           )}
         </GlassCard>
-        </main>
+        </CoachPageShell>
       </div>
     </AnimatedBackground>
   );

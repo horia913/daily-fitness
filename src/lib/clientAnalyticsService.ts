@@ -16,6 +16,7 @@ import { getPeriodBounds } from "./metrics/period";
 import { getNutritionCompliance } from "./metrics/nutrition";
 import { getNutritionComplianceTrend } from "./nutritionLogService";
 import { dbToUiScale } from "./wellnessService";
+import { computeCurrentProgramWeekForAssignment } from "./programWeekCalendar";
 
 const TODAY = new Date().toISOString().split("T")[0];
 const THIRTY_DAYS_AGO = new Date();
@@ -93,6 +94,7 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
     bestStreak,
     checkInConfig,
     programAssignment,
+    profileRes,
     mealPlanRes,
     nutritionGoalsRes,
     habitAssignmentsRes,
@@ -106,7 +108,8 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
     getCheckinStreak(clientId),
     getBestStreak(clientId),
     getClientCheckInConfig(clientId),
-    supabase.from("program_assignments").select("id, program_id, start_date, duration_weeks").eq("client_id", clientId).eq("status", "active").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("program_assignments").select("id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot").eq("client_id", clientId).eq("status", "active").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("profiles").select("timezone").eq("id", clientId).maybeSingle(),
     supabase.from("meal_plan_assignments").select("id").eq("client_id", clientId).eq("is_active", true).limit(1),
     supabase.from("goals").select("id").eq("client_id", clientId).eq("pillar", "nutrition").eq("status", "active").limit(1),
     supabase.from("habit_assignments").select("id, habit_id").eq("client_id", clientId).eq("is_active", true),
@@ -134,12 +137,21 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
   let programAdherencePriorWeek: number | null = null;
 
   if (assignment?.id) {
-    const [{ data: progress }, { data: schedule }, { data: completions }] = await Promise.all([
-      supabase.from("program_progress").select("current_week_number").eq("program_assignment_id", assignment.id).single(),
+    const [{ data: schedule }, { data: completions }] = await Promise.all([
       supabase.from("program_schedule").select("id, week_number, is_optional").eq("program_id", assignment.program_id),
       supabase.from("program_day_completions").select("program_schedule_id, program_schedule(week_number)").eq("program_assignment_id", assignment.id),
     ]);
-    const weekNum = progress?.current_week_number ?? 1;
+    const { week: weekNum } = computeCurrentProgramWeekForAssignment(
+      {
+        start_date: assignment.start_date ?? null,
+        duration_weeks: assignment.duration_weeks ?? null,
+        pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+        pause_status: assignment.pause_status ?? null,
+        paused_at: assignment.paused_at ?? null,
+        timezone_snapshot: assignment.timezone_snapshot ?? null,
+      },
+      (profileRes.data as { timezone?: string | null } | null)?.timezone ?? 'UTC'
+    );
     const durationWeeks = assignment.duration_weeks ?? 12;
     programProgress = { weekNum, totalWeeks: durationWeeks, pct: durationWeeks > 0 ? Math.round((weekNum / durationWeeks) * 100) : 0 };
     const slotsThisWeek = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === weekNum);

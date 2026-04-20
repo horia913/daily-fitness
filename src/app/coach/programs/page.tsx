@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ProgramsDashboardContent from "@/components/coach/ProgramsDashboardContent";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -15,8 +16,7 @@ export default function CoachProgramsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-32">
-          <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 sm:py-4">
+        <CoachPageShell widthVariant="data-7xl" className="px-4 py-3 pb-32 sm:px-6 sm:py-4">
             <Link
               href="/coach"
               className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
@@ -25,8 +25,7 @@ export default function CoachProgramsPage() {
               Dashboard
             </Link>
             <ProgramsDashboardContent />
-          </div>
-        </div>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

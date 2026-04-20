@@ -37,13 +37,13 @@ const CATEGORY_LABEL: Record<ActivityCategory, string> = {
 function categoryPillClass(cat: ActivityCategory): string {
   switch (cat) {
     case "cardio":
-      return "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+      return "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]";
     case "strength":
-      return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+      return "bg-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)] text-[color:var(--fc-status-warning)] border-[color-mix(in_srgb,var(--fc-status-warning)_30%,transparent)]";
     case "flexibility":
-      return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+      return "bg-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)] text-[color:var(--fc-status-success)] border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]";
     default:
-      return "bg-white/[0.06] text-gray-400 border-white/10";
+      return "bg-[color:var(--fc-glass-highlight)] fc-text-dim border-[color:var(--fc-glass-border)]";
   }
 }
 
@@ -121,11 +121,11 @@ function ActivityRow({
   return (
     <div
       className={cn(
-        "group rounded-xl border border-white/10 bg-white/[0.04] p-4"
+        "group rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4"
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <h3 className="text-base font-semibold text-white tracking-tight min-w-0 pr-2">
+        <h3 className="text-base font-semibold fc-text-primary tracking-tight min-w-0 pr-2">
           {displayName}
         </h3>
         <div className="flex items-center gap-2 shrink-0">
@@ -141,41 +141,41 @@ function ActivityRow({
             <button
               type="button"
               onClick={() => onEdit(activity)}
-              className="p-1.5 rounded-lg hover:bg-cyan-500/10 transition-colors"
-              title="Edit"
+              className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] transition-colors"
+              aria-label={`Edit ${displayName}`}
             >
-              <Pencil className="w-3.5 h-3.5 text-gray-400" />
+              <Pencil className="w-3.5 h-3.5 fc-text-dim" aria-hidden />
             </button>
             <button
               type="button"
               onClick={() => onDelete(activity.id)}
-              className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-              title="Delete"
+              className="p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)] transition-colors"
+              aria-label={`Delete ${displayName}`}
             >
-              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <Trash2 className="w-3.5 h-3.5 text-[color:var(--fc-status-error)]" aria-hidden />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 mt-2 flex flex-wrap items-center gap-x-1.5">
+      <div className="text-xs fc-text-subtle mt-2 flex flex-wrap items-center gap-x-1.5">
         <span>{formatDate(activity.activity_date)}</span>
-        <span className="text-gray-600">·</span>
+        <span className="fc-text-subtle">·</span>
         <span className="tabular-nums">{activity.duration_minutes} min</span>
         {activity.distance_km != null ? (
           <>
-            <span className="text-gray-600">·</span>
+            <span className="fc-text-subtle">·</span>
             <span>
               <span className="tabular-nums">{activity.distance_km}</span> km
             </span>
           </>
         ) : null}
-        <span className="text-gray-600">·</span>
+        <span className="fc-text-subtle">·</span>
         <span>{intensityMeta.label}</span>
       </div>
 
       {activity.notes ? (
-        <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 mt-2">
+        <p className="text-sm fc-text-dim leading-relaxed line-clamp-2 mt-2">
           {activity.notes}
         </p>
       ) : null}
@@ -214,7 +214,7 @@ export function ActivityList({
     <div className="space-y-4">
       {sortedDates.map((date) => (
         <div key={date}>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider fc-text-subtle mb-2">
             {formatDate(date)}
           </p>
           <div className="space-y-3">

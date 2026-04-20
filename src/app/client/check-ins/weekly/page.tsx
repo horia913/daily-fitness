@@ -11,7 +11,7 @@ import { WeeklyCheckInFlow } from "@/components/client/weekly-checkin/WeeklyChec
 import { getClientCheckInConfig } from "@/lib/checkInConfigService";
 import { getLatestMeasurement } from "@/lib/measurementService";
 import { getPhotoTimeline } from "@/lib/progressPhotoService";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 export default function WeeklyCheckInPage() {
   const { performanceSettings } = useTheme();
@@ -58,8 +58,7 @@ export default function WeeklyCheckInPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg px-4 pb-32">
-            <Skeleton className="h-12 w-64 rounded-xl mb-6" />
-            <Skeleton className="h-80 w-full rounded-2xl" />
+            <PageSkeleton variant="form" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>

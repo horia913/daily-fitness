@@ -1,3 +1,19 @@
+# DEPRECATED 2026-04-16
+
+> **This document is no longer authoritative.** It tracks a previous UI refactor plan that is closed. The `[x] Done` statuses reflect the mockup-driven workflow (now retired) and include routes that have since been deleted from the app (`/client/sessions`, `/client/clipcards`, `/client/achievements`, `/coach/sessions`, `/coach/availability`, `/coach/scheduling`, `/coach/clipcards`, `/coach/bulk-assignments`, `/coach/notifications`, `/coach/achievements`, etc.).
+>
+> The new source of truth for UI work is:
+>
+> - [`dailyfitness-app/docs/ui/95-STANDARD.md`](./ui/95-STANDARD.md) — the 9.5 Standard specification
+> - [`dailyfitness-app/docs/ui/screen-inventory.md`](./ui/screen-inventory.md) — the live screen inventory with target shells
+> - [`dailyfitness-app/docs/ui/audit-grades-2026-04-16.md`](./ui/audit-grades-2026-04-16.md) — the fresh per-screen grades
+>
+> The referenced old plan `C:\Users\HP\.cursor\plans\fitcoach-ui-refactor_7a464480.plan.md` is closed. The current plan is `C:\Users\HP\.cursor\plans\95-standard-uplift_087cb01c.plan.md`.
+>
+> Content preserved for historical reference only.
+
+---
+
 # UI Update Tracker
 
 Use this checklist alongside:
@@ -187,7 +203,7 @@ Legend:
 - [x] `src/components/MealPlanBuilder.tsx` — Meal plan builder (UI-only)
 
 ### Other Notable UI Components
-- [x] `src/components/features/programs/ProgramCard.tsx` — Program card (UI-only)
+ - [x] `src/components/features/programs/ProgramCard.tsx` — Program card (UI-only)
 - [x] `src/components/features/workouts/WorkoutTemplateCard.tsx` — Workout template card (UI-only)
 - [x] `src/components/features/workouts/ExerciseBlockCard.tsx` — Exercise block card (UI-only)
 - [x] `src/components/features/workouts/ExerciseItem.tsx` — Exercise item (UI-only)

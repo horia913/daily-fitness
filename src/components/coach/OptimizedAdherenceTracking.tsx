@@ -1,14 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   BarChart3, 
   Users, 
@@ -26,10 +23,8 @@ import {
   Heart,
   Activity,
   MessageSquare,
-  ArrowLeft,
   ArrowRight,
   Filter,
-  Download,
   RefreshCw,
   Star,
   Flame,
@@ -39,9 +34,9 @@ import {
   Settings,
   UserPlus,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import AdherenceTrendChart, { type TrendData } from '@/components/coach/AdherenceTrendChart'
 
 interface AdherenceData {
@@ -72,10 +67,6 @@ interface OptimizedAdherenceTrackingProps {
 }
 
 export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdherenceTrackingProps) {
-  const { getThemeStyles, performanceSettings } = useTheme()
-  const router = useRouter()
-  const theme = getThemeStyles()
-
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('all')
@@ -345,163 +336,96 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
   const stats = getOverallStats()
 
   if (loading) {
-    return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse space-y-4">
-          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
-            <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
-              <div className="fc-card-shell p-3 sm:p-6">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-3 sm:mb-4"></div>
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen flex flex-col gap-0 sm:gap-6">
-        {loadError && (
-          <div className="px-2 sm:px-6 pt-2">
-            <ErrorBanner
-              title="Couldn't load adherence data"
-              message={loadError}
-              onRetry={() => {
-                didLoadRef.current = false
-                loadAdherenceData()
-              }}
-            />
-          </div>
-        )}
-        {/* Enhanced Header - hidden on mobile to save ~250px; page header is sufficient */}
-        <div className="hidden sm:block shrink-0">
-        <div className={`p-2 sm:p-6 ${theme.background} relative overflow-hidden max-w-full overflow-x-hidden`}>
-          {/* Floating background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-2xl"></div>
-          </div>
+    <div className="space-y-4 sm:space-y-6">
+      {loadError && (
+        <ErrorBanner
+          title="Couldn't load adherence data"
+          message={loadError}
+          onRetry={() => {
+            didLoadRef.current = false
+            loadAdherenceData()
+          }}
+        />
+      )}
 
-          <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
-                  <div className="flex items-start gap-2 sm:gap-4 min-w-0 flex-1">
-                    <Button
-                      variant="ghost"
-                      onClick={() => router.push('/coach')}
-                      className="fc-btn fc-btn-ghost h-10 w-10 flex-shrink-0"
-                    >
-                      <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div className="space-y-2 min-w-0 flex-1 overflow-hidden">
-                      <Badge className="fc-badge flex-shrink-0">Adherence Monitor</Badge>
-                      <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">
-                        Client Adherence Tracking 📈
-                      </h1>
-                      <p className="text-sm sm:text-lg text-[color:var(--fc-text-dim)] truncate">
-                        Monitor detailed client engagement and program adherence
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
-                      onClick={loadAdherenceData}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Refresh
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
+      {/* Control bar: Refresh */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          className="fc-btn fc-btn-ghost flex items-center gap-2"
+          size="sm"
+          onClick={loadAdherenceData}
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
 
-                {/* Overall Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
-                        </div>
-                        <div className="min-w-0 overflow-hidden">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{(stats.avgAdherence ?? 0).toFixed(1)}%</p>
-                          <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Adherence</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+      {/* KPI strip - preserved from hero */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
+              </div>
+              <div className="min-w-0 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{(stats.avgAdherence ?? 0).toFixed(1)}%</p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Adherence</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
-                        </div>
-                        <div className="min-w-0 overflow-hidden">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{stats.totalClients}</p>
-                          <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Active Clients</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{stats.totalClients}</p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Active Clients</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
-                        </div>
-                        <div className="min-w-0 overflow-hidden">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{stats.totalAlerts}</p>
-                          <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Active Alerts</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
+              </div>
+              <div className="min-w-0 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{stats.totalAlerts}</p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Active Alerts</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
-                        </div>
-                        <div className="min-w-0 overflow-hidden">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{(stats.avgStreak ?? 0).toFixed(0)}</p>
-                          <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Streak</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        </div>
-        </div>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
+              </div>
+              <div className="min-w-0 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] truncate">{(stats.avgStreak ?? 0).toFixed(0)}</p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Streak</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Main Content - no top spacing on mobile when hero is hidden */}
-      <div className="p-2 sm:p-6 max-w-full overflow-x-hidden pt-0 sm:pt-6 min-w-0">
-        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-8">
+      {/* Main content */}
+      <div className="space-y-4 sm:space-y-8">
           {/* Filters */}
           <Card className="fc-card-shell">
             <CardContent className="p-3 sm:p-6">
@@ -803,6 +727,5 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           )}
         </div>
       </div>
-    </AnimatedBackground>
   )
 }

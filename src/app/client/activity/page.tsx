@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -9,6 +10,7 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
 import { ActivityList } from "@/components/client/activity/ActivityList";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Activity, ArrowLeft, Plus } from "lucide-react";
 import {
   logActivity,
@@ -42,6 +44,7 @@ function getDateRange(filter: FilterRange): { start: string; end: string } {
 }
 
 function ActivityHubContent() {
+  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
@@ -128,16 +131,17 @@ function ActivityHubContent() {
           <div className="flex items-center gap-3 mb-4">
             <button
               type="button"
-              onClick={() => { window.location.href = "/client/me"; }}
+              onClick={() => router.push("/client/me")}
               className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity shrink-0"
+              aria-label="Back to Me"
             >
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
             </button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-white tracking-tight">
+              <h1 className="text-xl font-bold fc-text-primary tracking-tight">
                 Activity Log
               </h1>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <p className="text-sm fc-text-dim mt-0.5">
                 Track your extra training and activities
               </p>
             </div>
@@ -145,31 +149,31 @@ function ActivityHubContent() {
 
           {/* Stats strip */}
           {activities.length > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-3">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">
                     {activities.length}
                   </p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                     Activities
                   </p>
                 </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">
                     {totalDuration}
                   </p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                     Minutes
                   </p>
                 </div>
-                <div className="w-px h-8 bg-white/10 shrink-0" aria-hidden />
+                <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
                 <div className="flex-1 min-w-0 text-center">
-                  <p className="text-base font-semibold text-white tabular-nums">
+                  <p className="text-base font-semibold fc-text-primary tabular-nums">
                     {topType?.[1] ?? 0}
                   </p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                  <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
                     Top type
                   </p>
                 </div>
@@ -178,17 +182,19 @@ function ActivityHubContent() {
           )}
 
           {/* Filter chips */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Activity date range">
             {(["week", "month", "all"] as FilterRange[]).map((f) => (
               <button
                 key={f}
                 type="button"
+                role="tab"
+                aria-selected={filter === f}
                 onClick={() => setFilter(f)}
                 className={cn(
                   "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors",
                   filter === f
-                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
-                    : "bg-white/[0.03] text-gray-400 border-white/10"
+                    ? "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]"
+                    : "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)] hover:fc-text-primary"
                 )}
               >
                 {f === "week"
@@ -202,20 +208,7 @@ function ActivityHubContent() {
 
           {/* Activity List */}
           {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="rounded-xl border border-white/10 bg-white/[0.02] p-4 animate-pulse"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="h-4 bg-white/10 rounded w-[45%]" />
-                    <div className="h-5 bg-white/10 rounded-full w-16 shrink-0" />
-                  </div>
-                  <div className="h-3 bg-white/10 rounded w-[75%] mt-2" />
-                </div>
-              ))}
-            </div>
+            <PageSkeleton variant="list" />
           ) : activities.length > 0 ? (
             <ActivityList
               activities={activities}
@@ -225,12 +218,12 @@ function ActivityHubContent() {
           ) : (
             <div className="py-8 px-4 text-center">
               <Activity
-                className="w-8 h-8 mx-auto text-gray-600 mb-3"
+                className="w-8 h-8 mx-auto fc-text-subtle mb-3"
                 strokeWidth={1.25}
                 aria-hidden
               />
-              <p className="text-sm text-gray-400">No activities yet</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm fc-text-dim">No activities yet</p>
+              <p className="text-xs fc-text-subtle mt-1">
                 {filter === "week"
                   ? "Log your first activity this week!"
                   : "Your activity log will appear here"}
@@ -247,9 +240,9 @@ function ActivityHubContent() {
             setShowModal(true);
           }}
           className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full bg-[var(--fc-accent-cyan)] text-white shadow-lg shadow-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] flex items-center justify-center hover:brightness-110 active:scale-95 transition-all"
-          title="Log activity"
+          aria-label="Log activity"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-6 h-6" aria-hidden />
         </button>
       </AnimatedBackground>
 

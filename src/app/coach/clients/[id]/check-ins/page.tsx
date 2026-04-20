@@ -30,15 +30,15 @@ export default function ClientCheckInsPage() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-cyan-300/70">
+      <section className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4">
+        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] opacity-80">
           Daily wellness (last 14 days)
         </h2>
         <ClientProgressWellnessSection clientId={clientId} coachId={null} />
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-cyan-300/70">
+      <section className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4">
+        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] opacity-80">
           Scheduled check-ins
         </h2>
         <ClientProgressBodySection clientId={clientId} />

@@ -13,12 +13,15 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
+import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
   Dumbbell,
   Edit,
   ArrowLeft,
   Copy as CopyIcon,
   Trash2,
+  FileQuestion,
 } from "lucide-react";
 import Link from "next/link";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
@@ -257,16 +260,9 @@ export default function WorkoutTemplateDetailsPage() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="animate-pulse space-y-6">
-              <div className="fc-card-shell p-6">
-                <div className="h-8 rounded mb-4 bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="h-4 rounded w-2/3 bg-[color:var(--fc-glass-highlight)]"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+          <PageSkeleton variant="list" />
+        </CoachPageShell>
       </AnimatedBackground>
     );
   }
@@ -275,35 +271,21 @@ export default function WorkoutTemplateDetailsPage() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 flex items-center justify-center p-4">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 max-w-md text-center">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-              style={{
-                background: `${getSemanticColor("critical").primary}20`,
-              }}
-            >
-              <Dumbbell
-                className="w-8 h-8"
-                style={{ color: getSemanticColor("critical").primary }}
-              />
-            </div>
-            <h2 className="text-2xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
-              {error || "Template not found"}
-            </h2>
-            <p className="text-sm mb-6 text-[color:var(--fc-text-dim)]">
-              {error
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+          <EmptyState
+            icon={FileQuestion}
+            title={error || "Template not found"}
+            description={
+              error
                 ? "There was an error loading this template. Please try again."
-                : "The template you're looking for doesn't exist or you don't have access to it."}
-            </p>
-            <Link href="/coach/workouts/templates">
-              <Button className="fc-btn fc-btn-primary">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Templates
-              </Button>
-            </Link>
-          </div>
-        </div>
+                : "The template you're looking for doesn't exist or you don't have access to it."
+            }
+            action={{
+              label: "Back to Templates",
+              onClick: () => router.push("/coach/workouts/templates"),
+            }}
+          />
+        </CoachPageShell>
       </AnimatedBackground>
     );
   }
@@ -312,8 +294,8 @@ export default function WorkoutTemplateDetailsPage() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 p-4 sm:p-6 pt-4">
-        <div className="max-w-5xl mx-auto space-y-4">
+      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+        <div className="space-y-4">
           <nav className="flex min-h-12 flex-wrap items-center justify-between gap-2">
             <Link
               href="/coach/workouts/templates"
@@ -335,7 +317,7 @@ export default function WorkoutTemplateDetailsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 fc-btn border-red-500/30 text-red-500 hover:bg-red-500/10"
+                className="h-9 fc-btn border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)] text-[color:var(--fc-status-error)] hover:bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)]"
                 onClick={handleDelete}
               >
                 <Trash2 className="w-4 h-4 sm:mr-1" />
@@ -383,7 +365,7 @@ export default function WorkoutTemplateDetailsPage() {
             )}
           </header>
 
-          <p className="text-sm text-gray-400">
+          <p className="text-sm fc-text-dim">
             {template.estimated_duration ?? 0} min · {exerciseCount} exercise
             {exerciseCount !== 1 ? "s" : ""} · {template.usage_count ?? 0}{" "}
             assignment{(template.usage_count ?? 0) !== 1 ? "s" : ""}
@@ -395,7 +377,7 @@ export default function WorkoutTemplateDetailsPage() {
           <section>
             <div className="flex items-center justify-between border-b border-[color:var(--fc-glass-border)]/40 pb-2">
               <h2 className="text-sm font-semibold fc-text-primary">Exercises</h2>
-              <span className="font-mono text-xs text-gray-400">
+              <span className="font-mono text-xs fc-text-dim">
                 {exerciseCount}
               </span>
             </div>
@@ -410,7 +392,7 @@ export default function WorkoutTemplateDetailsPage() {
                     <span className="min-w-0 flex-1 truncate font-medium fc-text-primary">
                       {row.name}
                     </span>
-                    <span className="shrink-0 tabular-nums text-gray-400">
+                    <span className="shrink-0 tabular-nums fc-text-dim">
                       {row.setsReps}
                     </span>
                   </div>
@@ -427,7 +409,7 @@ export default function WorkoutTemplateDetailsPage() {
             )}
           </section>
         </div>
-      </div>
+      </CoachPageShell>
     </AnimatedBackground>
   );
 }

@@ -1,3 +1,17 @@
+# DEPRECATED 2026-04-16
+
+> **This document is no longer authoritative.** This 2026-02-01 inventory is stale and mixes performance concerns with route listings; several routes it references no longer exist in the codebase (e.g. `/coach/pickup`, `/client/body-metrics`, `/client/personal-records`, `/client/settings`, `/client/notifications`, `/client/messages`, `/client/support`, `/client/onboarding`, `/coach/workouts`, `/coach/exercises/create`, `/coach/exercises/[id]/edit`, `/coach/schedule`, `/coach/messages`, `/coach/settings`, `/coach/calendar`, `/admin/users`, `/admin/goals`, `/admin/habits`, `/admin/achievements`, `/admin/settings`, `/admin/analytics`).
+>
+> The current screen inventory is at:
+>
+> - [`dailyfitness-app/docs/ui/screen-inventory.md`](./ui/screen-inventory.md) — UI-tier inventory with shell state + target width variant
+>
+> Performance-focused analysis from this document is superseded by more recent work in `docs/QUERY_PERFORMANCE_AUDIT_MARCH_2026.md` and `docs/DASHBOARD_PAGE_DATA_AUDIT.md`.
+>
+> Content preserved for historical reference only.
+
+---
+
 # Screen Inventory - Performance Analysis
 
 Generated: 2026-02-01

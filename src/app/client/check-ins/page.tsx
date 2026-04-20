@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { DailyCheckInForm } from "@/components/client/check-ins/DailyCheckInForm";
 import { AddCheckInSheet } from "@/components/client/check-ins/AddCheckInSheet";
 import { WeeklyStrip } from "@/components/client/check-ins/WeeklyStrip";
@@ -15,7 +17,7 @@ import { WeeklyCheckInCard } from "@/components/client/WeeklyCheckInCard";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, AlertTriangle } from "lucide-react";
 import {
   getTodayLog,
   getLogRange,
@@ -64,6 +66,7 @@ interface CheckInPageData {
 }
 
 export default function ClientCheckInsPage() {
+  const router = useRouter();
   const { performanceSettings } = useTheme();
   const { user } = useAuth();
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -247,23 +250,14 @@ export default function ClientCheckInsPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell>
-            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
-              <div className="text-4xl mb-3">⚠️</div>
-              <h2 className="text-lg font-semibold text-white mb-2">
-                Couldn't load this page
-              </h2>
-              <p className="text-sm text-gray-400 mb-4">
-                Something went wrong. Please try again.
-              </p>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-cyan-500 text-white rounded-lg font-medium hover:bg-cyan-400 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <EmptyState
+              icon={AlertTriangle}
+              title="Couldn't load this page"
+              description="Something went wrong. Please try again."
+              actionLabel="Retry"
+              onAction={() => window.location.reload()}
+            />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -279,8 +273,8 @@ export default function ClientCheckInsPage() {
             <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
-                onClick={() => { window.location.href = "/client"; }}
-                className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+                onClick={() => router.push("/client")}
+                className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
                 aria-label="Back to home"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -290,7 +284,7 @@ export default function ClientCheckInsPage() {
             <button
               type="button"
               onClick={() => setShowAddSheet(true)}
-              className="relative shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary text-sm font-semibold hover:bg-white/[0.06] transition-colors"
+              className="relative shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary text-sm font-semibold hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
             >
               <Plus className="w-5 h-5" />
               Add
@@ -325,10 +319,8 @@ export default function ClientCheckInsPage() {
                   <WellnessTrends thisWeekLogs={thisWeekLogs} lastWeekLogs={lastWeekLogs} />
                   <button
                     type="button"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins/history";
-                    }}
-                    className="w-full text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-white/[0.04] px-1 transition-colors"
+                    onClick={() => router.push("/client/check-ins/history")}
+                    className="w-full text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-[color:var(--fc-glass-highlight)] px-1 transition-colors"
                   >
                     View Full History →
                   </button>

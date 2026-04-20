@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { withTimeout } from '@/lib/withTimeout'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTheme } from '@/contexts/ThemeContext'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { 
   Users, 
   TrendingUp, 
@@ -24,7 +22,6 @@ import {
   Calendar,
   BarChart3,
   Eye,
-  Download,
   Filter,
   Search,
   RefreshCw,
@@ -63,9 +60,6 @@ interface OptimizedComplianceDashboardProps {
 }
 
 export default function OptimizedComplianceDashboard({ coachId }: OptimizedComplianceDashboardProps) {
-  const { getThemeStyles, performanceSettings } = useTheme()
-  const theme = getThemeStyles()
-
   const [clients, setClients] = useState<ComplianceDashboardData[]>([])
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
@@ -299,143 +293,87 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
   }
 
   if (loading) {
-    return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse">
-          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-6 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-card-shell p-6">
-                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
-                <div className="space-y-4">
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   const stats = getOverallStats()
 
   return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen flex flex-col gap-0 sm:gap-6">
-        {/* Enhanced Header - hidden on mobile to save vertical space */}
-        <div className="hidden sm:block shrink-0">
-        <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
-          {/* Floating background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-domain-habits)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-status-warning)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-2xl"></div>
-          </div>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Control bar: Refresh */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          onClick={loadClientData}
+          className="fc-btn fc-btn-ghost flex items-center gap-2"
+          size="sm"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
 
-          <div className="max-w-7xl mx-auto relative z-10 space-y-6">
-            <Card className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="p-5 sm:p-6 space-y-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="space-y-2">
-                    <Badge className="fc-badge">Compliance Overview</Badge>
-                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      Client Compliance Dashboard 📊
-                    </h1>
-                    <p className="text-lg text-[color:var(--fc-text-dim)]">
-                      Monitor client progress and engagement across all areas
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={loadClientData}
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Refresh
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
+      {/* KPI strip - preserved from hero */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                {/* Overall Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
-                          <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgCompliance ?? 0).toFixed(1)}%</p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Compliance</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgCompliance ?? 0).toFixed(1)}%</p>
-                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Compliance</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgEngagement ?? 0).toFixed(1)}%</p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Engagement</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgEngagement ?? 0).toFixed(1)}%</p>
-                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Engagement</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <Card className="fc-card-shell">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">Critical Alerts</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-                  <Card className="fc-card-shell">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                          <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
-                          <p className="text-sm text-[color:var(--fc-text-dim)]">Critical Alerts</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        </div>
-
-      {/* Main Content - no top spacing on mobile when hero is hidden */}
-      <div className="p-4 sm:p-6 pt-0 sm:pt-6 min-w-0">
-        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
+      {/* Main content */}
+      <div className="space-y-4 sm:space-y-8">
           {/* Filters */}
           <Card className="fc-card-shell">
             <CardContent className="p-6">
@@ -734,9 +672,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
               <ComplianceSummaryWidget clients={clients} selectedPeriod={selectedPeriod} />
             </div>
           </div>
-        </div>
       </div>
-      </div>
-    </AnimatedBackground>
+    </div>
   )
 }

@@ -20,7 +20,7 @@ import {
   Trash2,
   Save,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { isFromCheckIns, progressBackHref } from "@/lib/clientProgressNav";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -29,8 +29,10 @@ import {
 } from "@/lib/progressTrackingService";
 import MobilityFormFields from "@/components/progress/MobilityFormFields";
 import { ClientPageShell } from "@/components/client-ui";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 function MobilityMetricsPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const fromCheckIns = isFromCheckIns(searchParams);
   const { addToast } = useToast();
@@ -256,10 +258,7 @@ function MobilityMetricsPageContent() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-            </div>
+            <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -274,9 +273,7 @@ function MobilityMetricsPageContent() {
           <div className="mb-3 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = progressBackHref(fromCheckIns);
-              }}
+              onClick={() => router.push(progressBackHref(fromCheckIns))}
               className="fc-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]"
               aria-label="Go back"
             >
@@ -620,10 +617,7 @@ export default function MobilityMetricsPage() {
         <ProtectedRoute>
           <AnimatedBackground>
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-              <div className="animate-pulse space-y-3">
-                <div className="h-10 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-                <div className="h-32 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
-              </div>
+              <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>
         </ProtectedRoute>

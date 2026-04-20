@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Dumbbell } from "lucide-react";
+import { Dumbbell, AlertTriangle } from "lucide-react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Row = {
   id: string;
@@ -79,17 +81,7 @@ export default function CoachClientWorkoutLogsListPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={`/coach/clients/${clientId}/workouts`}
-          className="inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 text-sm fc-text-primary fc-glass"
-        >
-          <ArrowLeft className="w-4 h-4 shrink-0" />
-          Back to Training
-        </Link>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div className="fc-icon-tile fc-icon-workouts">
           <Dumbbell className="w-5 h-5" />
@@ -101,11 +93,21 @@ export default function CoachClientWorkoutLogsListPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm fc-text-dim py-8">Loading…</p>
+        <PageSkeleton variant="list" />
       ) : error ? (
-        <p className="text-sm fc-text-error py-4">{error}</p>
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn't load sessions"
+          description={error}
+          variant="compact"
+        />
       ) : rows.length === 0 ? (
-        <p className="text-sm fc-text-dim py-8">No completed sessions yet.</p>
+        <EmptyState
+          icon={Dumbbell}
+          title="No completed sessions yet"
+          description="Logged workouts will appear here when this client finishes a session."
+          variant="compact"
+        />
       ) : (
         <ul className="space-y-2">
           {rows.map((r) => (
@@ -132,7 +134,6 @@ export default function CoachClientWorkoutLogsListPage() {
           ))}
         </ul>
       )}
-
     </div>
   );
 }

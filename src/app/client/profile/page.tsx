@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
@@ -8,6 +9,13 @@ import { useToast } from '@/components/ui/toast-provider'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { DatabaseService } from '@/lib/database'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,7 +24,6 @@ import {
   Calendar,
   Edit,
   Save,
-  X,
   Camera,
   Lock,
   LogOut,
@@ -29,6 +36,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
 import { ClientPageShell } from '@/components/client-ui'
+import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import { LogSetButton } from '@/components/client/workout-execution/ui/LogSetButton'
 import { cn } from '@/lib/utils'
 
@@ -146,6 +154,7 @@ function buildUpdatePayload(form: ProfileForm): Record<string, unknown> {
 
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
+  const router = useRouter()
   const { addToast } = useToast()
   const { performanceSettings } = useTheme()
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
@@ -494,8 +503,8 @@ export default function ClientProfilePage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 flex items-center justify-center min-h-[50vh]">
-            <div className="p-4 max-w-md w-full text-center space-y-3 rounded-xl border border-white/10 bg-black/20">
-              <p className="text-sm text-gray-400">{loadError}</p>
+            <div className="p-4 max-w-md w-full text-center space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
+              <p className="text-sm fc-text-dim">{loadError}</p>
               <Button
                 onClick={() => {
                   if (retryUserId) loadProfile(retryUserId)
@@ -518,11 +527,7 @@ export default function ClientProfilePage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-16 rounded-lg bg-white/5" />
-              <div className="h-10 rounded-lg bg-white/5" />
-              <div className="h-40 rounded-lg bg-white/5" />
-            </div>
+            <PageSkeleton variant="form" />
           </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -537,8 +542,8 @@ export default function ClientProfilePage() {
       : null
 
   const inputClass = 'h-11 rounded-lg fc-input'
-  const labelClass = 'text-xs uppercase tracking-wider text-gray-400 mb-1 block'
-  const sectionTitleClass = 'text-sm uppercase tracking-wider text-cyan-300/70 mb-2'
+  const labelClass = 'text-xs uppercase tracking-wider fc-text-dim mb-1 block'
+  const sectionTitleClass = 'text-sm uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2'
 
   return (
     <ProtectedRoute requiredRole="client">
@@ -551,9 +556,9 @@ export default function ClientProfilePage() {
           )}
         >
           {/* 1. Header */}
-          <header className="flex items-start gap-3 mb-6 pb-6 border-b border-white/5">
+          <header className="flex items-start gap-3 mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <div className="relative shrink-0">
-              <div className="w-16 h-16 rounded-full border border-white/10 overflow-hidden bg-white/5">
+              <div className="w-16 h-16 rounded-full border border-[color:var(--fc-glass-border)] overflow-hidden bg-[color:var(--fc-glass-highlight)]">
                 {avatarUrl ? (
                   <img
                     key={`${avatarUrl}-${avatarUrlKey}`}
@@ -563,13 +568,13 @@ export default function ClientProfilePage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <User className="w-8 h-8 text-gray-500" />
+                    <User className="w-8 h-8 fc-text-dim" />
                   </div>
                 )}
               </div>
               {canEdit && (
                 <label className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-[color:var(--fc-domain-workouts)] flex items-center justify-center border-2 border-[color:var(--fc-bg-deep)] shadow cursor-pointer">
-                  <Camera className="w-3.5 h-3.5 text-white" />
+                  <Camera className="w-3.5 h-3.5 text-[color:var(--fc-bg-base)]" />
                   <input
                     type="file"
                     accept="image/*"
@@ -583,14 +588,14 @@ export default function ClientProfilePage() {
             <div className="flex-1 min-w-0 pt-0.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h1 className="text-lg font-semibold text-white truncate">
+                  <h1 className="text-lg font-semibold fc-text-primary truncate">
                     {[formData.first_name, formData.last_name].filter(Boolean).join(' ') ||
                       displayEmail.split('@')[0] ||
                       'Profile'}
                   </h1>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">{displayEmail}</p>
+                  <p className="text-xs fc-text-dim mt-0.5 truncate">{displayEmail}</p>
                   {memberSince && (
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <p className="text-xs fc-text-dim mt-1 flex items-center gap-1">
                       <Calendar className="w-3 h-3 shrink-0" />
                       Member since {memberSince}
                     </p>
@@ -602,14 +607,14 @@ export default function ClientProfilePage() {
 
           {/* 2. Subscription */}
           {subscriptionLine && (
-            <div className="mb-6 pb-6 border-b border-white/5 flex items-center gap-2 text-xs text-gray-400">
-              <CreditCard className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+            <div className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)] flex items-center gap-2 text-xs fc-text-dim">
+              <CreditCard className="w-3.5 h-3.5 shrink-0 fc-text-dim" />
               <span className="leading-snug">{subscriptionLine}</span>
             </div>
           )}
 
           {/* 3. Personal Info */}
-          <section className="mb-6 pb-6 border-b border-white/5">
+          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <h2 className={sectionTitleClass}>Personal Info</h2>
             <div className="space-y-3">
               <div>
@@ -675,9 +680,9 @@ export default function ClientProfilePage() {
           </section>
 
           {/* 4. Body stats */}
-          <section className="mb-6 pb-6 border-b border-white/5">
+          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <h2 className={sectionTitleClass}>Body stats</h2>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs fc-text-dim mb-3">
               Updates your profile weight for your coach. Body metrics history lives under Progress.
             </p>
             <div className="space-y-3">
@@ -711,7 +716,7 @@ export default function ClientProfilePage() {
           </section>
 
           {/* 5. Training */}
-          <section className="mb-6 pb-6 border-b border-white/5">
+          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <h2 className={sectionTitleClass}>Training</h2>
             <div className="space-y-3">
               <div>
@@ -751,7 +756,7 @@ export default function ClientProfilePage() {
           </section>
 
           {/* 6. Health */}
-          <section className="mb-6 pb-6 border-b border-white/5">
+          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <h2 className={sectionTitleClass}>Health</h2>
             <div className="space-y-3">
               <div>
@@ -782,34 +787,30 @@ export default function ClientProfilePage() {
           </section>
 
           {/* 7. Profile Hub */}
-          <section className="mb-6 pb-6 border-b border-white/5">
+          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
             <h2 className={sectionTitleClass}>Profile Hub</h2>
-            <div className="divide-y divide-white/5 rounded-lg border border-white/5 overflow-hidden">
+            <div className="divide-y divide-[color:var(--fc-glass-border)] rounded-lg border border-[color:var(--fc-glass-border)] overflow-hidden">
               <button
                 type="button"
-                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-white/5 transition-colors"
-                onClick={() => {
-                  window.location.href = '/client/progress/achievements'
-                }}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                onClick={() => router.push('/client/progress/achievements')}
               >
-                <span className="flex items-center gap-2 text-sm font-medium text-white">
-                  <Award className="w-4 h-4 text-amber-400/90 shrink-0" />
+                <span className="flex items-center gap-2 text-sm font-medium fc-text-primary">
+                  <Award className="w-4 h-4 shrink-0 text-[color:var(--fc-status-warning)] opacity-90" />
                   Achievements
                 </span>
-                <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+                <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
               </button>
               <button
                 type="button"
-                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-white/5 transition-colors"
-                onClick={() => {
-                  window.location.href = '/client/goals/history'
-                }}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                onClick={() => router.push('/client/goals/history')}
               >
-                <span className="flex items-center gap-2 text-sm font-medium text-white">
-                  <Target className="w-4 h-4 text-emerald-400/90 shrink-0" />
+                <span className="flex items-center gap-2 text-sm font-medium fc-text-primary">
+                  <Target className="w-4 h-4 shrink-0 fc-text-success opacity-90" />
                   Goal History
                 </span>
-                <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+                <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
               </button>
             </div>
           </section>
@@ -822,7 +823,7 @@ export default function ClientProfilePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 justify-start rounded-lg border-white/10 text-sm"
+                  className="h-11 justify-start rounded-lg border-[color:var(--fc-glass-border)] text-sm"
                   onClick={() => setShowPasswordModal(true)}
                 >
                   <Lock className="w-4 h-4 mr-2 shrink-0" />
@@ -831,7 +832,7 @@ export default function ClientProfilePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 justify-start rounded-lg border-white/10 text-sm"
+                  className="h-11 justify-start rounded-lg border-[color:var(--fc-glass-border)] text-sm"
                   onClick={() => void handleSignOut()}
                 >
                   <LogOut className="w-4 h-4 mr-2 shrink-0" />
@@ -844,7 +845,7 @@ export default function ClientProfilePage() {
 
         {isDirty && canEdit && (
           <div
-            className="fixed left-0 right-0 z-[10060] p-3 sm:px-4 pointer-events-none bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-white/10"
+            className="fixed left-0 right-0 z-[10060] p-3 sm:px-4 pointer-events-none bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]"
             style={{ bottom: '76px' }}
           >
             <div className="max-w-lg mx-auto w-full pointer-events-auto">
@@ -861,95 +862,93 @@ export default function ClientProfilePage() {
           </div>
         )}
 
-        {showPasswordModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="fc-card-shell rounded-2xl p-5 w-full max-w-md border border-white/10">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white">Change password</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0"
-                  onClick={() => {
-                    setShowPasswordModal(false)
-                    setPasswordData({ newPassword: '', confirmPassword: '' })
-                    setPasswordError('')
-                    setPasswordSuccess(false)
-                  }}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+        <Dialog
+          open={showPasswordModal}
+          onOpenChange={(open) => {
+            setShowPasswordModal(open)
+            if (!open) {
+              setPasswordData({ newPassword: '', confirmPassword: '' })
+              setPasswordError('')
+              setPasswordSuccess(false)
+            }
+          }}
+        >
+          <DialogContent className="max-w-md border border-[color:var(--fc-glass-border)]">
+            <DialogHeader>
+              <DialogTitle className="fc-text-primary">Change password</DialogTitle>
+            </DialogHeader>
+
+            {passwordSuccess ? (
+              <div className="text-center py-6">
+                <CheckCircle className="w-14 h-14 mx-auto mb-3 fc-text-success" aria-hidden />
+                <p className="text-base font-semibold fc-text-success">Password changed successfully!</p>
               </div>
-
-              {passwordSuccess ? (
-                <div className="text-center py-6">
-                  <CheckCircle className="w-14 h-14 mx-auto mb-3 text-emerald-400" />
-                  <p className="text-base font-semibold text-emerald-400">Password changed successfully!</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="newPassword" className="text-xs fc-text-dim">
+                    New password
+                  </Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Enter new password"
+                    value={passwordData.newPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                    }
+                    className="mt-1 h-11 rounded-lg"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="newPassword" className="text-xs text-gray-400">
-                      New password
-                    </Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      placeholder="Enter new password"
-                      value={passwordData.newPassword}
-                      onChange={(e) =>
-                        setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
-                      }
-                      className="mt-1 h-11 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword" className="text-xs text-gray-400">
-                      Confirm password
-                    </Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="Confirm new password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) =>
-                        setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                      }
-                      className="mt-1 h-11 rounded-lg"
-                    />
-                  </div>
-
-                  {passwordError && (
-                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                      {passwordError}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      className="flex-1 h-11 rounded-lg"
-                      onClick={() => {
-                        setShowPasswordModal(false)
-                        setPasswordData({ newPassword: '', confirmPassword: '' })
-                        setPasswordError('')
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="flex-1 h-11 rounded-lg fc-btn fc-btn-primary"
-                      onClick={() => void handlePasswordChange()}
-                      disabled={changingPassword}
-                    >
-                      {changingPassword ? 'Changing…' : 'Change password'}
-                    </Button>
-                  </div>
+                <div>
+                  <Label htmlFor="confirmPassword" className="text-xs fc-text-dim">
+                    Confirm password
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                    }
+                    className="mt-1 h-11 rounded-lg"
+                  />
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+
+                {passwordError && (
+                  <div className="p-2.5 rounded-lg border border-[color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] fc-text-error text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                <DialogFooter className="gap-2 sm:gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-lg sm:flex-1"
+                    onClick={() => {
+                      setShowPasswordModal(false)
+                      setPasswordData({ newPassword: '', confirmPassword: '' })
+                      setPasswordError('')
+                      setPasswordSuccess(false)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-11 rounded-lg fc-btn fc-btn-primary sm:flex-1"
+                    onClick={() => void handlePasswordChange()}
+                    disabled={changingPassword}
+                  >
+                    {changingPassword ? 'Changing…' : 'Change password'}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </AnimatedBackground>
     </ProtectedRoute>
   )

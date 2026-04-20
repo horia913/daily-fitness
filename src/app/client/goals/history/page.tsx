@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -12,6 +13,8 @@ import {
   SectionHeader,
   SecondaryButton,
 } from "@/components/client-ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { ArrowLeft, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -54,15 +57,12 @@ function categoryLabel(cat: string): string {
 function statusPillClasses(status: string): string {
   const s = (status || "").toLowerCase();
   if (s === "active") {
-    return "bg-cyan-500/20 text-cyan-300 border-cyan-500/30";
+    return "bg-[color-mix(in_srgb,var(--fc-status-info)_20%,transparent)] text-[color:var(--fc-status-info)] border-[color-mix(in_srgb,var(--fc-status-info)_30%,transparent)]";
   }
   if (s === "completed" || s === "complete") {
-    return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    return "bg-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)] text-[color:var(--fc-status-success)] border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]";
   }
-  if (s === "abandoned") {
-    return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-  }
-  return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+  return "bg-[color-mix(in_srgb,var(--fc-text-subtle)_20%,transparent)] fc-text-subtle border-[color:var(--fc-glass-border)]";
 }
 
 function formatStatusLabel(status: string): string {
@@ -74,6 +74,7 @@ function formatStatusLabel(status: string): string {
 }
 
 export default function GoalHistoryPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
   const [goals, setGoals] = useState<GoalRow[]>([]);
@@ -132,8 +133,9 @@ export default function GoalHistoryPage() {
           <div className="flex items-center gap-4 mb-4">
             <button
               type="button"
-              onClick={() => { window.location.href = "/client/goals"; }}
+              onClick={() => router.push("/client/goals")}
               className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity"
+              aria-label="Back to Goals"
             >
               <ArrowLeft className="w-5 h-5 fc-text-primary" />
             </button>
@@ -144,13 +146,15 @@ export default function GoalHistoryPage() {
           </div>
 
           <ClientGlassCard className="p-4 mb-4">
-            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            <div className="flex flex-wrap items-center gap-1.5 mb-3" role="tablist" aria-label="Goal category">
               <Filter className="w-4 h-4 fc-text-dim shrink-0" />
               <span className="text-sm fc-text-dim shrink-0">Filter:</span>
               {(["all", "training", "nutrition", "lifestyle"] as const).map((c) => (
                 <button
                   key={c}
                   type="button"
+                  role="tab"
+                  aria-selected={categoryFilter === c}
                   onClick={() => setCategoryFilter(c)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider border transition-colors ${
                     categoryFilter === c
@@ -162,29 +166,25 @@ export default function GoalHistoryPage() {
                 </button>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-sm fc-text-dim cursor-pointer">
-              <input
-                type="checkbox"
+            <label htmlFor="goals-history-active-only" className="flex items-center gap-2 text-sm fc-text-dim cursor-pointer">
+              <Checkbox
+                id="goals-history-active-only"
                 checked={activeOnly}
-                onChange={(e) => setActiveOnly(e.target.checked)}
+                onCheckedChange={(checked) => setActiveOnly(checked === true)}
               />
               Active only
             </label>
           </ClientGlassCard>
 
           {loading ? (
-            <div className="space-y-3 mb-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-24 rounded-2xl animate-pulse bg-[color:var(--fc-surface-sunken)]" />
-              ))}
-            </div>
+            <PageSkeleton variant="list" />
           ) : filtered.length === 0 ? (
             <div className="py-8 px-4 text-center">
-              <p className="text-sm text-gray-400 mb-2">No goals found</p>
-              <p className="text-sm text-gray-400 mb-6">Create goals from the Goals page to see them here.</p>
+              <p className="text-sm fc-text-dim mb-2">No goals found</p>
+              <p className="text-sm fc-text-dim mb-6">Create goals from the Goals page to see them here.</p>
               <SecondaryButton
                 type="button"
-                onClick={() => { window.location.href = "/client/goals"; }}
+                onClick={() => router.push("/client/goals")}
               >
                 Open Goals
               </SecondaryButton>
@@ -226,12 +226,12 @@ export default function GoalHistoryPage() {
                         g.current_value != null ? String(g.current_value) : null;
 
                       return (
-                        <div
+                        <ClientGlassCard
                           key={g.id}
-                          className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left"
+                          className="p-4 text-left"
                         >
                           <div className="mb-1 flex items-start justify-between gap-2">
-                            <h3 className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight text-white">
+                            <h3 className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight fc-text-primary">
                               {g.title}
                             </h3>
                             <span
@@ -241,23 +241,23 @@ export default function GoalHistoryPage() {
                             </span>
                           </div>
                           {g.description ? (
-                            <p className="mb-2 mt-1 text-sm leading-relaxed text-gray-400 line-clamp-2">
+                            <p className="mb-2 mt-1 text-sm leading-relaxed fc-text-dim line-clamp-2">
                               {g.description}
                             </p>
                           ) : null}
                           <div
-                            className={`flex flex-wrap items-baseline gap-x-1 text-xs text-gray-500 mb-0 ${g.description ? "" : "mt-2"}`}
+                            className={`flex flex-wrap items-baseline gap-x-1 text-xs fc-text-dim mb-0 ${g.description ? "" : "mt-2"}`}
                           >
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-300/70">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-[color:var(--fc-accent)]">
                               {categoryLabel(cat)}
                             </span>
-                            <span className="text-gray-600" aria-hidden>
+                            <span className="fc-text-subtle" aria-hidden>
                               ·
                             </span>
                             <span className="tabular-nums">{dateStr}</span>
                             {!showProgressBar && targetDisplay != null ? (
                               <>
-                                <span className="text-gray-600" aria-hidden>
+                                <span className="fc-text-subtle" aria-hidden>
                                   ·
                                 </span>
                                 <span>
@@ -268,7 +268,7 @@ export default function GoalHistoryPage() {
                             ) : null}
                             {!showProgressBar && currentDisplay != null ? (
                               <>
-                                <span className="text-gray-600" aria-hidden>
+                                <span className="fc-text-subtle" aria-hidden>
                                   ·
                                 </span>
                                 <span>
@@ -281,23 +281,23 @@ export default function GoalHistoryPage() {
                           {showProgressBar && currentNum != null && targetNum != null ? (
                             <div className="mt-3">
                               <div className="mb-1 flex items-baseline justify-between gap-2">
-                                <span className="text-sm font-semibold tabular-nums text-white">
+                                <span className="text-sm font-semibold tabular-nums fc-text-primary">
                                   {String(currentNum)}
                                 </span>
-                                <span className="text-xs tabular-nums text-gray-500">
+                                <span className="text-xs tabular-nums fc-text-dim">
                                   / {String(targetNum)}
                                   {g.target_unit ?? ""}
                                 </span>
                               </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--fc-glass-border)]">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400"
+                                  className="h-full rounded-full bg-[color:var(--fc-accent)]"
                                   style={{ width: `${progressPct}%` }}
                                 />
                               </div>
                             </div>
                           ) : null}
-                        </div>
+                        </ClientGlassCard>
                       );
                     })}
                   </div>

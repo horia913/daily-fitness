@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ClientPageShell } from "@/components/client-ui";
@@ -21,11 +22,12 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
 import { X, Utensils, Save } from "lucide-react";
 
-const labelClass = "text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1.5";
+const labelClass = "text-[10px] font-bold uppercase tracking-wider fc-text-dim block mb-1.5";
 const fieldClass =
-  "h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/40";
+  "h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--fc-accent)]";
 
 export default function AddCustomFoodPage() {
+  const router = useRouter();
   const { performanceSettings } = useTheme();
   const { addToast } = useToast();
 
@@ -78,7 +80,7 @@ export default function AddCustomFoodPage() {
       if (error) throw error;
 
       addToast({ title: "Saved", description: "Custom food added successfully!", variant: "success" });
-      window.location.href = "/client/nutrition";
+      router.push("/client/nutrition");
     } catch (err: unknown) {
       console.error("Error adding custom food:", err);
       if (err instanceof Error && err.message === "timeout") {
@@ -98,15 +100,13 @@ export default function AddCustomFoodPage() {
         <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden min-h-screen">
           <header className="flex justify-between items-start gap-3 mb-4">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold text-white tracking-tight">Add Custom Food</h1>
-              <p className="text-sm text-gray-500 leading-relaxed mt-0.5">Define your personal nutritional data</p>
+              <h1 className="text-xl font-bold fc-text-primary tracking-tight">Add Custom Food</h1>
+              <p className="text-sm fc-text-dim leading-relaxed mt-0.5">Define your personal nutritional data</p>
             </div>
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/nutrition";
-              }}
-              className="shrink-0 h-11 w-11 rounded-lg border border-white/10 bg-white/[0.04] flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              onClick={() => router.push("/client/nutrition")}
+              className="shrink-0 h-11 w-11 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft flex items-center justify-center fc-text-dim hover:fc-text-primary transition-colors"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -117,14 +117,14 @@ export default function AddCustomFoodPage() {
             <section className="space-y-4">
               <div>
                 <Label className={labelClass}>Food name</Label>
-                <div className="flex items-center gap-2 h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 focus-within:ring-1 focus-within:ring-cyan-500/40">
-                  <Utensils className="w-4 h-4 text-gray-500 shrink-0" />
+                <div className="flex items-center gap-2 h-11 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 focus-within:ring-1 focus-within:ring-[color:var(--fc-accent)]">
+                  <Utensils className="w-4 h-4 fc-text-dim shrink-0" />
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Organic Greek Yogurt"
                     required
-                    className="flex-1 h-full border-0 bg-transparent p-0 text-sm text-white placeholder:text-gray-500 focus-visible:ring-0"
+                    className="flex-1 h-full border-0 bg-transparent p-0 text-sm fc-text-primary placeholder:fc-text-subtle focus-visible:ring-0"
                   />
                 </div>
               </div>
@@ -195,7 +195,7 @@ export default function AddCustomFoodPage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <section className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
               <Label className={labelClass + " mb-3"}>Total energy (per serving)</Label>
               <div className="flex flex-wrap items-baseline gap-2">
                 <Input
@@ -212,13 +212,13 @@ export default function AddCustomFoodPage() {
                     })
                   }
                   placeholder="0"
-                  className="w-28 border-0 bg-transparent p-0 text-2xl font-semibold tabular-nums text-white placeholder:text-gray-500 focus-visible:ring-0"
+                  className="w-28 border-0 bg-transparent p-0 text-2xl font-semibold tabular-nums fc-text-primary placeholder:fc-text-subtle focus-visible:ring-0"
                 />
-                <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">kcal</span>
+                <span className="text-sm font-medium fc-text-dim uppercase tracking-wide">kcal</span>
               </div>
-              <div className="w-full h-1.5 rounded-full bg-white/10 mt-4 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-[color:var(--fc-glass-border)] mt-4 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500/70 to-emerald-500/60 transition-all"
+                  className="h-full rounded-full bg-[color:var(--fc-accent)] transition-all"
                   style={{ width: `${Math.min(100, (num(formData.calories_per_serving) / 500) * 100)}%` }}
                 />
               </div>
@@ -227,10 +227,10 @@ export default function AddCustomFoodPage() {
             <section className="space-y-3">
               <h3 className={labelClass + " mb-1"}>Macronutrients (per serving)</h3>
 
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 space-y-2">
+              <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-500/80 shrink-0" />
-                  <span className="text-sm font-semibold text-white tracking-tight">Protein</span>
+                  <span className="w-2 h-2 rounded-full bg-[color:var(--fc-macro-protein,var(--fc-accent-cyan))] shrink-0" />
+                  <span className="text-sm font-semibold fc-text-primary tracking-tight">Protein</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -246,14 +246,14 @@ export default function AddCustomFoodPage() {
                     className={fieldClass + " font-mono tabular-nums flex-1"}
                     placeholder="0"
                   />
-                  <span className="text-xs text-gray-500 w-6 shrink-0">g</span>
+                  <span className="text-xs fc-text-dim w-6 shrink-0">g</span>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 space-y-2">
+              <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500/80 shrink-0" />
-                  <span className="text-sm font-semibold text-white tracking-tight">Carbohydrates</span>
+                  <span className="w-2 h-2 rounded-full bg-[color:var(--fc-macro-carbs,var(--fc-status-warning))] shrink-0" />
+                  <span className="text-sm font-semibold fc-text-primary tracking-tight">Carbohydrates</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -269,14 +269,14 @@ export default function AddCustomFoodPage() {
                     className={fieldClass + " font-mono tabular-nums flex-1"}
                     placeholder="0"
                   />
-                  <span className="text-xs text-gray-500 w-6 shrink-0">g</span>
+                  <span className="text-xs fc-text-dim w-6 shrink-0">g</span>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 space-y-2">
+              <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500/70 shrink-0" />
-                  <span className="text-sm font-semibold text-white tracking-tight">Fat</span>
+                  <span className="w-2 h-2 rounded-full bg-[color:var(--fc-macro-fat,var(--fc-status-error))] shrink-0" />
+                  <span className="text-sm font-semibold fc-text-primary tracking-tight">Fat</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -292,7 +292,7 @@ export default function AddCustomFoodPage() {
                     className={fieldClass + " font-mono tabular-nums flex-1"}
                     placeholder="0"
                   />
-                  <span className="text-xs text-gray-500 w-6 shrink-0">g</span>
+                  <span className="text-xs fc-text-dim w-6 shrink-0">g</span>
                 </div>
               </div>
 
@@ -314,9 +314,9 @@ export default function AddCustomFoodPage() {
               </div>
             </section>
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 flex gap-3">
-              <span className="text-gray-500 shrink-0 text-sm leading-relaxed">ℹ</span>
-              <p className="text-sm text-gray-400 leading-relaxed">
+            <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 flex gap-3">
+              <span className="fc-text-dim shrink-0 text-sm leading-relaxed">ℹ</span>
+              <p className="text-sm fc-text-dim leading-relaxed">
                 Custom foods are saved to your private library. Only you can see them unless you choose to share with
                 your coach.
               </p>
@@ -328,10 +328,8 @@ export default function AddCustomFoodPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  window.location.href = "/client/nutrition";
-                }}
-                className="flex-1 h-11 rounded-lg border border-white/10 bg-white/[0.04] text-gray-300 font-semibold text-sm"
+                onClick={() => router.push("/client/nutrition")}
+                className="flex-1 h-11 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim font-semibold text-sm"
               >
                 Cancel
               </Button>
@@ -339,7 +337,7 @@ export default function AddCustomFoodPage() {
                 type="submit"
                 form="create-food-form"
                 disabled={loading}
-                className="flex-[2] h-11 rounded-lg flex items-center justify-center gap-2 font-semibold text-sm bg-emerald-600 hover:bg-emerald-500 text-white border-0"
+                className="flex-[2] h-11 rounded-lg flex items-center justify-center gap-2 font-semibold text-sm fc-btn fc-btn-primary border-0"
               >
                 {loading ? (
                   "Saving…"

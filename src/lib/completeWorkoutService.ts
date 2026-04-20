@@ -36,6 +36,7 @@ import {
   clampedWallClockSessionMinutes,
   durationMinutesFromSetCompletedAts,
 } from './workoutLogDuration'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
 
 // ============================================================================
 // INTERFACES
@@ -224,7 +225,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
 
   // Fix C: Fallback when workout_log lacks program context (e.g. created via /api/log-set)
   // Trace: workout_assignments → program_day_assignments → program_assignments + program_schedule
-  // Use program_progress.current_week_number so we resolve the correct week's schedule slot (not just day_number).
+  // Use calendar-derived current week so we resolve the correct week's schedule slot.
   if ((!programAssignmentId || !programScheduleId) && workoutLog.workout_assignment_id) {
     const { data: pda } = await supabaseAdmin
       .from('program_day_assignments')
@@ -235,17 +236,22 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     if (pda?.program_assignment_id != null && pda?.day_number != null) {
       const { data: pa } = await supabaseAdmin
         .from('program_assignments')
-        .select('program_id')
+        .select('program_id, start_date, duration_weeks, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
         .eq('id', pda.program_assignment_id)
         .maybeSingle()
 
       if (pa?.program_id) {
-        const { data: progress } = await supabaseAdmin
-          .from('program_progress')
-          .select('current_week_number')
-          .eq('program_assignment_id', pda.program_assignment_id)
-          .maybeSingle()
-        const currentWeek = progress?.current_week_number ?? 1
+        const currentWeek = computeCurrentProgramWeekForAssignment(
+          {
+            start_date: pa.start_date ?? null,
+            pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+            pause_status: pa.pause_status ?? null,
+            paused_at: pa.paused_at ?? null,
+            timezone_snapshot: pa.timezone_snapshot ?? null,
+            duration_weeks: pa.duration_weeks ?? null,
+          },
+          pa.timezone_snapshot ?? 'UTC'
+        ).week
 
         const { data: ps } = await supabaseAdmin
           .from('program_schedule')
@@ -270,7 +276,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     const { data: assignment } = await supabaseAdmin
       .from('program_assignments')
       .select(
-        'id, client_id, program_id, start_date, status, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days'
+        'id, client_id, program_id, start_date, duration_weeks, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
       )
       .eq('id', programAssignmentId)
       .single()
@@ -299,7 +305,12 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
             {
               progression_mode:
                 assignment.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
-              coach_unlocked_week: assignment.coach_unlocked_week,
+              start_date: assignment.start_date,
+              duration_weeks: assignment.duration_weeks ?? null,
+              pause_status: assignment.pause_status ?? 'active',
+              paused_at: assignment.paused_at ?? null,
+              pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
+              timezone_snapshot: assignment.timezone_snapshot ?? 'UTC',
             }
           )
         } catch (lockErr: any) {

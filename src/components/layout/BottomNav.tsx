@@ -76,7 +76,6 @@ function isSegmentActive(pathname: string, item: NavItem): boolean {
       pathname.startsWith("/coach/programs") ||
       pathname.startsWith("/coach/workouts") ||
       pathname.startsWith("/coach/exercises") ||
-      pathname.startsWith("/coach/exercise-categories") ||
       pathname.startsWith("/coach/categories") ||
       pathname.startsWith("/coach/gym-console") ||
       pathname.startsWith("/coach/challenges")

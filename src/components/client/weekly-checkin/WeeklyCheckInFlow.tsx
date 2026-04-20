@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { StepBodyMetrics } from "./StepBodyMetrics";
 import { StepPhotos } from "./StepPhotos";
@@ -61,6 +62,7 @@ export function WeeklyCheckInFlow({
   onComplete,
   onBack,
 }: WeeklyCheckInFlowProps) {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [bodyData, setBodyData] = useState<WeeklyCheckInBodyData>(emptyBodyData());
   const [photoFiles, setPhotoFiles] = useState<WeeklyCheckInPhotoFiles>({});
@@ -235,11 +237,12 @@ export function WeeklyCheckInFlow({
         <button
           type="button"
           onClick={() => {
-            window.location.href = "/client/check-ins";
+            router.push("/client/check-ins");
           }}
+          aria-label="Back to check-ins"
           className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" aria-hidden />
         </button>
         <div>
           <h1 className="text-xl font-bold fc-text-primary">
@@ -299,7 +302,7 @@ export function WeeklyCheckInFlow({
             if (newAchievementsQueue.length > 0) {
               setShowAchievementModal(true);
             } else {
-              window.location.href = "/client/check-ins";
+              router.push("/client/check-ins");
             }
           }}
         />
@@ -316,7 +319,7 @@ export function WeeklyCheckInFlow({
               setNewAchievementsQueue([]);
               setAchievementModalIndex(0);
               setShowAchievementModal(false);
-              window.location.href = "/client/check-ins";
+              router.push("/client/check-ins");
             }
           }}
         />

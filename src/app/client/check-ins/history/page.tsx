@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +37,7 @@ interface HistoryPageData {
 }
 
 export default function CheckInsHistoryPage() {
+  const router = useRouter();
   const { performanceSettings } = useTheme();
   const { user } = useAuth();
   const [pillarGoals, setPillarGoals] = useState<
@@ -209,10 +211,8 @@ export default function CheckInsHistoryPage() {
           <header className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => {
-                window.location.href = "/client/check-ins";
-              }}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-white/[0.06] transition-colors"
+              onClick={() => router.push("/client/check-ins")}
+              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
               aria-label="Back to check-ins"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -254,13 +254,11 @@ export default function CheckInsHistoryPage() {
                 />
               </section>
 
-              <section className="mb-4 border-b border-white/5 pb-4">
+              <section className="mb-4 border-b border-[color:var(--fc-glass-border)] pb-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.location.href = "/client/progress/body-metrics";
-                  }}
-                  className="text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-white/[0.04] px-1 -ml-1 w-full transition-colors bg-transparent border-0 cursor-pointer"
+                  onClick={() => router.push("/client/progress/body-metrics")}
+                  className="text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-[color:var(--fc-glass-highlight)] px-1 -ml-1 w-full transition-colors bg-transparent border-0 cursor-pointer"
                 >
                   Full body metrics history →
                 </button>
@@ -303,7 +301,7 @@ export default function CheckInsHistoryPage() {
                 <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>
                   + Add Check-in Goal
                 </PrimaryButton>
-                <SecondaryButton className="w-full sm:w-auto" onClick={() => { window.location.href = "/client/goals"; }}>
+                <SecondaryButton className="w-full sm:w-auto" onClick={() => router.push("/client/goals")}>
                   Manage all goals
                 </SecondaryButton>
               </div>

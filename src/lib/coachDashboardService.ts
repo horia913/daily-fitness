@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { dbToUiScale } from './wellnessService';
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
 
 /** Compute program end date from start_date + duration_weeks (program_assignments has no end_date column). */
 function computeProgramEndDate(start_date: string | null, duration_weeks: number | null): string | null {
@@ -256,7 +257,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', activeClientIds).gte('log_date', weekStartStr).lte('log_date', todayStr),
       db.from('workout_logs').select('client_id, completed_at').in('client_id', allClientIds).not('completed_at', 'is', null).order('completed_at', { ascending: false }),
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', allClientIds).order('log_date', { ascending: false }),
-      db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks, progression_mode, coach_unlocked_week').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
+      db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
       db.from('meal_plan_assignments').select('client_id').in('client_id', activeClientIds).eq('is_active', true),
       db.from('athlete_scores').select('client_id, score').in('client_id', activeClientIds).order('calculated_at', { ascending: false }),
       db.from('workout_assignments').select('id, client_id, scheduled_date, status').in('client_id', activeClientIds).gte('scheduled_date', sevenDaysAgoStr).lte('scheduled_date', todayStr).in('status', ['assigned', 'in_progress']),
@@ -308,7 +309,12 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         end_date: string | null;
         program_id: string;
         progression_mode: string | null;
-        coach_unlocked_week: number | null;
+        start_date: string | null;
+        duration_weeks: number | null;
+        pause_status: string | null;
+        paused_at: string | null;
+        pause_accumulated_days: number | null;
+        timezone_snapshot: string | null;
       }
     >();
     (activePrograms || []).forEach((p: any) => {
@@ -319,7 +325,12 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
           end_date,
           program_id: p.program_id,
           progression_mode: p.progression_mode ?? null,
-          coach_unlocked_week: p.coach_unlocked_week ?? null,
+          start_date: p.start_date ?? null,
+          duration_weeks: p.duration_weeks ?? null,
+          pause_status: p.pause_status ?? null,
+          paused_at: p.paused_at ?? null,
+          pause_accumulated_days: p.pause_accumulated_days ?? 0,
+          timezone_snapshot: p.timezone_snapshot ?? null,
         });
       }
     });
@@ -327,21 +338,31 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
     // Batch fetch program compliance data (current week, schedule, completions) for per-client %
     const assignmentIdsForCompliance = Array.from(activeProgramMap.values()).map((p) => p.id);
     const programIdsForCompliance = [...new Set(Array.from(activeProgramMap.values()).map((p) => p.program_id))];
-    let progressMap = new Map<string, number>();
+    let currentWeekMap = new Map<string, number>();
     let scheduleByProgram = new Map<string, Array<{ id: string; program_id: string; week_number: number; day_number: number; is_optional?: boolean }>>();
     let completionRowsCompliance: Array<{ program_assignment_id: string; program_schedule_id: string }> = [];
     if (assignmentIdsForCompliance.length > 0) {
       const [
-        { data: progressRows },
         { data: scheduleRows },
         { data: completionRowsComp },
       ] = await Promise.all([
-        db.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIdsForCompliance),
         db.from('program_schedule').select('id, program_id, week_number, day_number, is_optional').in('program_id', programIdsForCompliance).order('week_number', { ascending: true }).order('day_number', { ascending: true }),
         db.from('program_day_completions').select('program_assignment_id, program_schedule_id').in('program_assignment_id', assignmentIdsForCompliance),
       ]);
-      for (const r of progressRows ?? []) {
-        if (r.current_week_number != null) progressMap.set(r.program_assignment_id, r.current_week_number);
+      for (const p of (activePrograms || []) as any[]) {
+        if (!p?.id) continue;
+        const week = computeCurrentProgramWeekForAssignment(
+          {
+            start_date: p.start_date ?? null,
+            pause_accumulated_days: p.pause_accumulated_days ?? 0,
+            pause_status: p.pause_status ?? null,
+            paused_at: p.paused_at ?? null,
+            timezone_snapshot: p.timezone_snapshot ?? null,
+            duration_weeks: p.duration_weeks ?? null,
+          },
+          'UTC'
+        ).week;
+        currentWeekMap.set(p.id, week);
       }
       for (const s of scheduleRows ?? []) {
         const list = scheduleByProgram.get(s.program_id) ?? [];
@@ -358,10 +379,25 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       id: string;
       client_id: string;
       program_id: string;
-      coach_unlocked_week: number | null;
+      start_date: string | null;
+      duration_weeks: number | null;
+      pause_status: string | null;
+      paused_at: string | null;
+      pause_accumulated_days: number | null;
+      timezone_snapshot: string | null;
     }>;
     for (const a of coachManagedAssignments) {
-      const currentWeek = a.coach_unlocked_week ?? 1;
+      const currentWeek = computeCurrentProgramWeekForAssignment(
+        {
+          start_date: a.start_date ?? null,
+          pause_accumulated_days: a.pause_accumulated_days ?? 0,
+          pause_status: a.pause_status ?? null,
+          paused_at: a.paused_at ?? null,
+          timezone_snapshot: a.timezone_snapshot ?? null,
+          duration_weeks: a.duration_weeks ?? null,
+        },
+        'UTC'
+      ).week;
       const slots = (scheduleByProgram.get(a.program_id) ?? []).filter((s) => s.week_number === currentWeek);
       const required = slots.filter((s) => !s.is_optional);
       if (required.length === 0) continue;
@@ -715,7 +751,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       if (program) {
         const assignmentId = program.id;
         const programId = program.program_id;
-        const currentWeek = progressMap.get(assignmentId) ?? 1;
+        const currentWeek = currentWeekMap.get(assignmentId) ?? 1;
         const slots = scheduleByProgram.get(programId) ?? [];
         const requiredSlotsThisWeek = slots.filter((s) => s.week_number === currentWeek && !s.is_optional);
         const scheduleIdsThisWeek = requiredSlotsThisWeek.map((s) => s.id);
@@ -936,7 +972,7 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     // Batch fetch active programs (first row per client via order + dedupe below)
     const { data: activePrograms, error: programsError } = await db
       .from('program_assignments')
-      .select('id, client_id, program_id, name, start_date, duration_weeks, status, progression_mode, coach_unlocked_week')
+      .select('id, client_id, program_id, name, start_date, duration_weeks, status, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot')
       .in('client_id', clientIds)
       .eq('status', 'active')
       .order('updated_at', { ascending: false });
@@ -954,7 +990,10 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
       duration_weeks: number | null;
       status: string;
       progression_mode: string | null;
-      coach_unlocked_week: number | null;
+      pause_status: string | null;
+      paused_at: string | null;
+      pause_accumulated_days: number | null;
+      timezone_snapshot: string | null;
     }>;
     const firstProgramByClient = new Map<string, (typeof programRows)[0]>();
     for (const row of programRows) {
@@ -965,13 +1004,10 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     const assignmentIds = [...new Set([...firstProgramByClient.values()].map((r) => r.id))];
 
     const programIdsForNames = [...new Set([...firstProgramByClient.values()].map((r) => r.program_id).filter(Boolean))];
-    const [{ data: programNameRows }, { data: progressRows }, { data: mealCompletionRows }, { data: clipRows }] = await Promise.all([
+    const [{ data: programNameRows }, { data: mealCompletionRows }, { data: clipRows }] = await Promise.all([
       programIdsForNames.length
         ? db.from('workout_programs').select('id, name').in('id', programIdsForNames)
         : Promise.resolve({ data: [] as { id: string; name: string }[] | null }),
-      assignmentIds.length
-        ? db.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIds)
-        : Promise.resolve({ data: [] as { program_assignment_id: string; current_week_number: number | null }[] | null }),
       db
         .from('meal_completions')
         .select('client_id, completed_at')
@@ -985,12 +1021,23 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
     ]);
 
     const programNameById = new Map((programNameRows || []).map((p: { id: string; name: string }) => [p.id, p.name]));
-    const currentWeekByAssignment = new Map(
-      (progressRows || []).map((r: { program_assignment_id: string; current_week_number: number | null }) => [
-        r.program_assignment_id,
-        r.current_week_number,
-      ])
-    );
+    const currentWeekByAssignment = new Map<string, number>();
+    for (const row of programRows) {
+      currentWeekByAssignment.set(
+        row.id,
+        computeCurrentProgramWeekForAssignment(
+          {
+            start_date: row.start_date ?? null,
+            pause_accumulated_days: row.pause_accumulated_days ?? 0,
+            pause_status: row.pause_status ?? null,
+            paused_at: row.paused_at ?? null,
+            timezone_snapshot: row.timezone_snapshot ?? null,
+            duration_weeks: row.duration_weeks ?? null,
+          },
+          'UTC'
+        ).week
+      );
+    }
 
     const nearestSubByClient = new Map<string, { end_date: string; cancelled: boolean }>();
     for (const row of clipRows || []) {
@@ -1039,7 +1086,17 @@ export async function getClientMetrics(clientIds: string[], supabaseClient?: Sup
         completionsByAssignment.set(c.program_assignment_id, set);
       }
       for (const a of coachManagedAssignments) {
-        const currentWeek = a.coach_unlocked_week ?? 1;
+        const currentWeek = computeCurrentProgramWeekForAssignment(
+          {
+            start_date: a.start_date ?? null,
+            pause_accumulated_days: a.pause_accumulated_days ?? 0,
+            pause_status: a.pause_status ?? null,
+            paused_at: a.paused_at ?? null,
+            timezone_snapshot: a.timezone_snapshot ?? null,
+            duration_weeks: a.duration_weeks ?? null,
+          },
+          'UTC'
+        ).week;
         const slots = (scheduleByProgram.get(a.program_id) ?? []).filter(s => s.week_number === currentWeek);
         const required = slots.filter(s => !s.is_optional);
         if (required.length === 0) continue;
