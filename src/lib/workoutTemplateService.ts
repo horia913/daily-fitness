@@ -1566,6 +1566,35 @@ export class WorkoutTemplateService {
 
   // ===== PROGRAM ASSIGNMENT MANAGEMENT =====
 
+  /**
+   * Same client + program_id reuses the existing `program_assignments` row (UPDATE path).
+   * Prior `workout_logs` / ledgers still reference that id + the same `program_schedule` ids,
+   * so the Train UI would show every slot as completed. Wipe run-scoped rows for a fresh start.
+   * Deletes run server-side (`POST .../reset-run-data`) so the service role bypasses RLS on the client's logs.
+   */
+  private static async clearStaleRunDataForAssignmentReuse(assignmentId: string): Promise<void> {
+    // Plain fetch (not fetchApi): fetchApi retries 403 and may sign out on a real "forbidden" response.
+    const url = `/api/coach/program-assignments/${encodeURIComponent(assignmentId)}/reset-run-data`
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string
+      step?: string
+      detail?: string
+    }
+    if (!res.ok) {
+      const msg =
+        typeof body?.error === 'string'
+          ? body.error
+          : `reset-run-data failed (${res.status})`
+      console.error('[createProgramAssignment] clearStaleRunData:', msg, body)
+      throw new Error(msg)
+    }
+  }
+
   static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string, progressionMode?: 'auto' | 'coach_managed'): Promise<ProgramAssignment> {
     try {
       console.log('[createProgramAssignment] Creating assignment:', {
@@ -1632,6 +1661,8 @@ export class WorkoutTemplateService {
         if (insertResponse.error) throw insertResponse.error
         data = insertResponse.data
       } else {
+        await WorkoutTemplateService.clearStaleRunDataForAssignmentReuse(existing.id)
+
         const updatePayload: Record<string, any> = {
             status: 'active',
             start_date: startDate,
