@@ -1,7 +1,9 @@
 export { ClientPageShell } from "./ClientPageShell";
 export { ClientGlassCard, type ClientCardShellTone } from "./GlassCard";
+export { AthleteScoreRing, type AthleteScoreRingSizePreset } from "./AthleteScoreRing";
 export { SectionHeader } from "./SectionHeader";
 export { PrimaryButton } from "./PrimaryButton";
 export { SecondaryButton } from "./SecondaryButton";
-export { Pill } from "./Pill";
 export { AssignedWorkoutRow } from "./AssignedWorkoutRow";
+export { Eyebrow } from "@/components/ui/Eyebrow";
+export { IconButton } from "@/components/ui/IconButton";

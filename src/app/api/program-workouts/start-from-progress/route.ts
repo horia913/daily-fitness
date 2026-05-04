@@ -118,6 +118,14 @@ export async function POST(request: NextRequest) {
           message: 'The selected schedule slot does not belong to this program',
         }, { status: 400 })
       }
+
+      if (!requestedSlot.id) {
+        console.warn('[start-from-progress] REJECTED — slot has no program_schedule id (master row missing)')
+        return NextResponse.json({
+          error: 'Invalid slot',
+          message: 'Schedule slot is missing master program_schedule reference',
+        }, { status: 400 })
+      }
       
       // Check if already completed
       const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_schedule_id))

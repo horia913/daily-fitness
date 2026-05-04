@@ -1,0 +1,58 @@
+.wrap {
+  display: flex;
+  gap: 4px;
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-divider);
+  border-radius: 13px;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  padding: 7px 11px;
+  border-radius: 9px;
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fc-text-subtle);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.tab:hover:not(.tabActive) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fc-text-primary);
+}
+
+.tabActive {
+  background: var(--fc-set-type-straight-soft);
+  color: var(--fc-set-type-straight);
+  box-shadow: inset 0 0 0 1px var(--fc-set-type-straight-border);
+}
+
+.tabActivePurple {
+  background: color-mix(in srgb, var(--fc-meal-dinner) 14%, transparent);
+  color: var(--fc-meal-dinner);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-meal-dinner) 32%, transparent);
+}
+
+.icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}

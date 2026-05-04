@@ -33,6 +33,7 @@ type AssignmentPauseRow = {
   pause_status: string | null
   paused_at: string | null
   pause_accumulated_days: number | null
+  timezone_snapshot: string | null
 }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -48,7 +49,7 @@ async function main() {
   const { data: rows, error } = await sb
     .from('program_assignments')
     .select(
-      'id, client_id, program_id, start_date, status, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days'
+      'id, client_id, program_id, start_date, status, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days, timezone_snapshot'
     )
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -70,10 +71,20 @@ async function main() {
     const totalWeeks = await getTotalWeeksForProgram(sb, a.program_id)
     const slots = await getProgramScheduleSlotsForAssignment(sb, a.program_id, a.id)
     const completed = await getCompletedSlots(sb, a.id)
-    const finalUnlocked = computeUnlockedWeekMax(slots, completed, {
-      progression_mode: a.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
-      coach_unlocked_week: a.coach_unlocked_week,
-    })
+    const finalUnlocked = computeUnlockedWeekMax(
+      slots,
+      completed,
+      {
+        start_date: a.start_date,
+        pause_accumulated_days: a.pause_accumulated_days,
+        pause_status: a.pause_status,
+        paused_at: a.paused_at,
+        timezone_snapshot: a.timezone_snapshot,
+        progression_mode: a.progression_mode === 'coach_managed' ? 'coach_managed' : 'auto',
+        coach_unlocked_week: a.coach_unlocked_week,
+      },
+      tz
+    )
 
     const startYmd = String(a.start_date ?? '').slice(0, 10)
     const pauseAccum = Math.max(0, Number(a.pause_accumulated_days) || 0)

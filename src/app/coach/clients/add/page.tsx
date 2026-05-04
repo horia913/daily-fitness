@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { FloatingInput } from '@/components/ui/floating-input'
-import { ProgressIndicator } from '@/components/ui/progress-indicator'
+import { WizardStepIndicator } from '@/components/ui/progress-indicator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { 
   Copy,
@@ -401,7 +401,7 @@ export default function AddClient() {
           </div>
 
           <div className="fc-card-shell rounded-xl border border-[color:var(--fc-glass-border)] p-4">
-            <ProgressIndicator steps={steps} currentStep={currentStep} />
+            <WizardStepIndicator steps={steps} currentStep={currentStep} />
             <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
               <h2 className="text-sm font-semibold fc-text-primary">{steps[currentStep - 1]?.title}</h2>
               <div className="space-y-3 mt-2">

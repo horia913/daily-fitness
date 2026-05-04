@@ -26,6 +26,7 @@ import {
   ArrowRight,
   Filter,
   RefreshCw,
+  X,
   Star,
   Flame,
   Shield,
@@ -37,36 +38,38 @@ import {
 import Link from 'next/link'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
-import AdherenceTrendChart, { type TrendData } from '@/components/coach/AdherenceTrendChart'
+import AdherenceTrendChart from '@/components/coach/AdherenceTrendChart'
+import { fetchApi } from "@/lib/apiClient";
+import { computeCoachAdherenceFromPayload, type AdherenceData } from "@/lib/coachAdherenceCompute";
 
-interface AdherenceData {
-  clientId: string
-  clientName: string
-  avatar: string
-  overallAdherence: number
-  workoutAdherence: number
-  nutritionAdherence: number
-  habitAdherence: number
-  sessionAttendance: number
-  trend: 'up' | 'down' | 'stable'
-  lastActive: string
-  alerts: number
-  streak: number
-  weeklyData: {
-    date: string
-    workout: boolean
-    nutrition: boolean
-    habit: boolean
-    session: boolean
-  }[]
-  status: 'on_track' | 'at_risk' | 'needs_attention'
-}
+export type { NutritionDayCell, AdherenceData } from "@/lib/coachAdherenceCompute";
 
 interface OptimizedAdherenceTrackingProps {
   coachId?: string
+  clientId?: string
 }
 
-export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdherenceTrackingProps) {
+function getInitialsFromName(name: string): string {
+  const parts = (name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (parts.length === 0) return "C";
+  return parts.map((p) => p[0]?.toUpperCase() || "").join("") || "C";
+}
+
+function isLikelyAvatarUrl(value: string): boolean {
+  if (!value) return false;
+  return (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("/") ||
+    value.includes("/storage/v1/object/public/avatars/")
+  );
+}
+
+export default function OptimizedAdherenceTracking({ coachId, clientId }: OptimizedAdherenceTrackingProps) {
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('all')
@@ -78,113 +81,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
   const [adherenceData, setAdherenceData] = useState<AdherenceData[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const didLoadRef = useRef(false)
-
-  function computeAdherenceFromPayload(
-    clients: { client_id: string }[],
-    profiles: { id: string; first_name?: string; last_name?: string; avatar_url?: string }[],
-    assignments: { id: string; client_id: string; scheduled_date?: string; status?: string }[],
-    logs: { client_id: string; workout_assignment_id?: string; completed_at?: string }[],
-    wellness: { client_id: string; log_date: string }[],
-    todayStr: string,
-    _sevenDaysAgoStr: string
-  ): AdherenceData[] {
-    const clientIds = clients.map((c) => c.client_id)
-    const profilesMap = new Map(profiles.map((p) => [p.id, p]))
-    const now = new Date()
-
-    const adherenceResults: AdherenceData[] = clientIds.map((clientId) => {
-      const profile = profilesMap.get(clientId)
-      const firstName = profile?.first_name || ''
-      const lastName = profile?.last_name || ''
-      const clientName = `${firstName} ${lastName}`.trim() || 'Client'
-      const avatar = profile?.avatar_url || `${(firstName || '')[0]}${(lastName || '')[0]}`.toUpperCase() || 'C'
-
-      const clientAssignments = assignments.filter((a) => a.client_id === clientId)
-      const workoutsScheduled = clientAssignments.length
-      const completedWorkoutIds = new Set(
-        logs.filter((l) => l.client_id === clientId && l.workout_assignment_id).map((l) => l.workout_assignment_id!)
-      )
-      const workoutsCompleted = clientAssignments.filter((a) => completedWorkoutIds.has(a.id)).length
-      const workoutAdherence = workoutsScheduled > 0 ? Math.round((workoutsCompleted / workoutsScheduled) * 100) : 100
-
-      const checkinDates = new Set(wellness.filter((w) => w.client_id === clientId).map((w) => w.log_date))
-      const checkinsCompleted = checkinDates.size
-      const checkinAdherence = Math.round((checkinsCompleted / 7) * 100)
-
-      const overallAdherence = Math.round((workoutAdherence + checkinAdherence) / 2)
-      const status: 'on_track' | 'at_risk' | 'needs_attention' =
-        overallAdherence >= 75 ? 'on_track' : overallAdherence >= 50 ? 'at_risk' : 'needs_attention'
-
-      const lastWorkout = logs
-        .filter((l) => l.client_id === clientId && l.completed_at)
-        .map((l) => (typeof l.completed_at === 'string' && l.completed_at.startsWith('2') ? l.completed_at.split('T')[0] : new Date(l.completed_at!).toISOString().split('T')[0]))
-        .sort()
-        .pop()
-      const lastCheckin = Array.from(checkinDates).sort().pop()
-      const lastActive = lastWorkout && lastCheckin ? (lastWorkout > lastCheckin ? lastWorkout : lastCheckin) : lastWorkout || lastCheckin || todayStr
-
-      const allActivityDates = new Set([
-        ...logs.filter((l) => l.client_id === clientId && l.completed_at).map((l) => (typeof l.completed_at === 'string' && l.completed_at.startsWith('2') ? l.completed_at.split('T')[0] : new Date(l.completed_at!).toISOString().split('T')[0])),
-        ...checkinDates,
-      ])
-      const sortedDates = Array.from(allActivityDates).sort().reverse()
-      let streak = 0
-      let currentDate = new Date(now)
-      currentDate.setHours(0, 0, 0, 0)
-      for (let i = 0; i < sortedDates.length; i++) {
-        const checkDate = new Date(sortedDates[i] + 'T12:00:00')
-        const diffDays = Math.floor((currentDate.getTime() - checkDate.getTime()) / (1000 * 60 * 60 * 24))
-        if (diffDays === i) streak++
-        else break
-      }
-
-      const weeklyData: { date: string; workout: boolean; nutrition: boolean; habit: boolean; session: boolean }[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(now)
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toISOString().split('T')[0]
-        const hasWorkout = logs.some(
-          (l) => l.client_id === clientId && l.completed_at && (typeof l.completed_at === 'string' ? l.completed_at.startsWith(dateStr) : new Date(l.completed_at).toISOString().split('T')[0] === dateStr)
-        )
-        const hasCheckin = checkinDates.has(dateStr)
-        weeklyData.push({
-          date: dateStr,
-          workout: hasWorkout,
-          nutrition: false,
-          habit: false,
-          session: hasCheckin,
-        })
-      }
-
-      const firstHalf = weeklyData.slice(0, 3)
-      const secondHalf = weeklyData.slice(4, 7)
-      const firstHalfActivity = firstHalf.filter((d) => d.workout || d.session).length
-      const secondHalfActivity = secondHalf.filter((d) => d.workout || d.session).length
-      const trend: 'up' | 'down' | 'stable' =
-        secondHalfActivity > firstHalfActivity ? 'up' : secondHalfActivity < firstHalfActivity ? 'down' : 'stable'
-      const alerts = weeklyData.filter((d) => !d.workout && !d.session).length
-
-      return {
-        clientId,
-        clientName,
-        avatar,
-        overallAdherence,
-        workoutAdherence,
-        nutritionAdherence: 0,
-        habitAdherence: 0,
-        sessionAttendance: checkinAdherence,
-        trend,
-        lastActive,
-        alerts,
-        streak,
-        weeklyData,
-        status,
-      }
-    })
-
-    adherenceResults.sort((a, b) => a.overallAdherence - b.overallAdherence)
-    return adherenceResults
-  }
+  const isScopedClient = Boolean(clientId)
 
   const loadData = useCallback(
     async (signal?: AbortSignal) => {
@@ -196,18 +93,22 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
       setLoading(true)
       setLoadError(null)
       try {
-        const res = await fetch(`/api/coach/analytics/adherence?period=${selectedPeriod}`, { signal: signal ?? null })
+        const res = await fetchApi(`/api/coach/analytics/adherence?period=${selectedPeriod}`, { signal: signal ?? null })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error ?? `HTTP ${res.status}`)
         }
         const data = await res.json()
-        const results = computeAdherenceFromPayload(
+        const results = computeCoachAdherenceFromPayload(
           data.clients ?? [],
           data.profiles ?? [],
           data.assignments ?? [],
           data.logs ?? [],
           data.wellness ?? [],
+          data.nutritionTrackedIds ?? [],
+          data.habitTrackedIds ?? [],
+          data.historicalAdherence ?? {},
+          data.weekAdherence ?? [],
           data.todayStr ?? new Date().toISOString().split('T')[0],
           data.sevenDaysAgoStr ?? ''
         )
@@ -276,26 +177,6 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
     }
   }
 
-  /** Convert client weeklyData (last 7 days) to TrendData for AdherenceTrendChart */
-  function getTrendDataFromWeeklyData(
-    weeklyData: AdherenceData['weeklyData']
-  ): TrendData[] {
-    return weeklyData.map((day) => {
-      const workout = day.workout ? 100 : 0
-      const nutrition = day.nutrition ? 100 : 0
-      const habit = day.habit ? 100 : 0
-      const session = day.session ? 100 : 0
-      const overall = Math.round((workout + nutrition + habit + session) / 4)
-      return {
-        date: day.date,
-        workout,
-        nutrition,
-        habit,
-        overall,
-      }
-    })
-  }
-
   const getOverallStats = () => {
     const totalClients = adherenceData.length
     const avgAdherence = adherenceData.length > 0 
@@ -317,8 +198,12 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
   const filteredClients = useMemo(() => {
     let filtered = adherenceData
 
+    if (clientId) {
+      filtered = filtered.filter((client) => client.clientId === clientId)
+    }
+
     // Filter by selected client
-    if (selectedClient !== 'all') {
+    if (!clientId && selectedClient !== 'all') {
       filtered = filtered.filter(client => client.clientId === selectedClient)
     }
 
@@ -331,7 +216,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
     }
 
     return filtered
-  }, [adherenceData, selectedClient, searchQuery])
+  }, [adherenceData, selectedClient, searchQuery, clientId])
 
   const stats = getOverallStats()
 
@@ -366,7 +251,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
       </div>
 
       {/* KPI strip - preserved from hero */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+      {!isScopedClient && <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card className="fc-card-shell">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -422,10 +307,12 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* Main content */}
       <div className="space-y-4 sm:space-y-8">
+          {!isScopedClient && (
+          <>
           {/* Filters */}
           <Card className="fc-card-shell">
             <CardContent className="p-3 sm:p-6">
@@ -489,6 +376,8 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
 
           {/* Client Adherence Cards */}
           <div className="space-y-3 sm:space-y-6">
@@ -499,8 +388,18 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 overflow-hidden">
                       {/* Client Avatar */}
                       <div className="relative flex-shrink-0">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-base sm:text-lg">
-                          {client.avatar}
+                        <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-base sm:text-lg overflow-hidden">
+                          <span>{getInitialsFromName(client.clientName)}</span>
+                          {isLikelyAvatarUrl(client.avatar) ? (
+                            <img
+                              src={client.avatar}
+                              alt={`${client.clientName} avatar`}
+                              className="absolute inset-0 w-full h-full object-cover rounded-full"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : null}
                         </div>
                         {/* Status indicator */}
                         <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[color:var(--fc-glass-border)] ${getStatusColor(client.status)}`}></div>
@@ -573,11 +472,20 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-1 min-w-0">
-                          <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${getAdherenceColor(client.nutritionAdherence)}`}>
-                            {client.nutritionAdherence}%
-                          </span>
+                          {client.nutritionTracked && client.nutritionHasWeeklyPlan ? (
+                            <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${getAdherenceColor(client.nutritionAdherence)}`}>
+                              {client.nutritionAdherence}%
+                            </span>
+                          ) : (
+                            <span className="text-sm sm:text-base font-medium text-[color:var(--fc-text-dim)] flex-shrink-0">
+                              Not tracked
+                            </span>
+                          )}
                         </div>
-                        <Progress value={client.nutritionAdherence} className="h-2" />
+                        <Progress
+                          value={client.nutritionTracked && client.nutritionHasWeeklyPlan ? client.nutritionAdherence : 0}
+                          className={`h-2 ${client.nutritionTracked && client.nutritionHasWeeklyPlan ? '' : 'opacity-40'}`}
+                        />
                       </div>
                     </div>
                     
@@ -588,18 +496,27 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-1 min-w-0">
-                          <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${getAdherenceColor(client.habitAdherence)}`}>
-                            {client.habitAdherence}%
-                          </span>
+                          {client.habitTracked && client.habitHasWeeklyPlan ? (
+                            <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${getAdherenceColor(client.habitAdherence)}`}>
+                              {client.habitAdherence}%
+                            </span>
+                          ) : (
+                            <span className="text-sm sm:text-base font-medium text-[color:var(--fc-text-dim)] flex-shrink-0">
+                              Not tracked
+                            </span>
+                          )}
                         </div>
-                        <Progress value={client.habitAdherence} className="h-2" />
+                        <Progress
+                          value={client.habitTracked && client.habitHasWeeklyPlan ? client.habitAdherence : 0}
+                          className={`h-2 ${client.habitTracked && client.habitHasWeeklyPlan ? '' : 'opacity-40'}`}
+                        />
                       </div>
                     </div>
                     
                     <div className="space-y-2 sm:space-y-3 min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2 min-w-0">
                         <Calendar className="w-4 h-4 text-[color:var(--fc-status-warning)] flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)] truncate">Sessions</span>
+                        <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)] truncate">Check-ins</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-1 min-w-0">
@@ -615,37 +532,185 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                   {/* Weekly Adherence Calendar */}
                   <div className="fc-glass rounded-2xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)] overflow-hidden">
                     <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-2 sm:mb-4 truncate">Weekly Adherence Calendar</h4>
-                    <div className="overflow-x-auto -mx-1">
-                      <div className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[280px]">
-                      {client.weeklyData.map((day, index) => (
-                        <div key={index} className="text-center min-w-0 flex-shrink-0">
-                          <div className="text-xs text-[color:var(--fc-text-subtle)] mb-1 truncate">
-                            {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
-                          </div>
-                          <div className="space-y-1">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.workout ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-workouts)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
-                            }`}>
-                              <Dumbbell className="w-3 h-3" />
-                            </div>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.nutrition ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-meals)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
-                            }`}>
-                              <Apple className="w-3 h-3" />
-                            </div>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.habit ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-habits)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
-                            }`}>
-                              <Zap className="w-3 h-3" />
-                            </div>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.session ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-warning)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
-                            }`}>
-                              <Calendar className="w-3 h-3" />
-                            </div>
-                          </div>
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[560px] space-y-2">
+                        <div className="grid grid-cols-[88px_repeat(7,minmax(52px,1fr))] gap-2 items-center">
+                          <div />
+                          {client.weeklyData.map((day, index) => {
+                            const isToday = day.date === client.calendarTodayYmd
+                            return (
+                              <div key={`weekday-${index}`} className={`text-center text-xs font-medium rounded-lg py-1 ${isToday ? 'text-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-accent-cyan)]/15 border border-[color:var(--fc-accent-cyan)]/50' : 'text-[color:var(--fc-text-subtle)]'}`}>
+                                {new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })}
+                              </div>
+                            )
+                          })}
                         </div>
-                      ))}
+
+                        {[
+                          { key: 'workout', label: 'Workout', icon: Dumbbell, onClass: 'bg-[color:var(--fc-status-success)]/85 border-[color:var(--fc-status-success)]/70 text-white' },
+                          { key: 'nutrition', label: 'Nutrition', icon: Apple, onClass: 'bg-[color:var(--fc-domain-meals)]/85 border-[color:var(--fc-domain-meals)]/70 text-white' },
+                          { key: 'habit', label: 'Habits', icon: Zap, onClass: 'bg-[color:var(--fc-domain-habits)]/85 border-[color:var(--fc-domain-habits)]/70 text-white' },
+                          { key: 'session', label: 'Check-in', icon: Calendar, onClass: 'bg-[color:var(--fc-accent-cyan)]/85 border-[color:var(--fc-accent-cyan)]/70 text-white' },
+                        ].map((domain) => (
+                          <div key={domain.key} className="grid grid-cols-[88px_repeat(7,minmax(52px,1fr))] gap-2 items-center">
+                            <div className="text-xs sm:text-sm text-[color:var(--fc-text-primary)] font-medium flex items-center gap-1.5">
+                              <domain.icon className="w-3.5 h-3.5" />
+                              {domain.label}
+                            </div>
+                            {client.weeklyData.map((day, index) => {
+                              const isToday = day.date === client.calendarTodayYmd
+                              const isPast = day.date < client.calendarTodayYmd
+                              const isFuture = day.date > client.calendarTodayYmd
+
+                              if (domain.key === 'nutrition') {
+                                const nd = day.nutritionDay
+                                const rowTracked = client.nutritionTracked
+                                const noMealPlanDay = rowTracked && nd && !nd.has_slot
+                                const nutDone = Boolean(rowTracked && nd?.has_slot && nd.done)
+                                const stateClass = !rowTracked
+                                  ? 'border-dashed border-[color:var(--fc-glass-border)]/70 bg-[color:var(--fc-glass-soft)]/30 text-[color:var(--fc-text-subtle)] opacity-70'
+                                  : noMealPlanDay
+                                    ? 'border-dashed border-[color:var(--fc-glass-border)]/50 bg-[color:var(--fc-glass-soft)]/20 text-[color:var(--fc-text-subtle)] opacity-60'
+                                    : nutDone
+                                      ? domain.onClass
+                                      : isFuture
+                                        ? 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                                        : isPast
+                                          ? 'border-[color:var(--fc-status-error)]/50 bg-[color:var(--fc-status-error)]/12 text-[color:var(--fc-status-error)]'
+                                          : 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                                const titleLabel = !rowTracked
+                                  ? `${domain.label}: Not tracked (${day.date})`
+                                  : noMealPlanDay
+                                    ? `${domain.label}: No plan this day (${day.date})`
+                                    : nutDone
+                                      ? `${domain.label}: Done (${day.date})`
+                                      : isFuture
+                                        ? `${domain.label}: Upcoming (${day.date})`
+                                        : `${domain.label}: Missed (${day.date})`
+                                return (
+                                  <div
+                                    key={`${domain.key}-${index}`}
+                                    className={`h-11 rounded-xl border transition-all flex items-center justify-center ${stateClass} ${
+                                      isToday
+                                        ? 'ring-2 ring-[color:var(--fc-accent-cyan)]/60 shadow-[0_0_0_1px_rgba(56,189,248,0.45)]'
+                                        : ''
+                                    }`}
+                                    title={titleLabel}
+                                    aria-label={titleLabel}
+                                  >
+                                    {!rowTracked ? (
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide">N/A</span>
+                                    ) : noMealPlanDay ? (
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-text-subtle)]">
+                                        N/A
+                                      </span>
+                                    ) : nutDone ? (
+                                      <domain.icon className="w-4 h-4" />
+                                    ) : isPast ? (
+                                      <X className="w-4 h-4" />
+                                    ) : (
+                                      <domain.icon className="w-4 h-4 opacity-70" />
+                                    )}
+                                  </div>
+                                )
+                              }
+
+                              if (domain.key === 'habit') {
+                                const hd = day.habitDay
+                                const rowTracked = client.habitTracked
+                                const noHabitSlotDay = rowTracked && hd && !hd.has_slot
+                                const habitDone = Boolean(rowTracked && hd?.has_slot && hd.done)
+                                const stateClass = !rowTracked
+                                  ? 'border-dashed border-[color:var(--fc-glass-border)]/70 bg-[color:var(--fc-glass-soft)]/30 text-[color:var(--fc-text-subtle)] opacity-70'
+                                  : noHabitSlotDay
+                                    ? 'border-dashed border-[color:var(--fc-glass-border)]/50 bg-[color:var(--fc-glass-soft)]/20 text-[color:var(--fc-text-subtle)] opacity-60'
+                                    : habitDone
+                                      ? domain.onClass
+                                      : isFuture
+                                        ? 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                                        : isPast
+                                          ? 'border-[color:var(--fc-status-error)]/50 bg-[color:var(--fc-status-error)]/12 text-[color:var(--fc-status-error)]'
+                                          : 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                                const titleLabel = !rowTracked
+                                  ? `${domain.label}: Not tracked (${day.date})`
+                                  : noHabitSlotDay
+                                    ? `${domain.label}: No habit slot this day (${day.date})`
+                                    : habitDone
+                                      ? `${domain.label}: Done (${day.date})`
+                                      : isFuture
+                                        ? `${domain.label}: Upcoming (${day.date})`
+                                        : `${domain.label}: Missed (${day.date})`
+                                return (
+                                  <div
+                                    key={`${domain.key}-${index}`}
+                                    className={`h-11 rounded-xl border transition-all flex items-center justify-center ${stateClass} ${
+                                      isToday
+                                        ? 'ring-2 ring-[color:var(--fc-accent-cyan)]/60 shadow-[0_0_0_1px_rgba(56,189,248,0.45)]'
+                                        : ''
+                                    }`}
+                                    title={titleLabel}
+                                    aria-label={titleLabel}
+                                  >
+                                    {!rowTracked ? (
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide">N/A</span>
+                                    ) : noHabitSlotDay ? (
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--fc-text-subtle)]">
+                                        N/A
+                                      </span>
+                                    ) : habitDone ? (
+                                      <domain.icon className="w-4 h-4" />
+                                    ) : isPast ? (
+                                      <X className="w-4 h-4" />
+                                    ) : (
+                                      <domain.icon className="w-4 h-4 opacity-70" />
+                                    )}
+                                  </div>
+                                )
+                              }
+
+                              const done = domain.key === 'workout' ? day.workout : day.session
+                              const tracked = true
+                              const stateClass = !tracked
+                                ? 'border-dashed border-[color:var(--fc-glass-border)]/70 bg-[color:var(--fc-glass-soft)]/30 text-[color:var(--fc-text-subtle)] opacity-70'
+                                : done
+                                  ? domain.onClass
+                                  : isFuture
+                                    ? 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                                    : isPast
+                                      ? 'border-[color:var(--fc-status-error)]/50 bg-[color:var(--fc-status-error)]/12 text-[color:var(--fc-status-error)]'
+                                      : 'border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)] bg-transparent'
+                              const titleLabel = !tracked
+                                ? `${domain.label}: Not tracked (${day.date})`
+                                : done
+                                  ? `${domain.label}: Done (${day.date})`
+                                  : isFuture
+                                    ? `${domain.label}: Upcoming (${day.date})`
+                                    : `${domain.label}: Missed (${day.date})`
+                              return (
+                                <div
+                                  key={`${domain.key}-${index}`}
+                                  className={`h-11 rounded-xl border transition-all flex items-center justify-center ${stateClass} ${
+                                    isToday
+                                      ? 'ring-2 ring-[color:var(--fc-accent-cyan)]/60 shadow-[0_0_0_1px_rgba(56,189,248,0.45)]'
+                                      : ''
+                                  }`}
+                                  title={titleLabel}
+                                  aria-label={titleLabel}
+                                >
+                                  {!tracked ? (
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide">N/A</span>
+                                  ) : done ? (
+                                    <domain.icon className="w-4 h-4" />
+                                  ) : isPast ? (
+                                    <X className="w-4 h-4" />
+                                  ) : (
+                                    <domain.icon className="w-4 h-4 opacity-70" />
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -654,8 +719,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                   <AdherenceTrendChart
                     clientId={client.clientId}
                     clientName={client.clientName}
-                    trendData={getTrendDataFromWeeklyData(client.weeklyData)}
-                    selectedMetric={selectedMetric}
+                    trendData={client.historicalAdherence}
                   />
 
                   {/* Quick Actions */}

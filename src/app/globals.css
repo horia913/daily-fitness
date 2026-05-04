@@ -45,8 +45,8 @@
 }
 
 :root {
-  --font-geist-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-geist-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-geist-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.875rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -113,9 +113,39 @@
   --font-weight-medium: 500;
   --font-weight-regular: 400;
 
-  /* Font stacks */
+  /* Font stacks — Cluster 7: mockup-aligned headline + display (see client-screens-v5.html) */
+  --f-headline: "Bricolage Grotesque", var(--font-geist-sans);
+  --f-display: "Big Shoulders Display", var(--font-number);
+  --f-mono: "Geist Mono", var(--font-geist-mono);
+  --font-display: "Big Shoulders Display", var(--font-number);
   --font-number: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+
+  /* Achievement tier palette (v1 trophy room) — semantically distinct from --warning / --lime where applicable */
+  --cyan: #4fe3e8;
+  --cyan-soft: rgba(79, 227, 232, 0.12);
+  --cyan-dim: rgba(79, 227, 232, 0.18);
+  --lime-2: #7fe89a;
+  --bronze: #d9844f;
+  --bronze-soft: rgba(217, 132, 79, 0.14);
+  --bronze-dim: rgba(217, 132, 79, 0.32);
+  --bronze-glow: rgba(217, 132, 79, 0.25);
+  --silver: #c5d2da;
+  --silver-soft: rgba(197, 210, 218, 0.14);
+  --silver-dim: rgba(197, 210, 218, 0.3);
+  --silver-glow: rgba(197, 210, 218, 0.22);
+  --gold: #f5c242;
+  --gold-soft: rgba(245, 194, 66, 0.14);
+  --gold-dim: rgba(245, 194, 66, 0.3);
+  --gold-glow: rgba(245, 194, 66, 0.28);
+  --platinum: #5dd7eb;
+  --platinum-soft: rgba(93, 215, 235, 0.14);
+  --platinum-dim: rgba(93, 215, 235, 0.3);
+  --platinum-glow: rgba(93, 215, 235, 0.28);
+  --mastered: #c5ff4a;
+  --mastered-soft: rgba(197, 255, 74, 0.16);
+  --mastered-dim: rgba(197, 255, 74, 0.35);
+  --mastered-glow: rgba(197, 255, 74, 0.32);
 }
 
 .dark {

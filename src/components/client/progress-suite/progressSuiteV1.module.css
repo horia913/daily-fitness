@@ -1,0 +1,808 @@
+/* Progress Suite v1 — scoped tokens (UI spec) */
+.psV1 {
+  --ps-bg: #07101a;
+  --ps-card: #0e1f2e;
+  --ps-card-2: #0b1824;
+  --ps-card-3: #091420;
+  --ps-line: rgba(255, 255, 255, 0.08);
+  --ps-line-2: rgba(255, 255, 255, 0.05);
+  --ps-t1: #fff;
+  --ps-t2: rgba(255, 255, 255, 0.65);
+  --ps-t3: rgba(255, 255, 255, 0.42);
+  --ps-t4: rgba(255, 255, 255, 0.26);
+  --ps-cyan: #4fe3e8;
+  --ps-cyan-soft: rgba(79, 227, 232, 0.12);
+  --ps-cyan-dim: rgba(79, 227, 232, 0.18);
+  --ps-cyan-bar-end: #34a8ad;
+  --ps-lime: #c5ff4a;
+  --ps-lime-2: #7fe89a;
+  --ps-lime-soft: rgba(197, 255, 74, 0.14);
+  --ps-lime-ring: rgba(197, 255, 74, 0.3);
+  --ps-critical: #ff5a5f;
+  --ps-critical-soft: rgba(255, 90, 95, 0.12);
+  --ps-critical-dim: rgba(255, 90, 95, 0.25);
+  --ps-warning: #f5c242;
+  --ps-warning-soft: rgba(245, 194, 66, 0.12);
+  --ps-warning-dim: rgba(245, 194, 66, 0.25);
+  --ps-good: #34d399;
+  --ps-good-soft: rgba(52, 211, 153, 0.12);
+  --ps-good-dim: rgba(52, 211, 153, 0.25);
+  --ps-purple: #a78bfa;
+  --ps-purple-soft: rgba(167, 139, 250, 0.12);
+  --ps-purple-dim: rgba(167, 139, 250, 0.25);
+  --ps-purple-bar-end: #7b5fe2;
+  --ps-pink: #f472b6;
+  --ps-pink-soft: rgba(244, 114, 182, 0.12);
+  --ps-pink-ring: rgba(244, 114, 182, 0.3);
+  --ps-orange: #fb923c;
+  --ps-orange-soft: rgba(251, 146, 60, 0.12);
+  --ps-row-hover: #0f2334;
+  --ps-f-headline: var(--f-headline, "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif);
+  --ps-f-display: var(--f-display, "Big Shoulders Display", ui-sans-serif, system-ui, sans-serif);
+  --ps-f-mono: var(--f-mono, "Geist Mono", ui-monospace, monospace);
+  --ps-f-body: var(--font-geist-sans, "Geist", ui-sans-serif, system-ui, sans-serif);
+
+  color: var(--ps-t1);
+  font-family: var(--ps-f-body);
+}
+
+.psFontHeadline {
+  font-family: var(--ps-f-headline);
+}
+.psFontDisplay {
+  font-family: var(--ps-f-display);
+}
+.psFontMono {
+  font-family: var(--ps-f-mono);
+}
+
+/* UI-1 Hero */
+.psHero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
+  border: 1px solid var(--ps-line);
+}
+
+.psHeroGlowCyan::before,
+.psHeroGlowLime::before,
+.psHeroGlowPurple::before {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  top: -40px;
+  right: -40px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.psHeroGlowCyan::before {
+  background: radial-gradient(circle, var(--ps-cyan-soft) 0%, transparent 70%);
+}
+.psHeroGlowLime::before {
+  background: radial-gradient(circle, var(--ps-lime-soft) 0%, transparent 70%);
+}
+.psHeroGlowPurple::before {
+  background: radial-gradient(circle, var(--ps-purple-soft) 0%, transparent 70%);
+}
+
+.psHeroTop {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.psHeroIconBtn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line);
+  color: var(--ps-t2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.psHeroIconBtn:hover {
+  color: var(--ps-t1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.psHeroMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.psEyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.psEyebrowDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.psEyebrowText {
+  font-family: var(--ps-f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.psHeroTitle {
+  font-family: var(--ps-f-headline);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ps-t1);
+  margin-top: 4px;
+}
+.psHeroTitleCompact {
+  font-size: 18px;
+}
+
+.psHeroSub {
+  font-family: var(--ps-f-body);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ps-t3);
+  margin-top: 3px;
+}
+
+.psHeroChildren {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* UI-2 Segmented */
+.psSegWrap {
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  padding: 3px;
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line-2);
+  border-radius: 12px;
+}
+
+.psSegBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  font-family: var(--ps-f-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ps-t3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.psSegBtnLabel {
+  flex-shrink: 0;
+}
+.psSegCount {
+  flex-shrink: 0;
+  font-family: var(--ps-f-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ps-t3);
+}
+.psSegCountActive {
+  background: var(--ps-cyan-dim);
+  color: var(--ps-cyan);
+}
+.psSegBtnActive {
+  background: var(--ps-cyan-soft);
+  color: var(--ps-cyan);
+  box-shadow: inset 0 0 0 1px var(--ps-cyan-dim);
+}
+
+/* UI-3 Chart card */
+.psChartCard {
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.psChartHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.psIconTile {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.psIconTileCyan {
+  background: var(--ps-cyan-soft);
+  color: var(--ps-cyan);
+}
+.psIconTilePurple {
+  background: var(--ps-purple-soft);
+  color: var(--ps-purple);
+}
+.psIconTileWarning {
+  background: var(--ps-warning-soft);
+  color: var(--ps-warning);
+}
+.psIconTileGood {
+  background: var(--ps-good-soft);
+  color: var(--ps-good);
+}
+.psIconTileLime {
+  background: var(--ps-lime-soft);
+  color: var(--ps-lime);
+}
+.psIconTilePink {
+  background: var(--ps-pink-soft);
+  color: var(--ps-pink);
+}
+.psIconTileOrange {
+  background: var(--ps-orange-soft);
+  color: var(--ps-orange);
+}
+
+.psIconTileSm {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+.psChartTitle {
+  font-family: var(--ps-f-headline);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ps-t1);
+  line-height: 1.2;
+}
+.psChartSub {
+  font-family: var(--ps-f-body);
+  font-size: 11px;
+  color: var(--ps-t3);
+  line-height: 1.3;
+}
+
+.psChartHeadValue {
+  margin-left: auto;
+  text-align: right;
+}
+.psChartHeadNum {
+  font-family: var(--ps-f-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ps-t1);
+  line-height: 1;
+}
+.psChartHeadUnit {
+  font-family: var(--ps-f-mono);
+  font-size: 11px;
+  color: var(--ps-t3);
+}
+
+/* UI-4 Section eyebrow */
+.psSectionEyebrow {
+  font-family: var(--ps-f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ps-t3);
+  line-height: 1.2;
+}
+.psSectionEyebrowCyan {
+  color: var(--ps-cyan);
+}
+.psSectionEyebrowLime {
+  color: var(--ps-lime);
+}
+.psSectionEyebrowPurple {
+  color: var(--ps-purple);
+}
+.psSectionEyebrowWarning {
+  color: var(--ps-warning);
+}
+.psSectionEyebrowGood {
+  color: var(--ps-good);
+}
+
+/* Nav row (hub) */
+.psNavRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 13px;
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 13px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, border-color 0.15s;
+}
+.psNavRow:hover {
+  background: var(--ps-row-hover);
+  border-color: var(--ps-cyan-dim);
+}
+
+.psNavChevron {
+  color: var(--ps-t4);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.psNavRow:hover .psNavChevron {
+  color: var(--ps-cyan);
+}
+
+/* Nav-style row without hover (e.g. Export placeholder) */
+.psNavRowStatic {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 13px;
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 13px;
+  text-align: left;
+  width: 100%;
+}
+
+.psBadge {
+  font-family: var(--ps-f-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid;
+}
+.psBadgeCyan {
+  background: var(--ps-cyan-soft);
+  color: var(--ps-cyan);
+  border-color: var(--ps-cyan-dim);
+}
+.psBadgeLime {
+  background: var(--ps-lime-soft);
+  color: var(--ps-lime);
+  border-color: var(--ps-lime-ring);
+}
+.psBadgeWarning {
+  background: var(--ps-warning-soft);
+  color: var(--ps-warning);
+  border-color: var(--ps-warning-dim);
+}
+.psBadgeGood {
+  background: var(--ps-good-soft);
+  color: var(--ps-good);
+  border-color: var(--ps-good-dim);
+}
+.psBadgePink {
+  background: var(--ps-pink-soft);
+  color: var(--ps-pink);
+  border-color: var(--ps-pink-ring);
+}
+
+/* RPE pill UI-21 */
+.psRpe {
+  font-family: var(--ps-f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  text-align: center;
+  display: inline-block;
+  min-width: 2.25rem;
+}
+.psRpeGood {
+  background: var(--ps-good-soft);
+  color: var(--ps-good);
+  border-color: var(--ps-good-dim);
+}
+.psRpeWarn {
+  background: var(--ps-warning-soft);
+  color: var(--ps-warning);
+  border-color: var(--ps-warning-dim);
+}
+.psRpeCrit {
+  background: var(--ps-critical-soft);
+  color: var(--ps-critical);
+  border-color: var(--ps-critical-dim);
+}
+.psRpeEmpty {
+  background: transparent;
+  color: var(--ps-t4);
+  border-color: transparent;
+}
+
+/* Progression CTA */
+.psProgCta {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 13px;
+  border-radius: 11px;
+  background: var(--ps-cyan-soft);
+  border: 1px solid var(--ps-cyan-dim);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.psProgCta:hover {
+  background: rgba(79, 227, 232, 0.18);
+}
+.psProgCtaLabel {
+  font-family: var(--ps-f-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ps-cyan);
+}
+
+/* Month this hero (hub) */
+.psMonthHero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
+  border: 1px solid var(--ps-line);
+}
+.psMonthSummary {
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line-2);
+  border-radius: 13px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.psMonthHero::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -40px;
+  right: -40px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--ps-cyan-soft) 0%, transparent 72%);
+}
+
+.psStatTile {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--ps-line-2);
+  border-radius: 11px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.psQuickTile {
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 13px;
+  padding: 11px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+/* Full analytics CTA (purple) */
+.psAnalyticsCta {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid var(--ps-purple-dim);
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.08), var(--ps-card-2));
+  transition: background 0.15s;
+}
+.psAnalyticsCta:hover {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), var(--ps-card-2));
+}
+.psAnalyticsCta::before {
+  content: "";
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  top: -30px;
+  right: -30px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--ps-purple-soft) 0%, transparent 70%);
+}
+.psAnalyticsIconSolid {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--ps-purple);
+  border: 1px solid var(--ps-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0a14;
+  flex-shrink: 0;
+}
+
+.psSummaryTag {
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line-2);
+  color: var(--ps-t3);
+  font-family: var(--ps-f-mono);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+/* Workout log row */
+.psLogRow {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 11px;
+  padding: 11px 12px;
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 13px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, border-color 0.15s;
+}
+.psLogRow:hover {
+  background: var(--ps-row-hover);
+  border-color: var(--ps-cyan-dim);
+}
+.psLogStripe {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ps-cyan);
+}
+.psLogStripeMuted {
+  background: var(--ps-t4);
+}
+.psLogDateCol {
+  width: 42px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  border-right: 1px solid var(--ps-line-2);
+}
+.psLogInfo {
+  flex: 1;
+  min-width: 0;
+  padding-left: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Sets table shell */
+.psSetsGrid {
+  display: grid;
+  gap: 1px;
+  background: var(--ps-line-2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.psSetsHead,
+.psSetsBody {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr 70px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+}
+.psSetsHead {
+  background: var(--ps-card-2);
+}
+.psSetsBody {
+  background: var(--ps-card);
+  transition: background 0.12s;
+}
+.psSetsBody:hover {
+  background: var(--ps-row-hover);
+}
+
+.psDropRow {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background: var(--ps-card);
+  border-radius: 10px;
+  border: 1px solid var(--ps-line);
+}
+
+.psDropTag {
+  font-family: var(--ps-f-mono);
+  font-size: 9px;
+  color: var(--ps-warning);
+  background: var(--ps-warning-soft);
+  border: 1px solid var(--ps-warning-dim);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* Session summary card */
+.psSessionCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(135deg, var(--ps-card), var(--ps-card-2));
+  border: 1px solid var(--ps-line);
+}
+.psSessionCard::before {
+  content: "";
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  top: -30px;
+  right: -30px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--ps-good-soft) 0%, transparent 70%);
+}
+
+.psCompletedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: var(--ps-f-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ps-good-soft);
+  color: var(--ps-good);
+  border: 1px solid var(--ps-good-dim);
+}
+
+/* Exercise block card */
+.psExerciseCard {
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Search input analytics */
+.psSearchWrap {
+  position: relative;
+  margin: 4px 0;
+}
+.psSearchInput {
+  width: 100%;
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line);
+  border-radius: 11px;
+  padding: 9px 11px 9px 32px;
+  font-family: var(--ps-f-body);
+  font-size: 12px;
+  color: var(--ps-t1);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.psSearchInput::placeholder {
+  color: var(--ps-t4);
+}
+.psSearchInput:focus {
+  border-color: var(--ps-cyan);
+  box-shadow: 0 0 0 3px var(--ps-cyan-soft);
+}
+
+/* Accordion row */
+.psAccRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--ps-card-2);
+  border: 1px solid var(--ps-line-2);
+  border-radius: 11px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s;
+}
+.psAccRow:hover {
+  background: var(--ps-row-hover);
+}
+
+/* Empty chart body */
+.psEmptyChart {
+  background: var(--ps-card-3);
+  border-radius: 9px;
+  padding: 18px 14px;
+  text-align: center;
+  font-family: var(--ps-f-body);
+  font-size: 11px;
+  color: var(--ps-t3);
+  line-height: 1.4;
+}

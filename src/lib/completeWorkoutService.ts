@@ -414,19 +414,8 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   // STEP 7: Sync goals and achievements (non-blocking)
   // ========================================================================
   try {
-    const { syncWorkoutConsistencyGoal } = await import('@/lib/goalSyncService')
-    const { data: consistencyGoals } = await supabaseAdmin
-      .from('goals')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('status', 'active')
-      .or('title.ilike.%Workout Consistency%,title.ilike.%workouts per week%')
-
-    if (consistencyGoals && consistencyGoals.length > 0) {
-      for (const goal of consistencyGoals) {
-        await syncWorkoutConsistencyGoal(goal.id, clientId)
-      }
-    }
+    const { syncGoalsForClient } = await import('@/lib/goalSyncService')
+    await syncGoalsForClient(clientId)
   } catch (syncError) {
     console.error('[completeWorkoutService] Failed to sync goals (non-blocking):', syncError)
   }

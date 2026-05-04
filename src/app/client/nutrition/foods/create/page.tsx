@@ -24,7 +24,7 @@ import { X, Utensils, Save } from "lucide-react";
 
 const labelClass = "text-[10px] font-bold uppercase tracking-wider fc-text-dim block mb-1.5";
 const fieldClass =
-  "h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--fc-accent)]";
+  "h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--fc-accent-cyan)]";
 
 export default function AddCustomFoodPage() {
   const router = useRouter();
@@ -117,7 +117,7 @@ export default function AddCustomFoodPage() {
             <section className="space-y-4">
               <div>
                 <Label className={labelClass}>Food name</Label>
-                <div className="flex items-center gap-2 h-11 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 focus-within:ring-1 focus-within:ring-[color:var(--fc-accent)]">
+                <div className="flex items-center gap-2 h-11 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 focus-within:ring-1 focus-within:ring-[color:var(--fc-accent-cyan)]">
                   <Utensils className="w-4 h-4 fc-text-dim shrink-0" />
                   <Input
                     value={formData.name}
@@ -218,7 +218,7 @@ export default function AddCustomFoodPage() {
               </div>
               <div className="w-full h-1.5 rounded-full bg-[color:var(--fc-glass-border)] mt-4 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-[color:var(--fc-accent)] transition-all"
+                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)] transition-all"
                   style={{ width: `${Math.min(100, (num(formData.calories_per_serving) / 500) * 100)}%` }}
                 />
               </div>

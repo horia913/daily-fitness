@@ -1,44 +1,5 @@
-'use client'
-
-import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
-import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
-import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { GlassCard } from '@/components/ui/GlassCard'
-import { Filter } from 'lucide-react'
-import OptimizedAdherenceTracking from '@/components/coach/OptimizedAdherenceTracking'
-import AnalyticsNav from '@/components/coach/AnalyticsNav'
+import { redirect } from 'next/navigation'
 
 export default function CoachAdherencePage() {
-  const { user } = useAuth()
-  const { performanceSettings } = useTheme()
-
-  return (
-    <ProtectedRoute requiredRole="coach">
-      <AnimatedBackground>
-        {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6">
-          <AnalyticsNav />
-          <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center flex-shrink-0">
-                <Filter className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                  Adherence Overview
-                </h1>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Track client follow-through and identify at-risk clients.
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-          <OptimizedAdherenceTracking coachId={user?.id || ''} />
-        </CoachPageShell>
-      </AnimatedBackground>
-    </ProtectedRoute>
-  )
+  redirect('/coach/progress')
 }

@@ -31,8 +31,9 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/toast-provider'
 import ExerciseForm from '@/components/ExerciseForm'
-import ExerciseAlternativesModal from '@/components/coach/ExerciseAlternativesModal'
+import CoachExerciseAlternativesModal from '@/components/coach/CoachExerciseAlternativesModal'
 import VideoPlayerModal from '@/components/VideoPlayerModal'
+import { fetchApi } from "@/lib/apiClient";
 
 interface Exercise {
   id: string
@@ -145,7 +146,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
     loadingRef.current = true
     try {
       setLoading(true)
-      const res = await fetch('/api/coach/exercises', { signal: signal ?? null })
+      const res = await fetchApi('/api/coach/exercises', { signal: signal ?? null })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body?.error ?? `HTTP ${res.status}`)
@@ -684,15 +685,20 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
             </Card>
           )}
 
-          {/* Floating Action Button */}
-          <div className="fixed bottom-6 right-6 z-50">
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="fc-btn fc-btn-primary w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 hover:scale-110"
-            >
-              <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
-            </Button>
-          </div>
+          {/*
+            Phase 0b 6-FAB extension — exercise library FAB migration.
+            Spec ref: design-system-v4 §6.21. Was: wrapper fixed bottom-6 right-6;
+            Button fc-btn fc-btn-primary w-14 h-14 (sm:w-16) rounded-full + scale hover.
+            Header "Add Exercise" CTA unchanged (Phase 1+). Now: fab-action, no wrapper.
+          */}
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(true)}
+            className="fab-action"
+            aria-label="Add exercise"
+          >
+            <Plus />
+          </button>
 
           {/* Exercise Form Modal */}
           <ExerciseForm
@@ -712,7 +718,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
           {/* Exercise Alternatives Modal */}
           {alternativesModalExercise && (
-            <ExerciseAlternativesModal
+            <CoachExerciseAlternativesModal
               isOpen={!!alternativesModalExercise}
               onClose={() => setAlternativesModalExercise(null)}
               exercise={alternativesModalExercise}

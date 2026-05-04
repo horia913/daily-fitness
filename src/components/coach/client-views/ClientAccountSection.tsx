@@ -1,13 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Shield, Clock } from 'lucide-react'
+import { Shield, Clock, User, Handshake } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import DetailGrid from '@/components/coach/client-detail/DetailGrid'
+import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
 
-type Props = { clientId: string }
+type Props = { clientId: string; layoutVariant?: 'default' | 'coachV6' }
 
-export default function ClientAccountSection({ clientId }: Props) {
+export default function ClientAccountSection({
+  clientId,
+  layoutVariant = 'default',
+}: Props) {
   const { user } = useAuth()
   const [role, setRole] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
@@ -75,6 +80,51 @@ export default function ClientAccountSection({ clientId }: Props) {
       <div className="flex justify-center py-8">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-[color:var(--fc-glass-border)] border-t-[color:var(--fc-domain-workouts)]" />
       </div>
+    )
+  }
+
+  if (layoutVariant === 'coachV6') {
+    const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Client'
+    const relColor =
+      status === 'active'
+        ? 'var(--fc-effort-easy)'
+        : status === 'pending'
+          ? 'var(--fc-effort-medium)'
+          : status === 'inactive'
+            ? 'var(--fc-effort-max)'
+            : 'var(--fc-text-primary)'
+
+    return (
+      <section className={sec.section}>
+        <span className={sec.eyebrow}>Account information</span>
+        <DetailGrid
+          rows={[
+            { icon: User, label: 'Role', value: roleLabel },
+            {
+              icon: Handshake,
+              label: 'Coaching relationship',
+              value: (
+                <span style={{ color: relColor }}>{statusLabel}</span>
+              ),
+              iconTone: 'good',
+            },
+            ...(createdAt
+              ? [
+                  {
+                    icon: Clock,
+                    label: 'Member since',
+                    value: new Date(createdAt).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
+                    iconTone: 'purple' as const,
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </section>
     )
   }
 

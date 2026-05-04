@@ -26,13 +26,19 @@ function TrendLine({ delta }: { delta: number }) {
   }
   if (delta > 0) {
     return (
-      <span className="text-[10px] text-emerald-500 dark:text-emerald-400">
+      <span
+        className="text-[10px]"
+        style={{ color: "var(--fc-status-success)" }}
+      >
         ↑ +{delta} from last week
       </span>
     );
   }
   return (
-    <span className="text-[10px] text-amber-600 dark:text-amber-400">
+    <span
+      className="text-[10px]"
+      style={{ color: "var(--fc-status-warning)" }}
+    >
       ↓ {Math.abs(delta)} from last week
     </span>
   );
@@ -111,7 +117,7 @@ export function ScoreBreakdown({
           opacity: isExpanded ? 1 : 0,
         }}
       >
-        <div className="divide-y divide-white/5 pt-4 pb-2 mt-1">
+        <div className="divide-y divide-[var(--fc-glass-border)] pt-4 pb-2 mt-1">
           {items.map((item) => (
             <div key={item.key} className="space-y-2 py-3.5 first:pt-2 last:pb-1">
               <div className="flex items-center justify-between gap-2">

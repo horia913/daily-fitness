@@ -1,207 +1,337 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import Link from 'next/link'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
-import { useToast } from '@/components/ui/toast-provider'
-import { 
-  TrendingUp, 
-  Calendar, 
-  Dumbbell, 
-  Target, 
-  Award,
-  Flame,
-  Clock,
+import {
   BarChart3,
-  Activity,
-  Zap,
-  Users,
-  CheckCircle,
-  AlertTriangle,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Star,
-  Copy,
-  UserPlus,
-  Filter,
-  SortAsc,
+  Calendar,
   Search,
-  Flag,
-  Timer,
-  DollarSign,
-  Package,
-  Trophy,
-  Eye,
+  Users,
+  Dumbbell,
+  Activity,
   Heart,
-  Smile,
-  ThumbsUp,
-  TrendingDown,
-  Minus,
-  Plus,
-  ChevronUp,
-  ChevronDown,
-  ArrowUp,
-  ArrowDown,
-  Circle,
-  Square,
-  Triangle,
-  Hexagon,
-  Download
+  AlertTriangle,
+  CheckCircle,
+  ArrowRight,
+  Flame,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { getTodayLog, getCompletionStats, getLogRange } from '@/lib/wellnessService'
 import AnalyticsNav from '@/components/coach/AnalyticsNav'
-import { GenerateReportModal } from '@/components/coach/GenerateReportModal'
-import { exportBodyMetricsCsv } from '@/lib/exportBodyMetricsCsv'
-import { supabase } from '@/lib/supabase'
 
-interface ClientProgress {
+type Period = 'week' | 'month'
+
+interface ActionQueueClient {
   id: string
   name: string
-  totalWorkouts: number
-  thisWeek: number
-  thisMonth: number
-  streak: number
-  completionRate: number
-  lastWorkout: string
+  avatarUrl: string | null
   adherence: number
+  lastActiveAt: string | null
 }
 
-interface WorkoutStats {
-  totalSessions: number
-  completedSessions: number
-  thisWeek: number
-  thisMonth: number
-  averageCompletionRate: number
+interface InactiveClient {
+  id: string
+  name: string
+  avatarUrl: string | null
+  daysSince: number | null
+  lastWellnessDate: string | null
 }
 
-interface WellnessOverview {
-  checkedInToday: number
-  totalClients: number
-  averageEnergy: number
-  highStressCount: number
-  highStressClients: Array<{ id: string; name: string; stress: number }>
-  inactiveClients: Array<{ id: string; name: string; daysSince: number }>
+interface FlaggedClient {
+  id: string
+  name: string
+  avatarUrl: string | null
+  signal: string
+  logDate: string
+  daysSince: number
+  stressUi: number | null
+}
+
+interface OverviewResponse {
+  period: Period
+  totals: {
+    activeClients: number
+    completedWorkouts: number
+    avgAdherence: number
+    checkinsThisWeek: number
+  }
+  actionQueue: {
+    needAttention: ActionQueueClient[]
+    inactiveCheckIns: InactiveClient[]
+    flagged: FlaggedClient[]
+  }
+  wellness: {
+    checkedInToday: number
+    totalClients: number
+    averageEnergy: number | null
+  }
+}
+
+const EMPTY_OVERVIEW: OverviewResponse = {
+  period: 'month',
+  totals: {
+    activeClients: 0,
+    completedWorkouts: 0,
+    avgAdherence: 0,
+    checkinsThisWeek: 0,
+  },
+  actionQueue: { needAttention: [], inactiveCheckIns: [], flagged: [] },
+  wellness: { checkedInToday: 0, totalClients: 0, averageEnergy: null },
+}
+
+function getInitials(name: string): string {
+  const parts = (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+  if (parts.length === 0) return 'C'
+  return parts.map((p) => p[0]?.toUpperCase() || '').join('') || 'C'
+}
+
+function avatarGradientFor(name: string): string {
+  const colors = [
+    'from-purple-500 to-purple-600',
+    'from-blue-500 to-blue-600',
+    'from-green-500 to-green-600',
+    'from-orange-500 to-orange-600',
+    'from-pink-500 to-pink-600',
+    'from-indigo-500 to-indigo-600',
+    'from-teal-500 to-teal-600',
+    'from-red-500 to-red-600',
+  ]
+  const idx = (name.charCodeAt(0) || 0) % colors.length
+  return colors[idx]
+}
+
+function isLikelyAvatarUrl(value: string | null | undefined): boolean {
+  if (!value) return false
+  return (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('/') ||
+    value.includes('/storage/v1/object/public/avatars/')
+  )
+}
+
+function formatLastActive(iso: string | null): string {
+  if (!iso) return 'No activity yet'
+  const d = new Date(iso)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays <= 0) return 'Active today'
+  if (diffDays === 1) return 'Active 1 day ago'
+  if (diffDays < 7) return `Active ${diffDays} days ago`
+  if (diffDays < 30)
+    return `Active ${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) === 1 ? '' : 's'} ago`
+  return `Active ${d.toLocaleDateString()}`
+}
+
+function formatLastCheckIn(daysSince: number | null): string {
+  if (daysSince == null) return 'Never checked in'
+  if (daysSince === 0) return 'Last check-in: today'
+  if (daysSince === 1) return 'Last check-in: 1 day ago'
+  return `Last check-in: ${daysSince} days ago`
+}
+
+interface AvatarProps {
+  name: string
+  avatarUrl: string | null
+  size?: 'sm' | 'md'
+}
+
+function Avatar({ name, avatarUrl, size = 'md' }: AvatarProps) {
+  const dimensions = size === 'sm' ? 'w-9 h-9 text-xs' : 'w-10 h-10 text-sm'
+  const showImage = avatarUrl && isLikelyAvatarUrl(avatarUrl)
+  if (showImage) {
+    return (
+      <div
+        className={`${dimensions} rounded-full overflow-hidden flex-shrink-0 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]`}
+      >
+        <img
+          src={avatarUrl as string}
+          alt={name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    )
+  }
+  return (
+    <div
+      className={`${dimensions} rounded-full bg-gradient-to-br ${avatarGradientFor(
+        name
+      )} flex items-center justify-center text-white font-semibold flex-shrink-0`}
+    >
+      {getInitials(name)}
+    </div>
+  )
+}
+
+interface ActionCardShellProps {
+  title: string
+  count: number
+  icon: React.ReactNode
+  accent: string
+  emptyState: string
+  empty: boolean
+  ariaLabel?: string
+  children?: React.ReactNode
+}
+
+function ActionCardShell({
+  title,
+  count,
+  icon,
+  accent,
+  emptyState,
+  empty,
+  ariaLabel,
+  children,
+}: ActionCardShellProps) {
+  return (
+    <GlassCard
+      elevation={1}
+      className="fc-card-shell p-4 sm:p-5 flex flex-col gap-3 min-h-[280px]"
+      aria-label={ariaLabel}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className={`p-2 rounded-xl ${accent} flex items-center justify-center flex-shrink-0`}
+          >
+            {icon}
+          </div>
+          <h3 className="text-base font-semibold text-[color:var(--fc-text-primary)] truncate">
+            {title}
+          </h3>
+        </div>
+        <Badge
+          variant="outline"
+          className="rounded-full text-xs px-2.5 py-0.5 flex-shrink-0"
+        >
+          {count}
+        </Badge>
+      </div>
+      {empty ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-[color:var(--fc-text-dim)] text-center px-4 py-6">
+          {emptyState}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 -mx-1">{children}</div>
+      )}
+    </GlassCard>
+  )
+}
+
+interface ActionRowProps {
+  href: string
+  name: string
+  avatarUrl: string | null
+  primary: string
+  secondary?: string | null
+  primaryClass?: string
+}
+
+function ActionRow({
+  href,
+  name,
+  avatarUrl,
+  primary,
+  secondary,
+  primaryClass,
+}: ActionRowProps) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+    >
+      <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[color:var(--fc-text-primary)] truncate">
+          {name}
+        </p>
+        {secondary && (
+          <p className="text-xs text-[color:var(--fc-text-dim)] truncate">
+            {secondary}
+          </p>
+        )}
+      </div>
+      <span
+        className={`text-xs font-semibold whitespace-nowrap ${
+          primaryClass ?? 'text-[color:var(--fc-text-primary)]'
+        }`}
+      >
+        {primary}
+      </span>
+      <ChevronRight
+        className="w-4 h-4 text-[color:var(--fc-text-subtle)] group-hover:text-[color:var(--fc-accent-cyan)] transition-colors"
+        aria-hidden
+      />
+    </Link>
+  )
 }
 
 export default function CoachProgress() {
   const { user } = useAuth()
-  const { addToast } = useToast()
   const { performanceSettings } = useTheme()
-  
+
   const [loading, setLoading] = useState(true)
-  const [clientProgress, setClientProgress] = useState<ClientProgress[]>([])
-  const [workoutStats, setWorkoutStats] = useState<WorkoutStats>({
-    totalSessions: 0,
-    completedSessions: 0,
-    thisWeek: 0,
-    thisMonth: 0,
-    averageCompletionRate: 0
-  })
-  
-  const [wellnessOverview, setWellnessOverview] = useState<WellnessOverview>({
-    checkedInToday: 0,
-    totalClients: 0,
-    averageEnergy: 0,
-    highStressCount: 0,
-    highStressClients: [],
-    inactiveClients: []
-  })
-  
-  // Enhanced filtering and search
+  const [error, setError] = useState<string | null>(null)
+  const [overview, setOverview] = useState<OverviewResponse>(EMPTY_OVERVIEW)
+  const [period, setPeriod] = useState<Period>('month')
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateRange, setDateRange] = useState('month')
-  const [metricFilter, setMetricFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('adherence')
-  
-  // Client details state
-  const [selectedClient, setSelectedClient] = useState<string | null>(null)
-  const [clientDetailPeriod, setClientDetailPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
-  const [selectedClientData, setSelectedClientData] = useState<any | null>(null)
-  const [selectedClientLoading, setSelectedClientLoading] = useState(false)
-  
-  // Analytics state
-  const [analyticsPeriod, setAnalyticsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
-  const [clientGroup, setClientGroup] = useState<string>('all')
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['adherence', 'workouts', 'strength'])
-  const [showReportModal, setShowReportModal] = useState(false)
 
   const loadingRef = useRef(false)
-  const didLoadRef = useRef(false)
 
   const loadData = useCallback(
-    async (signal?: AbortSignal) => {
+    async (selectedPeriod: Period, signal?: AbortSignal) => {
       if (!user) return
-      if (didLoadRef.current) return
       if (loadingRef.current) return
-      didLoadRef.current = true
       loadingRef.current = true
       setLoading(true)
+      setError(null)
       try {
-        const res = await fetch('/api/coach/progress/overview', {
-          signal: signal ?? null,
-        })
+        const res = await fetch(
+          `/api/coach/progress/overview?period=${selectedPeriod}`,
+          { signal: signal ?? null }
+        )
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error ?? `HTTP ${res.status}`)
         }
-        const data = await res.json()
-        setClientProgress(data.clientProgress ?? [])
-        setWorkoutStats(
-          data.workoutStats ?? {
-            totalSessions: 0,
-            completedSessions: 0,
-            thisWeek: 0,
-            thisMonth: 0,
-            averageCompletionRate: 0,
-          }
-        )
-        setWellnessOverview(
-          data.wellnessOverview ?? {
-            checkedInToday: 0,
-            totalClients: 0,
-            averageEnergy: 0,
-            highStressCount: 0,
-            highStressClients: [],
-            inactiveClients: [],
-          }
-        )
+        const data = (await res.json()) as OverviewResponse
+        setOverview({
+          period: data.period ?? selectedPeriod,
+          totals: data.totals ?? EMPTY_OVERVIEW.totals,
+          actionQueue: data.actionQueue ?? EMPTY_OVERVIEW.actionQueue,
+          wellness: data.wellness ?? EMPTY_OVERVIEW.wellness,
+        })
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
-          didLoadRef.current = false
           return
         }
-        console.error('Error loading progress overview:', err)
-        didLoadRef.current = false
-        setClientProgress([])
-        setWorkoutStats({
-          totalSessions: 0,
-          completedSessions: 0,
-          thisWeek: 0,
-          thisMonth: 0,
-          averageCompletionRate: 0,
-        })
-        setWellnessOverview({
-          checkedInToday: 0,
-          totalClients: 0,
-          averageEnergy: 0,
-          highStressCount: 0,
-          highStressClients: [],
-          inactiveClients: [],
-        })
+        console.error('[coach/progress] load failed:', err)
+        setError(
+          err instanceof Error ? err.message : 'Failed to load progress data'
+        )
+        setOverview(EMPTY_OVERVIEW)
       } finally {
         setLoading(false)
         loadingRef.current = false
@@ -213,352 +343,44 @@ export default function CoachProgress() {
   useEffect(() => {
     if (!user) {
       setLoading(false)
-      setClientProgress([])
+      setOverview(EMPTY_OVERVIEW)
       return
     }
     const ac = new AbortController()
-    loadData(ac.signal)
+    loadData(period, ac.signal)
     return () => {
-      didLoadRef.current = false
       loadingRef.current = false
       ac.abort()
     }
-  }, [user, loadData])
+  }, [user, period, loadData])
 
-  useEffect(() => {
-    if (!selectedClient) {
-      setSelectedClientData(null)
-      return
-    }
-    let isCancelled = false
-    setSelectedClientLoading(true)
-    ;(async () => {
-      const data = await getClientProgressData(selectedClient)
-      if (!isCancelled) {
-        setSelectedClientData(data)
-      }
-    })().finally(() => {
-      if (!isCancelled) setSelectedClientLoading(false)
-    })
-    return () => {
-      isCancelled = true
-    }
-  }, [selectedClient, clientProgress])
-
-
-  // Enhanced filtering and sorting functions
-  const filteredClientProgress = clientProgress.filter(client => {
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  }).sort((a, b) => {
-    switch (sortBy) {
-      case 'adherence':
-        return b.adherence - a.adherence
-      case 'name':
-        return a.name.localeCompare(b.name)
-      case 'workouts':
-        return b.totalWorkouts - a.totalWorkouts
-      case 'streak':
-        return b.streak - a.streak
-      case 'completion':
-        return b.completionRate - a.completionRate
-      default:
-        return 0
-    }
-  })
-
-  // Generate client avatar colors
-  const getClientAvatarColor = (name: string) => {
-    const colors = [
-      'bg-gradient-to-r from-purple-500 to-purple-600',
-      'bg-gradient-to-r from-blue-500 to-blue-600',
-      'bg-gradient-to-r from-green-500 to-green-600',
-      'bg-gradient-to-r from-orange-500 to-orange-600',
-      'bg-gradient-to-r from-pink-500 to-pink-600',
-      'bg-gradient-to-r from-indigo-500 to-indigo-600',
-      'bg-gradient-to-r from-teal-500 to-teal-600',
-      'bg-gradient-to-r from-red-500 to-red-600'
-    ]
-    const index = name.charCodeAt(0) % colors.length
-    return colors[index]
-  }
-
-  // Sparkline: use real data from metrics layer (last 7 days workout count per day)
-  const [sparklineByClientId, setSparklineByClientId] = useState<Record<string, number[]>>({})
-  useEffect(() => {
-    if (clientProgress.length === 0) {
-      setSparklineByClientId({})
-      return
-    }
-    const clientIds = clientProgress.map((c) => c.id)
-    import('@/lib/metrics').then(({ getSparklineDataBatch }) => {
-      getSparklineDataBatch(clientIds, 7).then((batch) => {
-        const next: Record<string, number[]> = {}
-        for (const id of clientIds) {
-          next[id] = (batch[id] || []).map((d) => d.count)
-        }
-        setSparklineByClientId(next)
-      })
-    })
-  }, [clientProgress])
-  const getSparklineDataForClient = (client: ClientProgress) => sparklineByClientId[client.id] ?? Array(7).fill(0)
-
-  // Convert array of numbers to sparkline points
-  const convertToSparklinePoints = (data: number[]) => {
-    const max = Math.max(...data, 1)
-    return data.map((value, index) => ({
-      height: (value / max) * 60,
-      y: value,
-      x: index
-    }))
-  }
-
-  // Get trend direction
-  const getTrendDirection = (client: ClientProgress) => {
-    if (client.adherence >= 80) return 'up'
-    if (client.adherence >= 60) return 'stable'
-    return 'down'
-  }
-
-  // Get trend icon
-  const getTrendIcon = (direction: string) => {
-    switch (direction) {
-      case 'up':
-        return <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-success)]" aria-hidden />
-      case 'down':
-        return <TrendingDown className="w-4 h-4 text-[color:var(--fc-status-error)]" aria-hidden />
-      default:
-        return <Activity className="w-4 h-4 text-[color:var(--fc-status-warning)]" aria-hidden />
-    }
-  }
-
-
-  const getAdherenceColor = (adherence: number) => {
-    if (adherence >= 80) {
-      return 'text-[color:var(--fc-status-success)] bg-[color-mix(in_srgb,var(--fc-status-success)_14%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-success)_28%,transparent)]'
-    }
-    if (adherence >= 60) {
-      return 'text-[color:var(--fc-status-warning)] bg-[color-mix(in_srgb,var(--fc-status-warning)_14%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-warning)_28%,transparent)]'
-    }
-    return 'text-[color:var(--fc-status-error)] bg-[color-mix(in_srgb,var(--fc-status-error)_14%,transparent)] border border-[color-mix(in_srgb,var(--fc-status-error)_28%,transparent)]'
-  }
-
-  const getAdherenceIcon = (adherence: number) => {
-    if (adherence >= 80) return CheckCircle
-    if (adherence >= 60) return AlertTriangle
-    return AlertTriangle
-  }
-
-  // Client details helper functions
-  const getSelectedClientData = () => {
-    return clientProgress.find(client => client.id === selectedClient)
-  }
-
-  const getClientProgressData = async (clientId: string) => {
-    const client = clientProgress.find(c => c.id === clientId)
-    if (!client) return null
-
-    // Fetch real recent activity from database
-    const activities: Array<{ type: string; name: string; date: string; status: string }> = []
-    
-    // Fetch recent workout logs (use total_duration_minutes per schema)
-    const { data: recentWorkouts } = await supabase
-      .from('workout_logs')
-      .select(`
-        id,
-        completed_at,
-        total_duration_minutes,
-        workout_assignments(name)
-      `)
-      .eq('client_id', clientId)
-      .order('completed_at', { ascending: false })
-      .limit(5)
-    
-    if (recentWorkouts) {
-      recentWorkouts.forEach((workout: any) => {
-        if (workout.completed_at) {
-          activities.push({
-            type: 'workout',
-            name: workout.workout_assignments?.name || 'Workout',
-            date: workout.completed_at,
-            status: 'completed'
-          })
-        }
-      })
-    }
-    
-    // Fetch recent meal completions (meal_logs does not exist; use meal_completions)
-    const { data: recentMeals } = await supabase
-      .from('meal_completions')
-      .select('id, completed_at')
-      .eq('client_id', clientId)
-      .order('completed_at', { ascending: false })
-      .limit(3)
-    
-    if (recentMeals) {
-      recentMeals.forEach((meal: any) => {
-        activities.push({
-          type: 'meal',
-          name: 'Meal',
-          date: meal.completed_at || new Date().toISOString(),
-          status: 'logged'
-        })
-      })
-    }
-    
-    // Sort by date (most recent first) and limit to 10
-    const sortedActivities = activities
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10)
-
-    // Real body and compliance from metrics layer (getHabitCompliance is in habit.ts, not nutrition)
-    const [
-      { getCurrentWeight, getWeightChange, getCurrentBodyFat, getBodyMetricsHistory },
-      { getNutritionCompliance },
-      { getHabitCompliance },
-      { getPeriodBounds }
-    ] = await Promise.all([
-      import('@/lib/metrics/body'),
-      import('@/lib/metrics/nutrition'),
-      import('@/lib/metrics/habit'),
-      import('@/lib/metrics/period')
-    ])
-    const period = getPeriodBounds('this_month')
-    const [currentWeight, weightChange, currentBodyFat, bodyHistory, nutritionCompliance, habitCompliance] = await Promise.all([
-      getCurrentWeight(clientId),
-      getWeightChange(clientId),
-      getCurrentBodyFat(clientId),
-      getBodyMetricsHistory(clientId, 3),
-      getNutritionCompliance(clientId, period, 'this_month'),
-      getHabitCompliance(clientId, period, 'this_month')
-    ])
-    const weightTrend = weightChange > 0 ? 'up' : weightChange < 0 ? 'down' : 'stable'
-    const bodyFatChange = bodyHistory.length >= 2 && bodyHistory[0].body_fat_percentage != null && bodyHistory[1].body_fat_percentage != null
-      ? Math.round((bodyHistory[0].body_fat_percentage - bodyHistory[1].body_fat_percentage) * 10) / 10
-      : 0
-
+  const filteredQueue = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return overview.actionQueue
+    const matches = (name: string) => name.toLowerCase().includes(term)
     return {
-      ...client,
-      weight: {
-        current: currentWeight ?? 0,
-        change: weightChange,
-        trend: weightTrend
-      },
-      bodyFat: {
-        current: currentBodyFat ?? 0,
-        change: bodyFatChange,
-        trend: bodyFatChange > 0 ? 'up' : bodyFatChange < 0 ? 'down' : 'stable'
-      },
-      strength: {
-        squat: { current: 0, change: 0, trend: 'stable' as const },
-        bench: { current: 0, change: 0, trend: 'stable' as const },
-        deadlift: { current: 0, change: 0, trend: 'stable' as const }
-      },
-      compliance: {
-        workouts: client.adherence,
-        nutrition: nutritionCompliance.ratePercent,
-        habits: habitCompliance.ratePercent
-      },
-      recentActivity: sortedActivities
+      needAttention: overview.actionQueue.needAttention.filter((c) =>
+        matches(c.name)
+      ),
+      inactiveCheckIns: overview.actionQueue.inactiveCheckIns.filter((c) =>
+        matches(c.name)
+      ),
+      flagged: overview.actionQueue.flagged.filter((c) => matches(c.name)),
     }
-  }
+  }, [overview.actionQueue, searchTerm])
 
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case 'up': return 'text-green-600'
-      case 'down': return 'text-red-600'
-      default: return 'text-[color:var(--fc-text-dim)]'
-    }
-  }
-
-  // Analytics: real aggregates from filtered clients; avg session time from metrics (no mock)
-  const [analyticsEngagement, setAnalyticsEngagement] = useState<{ avgSessionTime: number }>({ avgSessionTime: 0 })
-  useEffect(() => {
-    if (!user || clientProgress.length === 0) {
-      setAnalyticsEngagement({ avgSessionTime: 0 })
-      return
-    }
-    import('@/lib/metrics').then(({ getAvgSessionTime, getPeriodBounds }) => {
-      const period = getPeriodBounds('this_month')
-      const clientIds = clientProgress.map((c) => c.id)
-      getAvgSessionTime(clientIds, period).then((avg) => setAnalyticsEngagement({ avgSessionTime: avg }))
-    })
-  }, [user, clientProgress])
-
-  const getAnalyticsData = () => {
-    const filteredClients = clientGroup === 'all' 
-      ? clientProgress 
-      : clientProgress.filter(client => {
-          switch (clientGroup) {
-            case 'high_performers': return client.adherence >= 80
-            case 'needs_attention': return client.adherence < 60
-            case 'beginners': return client.totalWorkouts < 10
-            case 'advanced': return client.totalWorkouts >= 20
-            default: return true
-          }
-        })
-
-    const totalClients = filteredClients.length
-    const avgAdherence = totalClients > 0 ? Math.round(filteredClients.reduce((sum, c) => sum + c.adherence, 0) / totalClients) : 0
-    const avgWorkouts = totalClients > 0 ? Math.round(filteredClients.reduce((sum, c) => sum + c.totalWorkouts, 0) / totalClients * 10) / 10 : 0
-    const avgStreak = totalClients > 0 ? Math.round(filteredClients.reduce((sum, c) => sum + c.streak, 0) / totalClients * 10) / 10 : 0
-    
-    // Trend: single data point from current snapshot (no historical series without RPC)
-    const trendData = {
-      adherence: totalClients ? [avgAdherence] : [],
-      workouts: totalClients ? [avgWorkouts] : [],
-      strength: totalClients ? [avgWorkouts] : []
-    }
-
-    const programEffectiveness = {
-      weightLoss: { completed: 0, total: 0, rate: 0 },
-      strengthGain: { completed: 0, total: 0, rate: 0 },
-      generalFitness: { completed: totalClients, total: totalClients, rate: totalClients ? 100 : 0 }
-    }
-
-    const engagementMetrics = {
-      dailyActive: totalClients,
-      weeklyActive: totalClients,
-      monthlyActive: totalClients,
-      avgSessionTime: analyticsEngagement.avgSessionTime
-    }
-
-    const retentionData = {
-      month1: totalClients,
-      month3: totalClients,
-      month6: totalClients,
-      month12: totalClients
-    }
-
-    return {
-      totalClients,
-      avgAdherence,
-      avgWorkouts,
-      avgStreak,
-      trendData,
-      programEffectiveness,
-      engagementMetrics,
-      retentionData,
-      filteredClients
-    }
-  }
-
-  const getClientGroupLabel = (group: string) => {
-    switch (group) {
-      case 'all': return 'All Clients'
-      case 'high_performers': return 'High Performers'
-      case 'needs_attention': return 'Needs Attention'
-      case 'beginners': return 'Beginners'
-      case 'advanced': return 'Advanced'
-      default: return 'All Clients'
-    }
-  }
+  const periodLabel = period === 'week' ? 'This Week' : 'This Month'
+  const completedWorkoutsLabel =
+    period === 'week' ? 'Workouts This Week' : 'Workouts This Month'
 
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
-          <CoachPageShell widthVariant="data-7xl" className="p-6 pb-24 space-y-6 bg-[color:var(--fc-bg-page)]">
+          <CoachPageShell
+            widthVariant="data-7xl"
+            className="p-6 pb-24 space-y-6 bg-[color:var(--fc-bg-page)]"
+          >
             <PageSkeleton variant="dashboard" />
           </CoachPageShell>
         </AnimatedBackground>
@@ -566,1395 +388,331 @@ export default function CoachProgress() {
     )
   }
 
-  const clientData = selectedClientData
-
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="px-4 py-4 pb-32 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
-            <AnalyticsNav />
-            <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
-              <div className="flex flex-col gap-3 sm:gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] flex-shrink-0">
-                    <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                      Progress Dashboard
-                    </h1>
-                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                      Monitor client momentum, streaks, and completion metrics.
-                    </p>
-                  </div>
-                </div>
+        <CoachPageShell
+          widthVariant="data-7xl"
+          className="px-4 py-4 pb-32 sm:px-6 sm:py-6 space-y-4 sm:space-y-6"
+        >
+          <AnalyticsNav />
+
+          {/* Header */}
+          <GlassCard
+            elevation={2}
+            className="fc-card-shell p-3 sm:p-6 md:p-8"
+          >
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] flex-shrink-0">
+                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
+                  Progress Dashboard
+                </h1>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  Team operations cockpit — KPIs, action queue, and wellness pulse.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+
+          {error && (
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 border border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)]"
+            >
+              <p className="text-sm text-[color:var(--fc-status-error)]">
+                {error}
+              </p>
+            </GlassCard>
+          )}
+
+          {/* Filter row */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
+              <Input
+                placeholder="Search clients by name…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="fc-input h-12 w-full pl-12"
+                aria-label="Search clients in action queue"
+              />
+            </div>
+            <Select
+              value={period}
+              onValueChange={(value) => setPeriod(value as Period)}
+            >
+              <SelectTrigger className="fc-select h-12 w-full lg:w-48">
+                <Calendar className="w-4 h-4 mr-2" aria-hidden />
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Canonical KPI strip */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
+            >
+              <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-3 text-white flex-shrink-0">
+                <Users className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
+                  {overview.totals.activeClients}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  Active Clients
+                </p>
               </div>
             </GlassCard>
-            <div className="space-y-6">
-
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
-                    <Input
-                      placeholder="Search clients by name..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="fc-input h-12 w-full pl-12"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <Select value={dateRange} onValueChange={setDateRange}>
-                      <SelectTrigger className="fc-select h-12 w-48">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Date Range" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="week">This Week</SelectItem>
-                        <SelectItem value="month">This Month</SelectItem>
-                        <SelectItem value="quarter">This Quarter</SelectItem>
-                        <SelectItem value="year">This Year</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={metricFilter} onValueChange={setMetricFilter}>
-                      <SelectTrigger className="fc-select h-12 w-48">
-                        <Target className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Metric" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Metrics</SelectItem>
-                        <SelectItem value="workouts">Workouts</SelectItem>
-                        <SelectItem value="adherence">Adherence</SelectItem>
-                        <SelectItem value="streak">Streak</SelectItem>
-                        <SelectItem value="completion">Completion</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="fc-select h-12 w-48">
-                        <SortAsc className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Sort by" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="adherence">Adherence</SelectItem>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="workouts">Total Workouts</SelectItem>
-                        <SelectItem value="streak">Current Streak</SelectItem>
-                        <SelectItem value="completion">Completion Rate</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
-                  <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-2 sm:p-3 text-white flex-shrink-0">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clientProgress.length}</p>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
-                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex-shrink-0">
-                    <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className={`text-xl sm:text-2xl font-bold fc-text-primary`}>{workoutStats.totalSessions}</p>
-                    <p className={`text-sm fc-text-dim`}>Total Workouts</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
-                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 flex-shrink-0">
-                    <BarChart3 className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className={`text-xl sm:text-2xl font-bold fc-text-primary`}>{workoutStats.averageCompletionRate}%</p>
-                    <p className={`text-sm fc-text-dim`}>Avg Completion</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
-                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 flex-shrink-0">
-                    <TrendingUp className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className={`text-xl sm:text-2xl font-bold fc-text-primary`}>{workoutStats.thisMonth}</p>
-                    <p className={`text-sm fc-text-dim`}>This Month</p>
-                  </div>
-                </div>
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
+            >
+              <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-3 text-white flex-shrink-0">
+                <Dumbbell className="w-5 h-5" />
               </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
+                  {overview.totals.completedWorkouts}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  {completedWorkoutsLabel}
+                </p>
+              </div>
+            </GlassCard>
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
+            >
+              <div className="rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 p-3 text-white flex-shrink-0">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
+                  {overview.totals.avgAdherence}%
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  Avg Adherence
+                </p>
+              </div>
+            </GlassCard>
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
+            >
+              <div className="rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 p-3 text-white flex-shrink-0">
+                <Heart className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
+                  {overview.totals.checkinsThisWeek}
+                </p>
+                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  Check-ins This Week
+                </p>
+              </div>
+            </GlassCard>
+          </div>
 
-            {/* Enhanced Client Progress Tabs */}
-            <div className="relative">
-              <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 gap-2 relative z-50 rounded-lg p-1 bg-transparent border-0">
-                  <TabsTrigger
-                    value="overview"
-                    className="text-sm relative z-50 rounded-lg fc-text-primary"
-                  >
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="clients"
-                    className="text-sm relative z-50 rounded-lg fc-text-primary"
-                  >
-                    Client Details
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="analytics"
-                    className="text-sm relative z-50 rounded-lg fc-text-primary"
-                  >
-                    Analytics
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Enhanced Overview Tab */}
-                <TabsContent value="overview" className="space-y-8 mt-6 relative z-0">
-                  <div className="pt-8"></div>
-                  
-                  {/* Enhanced KPI Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {/* Total Active Clients */}
-                    <div className="flex items-center gap-4 p-4 rounded-lg">
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600">
-                          <Users className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className={`text-3xl font-bold fc-text-primary`}>{clientProgress.length}</div>
-                          <div className={`text-sm font-medium fc-text-dim`}>Active Clients</div>
-                          <div className={`text-xs fc-text-dim mt-1`}>
-                            {clientProgress.filter(c => c.adherence >= 80).length} high performers
-                          </div>
-                        </div>
-                      </div>
-                    <div className="flex items-center gap-4 p-4 rounded-lg">
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
-                          <CheckCircle className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className={`text-3xl font-bold fc-text-primary`}>{workoutStats.averageCompletionRate}%</div>
-                          <div className={`text-sm font-medium fc-text-dim`}>Avg Compliance</div>
-                          <div className={`text-xs fc-text-dim mt-1`}>
-                            {workoutStats.averageCompletionRate >= 80 ? 'Excellent' : 
-                             workoutStats.averageCompletionRate >= 60 ? 'Good' : 'Needs improvement'}
-                          </div>
-                        </div>
-                      </div>
-                    <div className="flex items-center gap-4 p-4 rounded-lg">
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600">
-                          <AlertTriangle className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className={`text-3xl font-bold fc-text-primary`}>
-                            {clientProgress.filter(c => c.adherence < 60).length}
-                          </div>
-                          <div className={`text-sm font-medium fc-text-dim`}>Need Attention</div>
-                          <div className={`text-xs fc-text-dim mt-1`}>
-                            Below 60% adherence
-                          </div>
-                        </div>
-                      </div>
-                    <div className="flex items-center gap-4 p-4 rounded-lg">
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600">
-                          <Trophy className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className={`text-3xl font-bold fc-text-primary`}>
-                            {clientProgress.filter(c => c.adherence >= 90).length}
-                          </div>
-                          <div className={`text-sm font-medium fc-text-dim`}>Top Performers</div>
-                          <div className={`text-xs fc-text-dim mt-1`}>
-                            90%+ adherence
-                          </div>
-                        </div>
-                      </div>
-                  </div>
-
-                  {/* Enhanced Client Progress Cards */}
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)]">
-                          <Users className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <h2 className={`text-2xl font-bold fc-text-primary`}>Client Progress Overview</h2>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="rounded-xl">
-                          {filteredClientProgress.length} clients
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredClientProgress.map((client) => {
-                        const trendDirection = getTrendDirection(client)
-                        const sparklineData = getSparklineDataForClient(client)
-                        const AdherenceIcon = getAdherenceIcon(client.adherence)
-                        
-                        return (
-                          <div key={client.id} className="p-4 rounded-lg">
-                            <div className="pb-4">
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-12 h-12 rounded-xl ${getClientAvatarColor(client.name)} shadow-2xl shadow-black/25 flex items-center justify-center`}>
-                                    <span className="text-white font-bold text-lg">
-                                      {client.name.charAt(0)}
-                                    </span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <CardTitle className={`text-lg font-bold fc-text-primary group-hover:text-[color:var(--fc-accent)] transition-colors`}>
-                                      {client.name}
-                                    </CardTitle>
-                                    <div className={`fc-text-dim text-sm mt-1`}>
-                                      {client.totalWorkouts} total workouts
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="pt-0">
-                              <div className="space-y-4">
-                                {/* Key Metrics */}
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="text-center">
-                                    <div className={`text-2xl font-bold fc-text-primary`}>{client.adherence}%</div>
-                                    <div className={`text-xs fc-text-dim`}>Adherence</div>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className={`text-2xl font-bold fc-text-primary`}>{client.streak}</div>
-                                    <div className={`text-xs fc-text-dim`}>Day Streak</div>
-                                  </div>
-                                </div>
-                                
-                                {/* Progress Bar */}
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className={`fc-text-dim`}>Progress</span>
-                                    <span className={`font-semibold fc-text-primary`}>{client.adherence}%</span>
-                                  </div>
-                                  <Progress 
-                                    value={client.adherence} 
-                                    className="h-3 rounded-full"
-                                  />
-                                </div>
-                                
-                                {/* Mini Sparkline */}
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-sm fc-text-dim`}>Weekly Activity</span>
-                                  <div className="flex items-center gap-1">
-                                    {getTrendIcon(trendDirection)}
-                                    <div className="flex gap-1">
-                                      {sparklineData.map((value, index) => (
-                                        <div
-                                          key={index}
-                                          className="w-2 bg-purple-500 rounded-full"
-                                          style={{ height: `${value * 4}px` }}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                {/* Status Badge */}
-                                <div className="flex justify-center">
-                                  <Badge className={`${getAdherenceColor(client.adherence)} rounded-xl px-3 py-1`}>
-                                    <AdherenceIcon className="w-3 h-3 mr-1" />
-                                    {client.adherence >= 80 ? 'On Track' : 
-                                     client.adherence >= 60 ? 'Making Progress' : 'Needs Attention'}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {filteredClientProgress.length === 0 && (
-                    <div className="p-12 text-center">
-                        <div className={`p-6 rounded-2xl bg-gradient-to-r from-purple-600 via-orange-500 to-green-500 shadow-2xl shadow-black/25 w-24 h-24 mx-auto mb-6 flex items-center justify-center`}>
-                          <Users className="w-12 h-12 text-white" />
-                        </div>
-                        <h3 className={`text-2xl font-bold fc-text-primary mb-4`}>
-                          {clientProgress.length === 0 ? 'No clients found' : 'No clients match your search'}
-                        </h3>
-                        <p className={`fc-text-dim text-lg mb-8 max-w-md mx-auto`}>
-                          {clientProgress.length === 0 
-                            ? 'Start by adding clients to track their progress.'
-                            : 'Try adjusting your search criteria or filters.'
-                          }
-                        </p>
-                    </div>
-                  )}
-
-                  {/* Wellness Overview */}
-                  <div className="p-6 mb-6">
-                    <div className="p-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 shadow-2xl shadow-black/25`}>
-                          <Heart className="w-5 h-5 text-white" />
-                        </div>
-                        <CardTitle className={`text-xl font-bold fc-text-primary`}>Wellness Overview</CardTitle>
-                      </div>
-                    </div>
-                    <div className="p-6 pt-0 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className={`p-4 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-2xl`}>
-                          <p className={`text-sm fc-text-dim mb-1`}>Checked In Today</p>
-                          <p className={`text-2xl font-bold fc-text-primary`}>
-                            {wellnessOverview.checkedInToday} / {wellnessOverview.totalClients}
-                          </p>
-                        </div>
-                        <div className={`p-4 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-2xl`}>
-                          <p className={`text-sm fc-text-dim mb-1`}>Avg Energy</p>
-                          <p className={`text-2xl font-bold fc-text-primary`}>
-                            {wellnessOverview.averageEnergy > 0 ? wellnessOverview.averageEnergy.toFixed(1) : '—'} / 10
-                          </p>
-                        </div>
-                      </div>
-
-                      {wellnessOverview.highStressCount > 0 && (
-                        <div className={`p-4 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-2xl border-yellow-500/50 bg-yellow-500/10`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                            <p className={`font-semibold fc-text-primary`}>
-                              High Stress ({wellnessOverview.highStressCount} clients)
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            {wellnessOverview.highStressClients.slice(0, 5).map((client) => (
-                              <p key={client.id} className={`text-sm fc-text-dim`}>
-                                {client.name} — Stress: {client.stress}/10
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {wellnessOverview.inactiveClients.length > 0 && (
-                        <div className={`p-4 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-2xl border-orange-500/50 bg-orange-500/10`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="w-5 h-5 text-orange-500" />
-                            <p className={`font-semibold fc-text-primary`}>
-                              Inactive Check-ins ({wellnessOverview.inactiveClients.length} clients)
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            {wellnessOverview.inactiveClients.map((client) => (
-                              <p key={client.id} className={`text-sm fc-text-dim`}>
-                                {client.name} — {client.daysSince === 999 ? 'Never checked in' : `${client.daysSince} days ago`}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Enhanced Weekly Progress and Top Performers */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Weekly Progress */}
-                    <div className="p-6">
-                      <div className="p-6">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-2xl shadow-black/25`}>
-                            <Calendar className="w-5 h-5 text-white" />
-                          </div>
-                          <CardTitle className={`text-xl font-bold fc-text-primary`}>This Week's Progress</CardTitle>
-                        </div>
-                      </div>
-                      <div className="p-6 pt-0 space-y-6">
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className={`fc-text-dim font-medium`}>Total Workouts</span>
-                            <span className={`font-bold text-2xl fc-text-primary`}>{workoutStats.thisWeek}</span>
-                          </div>
-                          <Progress 
-                            value={(workoutStats.thisWeek / (clientProgress.length * 5)) * 100} 
-                            className="h-4 rounded-full" 
-                          />
-                          <div className="flex justify-between text-sm">
-                            <span className={`fc-text-dim`}>Goal: 5 workouts per client</span>
-                            <span className={`fc-text-dim`}>
-                              {Math.round((workoutStats.thisWeek / (clientProgress.length * 5)) * 100)}% of goal
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className={`fc-text-dim font-medium`}>Average Completion</span>
-                            <span className={`font-bold text-2xl fc-text-primary`}>{workoutStats.averageCompletionRate}%</span>
-                          </div>
-                          <Progress 
-                            value={workoutStats.averageCompletionRate} 
-                            className="h-4 rounded-full" 
-                          />
-                          <div className="flex justify-between text-sm">
-                            <span className={`fc-text-dim`}>Target: 80%+</span>
-                            <span className={`fc-text-dim`}>
-                              {workoutStats.averageCompletionRate >= 80 ? '✅ Target met' : '⚠️ Below target'}
-                            </span>
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-
-                    {/* Top Performers */}
-                    <div className="p-6">
-                      <div className="p-6">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 shadow-2xl shadow-black/25`}>
-                            <Award className="w-5 h-5 text-white" />
-                          </div>
-                          <CardTitle className={`text-xl font-bold fc-text-primary`}>Top Performers</CardTitle>
-                        </div>
-                      </div>
-                      <div className="p-6 pt-0">
-                        <div className="space-y-4">
-                          {clientProgress
-                            .sort((a, b) => b.adherence - a.adherence)
-                            .slice(0, 3)
-                            .map((client, index) => {
-                              const Icon = getAdherenceIcon(client.adherence)
-                              const trendDirection = getTrendDirection(client)
-                              return (
-                                <div key={client.id} className={`flex items-center gap-4 p-4 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] rounded-2xl hover:shadow-lg transition-all duration-200`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-xl ${getClientAvatarColor(client.name)} shadow-2xl shadow-black/25 flex items-center justify-center`}>
-                                      <span className="text-white font-bold text-sm">
-                                        {client.name.charAt(0)}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`text-lg font-bold fc-text-primary`}>#{index + 1}</span>
-                                      <Icon className="w-4 h-4 text-green-600" />
-                                    </div>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className={`font-semibold fc-text-primary`}>{client.name}</p>
-                                    <div className="flex items-center gap-2">
-                                      <p className={`text-sm fc-text-dim`}>{client.adherence}% adherence</p>
-                                      {getTrendIcon(trendDirection)}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <Badge className={`${getAdherenceColor(client.adherence)} rounded-xl px-3 py-1`}>
-                                      {client.adherence}%
-                                    </Badge>
-                                    <div className={`text-xs fc-text-dim mt-1`}>
-                                      {client.streak} day streak
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                        </div>
-
-                        {/* Celebration Message */}
-                        <div className={`mt-6 p-4 rounded-2xl bg-green-900/20 border border-green-200 dark:border-green-800`}>
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-green-600" />
-                            <span className={`font-semibold text-green-800 dark:text-green-200`}>
-                              Great job this week!
-                            </span>
-                          </div>
-                          <p className={`text-sm text-green-600 dark:text-green-400 mt-1`}>
-                            {clientProgress.filter(c => c.adherence >= 80).length} clients are exceeding expectations
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actionable Insights Section */}
-                  <div className="p-6">
-                    <div className="p-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl shadow-black/25`}>
-                          <Heart className="w-5 h-5 text-white" />
-                        </div>
-                        <CardTitle className={`text-xl font-bold fc-text-primary`}>Coaching Insights & Actions</CardTitle>
-                      </div>
-                    </div>
-                    <div className="p-6 pt-0">
-                      <div className="grid md:grid-cols-2 gap-6">
-                        {/* Clients Needing Attention */}
-                        <div className="space-y-4">
-                          <h3 className={`font-semibold fc-text-primary flex items-center gap-2`}>
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
-                            Clients Needing Attention
-                          </h3>
-                          <div className="space-y-3">
-                            {clientProgress
-                              .filter(c => c.adherence < 60)
-                              .slice(0, 3)
-                              .map((client) => (
-                                <div key={client.id} className={`flex items-center justify-between p-3 rounded-xl bg-red-900/20 border border-red-200 dark:border-red-800`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-xl ${getClientAvatarColor(client.name)} shadow-2xl shadow-black/25 flex items-center justify-center`}>
-                                      <span className="text-white font-bold text-sm">
-                                        {client.name.charAt(0)}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <p className={`font-medium fc-text-primary`}>{client.name}</p>
-                                      <p className={`text-sm fc-text-dim`}>{client.adherence}% adherence</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            {clientProgress.filter(c => c.adherence < 60).length === 0 && (
-                              <div className={`p-4 rounded-xl bg-green-900/20 border border-green-200 dark:border-green-800`}>
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle className="w-5 h-5 text-green-600" />
-                                  <span className={`font-medium text-green-800 dark:text-green-200`}>
-                                    All clients are performing well!
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="space-y-4">
-                          <h3 className={`font-semibold fc-text-primary flex items-center gap-2`}>
-                            <Zap className="w-5 h-5 text-purple-500" />
-                            Quick Actions
-                          </h3>
-                          <div className="space-y-3">
-                            <Button
-                              variant="outline"
-                              className="w-full rounded-xl py-3"
-                              onClick={() => setShowReportModal(true)}
-                            >
-                              <BarChart3 className="w-4 h-4 mr-2" />
-                              Generate Progress Report
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Enhanced Client Details Tab */}
-                <TabsContent value="clients" className="space-y-8 mt-6 relative z-0">
-                  <div className="pt-8"></div>
-                  
-                  {!selectedClient ? (
-                    /* Client Selection View */
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)]">
-                            <Users className="w-5 h-5 text-blue-400" />
-                          </div>
-                          <h2 className={`text-2xl font-bold fc-text-primary`}>Client Details</h2>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="rounded-xl">
-                            {filteredClientProgress.length} clients
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredClientProgress.map((client) => {
-                          const AdherenceIcon = getAdherenceIcon(client.adherence)
-                          const trendDirection = getTrendDirection(client)
-                          return (
-                            <div key={client.id} className="p-4 rounded-lg cursor-pointer" onClick={() => setSelectedClient(client.id)}>
-                              <div className="pb-4">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-12 h-12 rounded-xl ${getClientAvatarColor(client.name)} shadow-2xl shadow-black/25 flex items-center justify-center`}>
-                                    <span className="text-white font-bold text-lg">
-                                      {client.name.charAt(0)}
-                                    </span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <CardTitle className={`text-lg font-bold fc-text-primary group-hover:text-[color:var(--fc-accent)] transition-colors`}>
-                                      {client.name}
-                                    </CardTitle>
-                                    <div className={`fc-text-dim text-sm mt-1`}>
-                                      Last workout: {new Date(client.lastWorkout).toLocaleDateString()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="pt-0">
-                                <div className="space-y-4">
-                                  {/* Key Metrics */}
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="text-center">
-                                      <div className={`text-2xl font-bold fc-text-primary`}>{client.adherence}%</div>
-                                      <div className={`text-xs fc-text-dim`}>Adherence</div>
-                                    </div>
-                                    <div className="text-center">
-                                      <div className={`text-2xl font-bold fc-text-primary`}>{client.streak}</div>
-                                      <div className={`text-xs fc-text-dim`}>Day Streak</div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Progress Bar */}
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                      <span className={`fc-text-dim`}>Progress</span>
-                                      <span className={`font-semibold fc-text-primary`}>{client.adherence}%</span>
-                                    </div>
-                                    <Progress 
-                                      value={client.adherence} 
-                                      className="h-3 rounded-full"
-                                    />
-                                  </div>
-                                  
-                                  {/* Status Badge */}
-                                  <div className="flex justify-center">
-                                    <Badge className={`${getAdherenceColor(client.adherence)} rounded-xl px-3 py-1`}>
-                                      <AdherenceIcon className="w-3 h-3 mr-1" />
-                                      {client.adherence >= 80 ? 'On Track' : 
-                                       client.adherence >= 60 ? 'Making Progress' : 'Needs Attention'}
-                                    </Badge>
-                                  </div>
-
-                                  {/* Click to view details */}
-                                  <div className="flex items-center justify-center gap-2 text-purple-600 text-sm font-medium">
-                                    <Eye className="w-4 h-4" />
-                                    Click to view details
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Individual Client Details View */
-                    <div className="space-y-8">
-                      {selectedClientData ? (
-                          <>
-                            {/* Client Header */}
-                            <div className="p-6">
-                              <div className="p-6">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setSelectedClient(null)}
-                                      className="rounded-xl"
-                                    >
-                                      <ArrowLeft className="w-4 h-4 mr-2" />
-                                      Back to Clients
-                                    </Button>
-                                    <div className={`w-16 h-16 rounded-2xl ${getClientAvatarColor(clientData.name)} shadow-2xl shadow-black/25 flex items-center justify-center`}>
-                                      <span className="text-white font-bold text-2xl">
-                                        {clientData.name.charAt(0)}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <CardTitle className={`text-3xl font-bold fc-text-primary`}>
-                                        {clientData.name}
-                                      </CardTitle>
-                                      <div className={`fc-text-dim mt-1`}>
-                                        Member since {new Date().toLocaleDateString()}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <Select value={clientDetailPeriod} onValueChange={(value: 'week' | 'month' | 'quarter' | 'year') => setClientDetailPeriod(value)}>
-                                      <SelectTrigger className="w-40 h-10 rounded-xl">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="week">Last 7 Days</SelectItem>
-                                        <SelectItem value="month">Last 30 Days</SelectItem>
-                                        <SelectItem value="quarter">Last 90 Days</SelectItem>
-                                        <SelectItem value="year">Last Year</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Key Progress Metrics */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                              {/* Current Weight */}
-                              <div className="p-4 rounded-lg">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-2xl shadow-black/25`}>
-                                      <Activity className="w-6 h-6 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className={`text-3xl font-bold fc-text-primary`}>{clientData.weight.current}kg</div>
-                                      <div className={`text-sm font-medium fc-text-dim`}>Current Weight</div>
-                                      <div className={`text-xs ${getTrendColor(clientData.weight.trend)} mt-1`}>
-                                        {clientData.weight.change > 0 ? '+' : ''}{clientData.weight.change}kg this month
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Body Fat % */}
-                              <div className="p-4 rounded-lg">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 shadow-2xl shadow-black/25`}>
-                                      <Target className="w-6 h-6 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className={`text-3xl font-bold fc-text-primary`}>{clientData.bodyFat.current}%</div>
-                                      <div className={`text-sm font-medium fc-text-dim`}>Body Fat</div>
-                                      <div className={`text-xs ${getTrendColor(clientData.bodyFat.trend)} mt-1`}>
-                                        {clientData.bodyFat.change > 0 ? '+' : ''}{clientData.bodyFat.change}% this month
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Overall Compliance */}
-                              <div className="p-4 rounded-lg">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 shadow-2xl shadow-black/25`}>
-                                      <CheckCircle className="w-6 h-6 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className={`text-3xl font-bold fc-text-primary`}>{clientData.adherence}%</div>
-                                      <div className={`text-sm font-medium fc-text-dim`}>Compliance</div>
-                                      <div className={`text-xs fc-text-dim mt-1`}>
-                                        {clientData.adherence >= 80 ? 'Excellent' : 
-                                         clientData.adherence >= 60 ? 'Good' : 'Needs improvement'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Strength Gains */}
-                              <div className="p-4 rounded-lg">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl shadow-black/25`}>
-                                      <Dumbbell className="w-6 h-6 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className={`text-3xl font-bold fc-text-primary`}>+{clientData.strength.squat.change}kg</div>
-                                      <div className={`text-sm font-medium fc-text-dim`}>Squat Progress</div>
-                                      <div className={`text-xs ${getTrendColor(clientData.strength.squat.trend)} mt-1`}>
-                                        {clientData.strength.squat.current}kg current
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Detailed Progress Charts */}
-                            <div className="grid md:grid-cols-2 gap-6">
-                              {/* Compliance Breakdown */}
-                              <div className="p-6 rounded-lg">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-2xl shadow-black/25`}>
-                                      <BarChart3 className="w-5 h-5 text-white" />
-                                    </div>
-                                    <CardTitle className={`text-xl font-bold fc-text-primary`}>Compliance Breakdown</CardTitle>
-                                  </div>
-                                </div>
-                                <div className="p-6 pt-0 space-y-6">
-                                  <div className="space-y-4">
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between text-sm">
-                                        <span className={`fc-text-dim`}>Workouts</span>
-                                        <span className={`font-semibold fc-text-primary`}>{clientData.compliance.workouts}%</span>
-                                      </div>
-                                      <Progress value={clientData.compliance.workouts} className="h-3 rounded-full" />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between text-sm">
-                                        <span className={`fc-text-dim`}>Nutrition</span>
-                                        <span className={`font-semibold fc-text-primary`}>{clientData.compliance.nutrition}%</span>
-                                      </div>
-                                      <Progress value={clientData.compliance.nutrition} className="h-3 rounded-full" />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between text-sm">
-                                        <span className={`fc-text-dim`}>Habits</span>
-                                        <span className={`font-semibold fc-text-primary`}>{clientData.compliance.habits}%</span>
-                                      </div>
-                                      <Progress value={clientData.compliance.habits} className="h-3 rounded-full" />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Strength Progress */}
-                              <div className="p-6">
-                                <div className="p-6">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl shadow-black/25`}>
-                                      <Dumbbell className="w-5 h-5 text-white" />
-                                    </div>
-                                    <CardTitle className={`text-xl font-bold fc-text-primary`}>Strength Progress</CardTitle>
-                                  </div>
-                                </div>
-                                <div className="p-6 pt-0 space-y-6">
-                                  <div className="space-y-4">
-                                    {Object.entries(clientData.strength).map(([exercise, data]: [string, any]) => (
-                                      <div key={exercise} className={`p-4 rounded-xl bg-[color:var(--fc-glass-highlight)]/50 border border-[color:var(--fc-glass-border)]`}>
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span className={`font-semibold fc-text-primary capitalize`}>{exercise}</span>
-                                          <div className="flex items-center gap-2">
-                                            {getTrendIcon(data.trend)}
-                                            <span className={`text-sm font-bold ${getTrendColor(data.trend)}`}>
-                                              +{data.change}kg
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className={`text-2xl font-bold fc-text-primary`}>
-                                          {data.current}kg
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Recent Activity Feed */}
-                            <div className="p-6">
-                              <div className="p-6">
-                                <div className="flex items-center gap-3">
-                                  <div className={`p-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 shadow-2xl shadow-black/25`}>
-                                    <Clock className="w-5 h-5 text-white" />
-                                  </div>
-                                  <CardTitle className={`text-xl font-bold fc-text-primary`}>Recent Activity</CardTitle>
-                                </div>
-                              </div>
-                              <div className="p-6 pt-0">
-                                <div className="space-y-4">
-                                  {clientData.recentActivity.map((activity: any, index: number) => (
-                                    <div key={index} className={`flex items-center gap-4 p-4 rounded-xl bg-[color:var(--fc-glass-highlight)]/50 border border-[color:var(--fc-glass-border)]`}>
-                                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                        activity.type === 'workout' ? 'bg-blue-100 dark:bg-blue-900/20' :
-                                        activity.type === 'meal' ? 'bg-green-100 dark:bg-green-900/20' :
-                                        'bg-purple-100 dark:bg-purple-900/20'
-                                      }`}>
-                                        {activity.type === 'workout' ? <Dumbbell className="w-5 h-5 text-blue-600" /> :
-                                         activity.type === 'meal' ? <Heart className="w-5 h-5 text-green-600" /> :
-                                         <Target className="w-5 h-5 text-purple-600" />}
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className={`font-semibold fc-text-primary`}>{activity.name}</div>
-                                        <div className={`text-sm fc-text-dim`}>
-                                          {new Date(activity.date).toLocaleString()}
-                                        </div>
-                                      </div>
-                                      <Badge className={`rounded-xl ${
-                                        activity.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200' :
-                                        'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200'
-                                      }`}>
-                                        {activity.status}
-                                      </Badge>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                      ) : (
-                        selectedClientLoading ? null : null
-                      )}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Enhanced Analytics Tab */}
-                <TabsContent value="analytics" className="space-y-8 mt-6 relative z-0">
-                  <div className="pt-8"></div>
-                  
-                  {(() => {
-                    const analyticsData = getAnalyticsData()
-                    
-                    return (
-                      <>
-                        {/* Analytics Header */}
-                        <div className="space-y-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)]">
-                                <BarChart3 className="w-5 h-5 text-purple-400" />
-                              </div>
-                              <h2 className={`text-2xl font-bold fc-text-primary`}>Advanced Analytics</h2>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="rounded-xl">
-                                {analyticsData.totalClients} clients
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Analytics Controls */}
-                          <div className="p-6">
-                            <div className="p-6">
-                              <div className="flex flex-col lg:flex-row gap-4">
-                                <div className="flex-1">
-                                  <Select value={analyticsPeriod} onValueChange={(value: 'week' | 'month' | 'quarter' | 'year') => setAnalyticsPeriod(value)}>
-                                    <SelectTrigger className="w-full h-12 rounded-xl">
-                                      <Calendar className="w-4 h-4 mr-2" />
-                                      <SelectValue placeholder="Time Period" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="week">Last 7 Days</SelectItem>
-                                      <SelectItem value="month">Last 30 Days</SelectItem>
-                                      <SelectItem value="quarter">Last 90 Days</SelectItem>
-                                      <SelectItem value="year">Last Year</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                
-                                <div className="flex-1">
-                                  <Select value={clientGroup} onValueChange={setClientGroup}>
-                                    <SelectTrigger className="w-full h-12 rounded-xl">
-                                      <Users className="w-4 h-4 mr-2" />
-                                      <SelectValue placeholder="Client Group" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="all">All Clients</SelectItem>
-                                      <SelectItem value="high_performers">High Performers</SelectItem>
-                                      <SelectItem value="needs_attention">Needs Attention</SelectItem>
-                                      <SelectItem value="beginners">Beginners</SelectItem>
-                                      <SelectItem value="advanced">Advanced</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    className="rounded-xl h-12"
-                                    disabled={!selectedClient}
-                                    title={!selectedClient ? 'Select a client in Client Details to export' : undefined}
-                                    onClick={() => {
-                                      if (selectedClient) {
-                                        const name = clientProgress.find(c => c.id === selectedClient)?.name
-                                        exportBodyMetricsCsv(selectedClient, name)
-                                      }
-                                    }}
-                                  >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Export
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Key Aggregate Metrics */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                          {/* Average Client Progress */}
-                          <div className="p-4 rounded-lg">
-                            <div className="p-6">
-                              <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-2xl shadow-black/25`}>
-                                  <TrendingUp className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`text-3xl font-bold fc-text-primary`}>{analyticsData.avgAdherence.toFixed(1)}%</div>
-                                  <div className={`text-sm font-medium fc-text-dim`}>Avg Progress</div>
-                                  <div className={`text-xs fc-text-dim mt-1`}>
-                                    {getClientGroupLabel(clientGroup)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Program Effectiveness */}
-                          <div className="p-4 rounded-lg">
-                            <div className="p-6">
-                              <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 shadow-2xl shadow-black/25`}>
-                                  <Target className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`text-3xl font-bold fc-text-primary`}>82%</div>
-                                  <div className={`text-sm font-medium fc-text-dim`}>Program Success</div>
-                                  <div className={`text-xs fc-text-dim mt-1`}>
-                                    Weight loss programs
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Engagement Rate */}
-                          <div className="p-4 rounded-lg">
-                            <div className="p-6">
-                              <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 shadow-2xl shadow-black/25`}>
-                                  <Activity className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`text-3xl font-bold fc-text-primary`}>{analyticsData.engagementMetrics.dailyActive}%</div>
-                                  <div className={`text-sm font-medium fc-text-dim`}>Daily Active</div>
-                                  <div className={`text-xs fc-text-dim mt-1`}>
-                                    {analyticsData.engagementMetrics.avgSessionTime}min avg session
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Retention Rate */}
-                          <div className="p-4 rounded-lg">
-                            <div className="p-6">
-                              <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl shadow-black/25`}>
-                                  <Users className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`text-3xl font-bold fc-text-primary`}>{analyticsData.retentionData.month3}%</div>
-                                  <div className={`text-sm font-medium fc-text-dim`}>3-Month Retention</div>
-                                  <div className={`text-xs fc-text-dim mt-1`}>
-                                    Client retention rate
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Interactive Charts & Graphs */}
-                        <div className="grid md:grid-cols-2 gap-6">
-                          {/* Performance Trends */}
-                          <div className="p-6">
-                            <div className="p-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-2xl shadow-black/25`}>
-                                  <BarChart3 className="w-5 h-5 text-white" />
-                                </div>
-                                <CardTitle className={`text-xl font-bold fc-text-primary`}>Performance Trends</CardTitle>
-                              </div>
-                            </div>
-                            <div className="p-6 pt-0">
-                              <div className="space-y-6">
-                                {/* Adherence Trend */}
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className={`font-semibold fc-text-primary`}>Adherence Trend</span>
-                                    <span className={`text-sm fc-text-dim`}>12 months</span>
-                                  </div>
-                                  <div className="flex items-end gap-1 h-16">
-                                    {convertToSparklinePoints(analyticsData.trendData.adherence as any).map((point, index) => (
-                                      <div
-                                        key={index}
-                                        className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-sm"
-                                        style={{ height: `${point.height}px` }}
-                                        title={`Month ${index + 1}: ${point.y}%`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
-                                    <span>Jan</span>
-                                    <span>Dec</span>
-                                  </div>
-                                </div>
-
-                                {/* Workout Volume Trend */}
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className={`font-semibold fc-text-primary`}>Workout Volume</span>
-                                    <span className={`text-sm fc-text-dim`}>12 months</span>
-                                  </div>
-                                  <div className="flex items-end gap-1 h-16">
-                                    {convertToSparklinePoints(analyticsData.trendData.workouts as any).map((point, index) => (
-                                      <div
-                                        key={index}
-                                        className="flex-1 bg-gradient-to-t from-green-500 to-green-400 rounded-t-sm"
-                                        style={{ height: `${point.height}px` }}
-                                        title={`Month ${index + 1}: ${point.y} workouts`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
-                                    <span>Jan</span>
-                                    <span>Dec</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Program Effectiveness */}
-                          <div className="p-6">
-                            <div className="p-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 shadow-2xl shadow-black/25`}>
-                                  <Target className="w-5 h-5 text-white" />
-                                </div>
-                                <CardTitle className={`text-xl font-bold fc-text-primary`}>Program Effectiveness</CardTitle>
-                              </div>
-                            </div>
-                            <div className="p-6 pt-0">
-                              <div className="space-y-6">
-                                {Object.entries(analyticsData.programEffectiveness).map(([program, data]: [string, any]) => (
-                                  <div key={program} className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                      <span className={`font-semibold fc-text-primary capitalize`}>
-                                        {program.replace(/([A-Z])/g, ' $1').trim()}
-                                      </span>
-                                      <span className={`text-sm font-bold fc-text-primary`}>{data.rate}%</span>
-                                    </div>
-                                    <Progress value={data.rate} className="h-3 rounded-full" />
-                                    <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
-                                      <span>{data.completed} completed</span>
-                                      <span>{data.total} total</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Client Distribution & Engagement */}
-                        <div className="grid md:grid-cols-2 gap-6">
-                          {/* Client Distribution */}
-                          <div className="p-6">
-                            <div className="p-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 shadow-2xl shadow-black/25`}>
-                                  <Users className="w-5 h-5 text-white" />
-                                </div>
-                                <CardTitle className={`text-xl font-bold fc-text-primary`}>Client Distribution</CardTitle>
-                              </div>
-                            </div>
-                            <div className="p-6 pt-0">
-                              <div className="space-y-4">
-                                <div className={`flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-green-600/10`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                                    <span className={`font-medium fc-text-primary`}>High Adherence (80%+)</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className={`font-bold text-2xl fc-text-primary`}>
-                                      {analyticsData.filteredClients.filter(c => c.adherence >= 80).length}
-                                    </span>
-                                    <div className={`text-xs fc-text-dim`}>
-                                      {analyticsData.totalClients > 0 ? Math.round((analyticsData.filteredClients.filter(c => c.adherence >= 80).length / analyticsData.totalClients) * 100) : 0}%
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className={`flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-yellow-500/10 to-yellow-600/10`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                                    <span className={`font-medium fc-text-primary`}>Medium Adherence (60-79%)</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className={`font-bold text-2xl fc-text-primary`}>
-                                      {analyticsData.filteredClients.filter(c => c.adherence >= 60 && c.adherence < 80).length}
-                                    </span>
-                                    <div className={`text-xs fc-text-dim`}>
-                                      {analyticsData.totalClients > 0 ? Math.round((analyticsData.filteredClients.filter(c => c.adherence >= 60 && c.adherence < 80).length / analyticsData.totalClients) * 100) : 0}%
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className={`flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-red-500/10 to-red-600/10`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                                    <span className={`font-medium fc-text-primary`}>Low Adherence (&lt;60%)</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className={`font-bold text-2xl fc-text-primary`}>
-                                      {analyticsData.filteredClients.filter(c => c.adherence < 60).length}
-                                    </span>
-                                    <div className={`text-xs fc-text-dim`}>
-                                      {analyticsData.totalClients > 0 ? Math.round((analyticsData.filteredClients.filter(c => c.adherence < 60).length / analyticsData.totalClients) * 100) : 0}%
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Engagement Metrics */}
-                          <div className="p-6">
-                            <div className="p-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-2xl shadow-black/25`}>
-                                  <Activity className="w-5 h-5 text-white" />
-                                </div>
-                                <CardTitle className={`text-xl font-bold fc-text-primary`}>Engagement Metrics</CardTitle>
-                              </div>
-                            </div>
-                            <div className="p-6 pt-0">
-                              <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="text-center p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-blue-600/10">
-                                    <div className={`text-2xl font-bold fc-text-primary`}>{analyticsData.engagementMetrics.dailyActive}%</div>
-                                    <div className={`text-xs fc-text-dim`}>Daily Active</div>
-                                  </div>
-                                  <div className="text-center p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-green-600/10">
-                                    <div className={`text-2xl font-bold fc-text-primary`}>{analyticsData.engagementMetrics.weeklyActive}%</div>
-                                    <div className={`text-xs fc-text-dim`}>Weekly Active</div>
-                                  </div>
-                                </div>
-                                
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className={`font-semibold fc-text-primary`}>Monthly Active Users</span>
-                                    <span className={`text-sm font-bold fc-text-primary`}>{analyticsData.engagementMetrics.monthlyActive}%</span>
-                                  </div>
-                                  <Progress value={analyticsData.engagementMetrics.monthlyActive} className="h-3 rounded-full" />
-                                </div>
-
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className={`font-semibold fc-text-primary`}>Average Session Time</span>
-                                    <span className={`text-sm font-bold fc-text-primary`}>{analyticsData.engagementMetrics.avgSessionTime} min</span>
-                                  </div>
-                                  <Progress value={(analyticsData.engagementMetrics.avgSessionTime / 60) * 100} className="h-3 rounded-full" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Retention Analysis */}
-                        <div className="p-6">
-                          <div className="p-6">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 shadow-2xl shadow-black/25`}>
-                                <Trophy className="w-5 h-5 text-white" />
-                              </div>
-                              <CardTitle className={`text-xl font-bold fc-text-primary`}>Retention Analysis</CardTitle>
-                            </div>
-                          </div>
-                          <div className="p-6 pt-0">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                              {Object.entries(analyticsData.retentionData).map(([period, rate]: [string, number]) => (
-                                <div key={period} className="text-center p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-indigo-600/10">
-                                  <div className={`text-3xl font-bold fc-text-primary`}>{rate}%</div>
-                                  <div className={`text-sm fc-text-dim mt-1`}>
-                                    {period === 'month1' ? '1 Month' :
-                                     period === 'month3' ? '3 Months' :
-                                     period === 'month6' ? '6 Months' : '12 Months'}
-                                  </div>
-                                  <div className={`text-xs fc-text-dim mt-2`}>
-                                    Retention Rate
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Actionable Insights */}
-                        <div className="p-6">
-                          <div className="p-6">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-xl bg-gradient-to-r from-pink-500 to-pink-600 shadow-2xl shadow-black/25`}>
-                                <Heart className="w-5 h-5 text-white" />
-                              </div>
-                              <CardTitle className={`text-xl font-bold fc-text-primary`}>Actionable Insights</CardTitle>
-                            </div>
-                          </div>
-                          <div className="p-6 pt-0">
-                            <div className="grid md:grid-cols-2 gap-6">
-                              <div className="space-y-4">
-                                <h3 className={`font-semibold fc-text-primary flex items-center gap-2`}>
-                                  <TrendingUp className="w-5 h-5 text-green-500" />
-                                  Positive Trends
-                                </h3>
-                                <div className="space-y-3">
-                                  <div className={`p-4 rounded-xl bg-green-900/20 border border-green-200 dark:border-green-800`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                      <span className={`font-medium text-green-800 dark:text-green-200`}>High Engagement</span>
-                                    </div>
-                                    <p className={`text-sm text-green-600 dark:text-green-400`}>
-                                      {analyticsData.engagementMetrics.dailyActive}% daily active rate is above industry average
-                                    </p>
-                                  </div>
-                                  <div className={`p-4 rounded-xl bg-blue-900/20 border border-blue-200 dark:border-blue-800`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Trophy className="w-4 h-4 text-blue-600" />
-                                      <span className={`font-medium text-blue-800 dark:text-blue-200`}>Strong Retention</span>
-                                    </div>
-                                    <p className={`text-sm text-blue-600 dark:text-blue-400`}>
-                                      87% 3-month retention rate indicates effective program design
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="space-y-4">
-                                <h3 className={`font-semibold fc-text-primary flex items-center gap-2`}>
-                                  <AlertTriangle className="w-5 h-5 text-orange-500" />
-                                  Areas for Improvement
-                                </h3>
-                                <div className="space-y-3">
-                                  <div className={`p-4 rounded-xl bg-orange-900/20 border border-orange-200 dark:border-orange-800`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Target className="w-4 h-4 text-orange-600" />
-                                      <span className={`font-medium text-orange-800 dark:text-orange-200`}>Program Optimization</span>
-                                    </div>
-                                    <p className={`text-sm text-orange-600 dark:text-orange-400`}>
-                                      Weight loss programs show 67% completion - consider program adjustments
-                                    </p>
-                                  </div>
-                                  <div className={`p-4 rounded-xl bg-red-900/20 border border-red-200 dark:border-red-800`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Users className="w-4 h-4 text-red-600" />
-                                      <span className={`font-medium text-red-800 dark:text-red-200`}>Client Support</span>
-                                    </div>
-                                    <p className={`text-sm text-red-600 dark:text-red-400`}>
-                                      {analyticsData.filteredClients.filter(c => c.adherence < 60).length} clients need additional support
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )
-                  })()}
-                </TabsContent>
-              </Tabs>
-            </div>
+          {/* Action Queue */}
+          <section aria-labelledby="action-queue-heading" className="space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                  <Flame className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
+                </div>
+                <h2
+                  id="action-queue-heading"
+                  className="text-xl font-bold text-[color:var(--fc-text-primary)]"
+                >
+                  Action Queue
+                </h2>
+              </div>
+              {searchTerm.trim().length > 0 && (
+                <Badge variant="outline" className="rounded-full text-xs">
+                  Filtered by &quot;{searchTerm.trim()}&quot;
+                </Badge>
+              )}
             </div>
 
-        {user?.id && (
-          <GenerateReportModal
-            open={showReportModal}
-            onClose={() => setShowReportModal(false)}
-            coachId={user.id}
-            clientId={null}
-            clientList={clientProgress.map(c => ({ id: c.id, name: c.name }))}
-          />
-        )}
-      </CoachPageShell>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Card A — Need Attention */}
+              <ActionCardShell
+                title="Need Attention"
+                count={filteredQueue.needAttention.length}
+                icon={<AlertTriangle className="w-5 h-5 text-white" />}
+                accent="bg-gradient-to-br from-red-500 to-orange-500"
+                emptyState={
+                  searchTerm.trim().length > 0
+                    ? 'No matches in this list.'
+                    : 'All clients on track 👍'
+                }
+                empty={filteredQueue.needAttention.length === 0}
+              >
+                {filteredQueue.needAttention.map((c) => (
+                  <ActionRow
+                    key={c.id}
+                    href={`/coach/clients/${c.id}/progress`}
+                    name={c.name}
+                    avatarUrl={c.avatarUrl}
+                    primary={`${c.adherence}%`}
+                    primaryClass={
+                      c.adherence < 60
+                        ? 'text-[color:var(--fc-status-error)]'
+                        : undefined
+                    }
+                    secondary={formatLastActive(c.lastActiveAt)}
+                  />
+                ))}
+              </ActionCardShell>
+
+              {/* Card B — Inactive Check-ins */}
+              <ActionCardShell
+                title="Inactive Check-ins"
+                count={filteredQueue.inactiveCheckIns.length}
+                icon={<Calendar className="w-5 h-5 text-white" />}
+                accent="bg-gradient-to-br from-amber-500 to-yellow-500"
+                emptyState={
+                  searchTerm.trim().length > 0
+                    ? 'No matches in this list.'
+                    : 'All clients checking in regularly'
+                }
+                empty={filteredQueue.inactiveCheckIns.length === 0}
+              >
+                {filteredQueue.inactiveCheckIns.map((c) => (
+                  <ActionRow
+                    key={c.id}
+                    href={`/coach/clients/${c.id}/progress`}
+                    name={c.name}
+                    avatarUrl={c.avatarUrl}
+                    primary={
+                      c.daysSince == null
+                        ? 'Never'
+                        : c.daysSince === 0
+                          ? 'Today'
+                          : `${c.daysSince}d`
+                    }
+                    primaryClass="text-[color:var(--fc-status-warning)]"
+                    secondary={formatLastCheckIn(c.daysSince)}
+                  />
+                ))}
+              </ActionCardShell>
+
+              {/* Card C — High Stress */}
+              <ActionCardShell
+                title="High Stress"
+                count={filteredQueue.flagged.length}
+                icon={<Heart className="w-5 h-5 text-white" />}
+                accent="bg-gradient-to-br from-pink-500 to-rose-500"
+                ariaLabel="High Stress"
+                emptyState={
+                  searchTerm.trim().length > 0
+                    ? 'No matches in this list.'
+                    : 'No high-stress check-ins'
+                }
+                empty={filteredQueue.flagged.length === 0}
+              >
+                {filteredQueue.flagged.map((c) => (
+                  <ActionRow
+                    key={c.id}
+                    href={`/coach/clients/${c.id}/progress`}
+                    name={c.name}
+                    avatarUrl={c.avatarUrl}
+                    primary={
+                      c.stressUi != null && c.stressUi >= 4
+                        ? `Stress ${c.stressUi}/5`
+                        : 'Stress'
+                    }
+                    primaryClass="text-[color:var(--fc-status-error)]"
+                    secondary={c.signal}
+                  />
+                ))}
+              </ActionCardShell>
+            </div>
+          </section>
+
+          {/* Wellness Overview — focused summary */}
+          <section aria-labelledby="wellness-heading" className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                <Heart className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
+              </div>
+              <h2
+                id="wellness-heading"
+                className="text-xl font-bold text-[color:var(--fc-text-primary)]"
+              >
+                Wellness Overview
+              </h2>
+            </div>
+            <GlassCard
+              elevation={1}
+              className="fc-card-shell p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4"
+            >
+              <div className="p-4 rounded-2xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)] text-sm mb-1">
+                  <CheckCircle className="w-4 h-4" aria-hidden />
+                  <span>Today&apos;s Check-ins</span>
+                </div>
+                <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                  {overview.wellness.checkedInToday} /{' '}
+                  {overview.wellness.totalClients}
+                </p>
+              </div>
+              <div className="p-4 rounded-2xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)] text-sm mb-1">
+                  <Activity className="w-4 h-4" aria-hidden />
+                  <span>Avg Energy (today)</span>
+                </div>
+                <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                  {overview.wellness.averageEnergy != null
+                    ? overview.wellness.averageEnergy.toFixed(1)
+                    : '—'}
+                </p>
+                <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
+                  Average across clients who checked in today.
+                </p>
+              </div>
+            </GlassCard>
+          </section>
+
+          {/* Trailing helper bar — link straight into the per-client adherence cockpit. */}
+          <GlassCard
+            elevation={1}
+            className="fc-card-shell p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
+                <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  Need a deeper look at one client?
+                </p>
+                <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
+                  The full adherence cockpit (calendar, trend chart, per-domain
+                  breakdown) lives on each client&apos;s progress page.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/coach/clients"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--fc-accent-cyan)] hover:underline"
+            >
+              Open client list
+              <ArrowRight className="w-4 h-4" aria-hidden />
+            </Link>
+          </GlassCard>
+        </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   )

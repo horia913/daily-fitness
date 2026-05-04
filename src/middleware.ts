@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// v1: role checks live in ProtectedRoute (client). v2 hardening could enforce profile.role
+// here (e.g. custom JWT claims or a profiles lookup) to block /coach vs /client URL mixing at the edge.
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {

@@ -4,6 +4,10 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Trophy, ChevronDown } from "lucide-react";
+import {
+  formatPersonalRecordCaption,
+  prProgressOverTimeSubtitle,
+} from "@/lib/personalRecordDisplay";
 
 export type PRTimelineTimeRange = "3M" | "6M" | "1Y" | "ALL";
 
@@ -23,22 +27,23 @@ const TIME_RANGE_OPTIONS: { value: PRTimelineTimeRange; label: string }[] = [
 
 export interface PRMilestone {
   date: string;
-  weight: number;
+  /** Y-axis value (weight, time, distance, reps, score, etc.) */
+  value: number;
 }
 
 interface PRTimelineChartProps {
-  /** Weight PR milestones: dates when a new PR was set, sorted by date ascending */
   milestones: PRMilestone[];
   exerciseName: string;
-  /** Display unit for Y axis and tooltips */
-  unit?: "kg" | "lbs";
+  /** personal_records.record_type — drives axis label and title */
+  recordType?: string;
+  /** record_unit from the series (e.g. kg, s, m) */
+  valueUnit?: string | null;
   defaultTimeRange?: PRTimelineTimeRange;
-  /** Collapsible: whether the chart section is collapsed (controlled by parent if provided) */
   defaultExpanded?: boolean;
   className?: string;
 }
 
-function filterMilestonesByTimeRange(
+export function filterMilestonesByTimeRange(
   milestones: PRMilestone[],
   timeRange: PRTimelineTimeRange
 ): PRMilestone[] {
@@ -53,7 +58,8 @@ function filterMilestonesByTimeRange(
 export function PRTimelineChart({
   milestones,
   exerciseName,
-  unit = "kg",
+  recordType = "weight",
+  valueUnit = null,
   defaultTimeRange = "3M",
   defaultExpanded = true,
   className,
@@ -78,44 +84,41 @@ export function PRTimelineChart({
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  const values = chartData.map((m) => m.weight);
+  const values = chartData.map((m) => m.value);
   const minVal = Math.min(...values, 0);
   const maxVal = Math.max(...values, 1);
   const range = maxVal - minVal || 1;
 
+  const xForIndex = (i: number, n: number) =>
+    padding.left + (n <= 1 ? chartWidth / 2 : (i / (n - 1)) * chartWidth);
+
+  const yForValue = (val: number) =>
+    padding.top + chartHeight - ((val - minVal) / range) * chartHeight;
+
   const pathPoints = chartData
     .map((p, i) => {
-      const x =
-        padding.left +
-        (chartData.length <= 1 ? 0 : (i / (chartData.length - 1)) * chartWidth);
-      const y =
-        padding.top +
-        chartHeight -
-        ((p.weight - minVal) / range) * chartHeight;
+      const x = xForIndex(i, chartData.length);
+      const y = yForValue(p.value);
       return `${x},${y}`;
     })
     .join(" ");
 
-  const showChart = chartData.length >= 2;
+  const showLine = chartData.length >= 2;
+  const showChart = chartData.length >= 1;
 
   useEffect(() => {
-    if (!mounted || !showChart) return;
+    if (!mounted || !showLine) return;
     const t = setTimeout(() => {
       if (!svgRef.current) return;
       const pathEl = svgRef.current.querySelector(".pr-timeline-line") as SVGPolylineElement | null;
       if (pathEl) setLineLength(pathEl.getTotalLength());
     }, 50);
     return () => clearTimeout(t);
-  }, [mounted, chartData.length, showChart]);
+  }, [mounted, chartData.length, showLine]);
 
   if (milestones.length === 0) {
     return (
-      <div
-        className={cn(
-          "fc-card-shell p-6",
-          className
-        )}
-      >
+      <div className={cn("fc-card-shell p-6", className)}>
         <EmptyState
           icon={Trophy}
           variant="compact"
@@ -127,6 +130,7 @@ export function PRTimelineChart({
   }
 
   const hoveredPoint = hoveredIndex != null ? chartData[hoveredIndex] : null;
+  const subtitle = prProgressOverTimeSubtitle(recordType);
 
   return (
     <div
@@ -135,15 +139,12 @@ export function PRTimelineChart({
         className
       )}
     >
-      {/* Collapsible header */}
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
         className="w-full flex items-center justify-between p-4 sm:p-5 text-left min-h-[44px] touch-manipulation"
       >
-        <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
-          PR Progress
-        </h3>
+        <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">PR Progress</h3>
         <ChevronDown
           className={cn(
             "w-5 h-5 text-[color:var(--fc-text-dim)] transition-transform",
@@ -156,7 +157,7 @@ export function PRTimelineChart({
         <div className="px-4 sm:px-5 pb-5 border-t border-[color:var(--fc-glass-border)]">
           <div className="mb-3">
             <p className="text-sm text-[color:var(--fc-text-dim)]">
-              {exerciseName} — weight PR over time
+              {exerciseName} — {subtitle}
             </p>
           </div>
 
@@ -214,7 +215,6 @@ export function PRTimelineChart({
                     </feMerge>
                   </filter>
                 </defs>
-                {/* Grid lines */}
                 {[0.25, 0.5, 0.75].map((ratio) => (
                   <line
                     key={ratio}
@@ -226,34 +226,28 @@ export function PRTimelineChart({
                     strokeWidth="0.5"
                   />
                 ))}
-                {/* Area fill */}
-                {chartData.length >= 2 && (() => {
-                  const pts = chartData
-                    .map((p, i) => {
-                      const x =
-                        padding.left +
-                        (i / (chartData.length - 1)) * chartWidth;
-                      const y =
-                        padding.top +
-                        chartHeight -
-                        ((p.weight - minVal) / range) * chartHeight;
-                      return `${x},${y}`;
-                    })
-                    .join(" L ");
-                  const bottom = padding.top + chartHeight;
-                  const left = padding.left;
-                  const right = padding.left + chartWidth;
-                  return (
-                    <path
-                      d={`M ${pts} L ${right},${bottom} L ${left},${bottom} Z`}
-                      fill="url(#pr-timeline-area-fill)"
-                      className="transition-opacity duration-300"
-                      style={{ opacity: mounted ? 1 : 0 }}
-                    />
-                  );
-                })()}
-                {/* Line */}
-                {chartData.length >= 2 && (
+                {showLine &&
+                  (() => {
+                    const pts = chartData
+                      .map((p, i) => {
+                        const x = xForIndex(i, chartData.length);
+                        const y = yForValue(p.value);
+                        return `${x},${y}`;
+                      })
+                      .join(" L ");
+                    const bottom = padding.top + chartHeight;
+                    const left = padding.left;
+                    const right = padding.left + chartWidth;
+                    return (
+                      <path
+                        d={`M ${pts} L ${right},${bottom} L ${left},${bottom} Z`}
+                        fill="url(#pr-timeline-area-fill)"
+                        className="transition-opacity duration-300"
+                        style={{ opacity: mounted ? 1 : 0 }}
+                      />
+                    );
+                  })()}
+                {showLine && (
                   <polyline
                     className="pr-timeline-line"
                     fill="none"
@@ -269,21 +263,13 @@ export function PRTimelineChart({
                     }}
                   />
                 )}
-                {/* Data point dots */}
                 {chartData.map((point, i) => {
-                  const x =
-                    padding.left +
-                    (chartData.length <= 1
-                      ? 0
-                      : (i / (chartData.length - 1)) * chartWidth);
-                  const y =
-                    padding.top +
-                    chartHeight -
-                    ((point.weight - minVal) / range) * chartHeight;
+                  const x = xForIndex(i, chartData.length);
+                  const y = yForValue(point.value);
                   const isHovered = hoveredIndex === i;
                   const isLast = i === chartData.length - 1;
                   return (
-                    <g key={`${point.date}-${point.weight}-${i}`}>
+                    <g key={`${point.date}-${point.value}-${i}`}>
                       <circle
                         cx={x}
                         cy={y}
@@ -292,11 +278,7 @@ export function PRTimelineChart({
                         stroke="var(--fc-bg-base)"
                         strokeWidth="2"
                         className="cursor-pointer"
-                        style={
-                          isLast
-                            ? { filter: "url(#pr-dot-glow)" }
-                            : undefined
-                        }
+                        style={isLast ? { filter: "url(#pr-dot-glow)" } : undefined}
                         onMouseEnter={() => setHoveredIndex(i)}
                         onMouseLeave={() => setHoveredIndex(null)}
                         onClick={() => setHoveredIndex(i)}
@@ -312,17 +294,14 @@ export function PRTimelineChart({
                   style={{ zIndex: 10 }}
                 >
                   <p className="font-semibold text-[color:var(--fc-text-primary)]">
-                    {new Date(hoveredPoint.date + "T12:00:00").toLocaleDateString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      }
-                    )}
+                    {new Date(hoveredPoint.date + "T12:00:00").toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
                   </p>
                   <p className="text-[color:var(--fc-text-dim)]">
-                    {hoveredPoint.weight} {unit}
+                    {formatPersonalRecordCaption(recordType, hoveredPoint.value, valueUnit)}
                   </p>
                 </div>
               )}
@@ -331,9 +310,7 @@ export function PRTimelineChart({
                 {chartData.length > 0 && (
                   <>
                     <span>
-                      {new Date(
-                        chartData[0].date + "T12:00:00"
-                      ).toLocaleDateString("en", {
+                      {new Date(chartData[0].date + "T12:00:00").toLocaleDateString("en", {
                         month: "short",
                         day: "numeric",
                       })}
@@ -352,7 +329,7 @@ export function PRTimelineChart({
             </div>
           ) : (
             <div className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
-              Need at least 2 PR milestones in this range to show the chart.
+              No PR milestones in this time range.
             </div>
           )}
         </div>

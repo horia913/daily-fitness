@@ -11,7 +11,12 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { ClientPageShell, ClientGlassCard } from "@/components/client-ui";
+import {
+  ClientPageShell,
+  ClientGlassCard,
+  Eyebrow,
+  IconButton,
+} from "@/components/client-ui";
 import { ActiveProgramCard } from "@/components/client/train/ActiveProgramCard";
 import { ProgramCompletedCard } from "@/components/client/train/ProgramCompletedCard";
 import { WeekStrip } from "@/components/client/train/WeekStrip";
@@ -19,7 +24,7 @@ import { OverdueWorkouts } from "@/components/client/train/OverdueWorkouts";
 import { ExtraTraining } from "@/components/client/train/ExtraTraining";
 import { ActivityWeekSummary } from "@/components/client/activity/ActivityWeekSummary";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
-import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { GoalWizard } from "@/components/goals/GoalWizard";
 import {
   getActivitiesByDateRange,
   getCurrentWeekBounds,
@@ -39,15 +44,25 @@ import {
   type PreviewDayStatus,
 } from "@/components/client/train/WorkoutDayPreview";
 import { useToast } from "@/components/ui/toast-provider";
-import { Dumbbell, Check, MessageSquare, X } from "lucide-react";
+import {
+  Dumbbell,
+  Check,
+  MessageSquare,
+  X,
+  Bell,
+  Target,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
 import {
+  computeTrainRpcWeekday,
+  resolveTrainPageTodayWeekday,
   rpcResponseToProgramWeekState,
   type TrainPageRpcResponse,
   type TrainPageRpcExtraWorkoutRow,
 } from "@/lib/trainPageDataMapper";
 import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
+import { fetchDashboardPageData } from "@/lib/clientDashboardPageData";
 
 const WEEKDAY_NAMES = [
   "Monday",
@@ -59,9 +74,19 @@ const WEEKDAY_NAMES = [
   "Sunday",
 ];
 
-/** 0=Monday .. 6=Sunday (client timezone) */
-function getTodayWeekday(): number {
-  return (new Date().getDay() + 6) % 7;
+function formatTrainWeekRangeLabel(): string {
+  const { start, end } = getCurrentWeekBounds();
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  const a = startDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const b = endDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  return `${a}–${b}`;
 }
 
 function getDayStatus(
@@ -122,10 +147,18 @@ interface TrainPageData {
   extraWorkouts: ExtraWorkout[];
   exerciseCounts: Map<string, number>;
   templateCategories: Map<string, string>;
+  /** Same semantics as `get_client_dashboard` → `weeklyProgress` (program-scoped this week). */
+  weeklyProgress: { current: number; goal: number };
+  /** Monday = 0 … Sunday = 6; aligned with snapshot → profile timezone (see trainPageDataMapper). */
+  todayWeekday: number;
 }
 
 export default function TrainPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const profileTimezone =
+    profile && typeof (profile as { timezone?: string }).timezone === "string"
+      ? (profile as { timezone?: string }).timezone
+      : null;
 
   const [isStarting, setIsStarting] = useState(false);
   const [startingScheduleId, setStartingScheduleId] = useState<string | null>(
@@ -162,24 +195,30 @@ export default function TrainPage() {
         extraWorkouts: [],
         exerciseCounts: new Map(),
         templateCategories: new Map(),
+        weeklyProgress: { current: 0, goal: 0 },
+        todayWeekday: computeTrainRpcWeekday(profileTimezone),
       };
     }
-    const todayWeekday = getTodayWeekday();
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "get_train_page_data",
-      {
+    const rpcWeekday = computeTrainRpcWeekday(profileTimezone);
+    const [{ data: rpcData, error: rpcError }, dashboardPage] = await Promise.all([
+      supabase.rpc("get_train_page_data", {
         p_client_id: user.id,
-        p_today_weekday: todayWeekday,
-      },
-    );
+        p_today_weekday: rpcWeekday,
+      }),
+      fetchDashboardPageData(user.id).catch(() => null),
+    ]);
     if (rpcError) {
       throw new Error(rpcError.message || "Failed to load train page data");
     }
 
+    const weeklyProgress =
+      dashboardPage?.dashboard?.weeklyProgress ?? { current: 0, goal: 0 };
+
     const data = (rpcData ?? null) as TrainPageRpcResponse | null;
     const programWeek = data
-      ? await rpcResponseToProgramWeekState(supabase, data, todayWeekday)
+      ? await rpcResponseToProgramWeekState(supabase, data, profileTimezone)
       : null;
+    const todayWeekday = resolveTrainPageTodayWeekday(data, profileTimezone);
     const extraFromRpc: TrainPageRpcExtraWorkoutRow[] = Array.isArray(data?.extraWorkouts)
       ? data.extraWorkouts
       : [];
@@ -218,8 +257,10 @@ export default function TrainPage() {
       extraWorkouts,
       exerciseCounts,
       templateCategories,
+      weeklyProgress,
+      todayWeekday,
     };
-  }, [user?.id]);
+  }, [user?.id, profileTimezone]);
 
   const { addToast } = useToast();
   const {
@@ -227,7 +268,7 @@ export default function TrainPage() {
     loading: programLoading,
     error,
     refetch,
-  } = usePageData(fetchProgramWeekOnly, [user?.id]);
+  } = usePageData(fetchProgramWeekOnly, [user?.id, profileTimezone]);
 
   const programWeek = programData?.programWeek ?? null;
   const extraWorkouts: ExtraWorkout[] = programData?.extraWorkouts ?? [];
@@ -235,9 +276,14 @@ export default function TrainPage() {
     programData?.exerciseCounts ?? new Map<string, number>();
   const templateCategories =
     programData?.templateCategories ?? new Map<string, string>();
+  const weeklyProgress = programData?.weeklyProgress ?? {
+    current: 0,
+    goal: 0,
+  };
 
   const loading = programLoading;
-  const todayWeekday = getTodayWeekday();
+  const todayWeekday =
+    programData?.todayWeekday ?? computeTrainRpcWeekday(profileTimezone);
 
   useEffect(() => {
     if (!programWeek?.coachFeedback || !programWeek?.programAssignmentId) return;
@@ -386,6 +432,14 @@ export default function TrainPage() {
     setSelectedRestWeekday(null);
   };
 
+  const getAvatarUrl = () => {
+    if (profile?.avatar_url) return profile.avatar_url;
+    if (profile?.first_name) {
+      return `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.first_name}`;
+    }
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "User"}`;
+  };
+
   const handleLogActivity = async (input: LogActivityInput) => {
     if (!user?.id) return;
     await logActivity(user.id, input);
@@ -397,12 +451,45 @@ export default function TrainPage() {
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
-          {/* Section 1: Page Header */}
-          <header className="mb-6">
+        <ClientPageShell className="max-w-lg px-0 pb-32 pt-6">
+          <header className="mb-2 flex items-center justify-between px-5 pt-0">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/client/me";
+              }}
+              className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--fc-glass-border)] p-0 transition-opacity hover:opacity-90"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--fc-surface-elevated), var(--fc-surface-card))",
+              }}
+              aria-label="Open profile"
+            >
+              <img
+                src={getAvatarUrl()}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </button>
+            <IconButton
+              size="md"
+              variant="ghost"
+              className="btn-ghost-icon shrink-0 border-transparent"
+              aria-label="Notifications"
+              onClick={() => {
+                window.location.href = "/client";
+              }}
+            >
+              <Bell className="h-5 w-5 fc-text-dim" strokeWidth={1.5} />
+            </IconButton>
+          </header>
+          <header className="mb-6 px-5">
             <h1
-              className="font-bold fc-text-primary"
-              style={{ fontSize: "var(--fc-type-h2)" }}
+              className="font-semibold leading-none tracking-[-0.025em] fc-text-primary"
+              style={{
+                fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
+                fontSize: "32px",
+              }}
             >
               Training
             </h1>
@@ -435,27 +522,20 @@ export default function TrainPage() {
               ) : programWeek?.hasProgram ? (
                 <>
                   {/* Section 2: Active Program Card */}
-                  <ActiveProgramCard
-                    programWeek={programWeek}
-                    onStartWorkout={handleStartWorkout}
-                    onSelectDay={setSelectedDay}
-                    isStarting={isStarting}
-                    startingScheduleId={startingScheduleId}
-                    exerciseCounts={exerciseCounts}
-                  />
+                  <div className="px-4">
+                    <ActiveProgramCard
+                      programWeek={programWeek}
+                      weeklyProgress={weeklyProgress}
+                      onStartWorkout={handleStartWorkout}
+                      onSelectDay={setSelectedDay}
+                      isStarting={isStarting}
+                      startingScheduleId={startingScheduleId}
+                      exerciseCounts={exerciseCounts}
+                    />
+                  </div>
 
                   {programWeek.pauseStatus !== "paused" && (
                     <>
-                      <div className="mb-4 -mt-2">
-                        <button
-                          type="button"
-                          onClick={() => setAddGoalOpen(true)}
-                          className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
-                        >
-                          Set a training goal
-                        </button>
-                      </div>
-
                       {/* Coach note (coach_managed); not a gate for week unlock */}
                       {programWeek.coachFeedback && !feedbackDismissed && (
                         <div className="mb-4 border-b border-white/5 border-l-[3px] border-l-[color:var(--fc-domain-workouts)] py-3">
@@ -463,23 +543,27 @@ export default function TrainPage() {
                             <div className="flex items-start gap-3 min-w-0">
                               <MessageSquare className="w-5 h-5 mt-0.5 shrink-0 fc-text-workouts" />
                               <div className="min-w-0">
-                                <p className="text-xs font-semibold uppercase tracking-wider fc-text-dim mb-1">Coach note</p>
+                                <Eyebrow tone="dim" density="section" className="!mb-1">
+                                  Coach note
+                                </Eyebrow>
                                 <p className="text-sm fc-text-primary leading-relaxed">{programWeek.coachFeedback.notes}</p>
                               </div>
                             </div>
-                            <button
+                            <IconButton
+                              size="sm"
+                              variant="ghost"
+                              className="shrink-0 rounded-lg"
+                              aria-label="Dismiss"
                               onClick={() => {
                                 setFeedbackDismissed(true);
                                 try {
                                   const key = `coach_feedback_dismissed_${programWeek.programAssignmentId}_${programWeek.currentWeekNumber}`;
-                                  localStorage.setItem(key, '1');
+                                  localStorage.setItem(key, "1");
                                 } catch {}
                               }}
-                              className="shrink-0 p-1 rounded-lg fc-text-dim hover:fc-text-primary transition-colors"
-                              aria-label="Dismiss"
                             >
-                              <X className="w-4 h-4" />
-                            </button>
+                              <X className="h-4 w-4" />
+                            </IconButton>
                           </div>
                         </div>
                       )}
@@ -502,6 +586,24 @@ export default function TrainPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Mock Phone 2: .section-head + .section-title + .section-link */}
+                      <div className="mx-auto mt-1 mb-3 flex max-w-lg items-baseline justify-between px-5">
+                        <div className="flex min-w-0 items-baseline gap-2.5">
+                          <h2
+                            className="m-0 text-[17px] font-semibold leading-none tracking-[-0.01em] fc-text-primary"
+                            style={{
+                              fontFamily:
+                                "var(--font-bricolage-grotesque, var(--f-headline))",
+                            }}
+                          >
+                            This week
+                          </h2>
+                        </div>
+                        <span className="shrink-0 text-xs font-medium fc-text-dim">
+                          {formatTrainWeekRangeLabel()}
+                        </span>
+                      </div>
 
                       <WeekStrip
                         days={programWeek.days}
@@ -616,10 +718,22 @@ export default function TrainPage() {
                 programWeek?.hasProgram &&
                 !programWeek.isCompleted &&
                 programWeek.pauseStatus !== "paused" && (
-                <ActivityWeekSummary
-                  activities={weekActivities}
-                  onQuickAdd={() => setShowActivityModal(true)}
-                />
+                <>
+                  <div className="mx-5 mb-4 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddGoalOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--fc-accent-cyan)] transition-opacity hover:opacity-90"
+                    >
+                      <Target className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      Set a training goal
+                    </button>
+                  </div>
+                  <ActivityWeekSummary
+                    activities={weekActivities}
+                    onQuickAdd={() => setShowActivityModal(true)}
+                  />
+                </>
               )}
             </>
           ) : null}
@@ -631,10 +745,10 @@ export default function TrainPage() {
         onClose={() => setShowActivityModal(false)}
         onSave={handleLogActivity}
       />
-      <AddGoalModal
+      <GoalWizard
         open={addGoalOpen}
         onClose={() => setAddGoalOpen(false)}
-        defaultPillar="training"
+        initialCategory={null}
         onSuccess={() => {
           setAddGoalOpen(false);
         }}

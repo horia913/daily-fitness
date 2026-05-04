@@ -12,21 +12,23 @@ import {
   Hash,
   Repeat2,
   Zap,
-  Weight,
+  Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
-  formatLoadPercentage,
   formatTime,
 } from "../BaseBlockExecutor";
 import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
 import { LargeInput } from "../ui/LargeInput";
+import logPairStyles from "../ui/logWeightRepsPair.module.css";
 import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { InlineRPERow } from "../ui/InlineRPERow";
+import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
+import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
+import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
@@ -52,7 +54,6 @@ export function EmomExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
-  onPlateCalculatorClick,
   onRestTimerClick,
   onWorkoutBack,
   previousPerformanceMap,
@@ -148,7 +149,7 @@ export function EmomExecutor({
     : null;
   const loadPercentage = currentExercise?.load_percentage ?? null;
   const e1rm = exerciseId ? (e1rmMap[exerciseId] ?? null) : null;
-  const { default_weight, suggested_weight, source } =
+  const { default_weight, suggested_weight } =
     getWeightDefaultAndSuggestion({
       sessionStickyWeight: sessionStickyWeight ?? null,
       lastSessionWeight: lastSessionWeight ?? null,
@@ -266,21 +267,11 @@ export function EmomExecutor({
     });
   }
 
-  if (currentExercise?.load_percentage != null) {
-    const suggestedForDisplay =
-      source === "percent_e1rm" ? suggested_weight : null;
-    const loadDisplay = formatLoadPercentage(
-      currentExercise.load_percentage,
-      suggestedForDisplay,
-    );
-    if (loadDisplay) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load",
-        value: loadDisplay,
-      });
-    }
-  }
+  appendTargetEffortItem(
+    prescriptionItems,
+    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
+    Flame,
+  );
 
   const instructions =
     currentExercise?.notes || block.block.set_notes || undefined;
@@ -488,128 +479,66 @@ export function EmomExecutor({
         ? viewingSetIndex
         : currentMinute;
 
-  const loggingInputs = (
-    <div className="space-y-4">
-      {allowSetEditDelete && loggedSetsList.length > 0 && (
-        <div className="border-t border-white/10 pt-3">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
-              Logged
-            </div>
-            {loggedSetsList.length > 2 && (
+  const updateSetRpe = useUpdateSetRpe({
+    blockId: block.block.id,
+    onSetLogUpsert,
+  });
+  const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => ({
+    id: setEntry.id,
+    title: `Min ${setEntry.set_number}: ${
+      setEntry.weight_kg != null && setEntry.weight_kg > 0
+        ? `${setEntry.weight_kg} kg × `
+        : ""
+    }${setEntry.reps_completed ?? "—"} reps`,
+    rpe: setEntry.rpe ?? null,
+    onEffortChange: (rpe) => updateSetRpe(setEntry, rpe),
+    disabled: setEntry.id.startsWith("temp-"),
+    menu: allowSetEditDelete ? (
+      <div className="relative flex items-center">
+        <button
+          type="button"
+          className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--fc-text-dim)] hover:bg-white/5 hover:text-[color:var(--fc-text-primary)]"
+          onClick={() =>
+            setMenuOpenSetId(menuOpenSetId === setEntry.id ? null : setEntry.id)
+          }
+          aria-label="Options"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        {menuOpenSetId === setEntry.id && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setMenuOpenSetId(null)}
+              aria-hidden
+            />
+            <div
+              className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg py-1 shadow-lg"
+              style={{
+                background: "var(--fc-surface-elevated)",
+                border: "1px solid var(--fc-surface-card-border)",
+              }}
+            >
               <button
                 type="button"
-                onClick={() => setShowAllSets(!showAllSets)}
-                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:opacity-80"
+                onClick={() => handleEditSet(setEntry)}
               >
-                {showAllSets ? (
-                  <>Show less ▲</>
-                ) : (
-                  <>Show all {loggedSetsList.length} sets ▼</>
-                )}
+                <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
-            )}
-          </div>
-          <ul className="flex flex-col border-y border-white/5">
-            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
-              // Calculate the actual index in the full list for isLatestSet
-              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
-              const isLatestSet = actualIndex === loggedSetsList.length - 1;
-              return (
-              <li
-                key={setEntry.id}
-                className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm fc-text-primary">
-                    Min {setEntry.set_number}:{" "}
-                    {setEntry.weight_kg != null && setEntry.weight_kg > 0
-                      ? `${setEntry.weight_kg} kg × `
-                      : ""}
-                    {setEntry.reps_completed ?? "—"} reps
-                  </span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-md hover:bg-black/10"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === setEntry.id ? null : setEntry.id,
-                        )
-                      }
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4 fc-text-dim" />
-                    </button>
-                    {menuOpenSetId === setEntry.id && (
-                      <div
-                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                          onClick={() => handleEditSet(setEntry)}
-                        >
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <InlineRPERow
-                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
-                  currentRPE={setEntry.rpe ?? null}
-                  onRPESelect={async (rpe) => {
-                    const updatedEntry: LoggedSet = {
-                      ...setEntry,
-                      rpe,
-                    };
-                    onSetLogUpsert?.(block.block.id, updatedEntry, {
-                      replaceId: setEntry.id,
-                    });
+            </div>
+          </>
+        )}
+      </div>
+    ) : null,
+  }));
+  const aboveStickyContent =
+    loggedSetRows.length > 0 ? (
+      <LoggedSetsList rows={loggedSetRows} />
+    ) : null;
 
-                    if (!setEntry.id.startsWith("temp-")) {
-                      try {
-                        const res = await fetch(`/api/sets/${setEntry.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ rpe }),
-                          credentials: "include",
-                        });
-                        if (!res.ok) {
-                          console.error("Failed to update RPE:", await res.text());
-                          const revertedEntry: LoggedSet = {
-                            ...setEntry,
-                            rpe: setEntry.rpe ?? undefined,
-                          };
-                          onSetLogUpsert?.(block.block.id, revertedEntry, {
-                            replaceId: setEntry.id,
-                          });
-                        }
-                      } catch (err) {
-                        console.error("Error updating RPE:", err);
-                        const revertedEntry: LoggedSet = {
-                          ...setEntry,
-                          rpe: setEntry.rpe ?? undefined,
-                        };
-                        onSetLogUpsert?.(block.block.id, revertedEntry, {
-                          replaceId: setEntry.id,
-                        });
-                      }
-                    }
-                  }}
-                  isLatestSet={isLatestSet}
-                />
-              </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+  const loggingInputs = (
+    <div className="space-y-4">
       {/* Minute Counter */}
       <div
         className="rounded-xl p-5 text-center"
@@ -655,7 +584,7 @@ export function EmomExecutor({
         className="p-4 rounded-xl"
         style={{ background: "var(--fc-surface-sunken)" }}
       >
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
           <div className="space-y-2">
             <LargeInput
               label="Weight"
@@ -673,8 +602,7 @@ export function EmomExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
-              plateCalculatorEnabled
-            />
+              />
             {suggested_weight != null && suggested_weight > 0 && (
               <button
                 type="button"
@@ -814,8 +742,7 @@ export function EmomExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
-        onPlateCalculatorClick,
-        onRestTimerClick,
+              onRestTimerClick,
         onWorkoutBack,
         previousPerformanceMap,
       }}
@@ -827,10 +754,10 @@ export function EmomExecutor({
       progressLabel="Minute"
       loggingInputs={loggingInputs}
       logButton={logButton}
-      logSectionTitle={`LOG MINUTE ${displayMinute}`}
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}
+      aboveStickyContent={aboveStickyContent}
     />
   );
 }

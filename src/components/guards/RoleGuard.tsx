@@ -18,6 +18,7 @@ interface RoleGuardProps {
  */
 export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardProps) {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { user, profile, loading, refreshProfile } = useAuth();
 
@@ -26,6 +27,8 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
       try {
         if (loading) return;
         if (!user) {
+          setIsAuthorized(false);
+          setIsLoading(false);
           router.push('/');
           return;
         }
@@ -33,6 +36,8 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
         const resolvedProfile = profile || (await refreshProfile());
 
         if (!resolvedProfile) {
+          setIsAuthorized(false);
+          setIsLoading(false);
           router.push('/');
           return;
         }
@@ -43,21 +48,29 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
         if (requiredRole === 'coach') {
           const hasCoachRole = isCoachRole(userRole);
           if (!hasCoachRole) {
+            setIsAuthorized(false);
+            setIsLoading(false);
             router.push(fallbackPath || '/client');
             return;
           }
           setIsAuthorized(true);
+          setIsLoading(false);
         } else {
           // Client role check
           const isClient = !isCoachRole(userRole);
           if (!isClient) {
+            setIsAuthorized(false);
+            setIsLoading(false);
             router.push(fallbackPath || '/coach');
             return;
           }
           setIsAuthorized(true);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Error in RoleGuard:', error);
+        setIsAuthorized(false);
+        setIsLoading(false);
         router.push('/');
       }
     };
@@ -66,7 +79,7 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
   }, [requiredRole, fallbackPath, router, user, profile, loading, refreshProfile]);
 
   // Show loading state while checking authorization
-  if (isAuthorized === null) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
         <div className="text-center">
@@ -77,7 +90,8 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
     );
   }
 
-  // Only render children if authorized
-  return isAuthorized ? <>{children}</> : null;
+  if (!isAuthorized) return null;
+
+  return <>{children}</>;
 }
 

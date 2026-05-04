@@ -23,6 +23,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { createChallenge, type CreateChallengePayload, type ScoringMethod } from "@/lib/challengeService";
 import { supabase } from "@/lib/supabase";
+import { fetchApi } from "@/lib/apiClient";
 
 const SCORING_METHODS: { value: ScoringMethod; label: string }[] = [
   { value: "max_weight", label: "Max weight" },
@@ -79,7 +80,7 @@ export function CreateChallengeModal({
 
   useEffect(() => {
     if (open && coachId) {
-      fetch("/api/coach/programs?filter=all")
+      fetchApi("/api/coach/programs?filter=all")
         .then((r) => r.json())
         .then((d) => setPrograms(d.programs || []))
         .catch(() => setPrograms([]));
@@ -159,7 +160,7 @@ export function CreateChallengeModal({
       if (challenge) {
         if (payload.is_public) {
           try {
-            await fetch("/api/coach/challenges/notify-created", {
+            await fetchApi("/api/coach/challenges/notify-created", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ challengeId: challenge.id }),

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   ProgramProgressionService,
   ProgramProgressionRule,
@@ -40,6 +41,7 @@ interface ProgramProgressionRulesEditorProps {
   exercises: Exercise[];
   templates?: WorkoutTemplate[];
   onUpdate?: () => void;
+  onDirtyStateChange?: (isDirty: boolean) => void;
   /**
    * Called after a progression is successfully applied (distinct from onUpdate which fires
    * for any change). The parent can use this to auto-navigate to Week 2 so the coach
@@ -90,6 +92,7 @@ export default function ProgramProgressionRulesEditor({
   exercises,
   templates = [],
   onUpdate,
+  onDirtyStateChange,
   onApplied,
   blockSchedules = [],
 }: ProgramProgressionRulesEditorProps) {
@@ -1105,6 +1108,10 @@ export default function ProgramProgressionRulesEditor({
   ).length;
   const hasPendingChanges = pendingChangeCount > 0;
 
+  useEffect(() => {
+    onDirtyStateChange?.(hasPendingChanges);
+  }, [hasPendingChanges, onDirtyStateChange]);
+
   const handleBlockChange = (blockKey: string, updatedForm: any) => {
     setBlockForms((prev) =>
       prev.map((block) => {
@@ -1406,16 +1413,29 @@ export default function ProgramProgressionRulesEditor({
           </p>
         </div>
       ) : (
-        <div className="border-t border-black/5 dark:border-white/5 divide-y divide-black/5 dark:divide-white/5">
+        <div className="space-y-4">
           {blockForms.map((block) => {
             const typeEyebrow =
               SET_TYPE_SHORT[block.blockType] ??
               block.blockType.replace(/_/g, " ");
+            const primaryExerciseName =
+              block.formValue?.exercise?.name ||
+              block.rules.find((r) => r.exercise?.name)?.exercise?.name ||
+              block.blockName ||
+              `Block ${block.blockOrder}`;
             return (
-              <div key={block.key} className="py-2 first:pt-1">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                  {typeEyebrow}
-                </p>
+              <div
+                key={block.key}
+                className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] p-4 sm:p-5"
+              >
+                <div className="flex flex-wrap items-center gap-2 pb-4 mb-4 border-b border-[color:var(--fc-glass-border)]">
+                  <Badge className="fc-badge bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] border-[color:var(--fc-accent-cyan)]/30">
+                    {typeEyebrow}
+                  </Badge>
+                  <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)] leading-tight">
+                    {primaryExerciseName}
+                  </p>
+                </div>
                 <ExerciseDetailForm
                   exercise={{
                     ...block.formValue,

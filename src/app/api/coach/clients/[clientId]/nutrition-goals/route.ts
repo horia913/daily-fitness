@@ -84,7 +84,7 @@ export async function POST(
           target_value: value,
           target_unit: unit,
           status: 'active',
-          category: 'other',
+          category: 'nutrition',
           start_date: now.slice(0, 10),
           updated_at: now,
         }

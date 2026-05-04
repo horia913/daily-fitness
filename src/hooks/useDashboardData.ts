@@ -22,7 +22,16 @@ export function useClientDashboardData() {
   })
 
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      setData({
+        profile: null,
+        todaysWorkout: null,
+        stats: { thisWeek: 0, goalCompletion: 0 },
+        achievements: []
+      })
+      return
+    }
 
     const fetchData = async () => {
       setLoading(true)
@@ -102,7 +111,15 @@ export function useCoachDashboardData() {
   })
 
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      setData({
+        profile: null,
+        stats: { activeClients: 0, workoutsCreated: 0 },
+        clientProgress: []
+      })
+      return
+    }
 
     const fetchData = async () => {
       setLoading(true)

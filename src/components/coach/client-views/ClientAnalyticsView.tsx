@@ -18,15 +18,25 @@ import {
   BarChart3,
   ImageIcon,
 } from 'lucide-react'
-import { getClientAnalytics, type ClientAnalyticsData } from '@/lib/clientAnalyticsService'
+import { supabase } from '@/lib/supabase'
+import {
+  getClientAnalytics,
+  resolveStatsTabTimezone,
+  type ClientAnalyticsData,
+} from '@/lib/clientAnalyticsService'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { WellnessTrendsCard } from '@/components/client/WellnessTrendsCard'
 import type { DailyWellnessLog } from '@/lib/wellnessService'
+import ClientAnalyticsCoachSections from '@/components/coach/client-views/ClientAnalyticsCoachSections'
 
 interface ClientAnalyticsViewProps {
   clientId: string
   /** Optional actions shown at the top of the trends section (e.g. report / export). */
   toolbar?: React.ReactNode
+  /** When set, skip fetch and render from this bundle (e.g. coach Stats tab parallel load). */
+  prefetched?: ClientAnalyticsData | null
+  /** Coach client Stats tab layout (v6 sections). */
+  coachStatsLayout?: boolean
 }
 
 function getWeekStartMonday(): string {
@@ -38,25 +48,50 @@ function getWeekStartMonday(): string {
   return monday.toISOString().split('T')[0]
 }
 
-export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyticsViewProps) {
-  const [data, setData] = useState<ClientAnalyticsData | null>(null)
-  const [loading, setLoading] = useState(true)
+export default function ClientAnalyticsView({
+  clientId,
+  toolbar,
+  prefetched,
+  coachStatsLayout,
+}: ClientAnalyticsViewProps) {
+  const [data, setData] = useState<ClientAnalyticsData | null>(prefetched ?? null)
+  const [loading, setLoading] = useState(!prefetched)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (prefetched) {
+      setData(prefetched)
+      setLoading(false)
+      setError(null)
+      return
+    }
     let cancelled = false
-    getClientAnalytics(clientId)
-      .then((d) => {
+    setLoading(true)
+    ;(async () => {
+      try {
+        const [{ data: paRow }, { data: profRow }] = await Promise.all([
+          supabase
+            .from('program_assignments')
+            .select('timezone_snapshot')
+            .eq('client_id', clientId)
+            .eq('status', 'active')
+            .maybeSingle(),
+          supabase.from('profiles').select('timezone').eq('id', clientId).maybeSingle(),
+        ])
+        const tz = resolveStatsTabTimezone(
+          paRow?.timezone_snapshot as string | undefined,
+          profRow?.timezone as string | undefined,
+        )
+        const d = await getClientAnalytics(clientId, tz)
         if (!cancelled) setData(d)
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e?.message ?? 'Failed to load analytics')
-      })
-      .finally(() => {
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load analytics')
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    })()
     return () => { cancelled = true }
-  }, [clientId])
+  }, [clientId, prefetched])
 
   const weekStart = useMemo(() => getWeekStartMonday(), [])
   const weekDays = useMemo(() => {
@@ -113,7 +148,31 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
     )
   }
 
+  if (coachStatsLayout) {
+    return (
+      <ClientAnalyticsCoachSections
+        clientId={clientId}
+        data={data}
+        weekDays={weekDays}
+        lastWeekDays={lastWeekDays}
+      />
+    )
+  }
+
   const { overview, goals, workout, body, wellness, photos, nutrition, habits } = data
+  const priorityRank = (priority: string | null | undefined): number => {
+    if (priority === 'high') return 3
+    if (priority === 'medium') return 2
+    if (priority === 'low') return 1
+    return 0
+  }
+  const topActiveGoals = [...goals.active]
+    .sort((a, b) => {
+      const p = priorityRank(b.priority) - priorityRank(a.priority)
+      if (p !== 0) return p
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    })
+    .slice(0, 3)
   return (
     <div className="space-y-8">
       {toolbar && (
@@ -240,20 +299,36 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
           <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
             <h3 className="text-base font-medium fc-text-primary mb-3">Volume trend (last 12 weeks)</h3>
             {workout.weeklyVolume.length > 0 ? (
-              <div className="flex items-end gap-1 h-32">
-                {workout.weeklyVolume.slice(-12).map((w, i) => {
+              <div className="flex h-56 gap-1 items-stretch">
+                {workout.weeklyVolume.slice(-12).map((w) => {
                   const max = Math.max(...workout.weeklyVolume.map((x) => x.totalVolume), 1)
                   const pct = (w.totalVolume / max) * 100
+                  const vol = w.totalVolume
+                  const volumeLabel =
+                    vol >= 1000
+                      ? `${Math.round(vol / 100) / 10}t`
+                      : vol > 0
+                        ? `${vol} kg`
+                        : ''
                   return (
-                    <div key={w.weekStart} className="flex-1 flex flex-col items-center gap-1">
-                      <div className="w-full fc-progress-track rounded-t relative flex-1 min-h-[40px] overflow-hidden">
+                    <div
+                      key={w.weekStart}
+                      className="flex h-full min-h-0 min-w-0 flex-1 flex-col items-center gap-1"
+                    >
+                      <span className="flex h-4 items-center justify-center text-[10px] font-medium fc-text-primary">
+                        {volumeLabel}
+                      </span>
+                      <div className="relative min-h-[48px] w-full flex-1 overflow-hidden rounded-t fc-progress-track">
                         <div
                           className="absolute bottom-0 w-full rounded-t bg-gradient-to-t from-cyan-500 to-cyan-400 transition-all"
                           style={{ height: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[10px] fc-text-dim truncate max-w-full">
-                        {new Date(w.weekStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      <span className="max-w-full truncate text-[10px] fc-text-dim">
+                        {new Date(w.weekStart + 'T12:00:00').toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
                       </span>
                     </div>
                   )
@@ -406,7 +481,7 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
             <p className="fc-text-subtle">No nutrition goals set. Set nutrition targets to track compliance.</p>
             <button
               type="button"
-              className="mt-3 text-sm font-medium text-[color:var(--fc-accent)]"
+              className="mt-3 text-sm font-medium text-[color:var(--fc-accent-cyan)]"
               onClick={() => {
                 window.location.href = `/coach/clients/${clientId}/progress?section=goals`;
               }}
@@ -417,27 +492,28 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
         </section>
       )}
 
-      {/* SECTION 6: Goal Progress */}
+      {/* SECTION 6: Goals Summary */}
       <section>
-        <h2 className="text-lg font-semibold fc-text-primary mb-4">Goal Progress</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold fc-text-primary">Goals</h2>
+          <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+            {goals.active.length} active
+          </span>
+        </div>
         <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 space-y-2">
           {goals.active.length > 0 ? (
             <>
-              {goals.active.map((g) => (
-                <div key={g.id}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium fc-text-primary">{g.title}</span>
-                    <span className="fc-text-subtle">
-                      {g.current_value != null && g.target_value != null
-                        ? `${g.current_value} / ${g.target_value} ${g.target_unit ?? ''}`
-                        : g.progress_percentage != null
-                          ? `${g.progress_percentage}%`
-                          : '—'}
+              {topActiveGoals.map((g) => (
+                <div key={g.id} className="py-1">
+                  <div className="flex justify-between items-center text-sm mb-1 gap-3">
+                    <span className="font-medium fc-text-primary truncate">{g.title}</span>
+                    <span className="fc-text-subtle tabular-nums shrink-0">
+                      {Math.round(Math.min(100, Math.max(0, g.progress_percentage ?? 0)))}%
                     </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[color:var(--fc-accent)]"
+                      className="h-full rounded-full bg-[color:var(--fc-accent-cyan)]"
                       style={{ width: `${Math.min(100, g.progress_percentage ?? 0)}%` }}
                     />
                   </div>
@@ -445,22 +521,14 @@ export default function ClientAnalyticsView({ clientId, toolbar }: ClientAnalyti
               ))}
             </>
           ) : (
-            <p className="text-sm fc-text-subtle">No active goals.</p>
+            <p className="text-sm fc-text-subtle">No active goals</p>
           )}
-          {goals.completedCount > 0 && (
-            <p className="text-sm fc-text-subtle pt-2 border-t border-[color:var(--fc-glass-border)]">
-              {goals.completedCount} goal{goals.completedCount !== 1 ? 's' : ''} achieved
-            </p>
-          )}
-          <button
-            type="button"
-            className="text-sm font-medium text-[color:var(--fc-accent)]"
-            onClick={() => {
-              window.location.href = `/coach/clients/${clientId}/progress?section=goals`;
-            }}
+          <Link
+            href={`/coach/clients/${clientId}/progress?section=goals`}
+            className="inline-block text-sm font-medium text-[color:var(--fc-accent-cyan)] pt-1"
           >
-            Manage goals
-          </button>
+            {goals.active.length > 0 ? 'View all goals →' : 'View goals page →'}
+          </Link>
         </div>
       </section>
 

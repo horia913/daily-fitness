@@ -29,6 +29,7 @@ import {
   type PrDetectedFromLogSet,
   type LogSetPrSummary,
 } from "@/lib/setLogging/goldenLogSet";
+import { fetchApi } from "@/lib/apiClient";
 
 // ---------------------------------------------------------------------------
 // Hook return type
@@ -407,7 +408,7 @@ export function useSetLoggingOrchestrator(
           // Set is already synced, update via API
           (async () => {
             try {
-              const res = await fetch(`/api/sets/${targetEntry!.serverSetLogId}`, {
+              const res = await fetchApi(`/api/sets/${targetEntry!.serverSetLogId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ rpe }),

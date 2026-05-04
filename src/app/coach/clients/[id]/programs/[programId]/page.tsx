@@ -43,6 +43,7 @@ import {
   zonedYmdFromIsoTimestamp,
 } from '@/lib/clientZonedCalendar'
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import { fetchApi } from "@/lib/apiClient";
 
 interface ProgramAssignment {
   id: string
@@ -212,7 +213,7 @@ function ClientProgramDetailsContent() {
           const slot = slots.find(
             (s) => s.week_number === snap.week_number && s.day_number === snap.program_day
           )
-          if (slot) idMap[snap.id] = slot.id
+          if (slot?.id) idMap[snap.id] = slot.id
         }
         setScheduleIdByPdaId(idMap)
 
@@ -299,7 +300,7 @@ function ClientProgramDetailsContent() {
     if (!assignment) return
     setSkipLoading(true)
     try {
-      const res = await fetch('/api/coach/program-assignments/skip-day', {
+      const res = await fetchApi('/api/coach/program-assignments/skip-day', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -355,7 +356,7 @@ function ClientProgramDetailsContent() {
     if (!assignment) return
     setPauseBusy(true)
     try {
-      const res = await fetch(`/api/coach/program-assignments/${assignment.id}/pause`, {
+      const res = await fetchApi(`/api/coach/program-assignments/${assignment.id}/pause`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -381,7 +382,7 @@ function ClientProgramDetailsContent() {
     if (!assignment) return
     setPauseBusy(true)
     try {
-      const res = await fetch(`/api/coach/program-assignments/${assignment.id}/pause`, {
+      const res = await fetchApi(`/api/coach/program-assignments/${assignment.id}/pause`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -465,7 +466,7 @@ function ClientProgramDetailsContent() {
           <p className="fc-text-dim mb-4">This program assignment could not be found.</p>
           <Link
             href={`/coach/clients/${clientId}`}
-            className="inline-flex p-3 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)] mx-auto"
+            className="inline-flex p-3 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)] mx-auto"
             aria-label="Back to client hub"
           >
             <ArrowLeft className="w-5 h-5" aria-hidden />
@@ -480,7 +481,7 @@ function ClientProgramDetailsContent() {
         {/* Back */}
         <Link
           href={`/coach/clients/${clientId}`}
-          className="fc-surface inline-flex p-2.5 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-highlight)]/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]"
+          className="fc-surface inline-flex p-2.5 rounded-xl border border-[color:var(--fc-surface-card-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-highlight)]/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]"
           aria-label="Back to client hub"
         >
           <ArrowLeft className="w-5 h-5" aria-hidden />
@@ -780,14 +781,14 @@ function ClientProgramDetailsContent() {
                           className={cn(
                             'relative rounded-lg border p-2 text-left min-h-[76px] transition-colors',
                             snap.is_customized
-                              ? 'border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)]'
+                              ? 'border-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)]'
                               : 'border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)]',
                             isCompleted && 'ring-1 ring-[color-mix(in_srgb,var(--fc-status-success)_22%,transparent)]',
-                            'hover:bg-[color:var(--fc-glass-highlight)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)]'
+                            'hover:bg-[color:var(--fc-glass-highlight)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)]'
                           )}
                         >
                           {snap.is_customized && (
-                            <span className="absolute top-1 right-1 z-[1] px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)]">
+                            <span className="absolute top-1 right-1 z-[1] px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)]">
                               Edited
                             </span>
                           )}
@@ -872,7 +873,7 @@ function ClientProgramDetailsContent() {
                         {editingSnapshot.is_customized && (
                           <button
                             type="button"
-                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)] mb-2"
+                            className="w-full text-left text-sm py-2 px-3 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)] mb-2"
                             onClick={() => void runSnapshotPatch({ reset_to_template: true })}
                             disabled={snapshotSaveBusy}
                           >

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getBiggestWinForWeek, type BiggestWin } from "@/lib/biggestWinService";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 import "./BiggestWinCard.css";
 
 const PR_HREF = "/client/progress/personal-records";
@@ -90,9 +91,9 @@ export function BiggestWinCard({
               🎯
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <Eyebrow tone="zinc" density="section" className="!mb-0">
                 Your first win awaits
-              </p>
+              </Eyebrow>
               <p className="mt-2 text-sm text-zinc-400 leading-snug">
                 Train today to log your first improvement of the week
               </p>
@@ -142,9 +143,9 @@ export function BiggestWinCard({
               🏆
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+              <Eyebrow tone="amber" density="section" className="!mb-0">
                 Biggest win this week
-              </p>
+              </Eyebrow>
               <p className="mt-2 text-lg font-semibold text-white break-words hyphens-auto">
                 {w.exerciseName}
               </p>
@@ -193,9 +194,9 @@ export function BiggestWinCard({
             💪
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400/90">
+            <Eyebrow tone="cyanEmphasis" density="section" className="!mb-0">
               {consistencyHeading}
-            </p>
+            </Eyebrow>
             <p className="mt-2 text-lg font-semibold text-white break-words hyphens-auto">
               {w.exerciseName}
             </p>

@@ -1,0 +1,180 @@
+/* Coach program edit v1 — scoped tokens (UI spec) */
+.wrap {
+  --pe-bg: #07101a;
+  --pe-card: #0e1f2e;
+  --pe-card-2: #0b1824;
+  --pe-card-3: #091420;
+  --pe-line: rgba(255, 255, 255, 0.08);
+  --pe-line-2: rgba(255, 255, 255, 0.05);
+  --pe-t1: #fff;
+  --pe-t2: rgba(255, 255, 255, 0.65);
+  --pe-t3: rgba(255, 255, 255, 0.42);
+  --pe-t4: rgba(255, 255, 255, 0.26);
+  --pe-cyan: #4fe3e8;
+  --pe-cyan-soft: rgba(79, 227, 232, 0.12);
+  --pe-cyan-dim: rgba(79, 227, 232, 0.18);
+  --pe-lime: #c5ff4a;
+  --pe-lime-2: #7fe89a;
+  --pe-lime-soft: rgba(197, 255, 74, 0.14);
+  --pe-critical: #ff5a5f;
+  --pe-critical-soft: rgba(255, 90, 95, 0.12);
+  --pe-warning: #f5c242;
+  --pe-warning-soft: rgba(245, 194, 66, 0.12);
+  --pe-good: #34d399;
+  --pe-good-soft: rgba(52, 211, 153, 0.12);
+  --pe-purple: #a78bfa;
+  --pe-purple-soft: rgba(167, 139, 250, 0.12);
+  --pe-thumb-on: #0a1a26;
+  --pe-lime-text: #0a1a18;
+  color: var(--pe-t1);
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 16px;
+  border: 1px solid var(--pe-line);
+  background: linear-gradient(145deg, var(--pe-card) 0%, var(--pe-card-2) 100%);
+}
+
+.heroGlowCyan::before {
+  content: "";
+  position: absolute;
+  right: -20%;
+  top: -40%;
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(ellipse at center, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.heroGlowLime::before {
+  content: "";
+  position: absolute;
+  right: -20%;
+  top: -40%;
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(ellipse at center, rgba(197, 255, 74, 0.14) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.eyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pe-t3);
+}
+
+.statNum {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.statLbl {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pe-t3);
+}
+
+.heroTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--pe-t1);
+}
+
+.subTabs {
+  background: var(--pe-card-2);
+  border-radius: 13px;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+.subTab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--pe-t2);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.subTab:disabled {
+  color: var(--pe-t4);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.subTabActive {
+  background: var(--pe-cyan-soft);
+  color: var(--pe-cyan);
+  box-shadow: inset 0 0 0 1px var(--pe-cyan-dim);
+}
+
+.formCard {
+  background: var(--pe-card);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--pe-line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inputLike {
+  background: var(--pe-card-2);
+  border: 1px solid var(--pe-line);
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 12.5px;
+  color: var(--pe-t1);
+  width: 100%;
+}
+
+.inputLike:focus {
+  outline: none;
+  border-color: var(--pe-cyan);
+  box-shadow: 0 0 0 3px var(--pe-cyan-soft);
+}
+
+.inputLike::placeholder {
+  color: var(--pe-t4);
+  font-style: italic;
+}
+
+.progScroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.progScroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.progScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.progScroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}

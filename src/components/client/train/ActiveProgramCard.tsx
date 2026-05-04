@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
-import { Play, Loader2, Dumbbell, ChevronRight, PauseCircle } from "lucide-react";
+import { Play, Loader2, Dumbbell, ChevronRight, PauseCircle, Moon } from "lucide-react";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Badge } from "@/components/ui/badge";
 import { ProgramWeekState, type ProgramWeekDayCard } from "@/lib/programWeekStateBuilder";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
 import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
 
 interface ActiveProgramCardProps {
   programWeek: ProgramWeekState;
+  /** Program-scoped this-week counts from `get_client_dashboard` (same as home). */
+  weeklyProgress: { current: number; goal: number };
   onStartWorkout: (scheduleId: string) => void;
   /** When set, main CTA opens the day preview instead of starting directly */
   onSelectDay?: (day: ProgramWeekDayCard) => void;
@@ -17,12 +20,10 @@ interface ActiveProgramCardProps {
   exerciseCounts?: Map<string, number>; // templateId -> exercise count
 }
 
-const GOAL_COLORS: Record<string, string> = {
-  hypertrophy: "#06b6d4", strength: "#f97316", power: "#ef4444",
-  peaking: "#a855f7", accumulation: "#3b82f6", conditioning: "#22c55e",
-  deload: "#6b7280", general_fitness: "#14b8a6", sport_specific: "#eab308",
-  custom: "#8b5cf6",
-};
+/** Monday = 1 … Sunday = 7 (matches train page / RPC weekday indexing). */
+function todayOrdinalInWeek(): number {
+  return ((new Date().getDay() + 6) % 7) + 1;
+}
 
 function getCurrentBlock(
   blocks: TrainingBlock[],
@@ -41,13 +42,25 @@ function getCurrentBlock(
 
 export function ActiveProgramCard({
   programWeek,
+  weeklyProgress,
   onStartWorkout,
   onSelectDay,
   isStarting,
   startingScheduleId,
   exerciseCounts,
 }: ActiveProgramCardProps) {
-  const { programId, currentUnlockedWeek, totalWeeks, days, todaySlot, isRestDay, pauseStatus, pauseReason } = programWeek;
+  const {
+    programId,
+    programName,
+    currentUnlockedWeek,
+    currentWeekNumber,
+    totalWeeks,
+    days,
+    todaySlot,
+    isRestDay,
+    pauseStatus,
+    pauseReason,
+  } = programWeek;
 
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
   const cachedProgramIdRef = useRef<string | null>(null);
@@ -77,13 +90,13 @@ export function ActiveProgramCard({
 
   if (pauseStatus === "paused") {
     return (
-      <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+      <div className="mb-6 rounded-[22px] border border-amber-500/25 bg-[var(--fc-surface-card)] p-5 shadow-[var(--fc-shadow-card)]">
         <div className="flex items-start gap-3">
           <PauseCircle className="h-5 w-5 shrink-0 text-amber-400" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-300/70">
-              PROGRAM PAUSED
-            </p>
+            <Eyebrow tone="warning" className="mb-2">
+              Program paused
+            </Eyebrow>
             <p className="mt-2 text-sm text-white">
               Your coach has paused your program
             </p>
@@ -103,9 +116,10 @@ export function ActiveProgramCard({
     ? getCurrentBlock(trainingBlocks, currentUnlockedWeek)
     : null;
 
-  const completedDays = days.filter((d) => d.isCompleted).length;
-  const totalDays = days.length;
-  const completionPercent = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+  const safeGoal = Math.max(0, Math.floor(Number(weeklyProgress.goal) || 0));
+  const safeCurrent = Math.max(0, Math.floor(Number(weeklyProgress.current) || 0));
+  const weekPct =
+    safeGoal > 0 ? Math.min(100, Math.round((safeCurrent / safeGoal) * 100)) : 0;
 
   const nextWorkout = (todaySlot && !todaySlot.isCompleted)
     ? todaySlot
@@ -117,96 +131,134 @@ export function ActiveProgramCard({
 
   const handleStart = () => {
     if (!nextWorkout || isRestDay) return;
+    if (!nextWorkout.scheduleId) {
+      console.warn(
+        "[ActiveProgramCard] Next workout has no program_schedule id — snapshot/master mismatch; cannot start.",
+      );
+      return;
+    }
     onSelectDay?.(nextWorkout);
     onStartWorkout(nextWorkout.scheduleId);
   };
 
-  const gradId = "active-program-ring-grad";
+  const goalChipLabel =
+    blockInfo?.block.goal === "custom" && blockInfo.block.custom_goal_label
+      ? blockInfo.block.custom_goal_label
+      : blockInfo
+        ? TRAINING_BLOCK_GOALS[blockInfo.block.goal]
+        : null;
+
+  const todayOrdinal = todayOrdinalInWeek();
 
   return (
-    <ClientGlassCard
-      className="p-6 mb-6 border border-[color:var(--fc-glass-border)] shadow-[0_0_20px_rgba(6,182,212,0.1)]"
-    >
-      <div className="mb-4">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <h2 className="text-xl font-bold fc-text-primary">Active program</h2>
-          {programId ? (
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = `/client/programs/${programId}/details`;
-              }}
-              className="inline-flex shrink-0 items-center gap-0.5 text-xs text-cyan-400 hover:text-cyan-300"
-            >
-              View outline
-              <ChevronRight className="h-3 w-3" aria-hidden />
-            </button>
+    <div className="mb-6 rounded-[22px] border border-[color:var(--fc-glass-border)] bg-[var(--fc-surface-card)] p-5 shadow-[var(--fc-shadow-card)]">
+      <div className="mb-3.5 flex items-start justify-between gap-2">
+        <Eyebrow
+          tone="dim"
+          density="section"
+          className="!mb-0 !text-[10.5px] !font-bold !tracking-[0.18em] !text-zinc-500"
+        >
+          Active program
+        </Eyebrow>
+        {programId ? (
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = `/client/programs/${programId}/details`;
+            }}
+            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--fc-accent-cyan)] hover:opacity-90"
+          >
+            View outline
+            <ChevronRight className="h-3 w-3" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      <h2
+        className="mb-2 text-2xl font-semibold leading-[1.05] tracking-[-0.02em] fc-text-primary"
+        style={{
+          fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
+        }}
+      >
+        {programName ?? "Your program"}
+      </h2>
+      {goalChipLabel ? (
+        <div className="mb-3.5 flex flex-wrap items-center gap-2">
+          <Badge variant="status-info">{goalChipLabel}</Badge>
+          {blockInfo?.block.name ? (
+            <span className="max-w-[55%] truncate text-xs fc-text-dim">
+              {blockInfo.block.name}
+            </span>
           ) : null}
         </div>
-        <div className="flex-1">
-          {blockInfo && (
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{
-                  background: `${GOAL_COLORS[blockInfo.block.goal]}20`,
-                  color: GOAL_COLORS[blockInfo.block.goal],
-                  border: `1px solid ${GOAL_COLORS[blockInfo.block.goal]}40`,
-                }}
-              >
-                {blockInfo.block.goal === "custom" && blockInfo.block.custom_goal_label
-                  ? blockInfo.block.custom_goal_label
-                  : TRAINING_BLOCK_GOALS[blockInfo.block.goal]}
-              </span>
-              {blockInfo.block.name && (
-                <span className="text-xs fc-text-dim truncate">{blockInfo.block.name}</span>
-              )}
-            </div>
-          )}
-          <p className="text-sm fc-text-dim">
-            Week {currentUnlockedWeek} of {totalWeeks} · Day {completedDays + 1} of {totalDays}
-          </p>
-        </div>
-      </div>
+      ) : null}
 
-      {/* Progress bar — cyan gradient */}
-      <div className="mb-4">
-        <div className="h-2.5 w-full rounded-full bg-[color:var(--fc-surface-sunken)] overflow-hidden">
+      <div className="mb-4 mt-4">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
+            This week
+          </span>
+          <span
+            className="shrink-0 text-lg font-bold tabular-nums text-white"
+            style={{
+              fontFamily: "var(--font-big-shoulders-display, var(--font-sans))",
+            }}
+          >
+            {weekPct}%
+            <span className="text-xs font-medium text-zinc-500">
+              {" "}
+              · {safeCurrent}/{safeGoal}
+            </span>
+          </span>
+        </div>
+        <div
+          className="h-[6px] w-full overflow-hidden rounded-[3px] bg-white/[0.06]"
+          role="progressbar"
+          aria-valuenow={safeCurrent}
+          aria-valuemin={0}
+          aria-valuemax={safeGoal}
+          aria-label="This week workout progress"
+        >
           <div
-            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-300"
-            style={{ width: `${completionPercent}%` }}
+            className="h-full rounded-[3px] transition-[width] duration-500 ease-out"
+            style={{
+              width: `${weekPct}%`,
+              background:
+                "linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2))",
+            }}
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative w-14 h-14 flex-shrink-0">
-          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-            <defs>
-              <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#06b6d4" />
-                <stop offset="100%" stopColor="#22d3ee" />
-              </linearGradient>
-            </defs>
-            <circle cx="28" cy="28" r="23" fill="none" stroke="var(--fc-glass-border)" strokeWidth="4" />
-            <circle
-              cx="28"
-              cy="28"
-              r="23"
-              fill="none"
-              stroke={`url(#${gradId})`}
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={`${completionPercent * 1.445} 999`}
-            />
-          </svg>
-        </div>
-        <div>
-          <p className="text-cyan-400 font-bold text-2xl tabular-nums">{completionPercent}%</p>
-          <p className="text-sm font-bold fc-text-primary">
-            {completedDays}/{totalDays} <span className="font-semibold fc-text-dim">workouts</span>
+      <div className="my-4 h-px w-[calc(100%+40px)] -mx-5 bg-[color:var(--fc-glass-border)]" aria-hidden />
+
+      <div className="mb-6 flex items-center">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            Phase
+          </div>
+          <p
+            className="text-base font-semibold leading-tight fc-text-primary"
+            style={{
+              fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
+            }}
+          >
+            Week {currentWeekNumber} of {totalWeeks}
           </p>
-          <p className="text-xs fc-text-dim">This week&apos;s progress</p>
+        </div>
+        <div className="flex min-w-0 flex-1 justify-end text-right">
+          <div className="inline-flex flex-col items-end">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              Today
+            </div>
+            <p
+              className="text-base font-semibold leading-tight fc-text-primary"
+              style={{
+                fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
+              }}
+            >
+              Day {todayOrdinal} of 7
+            </p>
+          </div>
         </div>
       </div>
 
@@ -214,47 +266,68 @@ export function ActiveProgramCard({
         <>
           <div className="mb-4 flex items-center gap-3 rounded-r-lg border-l-2 border-l-cyan-500 pl-3 pr-1 py-2">
             <div
-              className="rounded-lg bg-cyan-500/20 p-2 shrink-0"
+              className="shrink-0 rounded-lg bg-cyan-500/20 p-2"
               aria-hidden
             >
-              <Dumbbell className="w-5 h-5 text-cyan-400" />
+              <Dumbbell className="h-5 w-5 text-cyan-400" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider fc-text-dim">Up next</span>
+              <div className="mb-2 flex items-center gap-2">
+                <Eyebrow tone="dim" density="section" className="!font-bold">
+                  Up next
+                </Eyebrow>
               </div>
-              <h3 className="text-lg font-bold fc-text-primary mb-1">{nextWorkout.workoutName}</h3>
+              <h3 className="mb-1 text-lg font-bold fc-text-primary">{nextWorkout.workoutName}</h3>
               <p className="text-sm fc-text-dim">
                 {exerciseCount > 0 ? `${exerciseCount} exercises` : "Workout"} • ~{nextWorkout.estimatedDuration || 45} min
               </p>
             </div>
-            <ChevronRight className="w-5 h-5 shrink-0 text-cyan-400" aria-hidden />
+            <ChevronRight className="h-5 w-5 shrink-0 text-cyan-400" aria-hidden />
           </div>
 
           <button
+            type="button"
             onClick={handleStart}
             disabled={isStarting && startingScheduleId === nextWorkout.scheduleId}
-            className="w-full h-14 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
           >
             {isStarting && startingScheduleId === nextWorkout.scheduleId ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
                 Starting...
               </>
             ) : (
               <>
-                <Play className="w-5 h-5 fill-current" />
+                <Play className="h-5 w-5 fill-current" />
                 START WORKOUT →
               </>
             )}
           </button>
         </>
       ) : (
-        <div className="text-center py-4">
-          <p className="text-base font-semibold fc-text-primary mb-1">Rest day</p>
-          <p className="text-sm fc-text-dim">No workout scheduled for today</p>
+        <div
+          className="rounded-[18px] border border-[color:var(--fc-glass-border)] px-4 py-5 text-center"
+          style={{
+            background: `linear-gradient(135deg, rgba(79, 227, 232, 0.05) 0%, transparent 100%), var(--fc-surface-card)`,
+          }}
+        >
+          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-400">
+            <Moon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+          </div>
+          <p
+            className="mb-1 text-lg font-semibold fc-text-primary"
+            style={{
+              fontFamily: "var(--font-bricolage-grotesque, var(--font-body))",
+            }}
+          >
+            Rest day
+          </p>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            No workout scheduled for today. Recovery still counts — hydrate and
+            move lightly if you can.
+          </p>
         </div>
       )}
-    </ClientGlassCard>
+    </div>
   );
 }

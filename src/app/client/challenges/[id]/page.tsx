@@ -163,7 +163,7 @@ function ChallengeDetailContent() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -176,7 +176,7 @@ function ChallengeDetailContent() {
 
   if (loadError || !challenge) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -240,7 +240,7 @@ function ChallengeDetailContent() {
 
 export default function ChallengeDetailPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <ChallengeDetailContent />
     </ProtectedRoute>
   );

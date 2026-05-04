@@ -70,6 +70,7 @@ export default function SetLoggingForm({
     weight_used: '',
     reps_completed: '',
     rpe: 5,
+    rpeTouched: false,
     notes: '',
     rest_time: 0
   })
@@ -88,7 +89,14 @@ export default function SetLoggingForm({
       setFormData({
         weight_used: defaultWeight.toString(),
         reps_completed: defaultReps.toString(),
-        rpe: previousSet?.rpe || 5,
+        rpe:
+          previousSet?.rpe != null &&
+          Number.isFinite(Number(previousSet.rpe)) &&
+          Number(previousSet.rpe) >= 1 &&
+          Number(previousSet.rpe) <= 10
+            ? Math.round(Number(previousSet.rpe))
+            : 5,
+        rpeTouched: false,
         notes: '',
         rest_time: templateExercise?.rest_seconds || 60
       })
@@ -108,19 +116,27 @@ export default function SetLoggingForm({
         throw new Error('User not authenticated')
       }
 
-      // Call /api/log-set endpoint
+      const rpeNum = Number(formData.rpe)
+      const includeRpe =
+        formData.rpeTouched &&
+        Number.isFinite(rpeNum) &&
+        Number.isInteger(rpeNum) &&
+        rpeNum >= 1 &&
+        rpeNum <= 10
+
       const response = await fetchApi('/api/log-set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workout_log_id: undefined, // API will create if needed
+          workout_log_id: undefined,
           set_entry_id: templateExercise?.set_entry_id,
           exercise_id: templateExercise?.exercise_id || templateExercise?.exercise?.id,
           weight: parseFloat(formData.weight_used) || 0,
           reps: parseInt(formData.reps_completed) || 0,
           client_id: user.id,
           session_id: sessionId,
-          template_exercise_id: templateExercise?.id
+          template_exercise_id: templateExercise?.id,
+          ...(includeRpe ? { rpe: rpeNum } : {})
         })
       })
 
@@ -385,15 +401,35 @@ export default function SetLoggingForm({
                       </div>
                     </div>
 
-                    {/* RPE Slider */}
+                    {/* RPE Slider — rpe omitted from API until user interacts */}
                     <div className="space-y-3">
                       <Label className={`text-sm font-semibold ${theme.text}`}>Rate of Perceived Exertion (RPE)</Label>
-                      <div className={`p-4 border ${theme.border} rounded-2xl ${getRpeBgColor(formData.rpe)}`}>
+                      <div
+                        className={`p-4 border ${theme.border} rounded-2xl transition-opacity ${
+                          formData.rpeTouched
+                            ? getRpeBgColor(formData.rpe)
+                            : isDark
+                              ? 'bg-slate-800/40 opacity-90'
+                              : 'bg-slate-100/80 opacity-90'
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-3">
-                          <span className={`text-sm ${theme.textSecondary}`}>How hard was this set?</span>
+                          <span
+                            className={`text-sm ${
+                              formData.rpeTouched ? theme.textSecondary : `${theme.textSecondary} opacity-70`
+                            }`}
+                          >
+                            {formData.rpeTouched ? 'How hard was this set?' : 'Tap to rate effort'}
+                          </span>
                           <div className="flex items-center gap-2">
-                            <span className={`text-2xl font-bold ${getRpeColor(formData.rpe)}`}>{formData.rpe}</span>
-                            <span className={`text-sm font-medium ${getRpeColor(formData.rpe)}`}>/10</span>
+                            {formData.rpeTouched ? (
+                              <>
+                                <span className={`text-2xl font-bold ${getRpeColor(formData.rpe)}`}>{formData.rpe}</span>
+                                <span className={`text-sm font-medium ${getRpeColor(formData.rpe)}`}>/10</span>
+                              </>
+                            ) : (
+                              <span className={`text-sm font-medium ${theme.textSecondary} opacity-75`}>—</span>
+                            )}
                           </div>
                         </div>
                         <Input
@@ -402,15 +438,49 @@ export default function SetLoggingForm({
                           max={10}
                           step={1}
                           value={formData.rpe}
-                          onChange={(e) => setFormData(prev => ({ ...prev, rpe: parseInt(e.target.value) }))}
-                          className="w-full"
+                          onPointerDown={() =>
+                            setFormData((prev) => ({ ...prev, rpeTouched: true }))
+                          }
+                          onKeyDown={(e) => {
+                            if (
+                              [
+                                'ArrowLeft',
+                                'ArrowRight',
+                                'ArrowUp',
+                                'ArrowDown',
+                                'Home',
+                                'End',
+                                'PageUp',
+                                'PageDown',
+                              ].includes(e.key)
+                            ) {
+                              setFormData((prev) => ({ ...prev, rpeTouched: true }))
+                            }
+                          }}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              rpe: parseInt(e.target.value, 10),
+                              rpeTouched: true,
+                            }))
+                          }
+                          className={`w-full ${!formData.rpeTouched ? 'opacity-60' : ''}`}
+                          aria-label="Rate of perceived exertion"
                         />
                         <div className="flex justify-between text-xs mt-2">
-                          <span className={`${theme.textSecondary}`}>Very Easy</span>
-                          <span className={`${theme.textSecondary}`}>Maximum Effort</span>
+                          <span className={`${theme.textSecondary} ${!formData.rpeTouched ? 'opacity-60' : ''}`}>
+                            Very Easy
+                          </span>
+                          <span className={`${theme.textSecondary} ${!formData.rpeTouched ? 'opacity-60' : ''}`}>
+                            Maximum Effort
+                          </span>
                         </div>
-                        <div className={`text-sm font-medium mt-2 ${getRpeColor(formData.rpe)}`}>
-                          {getRpeLabel(formData.rpe)}
+                        <div
+                          className={`text-sm font-medium mt-2 ${
+                            formData.rpeTouched ? getRpeColor(formData.rpe) : `${theme.textSecondary} opacity-70`
+                          }`}
+                        >
+                          {formData.rpeTouched ? getRpeLabel(formData.rpe) : 'Optional — not sent until you use the slider'}
                         </div>
                       </div>
                     </div>

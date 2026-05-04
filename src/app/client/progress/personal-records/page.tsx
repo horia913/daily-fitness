@@ -50,7 +50,7 @@ const EXERCISE_ICON_CLASSES = [
   "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20",
   "bg-[color:var(--fc-status-success)]/10 fc-text-success border border-[color:var(--fc-status-success)]/20",
   "bg-[color:var(--fc-status-warning)]/10 text-[color:var(--fc-status-warning)] border border-[color:var(--fc-status-warning)]/20",
-  "bg-[color:var(--fc-accent-primary)]/10 text-[color:var(--fc-accent-primary)] border border-[color:var(--fc-accent-primary)]/20",
+  "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20",
 ];
 
 function getExerciseIconClass(exerciseName: string, index: number): string {
@@ -202,7 +202,7 @@ export default function PersonalRecordsPage() {
       }
       byExercise.get(id)!.milestones.push({
         date: pr.achieved_date,
-        weight: pr.record_value ?? 0,
+        value: pr.record_value ?? 0,
       });
     }
     byExercise.forEach((data) => {
@@ -245,7 +245,7 @@ export default function PersonalRecordsPage() {
 
   if (loadError && !loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -270,7 +270,7 @@ export default function PersonalRecordsPage() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -292,7 +292,7 @@ export default function PersonalRecordsPage() {
     .join(" · ");
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden space-y-4">
@@ -315,7 +315,7 @@ export default function PersonalRecordsPage() {
 
           {backfilling ? (
             <div className="py-6 text-center border-y border-[color:var(--fc-glass-border)]">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-2" />
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-accent-cyan)] border-t-transparent mb-2" />
               <p className="text-sm fc-text-dim">Analyzing your workout history...</p>
             </div>
           ) : (prStats && prStats.totalPRs > 0) || totalRecords > 0 ? (
@@ -346,7 +346,8 @@ export default function PersonalRecordsPage() {
                 <PRTimelineChart
                   milestones={chartExercise?.milestones ?? []}
                   exerciseName={chartExercise?.name ?? "—"}
-                  unit="kg"
+                  recordType="weight"
+                  valueUnit={null}
                   defaultTimeRange="3M"
                   defaultExpanded={true}
                 />
@@ -544,7 +545,11 @@ export default function PersonalRecordsPage() {
                                 </span>
                                 <div className="flex items-center gap-2 min-w-0 justify-end">
                                   <span className="font-mono font-bold fc-text-primary tabular-nums">
-                                    {record.weight} kg × {record.reps}
+                                    {record.weight > 0 && record.reps > 0
+                                      ? `${record.weight} kg × ${record.reps}`
+                                      : record.weight > 0
+                                        ? `${record.weight} kg`
+                                        : `${record.reps} reps`}
                                   </span>
                                   <span className="text-[9px] font-semibold fc-text-success whitespace-nowrap">
                                     {getRecordType(record.weight, record.reps).label}

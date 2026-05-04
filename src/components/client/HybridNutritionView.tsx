@@ -399,7 +399,7 @@ export function HybridNutritionView({
                             setSelectedMealIdForAdd(meal.id);
                             setIsAddFoodOpen(true);
                           }}
-                          className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[color:var(--fc-accent)]/20 hover:bg-[color:var(--fc-accent)]/30 text-[color:var(--fc-accent)] transition-colors"
+                          className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[color:var(--fc-accent-cyan)]/20 hover:bg-[color:var(--fc-accent-cyan)]/30 text-[color:var(--fc-accent-cyan)] transition-colors"
                         >
                           <Plus className="w-4 h-4" />
                         </button>

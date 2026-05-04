@@ -1,9 +1,10 @@
 /**
  * Program Week State Builder
  *
- * SINGLE AUTHORITY for program-week data (days, todaySlot, isRestDay, overdueSlots).
- * Both /api/client/program-week and /api/client/dashboard MUST use this function.
- * Neither route may call programStateService directly for Today resolution.
+ * Builds `ProgramWeekState` from programStateService (slots, assignment, completions).
+ * Consumed by GET `/api/client/program-week` via `buildProgramWeekState`.
+ * The client dashboard primary payload uses `get_client_dashboard` RPC; dashboard uses this builder
+ * only where it explicitly delegates week UI state — do not assume every dashboard path imports here.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -17,7 +18,8 @@ import {
 import type { ProgramScheduleSlot } from './programStateService'
 
 export interface ProgramWeekDayCard {
-  scheduleId: string
+  /** program_schedule.id when merged from master; null if snapshot has no master row (do not treat as FK). */
+  scheduleId: string | null
   dayNumber: number
   dayLabel: string
   dayOfWeek: number // 0=Monday, 6=Sunday
@@ -29,7 +31,7 @@ export interface ProgramWeekDayCard {
 }
 
 export interface OverdueSlotCard {
-  scheduleId: string
+  scheduleId: string | null
   dayNumber: number
   dayOfWeek: number
   dayLabel: string
@@ -166,14 +168,14 @@ export async function buildProgramWeekState(
   const toDayCard = (slot: ProgramScheduleSlot): ProgramWeekDayCard => {
     const template = templateMap.get(slot.template_id)
     return {
-      scheduleId: slot.id,
+      scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
       templateId: slot.template_id,
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
-      isCompleted: completedScheduleIds.has(slot.id),
+      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
       isOptional: slot.is_optional ?? false,
     }
   }
@@ -192,7 +194,7 @@ export async function buildProgramWeekState(
   const overdueSlots: OverdueSlotCard[] = overdueRaw.map(slot => {
     const template = templateMap.get(slot.template_id)
     return {
-      scheduleId: slot.id,
+      scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
       dayOfWeek: slot.day_of_week,
       dayLabel: `Day ${slot.day_number}`,
@@ -200,7 +202,7 @@ export async function buildProgramWeekState(
       workoutId: slot.template_id,
       workoutName: template?.name || 'Workout',
       estimatedDuration: template?.estimated_duration || 0,
-      isCompleted: completedScheduleIds.has(slot.id),
+      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
       isOptional: slot.is_optional ?? false,
     }
   })
@@ -218,7 +220,7 @@ export async function buildProgramWeekState(
   // In coach_managed mode, check if all required slots in the current week are done
   const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
   const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
-    requiredCurrentWeekSlots.every(s => completedScheduleIds.has(s.id))
+    requiredCurrentWeekSlots.every(s => s.id != null && completedScheduleIds.has(s.id))
   const isWeekCompleteAwaitingReview =
     progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !state.isCompleted
 

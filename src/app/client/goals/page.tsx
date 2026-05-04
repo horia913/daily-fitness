@@ -6,53 +6,15 @@ import { createPortal } from "react-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Target,
   Plus,
-  TrendingUp,
   Dumbbell,
   Apple,
-  Weight,
-  CheckCircle,
-  Edit,
-  Trash,
-  Star,
-  Zap,
-  Activity,
-  Trophy,
-  Award,
-  Crown,
-  Rocket,
-  Timer,
-  X,
-  XCircle,
-  PauseCircle,
-  Calendar as CalendarIcon,
-  Clock as ClockIcon,
-  Target as TargetIcon,
+  Scale,
   ChevronDown,
   Leaf,
-  BarChart3,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -60,35 +22,70 @@ import { useToast } from "@/components/ui/toast-provider";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GoalCard } from "@/components/goals/GoalCard";
-import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
-import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { GoalWizard } from "@/components/goals/GoalWizard";
+import { EditGoalModal } from "@/components/goals/EditGoalModal";
+import type { GoalWizardCategory } from "@/lib/goalCreationService";
 import { withTimeout } from "@/lib/withTimeout";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
 const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string; icon: LucideIcon }[] = [
-  { id: "training", label: "Training", emoji: "🏋️", icon: Dumbbell },
+  { id: "training", label: "Training", emoji: "🏋️", icon: Zap },
   { id: "nutrition", label: "Nutrition", emoji: "🍎", icon: Apple },
-  { id: "checkins", label: "Check-ins", emoji: "📊", icon: BarChart3 },
+  { id: "checkins", label: "Body", emoji: "🧍", icon: Scale },
   { id: "lifestyle", label: "Lifestyle", emoji: "🌿", icon: Leaf },
-  { id: "general", label: "General", emoji: "⭐", icon: Star },
 ];
+
+/** Phase 0b Task 8.5: per-pillar icon color (tokens from `ui-system.css` §2.6 aliases). */
+const PILLAR_SECTION_ICON_COLOR: Record<Goal["pillar"], string> = {
+  training: "var(--fc-pillar-training)",
+  nutrition: "var(--fc-pillar-nutrition)",
+  checkins: "var(--fc-pillar-checkins)",
+  lifestyle: "var(--fc-pillar-lifestyle)",
+  general: "var(--fc-pillar-general)",
+};
+
+function sectionPillarForGoal(goal: Goal): Goal["pillar"] {
+  const cat = goal.category as string
+  if (cat === "behavioral") return "lifestyle"
+  switch (goal.category) {
+    case "body_composition":
+    case "weight_loss":
+    case "muscle_gain":
+      return "checkins";
+    case "nutrition":
+      return "nutrition";
+    case "outcome":
+      return "lifestyle";
+    case "performance":
+    case "strength":
+    case "endurance":
+    case "mobility":
+      return "training";
+    default:
+      return goal.pillar;
+  }
+}
 
 interface Goal {
   id: string;
   client_id: string;
   title: string;
   description?: string;
+  notes?: string | null;
   category:
+    | "body_composition"
+    | "performance"
+    | "outcome"
+    | "nutrition"
+    /** Legacy rows (pre–Phase 1 migration) may still surface until backfilled */
     | "weight_loss"
     | "muscle_gain"
     | "strength"
     | "endurance"
     | "mobility"
-    | "body_composition"
-    | "performance"
     | "other";
-  type: "target" | "habit" | "milestone";
+  type?: "target" | "habit" | "milestone";
   target_value?: number;
   target_unit?: string;
   current_value?: number;
@@ -99,217 +96,42 @@ interface Goal {
   created_at: string;
   updated_at: string;
   progress_percentage?: number;
-  goal_template_id?: string; // FK to goal_templates table
+  goal_template_id?: string;
   pillar: "training" | "nutrition" | "lifestyle" | "checkins" | "general";
   goal_type?: string | null;
+  goal_source_links?: { source_type: string } | { source_type: string }[] | null;
 }
 
-interface GoalCategory {
-  id: string;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  description: string;
+function unwrapSourceType(goal: Goal): string | null {
+  const raw = goal.goal_source_links;
+  if (raw == null) return null;
+  const row = Array.isArray(raw) ? raw[0] : raw;
+  return row?.source_type ?? null;
 }
 
-interface PresetGoal {
-  id: string;
-  title: string;
-  description?: string;
-  emoji: string;
-  category: string;
-  subcategory: string;
-  unit: string;
-  suggestedUnit: string;
-  isAutoTracked?: boolean;
-  autoTrackSource?: string;
+function goalHasAutoSync(goal: Goal): boolean {
+  const t = unwrapSourceType(goal);
+  return typeof t === "string" && t !== "manual";
 }
-
-// Database goal template interface (from goal_templates table)
-// Note: Goal templates are SYSTEM-ONLY (no coach customization)
-interface GoalTemplate {
-  id: string;
-  title: string;
-  description: string | null;
-  emoji: string;
-  category: string;
-  subcategory: string | null;
-  default_unit: string;
-  suggested_unit_display: string | null;
-  is_auto_tracked: boolean;
-  auto_track_source: string | null;
-  is_active: boolean;
-}
-
-// Expanded Preset Goals
-const PRESET_GOALS: PresetGoal[] = [
-  // BODY COMPOSITION GOALS
-  {
-    id: "fat-loss",
-    title: "Fat Loss",
-    description: "Reduce body fat percentage",
-    emoji: "🔥",
-    category: "body_composition",
-    subcategory: "Body Composition",
-    unit: "%",
-    suggestedUnit: "%",
-  },
-  {
-    id: "muscle-gain",
-    title: "Muscle Gain",
-    description: "Increase muscle mass",
-    emoji: "💪",
-    category: "muscle",
-    subcategory: "Body Composition",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  {
-    id: "weight-loss",
-    title: "Weight Loss",
-    description: "Reduce body weight",
-    emoji: "⚖️",
-    category: "weight",
-    subcategory: "Body Composition",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  {
-    id: "body-recomp",
-    title: "Body Recomposition",
-    description: "Increase muscle + decrease fat %",
-    emoji: "🔄",
-    category: "body_composition",
-    subcategory: "Body Composition",
-    unit: "combined",
-    suggestedUnit: "kg muscle / % fat",
-  },
-  // STRENGTH & PERFORMANCE GOALS
-  {
-    id: "bench-press",
-    title: "Increase Bench Press",
-    description: "Improve upper body strength",
-    emoji: "💥",
-    category: "strength",
-    subcategory: "Strength & Performance",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  {
-    id: "squat",
-    title: "Increase Squat",
-    description: "Build leg strength",
-    emoji: "🦵",
-    category: "strength",
-    subcategory: "Strength & Performance",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  {
-    id: "deadlift",
-    title: "Increase Deadlift",
-    description: "Develop posterior chain strength",
-    emoji: "🏋️",
-    category: "strength",
-    subcategory: "Strength & Performance",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  {
-    id: "hip-thrust",
-    title: "Increase Hip Thrust",
-    description: "Build glute and posterior chain strength",
-    emoji: "🍑",
-    category: "strength",
-    subcategory: "Strength & Performance",
-    unit: "kg",
-    suggestedUnit: "kg",
-  },
-  // CONSISTENCY & ADHERENCE GOALS
-  {
-    id: "workout-consistency",
-    title: "Workout Consistency",
-    description: "Complete X workouts per week",
-    emoji: "📅",
-    category: "consistency",
-    subcategory: "Consistency & Adherence",
-    unit: "workouts/week",
-    suggestedUnit: "per week",
-  },
-  {
-    id: "nutrition-tracking",
-    title: "Nutrition Tracking",
-    description: "Log meals X days per week",
-    emoji: "🥗",
-    category: "consistency",
-    subcategory: "Consistency & Adherence",
-    unit: "days/week",
-    suggestedUnit: "days per week",
-  },
-  {
-    id: "water-intake",
-    title: "Water Intake Goal",
-    description: "Drink X liters per day",
-    emoji: "💧",
-    category: "consistency",
-    subcategory: "Consistency & Adherence",
-    unit: "liters",
-    suggestedUnit: "liters per day",
-  },
-];
 
 export default function ClientGoals() {
   const router = useRouter();
   const { addToast } = useToast();
   const { user } = useAuth();
-  const { performanceSettings, isDark, getSemanticColor } = useTheme();
+  const { performanceSettings } = useTheme();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadingStartedAt, setLoadingStartedAt] = useState<number | null>(null);
   const loadingRef = useRef(false);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [presetGoalTemplates, setPresetGoalTemplates] = useState<PresetGoal[]>(
-    []
-  );
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [goalWizardOpen, setGoalWizardOpen] = useState(false);
+  const [goalWizardInitialCategory, setGoalWizardInitialCategory] = useState<GoalWizardCategory | null>(null);
+  const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "completed" | "paused" | "cancelled"
   >("all");
   const [sortBy, setSortBy] = useState<
     "newest" | "oldest" | "priority" | "progress"
   >("newest");
-  const [showPresetSelection, setShowPresetSelection] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
-  const [customizing, setCustomizing] = useState(false);
-  const [showCustomGoalForm, setShowCustomGoalForm] = useState(false);
-  const [customForm, setCustomForm] = useState({
-    targetValue: "",
-    targetUnit: "",
-    targetDate: "",
-    priority: "high",
-  });
-  const [presetTargets, setPresetTargets] = useState<Record<string, string>>(
-    {}
-  );
-  const [presetDates, setPresetDates] = useState<Record<string, string>>({});
-  const [progressUpdates, setProgressUpdates] = useState<
-    Record<string, number>
-  >({});
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "other" as Goal["category"],
-    type: "target" as Goal["type"],
-    target_value: "",
-    target_unit: "",
-    target_date: "",
-    priority: "medium" as Goal["priority"],
-    pillar: "training" as Goal["pillar"],
-  });
-  const [addGoalPillar, setAddGoalPillar] = useState<Goal["pillar"]>("general");
-  const [addGoalModalPillar, setAddGoalModalPillar] = useState<Goal["pillar"] | null>(null);
   const [completedSectionOpen, setCompletedSectionOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [fabPortalReady, setFabPortalReady] = useState(false);
@@ -317,95 +139,33 @@ export default function ClientGoals() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const shouldOpen = params.get("add") === "true";
-    const category = params.get("category");
-    const allowedPillars: Goal["pillar"][] = [
-      "training",
-      "nutrition",
-      "checkins",
-      "lifestyle",
-      "general",
-    ];
-    if (!shouldOpen || !category) return;
-    if (allowedPillars.includes(category as Goal["pillar"])) {
-      setAddGoalModalPillar(category as Goal["pillar"]);
-    }
+    const pillar = params.get("category") as Goal["pillar"] | null;
+    const map: Partial<Record<Goal["pillar"], GoalWizardCategory>> = {
+      nutrition: "nutrition",
+      checkins: "body_composition",
+      lifestyle: "outcome",
+    };
+    if (!shouldOpen) return;
+    const initial = pillar && map[pillar] ? map[pillar]! : null;
+    setGoalWizardInitialCategory(initial);
+    setGoalWizardOpen(true);
   }, []);
 
   useEffect(() => {
     setFabPortalReady(true);
   }, []);
 
-  const goalCategories: GoalCategory[] = [
-    {
-      id: "body_composition",
-      name: "Body Composition",
-      icon: Dumbbell,
-      color: "text-blue-600",
-      description: "Body composition goals",
-    },
-    {
-      id: "muscle_gain",
-      name: "Muscle Gain",
-      icon: Dumbbell,
-      color: "text-green-600",
-      description: "Muscle building goals",
-    },
-    {
-      id: "weight_loss",
-      name: "Weight Loss",
-      icon: Weight,
-      color: "text-purple-600",
-      description: "Weight management goals",
-    },
-    {
-      id: "strength",
-      name: "Strength",
-      icon: Zap,
-      color: "text-orange-600",
-      description: "Strength and power goals",
-    },
-    {
-      id: "endurance",
-      name: "Endurance",
-      icon: Activity,
-      color: "text-red-600",
-      description: "Cardio and endurance goals",
-    },
-    {
-      id: "performance",
-      name: "Performance",
-      icon: Star,
-      color: "text-yellow-600",
-      description: "Performance and consistency goals",
-    },
-    {
-      id: "mobility",
-      name: "Mobility",
-      icon: Activity,
-      color: "text-indigo-600",
-      description: "Mobility and flexibility goals",
-    },
-    {
-      id: "other",
-      name: "Other",
-      icon: Target,
-      color: "text-gray-600",
-      description: "Other goals",
-    },
-  ];
-
   const loadGoals = useCallback(async () => {
     if (!user) return;
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
-    setLoadingStartedAt(Date.now());
     try {
       await withTimeout(
         (async () => {
       const { data, error } = await supabase
         .from("goals")
-        .select("*")
+        .select("*, goal_source_links(source_type)")
         .eq("client_id", user.id)
         .order("pillar", { ascending: true })
         .order("created_at", { ascending: false });
@@ -483,235 +243,10 @@ export default function ClientGoals() {
       setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load goals"));
     } finally {
       setLoading(false);
-      setLoadingStartedAt(null);
       loadingRef.current = false;
     }
   }, [user]);
 
-
-  // Load preset goals from database (with fallback to hardcoded array)
-  const loadPresetGoals = useCallback(async () => {
-    try {
-      // Fetch templates from goal_templates table
-      const { data: templates, error } = await supabase
-        .from('goal_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('title', { ascending: true });
-
-      if (error) {
-        console.warn('Error fetching goal templates from DB, using fallback:', error);
-        setPresetGoalTemplates(PRESET_GOALS);
-        return;
-      }
-
-      if (templates && templates.length > 0) {
-        // Map database templates to PresetGoal format
-        const mappedTemplates: PresetGoal[] = templates.map((t: GoalTemplate) => ({
-          id: t.id,
-          title: t.title,
-          description: t.description || undefined,
-          emoji: t.emoji || '🎯',
-          category: t.category,
-          subcategory: t.subcategory || t.category,
-          unit: t.default_unit,
-          suggestedUnit: t.suggested_unit_display || t.default_unit,
-          isAutoTracked: t.is_auto_tracked,
-          autoTrackSource: t.auto_track_source || undefined,
-        }));
-        setPresetGoalTemplates(mappedTemplates);
-      } else {
-        // Fallback to hardcoded if no templates in DB yet
-        setPresetGoalTemplates(PRESET_GOALS);
-      }
-    } catch (error) {
-      console.error('Error loading preset goals:', error);
-      setPresetGoalTemplates(PRESET_GOALS);
-    }
-  }, []);
-
-  // Helper function to map preset category to valid database category
-  const mapCategoryToValid = (presetCategory: string): Goal["category"] => {
-    const categoryMap: Record<string, Goal["category"]> = {
-      body_composition: "body_composition", // Already valid ✓
-      muscle: "muscle_gain", // Map to muscle_gain ✓
-      weight: "weight_loss", // Map to weight_loss ✓
-      strength: "strength", // Already valid ✓
-      consistency: "performance", // Map to performance ✓
-      endurance: "endurance", // Already valid ✓
-      mobility: "mobility", // Already valid ✓
-      other: "other", // Fallback ✓
-    };
-    return categoryMap[presetCategory] || "other";
-  };
-
-  // Helper function to map title to category (legacy, kept for compatibility)
-  const getCategoryFromTitle = (title: string): string => {
-    const categoryMap: Record<string, string> = {
-      "Fat Loss": "body_composition",
-      "Muscle Gain": "muscle_gain",
-      "Weight Loss": "weight_loss",
-      "Body Recomposition": "body_composition",
-    };
-    return categoryMap[title] || "other";
-  };
-
-  // Create custom goal from preset
-  const selectPresetGoal = async (
-    presetTitle: string,
-    targetValue: number,
-    targetDate?: string
-  ) => {
-    if (!user || !targetValue) {
-      addToast({ title: "Please enter a target value", variant: "warning" });
-      return;
-    }
-
-    try {
-      const preset = presetGoalTemplates.find((p) => p.title === presetTitle);
-      const category = preset
-        ? getCategoryFromTitle(preset.title)
-        : getCategoryFromTitle(presetTitle);
-
-      // Check if the preset has a valid UUID (from database) vs hardcoded id
-      const isFromDatabase = preset?.id && preset.id.includes('-') && preset.id.length === 36;
-
-      const { data, error } = await supabase.from("goals").insert({
-        client_id: user.id,
-        coach_id: null,
-        title: presetTitle,
-        description: preset?.description || `Target: ${targetValue}`,
-        category: category,
-        pillar: addGoalPillar,
-        target_value: targetValue,
-        target_unit: preset?.unit || null,
-        target_date: targetDate || null,
-        current_value: 0,
-        status: "active",
-        priority: "high",
-        start_date: new Date().toISOString().split("T")[0],
-        progress_percentage: 0,
-        goal_template_id: isFromDatabase ? preset.id : null, // Link to template if from DB
-      });
-
-      if (error) throw error;
-
-      // Clear preset inputs
-      setPresetTargets((prev) => {
-        const newPrev = { ...prev };
-        delete newPrev[presetTitle];
-        return newPrev;
-      });
-      setPresetDates((prev) => {
-        const newPrev = { ...prev };
-        delete newPrev[presetTitle];
-        return newPrev;
-      });
-
-      await loadGoals();
-      addToast({ title: "Goal created successfully!", variant: "success" });
-    } catch (error) {
-      console.error("Error creating goal from preset:", error);
-      addToast({ title: "Failed to create goal. Please try again.", variant: "destructive" });
-    }
-  };
-
-  // Create custom goal from preset (new simplified handler)
-  const handleCreateCustomGoal = async (
-    e: React.FormEvent,
-    preset: PresetGoal
-  ) => {
-    e.preventDefault();
-
-    if (!user || !customForm.targetValue) {
-      addToast({ title: "Please enter a target value", variant: "warning" });
-      return;
-    }
-
-    try {
-      // Parse target value based on goal type
-      let parsedValue: number | null = null;
-
-      // For body recomp, store as description instead
-      if (preset.id === "body-recomp") {
-        parsedValue = null; // Will store in description
-      } else {
-        parsedValue = parseFloat(customForm.targetValue);
-        if (isNaN(parsedValue)) {
-          addToast({ title: "Please enter a valid number", variant: "warning" });
-          return;
-        }
-      }
-
-      const description =
-        preset.id === "body-recomp"
-          ? `Target: ${customForm.targetValue} ${customForm.targetUnit}`
-          : `Target: ${customForm.targetValue} ${
-              customForm.targetUnit || preset.suggestedUnit
-            }`;
-
-      // Map preset category to valid database category
-      const validCategory = mapCategoryToValid(preset.category);
-
-      // Check if the preset has a valid UUID (from database) vs hardcoded id
-      const isFromDatabase = preset.id && preset.id.includes('-') && preset.id.length === 36;
-
-      // Build insert data object
-      const insertData: any = {
-        client_id: user.id,
-        coach_id: null,
-        title: preset.title,
-        description: description,
-        category: validCategory,
-        pillar: addGoalPillar,
-        target_value: parsedValue,
-        target_date: customForm.targetDate || null,
-        current_value: 0,
-        status: "active", // Must be one of: 'active', 'completed', 'paused', 'cancelled'
-        priority: customForm.priority,
-        start_date: new Date().toISOString().split("T")[0],
-        progress_percentage: 0,
-        goal_template_id: isFromDatabase ? preset.id : null, // Link to template if from DB
-      };
-
-      // Only include target_unit if it has a value
-      const targetUnit = customForm.targetUnit || preset.suggestedUnit;
-      if (targetUnit && targetUnit.trim() !== "") {
-        insertData.target_unit = targetUnit;
-      }
-
-      const { error } = await supabase.from("goals").insert(insertData);
-
-      if (error) {
-        console.error("Supabase error:", error);
-        console.error("Error code:", error.code);
-        console.error("Error message:", error.message);
-        console.error("Error details:", error.details);
-        console.error("Error hint:", error.hint);
-        throw error;
-      }
-
-      // Success - reload goals and close modals
-      await loadGoals();
-      setCustomizing(false);
-      setSelectedPreset(null);
-      setShowPresetSelection(false);
-      setCustomForm({
-        targetValue: "",
-        targetUnit: "",
-        targetDate: "",
-        priority: "high",
-      });
-      addToast({ title: "Goal created successfully!", variant: "success" });
-    } catch (error: any) {
-      console.error("Error creating goal:", error);
-      const errorMessage =
-        error?.message ||
-        "Failed to create goal. Please check the console for details.";
-      addToast({ title: `Failed to create goal: ${errorMessage}`, variant: "destructive" });
-    }
-  };
 
   // Update goal progress
   const updateGoalProgress = async (
@@ -750,13 +285,6 @@ export default function ClientGoals() {
 
       if (error) throw error;
 
-      // Clear progress update input
-      setProgressUpdates((prev) => {
-        const newPrev = { ...prev };
-        delete newPrev[goalId];
-        return newPrev;
-      });
-
       await loadGoals();
     } catch (error) {
       console.error("Error updating goal progress:", error);
@@ -764,130 +292,11 @@ export default function ClientGoals() {
     }
   };
 
-  // Edit goal
-  const editGoal = async (
-    goalId: string,
-    updates: {
-      target_value?: number;
-      target_date?: string;
-      title?: string;
-      priority?: string;
-    }
-  ) => {
-    try {
-      let data: any = { ...updates, updated_at: new Date().toISOString() };
-
-      // Recalculate progress if target_value changes
-      if (updates.target_value) {
-        const { data: goal } = await supabase
-          .from("goals")
-          .select("current_value")
-          .eq("id", goalId)
-          .single();
-
-        if (goal && goal.current_value) {
-          data.progress_percentage = Math.min(
-            (goal.current_value / updates.target_value) * 100,
-            100
-          );
-          if (data.progress_percentage >= 100) {
-            data.status = "completed";
-            data.completed_date = new Date().toISOString().split("T")[0];
-          }
-        }
-      }
-
-      const { error } = await supabase
-        .from("goals")
-        .update(data)
-        .eq("id", goalId)
-        .eq("client_id", user?.id);
-
-      if (error) throw error;
-
-      await loadGoals();
-      return true;
-    } catch (error) {
-      console.error("Error editing goal:", error);
-      return false;
-    }
-  };
-
   useEffect(() => {
     if (user) {
-      Promise.all([loadGoals(), loadPresetGoals()]).then(() =>
-        setLoading(false)
-      );
+      loadGoals().finally(() => setLoading(false));
     }
-  }, [user, loadGoals, loadPresetGoals]);
-
-  const handleCreateGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    try {
-      const goalData = {
-        client_id: user.id,
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        pillar: formData.pillar,
-        type: formData.type,
-        target_value: formData.target_value
-          ? parseFloat(formData.target_value)
-          : null,
-        target_unit: formData.target_unit,
-        target_date: formData.target_date || null,
-        priority: formData.priority,
-        status: "active" as const,
-        current_value: 0,
-      };
-
-      const { error } = await supabase.from("goals").insert(goalData);
-
-      if (error) throw error;
-
-      await loadGoals();
-      resetForm();
-      setShowCreateForm(false);
-    } catch (error) {
-      console.error("Error creating goal:", error);
-    }
-  };
-
-  const handleUpdateGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingGoal) return;
-
-    try {
-      const goalData = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        type: formData.type,
-        target_value: formData.target_value
-          ? parseFloat(formData.target_value)
-          : null,
-        target_unit: formData.target_unit,
-        target_date: formData.target_date || null,
-        priority: formData.priority,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase
-        .from("goals")
-        .update(goalData)
-        .eq("id", editingGoal.id);
-
-      if (error) throw error;
-
-      await loadGoals();
-      resetForm();
-      setEditingGoal(null);
-    } catch (error) {
-      console.error("Error updating goal:", error);
-    }
-  };
+  }, [user, loadGoals]);
 
   const handleDeleteGoal = async (goalId: string) => {
     try {
@@ -901,188 +310,15 @@ export default function ClientGoals() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      description: "",
-      category: "other",
-      type: "target",
-      target_value: "",
-      target_unit: "",
-      target_date: "",
-      priority: "medium",
-      pillar: "training",
-    });
+  const openGoalWizard = (pillar: Goal["pillar"]) => {
+    const map: Partial<Record<Goal["pillar"], GoalWizardCategory>> = {
+      nutrition: "nutrition",
+      checkins: "body_composition",
+      lifestyle: "outcome",
+    };
+    setGoalWizardInitialCategory(map[pillar] ?? null);
+    setGoalWizardOpen(true);
   };
-
-  const startEditing = (goal: Goal) => {
-    setEditingGoal(goal);
-    setFormData({
-      title: goal.title,
-      description: goal.description || "",
-      category: goal.category,
-      type: goal.type,
-      target_value: goal.target_value?.toString() || "",
-      target_unit: goal.target_unit || "",
-      target_date: goal.target_date ? goal.target_date.split("T")[0] : "",
-      priority: goal.priority,
-      pillar: goal.pillar ?? "general",
-    });
-    setShowCreateForm(true);
-  };
-
-  const getCategoryIcon = (categoryId: string) => {
-    const category = goalCategories.find((c) => c.id === categoryId);
-    return category?.icon || Target;
-  };
-
-  const getCategoryColor = (categoryId: string) => {
-    const category = goalCategories.find((c) => c.id === categoryId);
-    return category?.color || "fc-text-dim";
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "text-red-600 bg-red-50 border-red-200";
-      case "medium":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200";
-      case "low":
-        return "text-green-600 bg-green-50 border-green-200";
-      default:
-        return "fc-text-dim bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-      case "in_progress":
-        return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-800";
-      case "completed":
-        return "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-900/20 dark:border-green-800";
-      case "paused":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/20 dark:border-yellow-800";
-      case "cancelled":
-        return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800";
-      default:
-        return "fc-text-dim bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]";
-    }
-  };
-
-  const getStatusDisplayText = (status: string) => {
-    if (status === "in_progress") return "Active";
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-
-  const getGoalIcon = (goal: Goal) => {
-    const CategoryIcon = getCategoryIcon(goal.category);
-    const status = goal.status;
-    const progress = goal.progress_percentage || 0;
-
-    if (status === "completed") {
-      return <Trophy className="w-6 h-6 text-yellow-600" />;
-    } else if (progress >= 80) {
-      return <Crown className="w-6 h-6 text-purple-600" />;
-    } else if (progress >= 50) {
-      return <Award className="w-6 h-6 text-blue-600" />;
-    } else if (status === "paused") {
-      return <PauseCircle className="w-6 h-6 text-yellow-500" />;
-    } else if (status === "cancelled") {
-      return <XCircle className="w-6 h-6 fc-text-error" />;
-    } else {
-      return (
-        <CategoryIcon
-          className={`w-6 h-6 ${getCategoryColor(goal.category)}`}
-        />
-      );
-    }
-  };
-
-  const getGoalGradient = (goal: Goal) => {
-    const status = goal.status;
-    const progress = goal.progress_percentage || 0;
-
-    if (status === "completed") {
-      return "from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20";
-    } else if (progress >= 80) {
-      return "from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20";
-    } else if (progress >= 50) {
-      return "from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20";
-    } else if (status === "paused") {
-      return "from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20";
-    } else if (status === "cancelled") {
-      return "from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20";
-    } else {
-      return "from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-glass-highlight)] dark:to-[color:var(--fc-surface)]";
-    }
-  };
-
-  const getMotivationalMessage = () => {
-    const activeGoals = goals.filter((g) => g.status === "active").length;
-    const completedGoals = goals.filter((g) => g.status === "completed").length;
-    const avgProgress =
-      goals.length > 0
-        ? Math.round(
-            goals.reduce(
-              (acc, goal) => acc + (goal.progress_percentage || 0),
-              0
-            ) / goals.length
-          )
-        : 0;
-
-    if (completedGoals > 0) {
-      return "You're crushing your goals! 🎉";
-    } else if (avgProgress >= 80) {
-      return "You're so close to victory! 💪";
-    } else if (avgProgress >= 50) {
-      return "Great progress! Keep pushing forward! 🚀";
-    } else if (activeGoals > 0) {
-      return "Every step counts towards your dreams! ✨";
-    } else {
-      return "Ready to set some amazing goals? 🌟";
-    }
-  };
-
-  const getDaysUntilDeadline = (targetDate: string) => {
-    const now = new Date();
-    const target = new Date(targetDate);
-    const diffTime = target.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  // List of preset goal titles that are auto-tracked
-  const PRESET_GOAL_TITLES = [
-    "Increase Bench Press",
-    "Bench Press",
-    "Increase Squat",
-    "Squat",
-    "Increase Deadlift",
-    "Deadlift",
-    "Increase Hip Thrust",
-    "Hip Thrust",
-    "Fat Loss",
-    "Weight Loss",
-    "Muscle Gain",
-    "Body Recomposition",
-    "Workout Consistency",
-    "Nutrition Tracking",
-    "Water Intake Goal",
-  ];
-
-  // Check if a goal is a preset (auto-tracked) goal
-  const isPresetGoal = (goal: Goal): boolean => {
-    return PRESET_GOAL_TITLES.some(
-      (presetTitle) =>
-        goal.title.toLowerCase().includes(presetTitle.toLowerCase()) ||
-        presetTitle.toLowerCase().includes(goal.title.toLowerCase())
-    );
-  };
-
-  // Split goals into preset and custom
-  const presetGoalItems = goals.filter((goal) => isPresetGoal(goal));
-  const customGoalItems = goals.filter((goal) => !isPresetGoal(goal));
 
   const filteredAndSortedGoals = (goalList: Goal[]) => {
     let filtered = goalList;
@@ -1181,11 +417,20 @@ export default function ClientGoals() {
     (filterStatus !== "all" ? 1 : 0) + (sortBy !== "newest" ? 1 : 0);
 
   const getActiveGoalsForPillar = (pillar: Goal["pillar"]) => {
-    let list = activeGoalsList.filter((g) => (g.pillar ?? "general") === pillar);
+    let list = activeGoalsList.filter((g) => sectionPillarForGoal(g) === pillar);
     return filteredAndSortedGoals(list);
   };
-  const getPillarStats = (pillar: Goal["pillar"]) =>
-    goalStatsFromService.byPillar.find((p) => p.pillar === pillar);
+  const getPillarStats = (pillar: Goal["pillar"]) => {
+    const list = activeGoalsList.filter((g) => sectionPillarForGoal(g) === pillar);
+    const count = list.length;
+    const adherence =
+      count > 0
+        ? Math.round(
+            list.reduce((sum, g) => sum + (g.progress_percentage ?? 0), 0) / count
+          )
+        : 0;
+    return { count, adherence };
+  };
 
   return (
     <ProtectedRoute requiredRole="client">
@@ -1200,7 +445,7 @@ export default function ClientGoals() {
                 <button
                   type="button"
                   onClick={() => router.push("/client/goals/history")}
-                  className="shrink-0 text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
+                  className="shrink-0 text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
                 >
                   History
                 </button>
@@ -1245,7 +490,7 @@ export default function ClientGoals() {
                     Filters
                   </span>
                   {activeFilterCount > 0 ? (
-                    <span className="text-[10px] text-[color:var(--fc-accent)]/70">
+                    <span className="text-[10px] text-[color:var(--fc-accent-cyan)]/70">
                       {activeFilterCount} active
                     </span>
                   ) : null}
@@ -1260,7 +505,7 @@ export default function ClientGoals() {
               {filtersOpen ? (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2">Status</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2">Status</p>
                     <div className="flex flex-wrap gap-2">
                       {(
                         [
@@ -1279,7 +524,7 @@ export default function ClientGoals() {
                             onClick={() => setFilterStatus(option.value)}
                             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
                               isActive
-                                ? "border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)]"
+                                ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)]"
                                 : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
                             }`}
                           >
@@ -1290,7 +535,7 @@ export default function ClientGoals() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2">Sort</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2">Sort</p>
                     <div className="flex flex-wrap gap-2">
                       {(
                         [
@@ -1308,7 +553,7 @@ export default function ClientGoals() {
                             onClick={() => setSortBy(option.value)}
                             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors ${
                               isActive
-                                ? "border-[color-mix(in_srgb,var(--fc-accent)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)]"
+                                ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_40%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_15%,transparent)] text-[color:var(--fc-accent-cyan)]"
                                 : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] fc-text-dim hover:fc-text-primary"
                             }`}
                           >
@@ -1330,10 +575,13 @@ export default function ClientGoals() {
               const adherence = pillarStat?.adherence ?? 0;
               return (
                 <section key={pillarId} className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
-                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-1">{label} pillar</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-1">{label} pillar</p>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight fc-text-primary">
-                      <PillarIcon className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--fc-accent-primary)" }} />
+                      <PillarIcon
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={{ color: PILLAR_SECTION_ICON_COLOR[pillarId] }}
+                      />
                       <span className="truncate">{label}</span>
                     </h2>
                     {count > 0 ? (
@@ -1347,8 +595,8 @@ export default function ClientGoals() {
                         <p className="text-sm fc-text-dim mb-1">No goals in this pillar yet.</p>
                         <button
                           type="button"
-                          onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
+                          onClick={() => openGoalWizard(pillarId)}
+                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
                         >
                           + Add {label} Goal
                         </button>
@@ -1360,17 +608,17 @@ export default function ClientGoals() {
                             <GoalCard
                               key={goal.id}
                               goal={goal as Goal}
-                              isAutoTracked={isPresetGoal(goal)}
+                              isAutoTracked={goalHasAutoSync(goal)}
                               onDelete={handleDeleteGoal}
                               onUpdate={updateGoalProgress}
-                              onEdit={startEditing}
+                              onEdit={(g) => setEditGoal(g as Goal)}
                             />
                           ))}
                         </div>
                         <button
                           type="button"
-                          onClick={() => setAddGoalModalPillar(pillarId)}
-                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent)] hover:text-[color:var(--fc-accent)]/80"
+                          onClick={() => openGoalWizard(pillarId)}
+                          className="text-xs font-semibold uppercase tracking-wider text-[color:var(--fc-accent-cyan)] hover:text-[color:var(--fc-accent-cyan)]/80"
                         >
                           + Add {label} Goal
                         </button>
@@ -1380,18 +628,35 @@ export default function ClientGoals() {
               );
             })}
 
-            {/* Add goal from pillar section (modal) */}
-            {addGoalModalPillar && (
-              <AddGoalModal
-                open={true}
-                onClose={() => setAddGoalModalPillar(null)}
-                defaultPillar={addGoalModalPillar}
-                onSuccess={() => {
-                  loadGoals();
-                  setAddGoalModalPillar(null);
-                }}
-              />
-            )}
+            <GoalWizard
+              open={goalWizardOpen}
+              onClose={() => {
+                setGoalWizardOpen(false);
+                setGoalWizardInitialCategory(null);
+              }}
+              initialCategory={goalWizardInitialCategory}
+              onSuccess={() => void loadGoals()}
+            />
+
+            <EditGoalModal
+              open={editGoal != null}
+              goal={
+                editGoal
+                  ? {
+                      id: editGoal.id,
+                      client_id: editGoal.client_id,
+                      title: editGoal.title,
+                      target_value: editGoal.target_value ?? null,
+                      target_date: editGoal.target_date ?? null,
+                      notes: editGoal.notes ?? null,
+                      description: editGoal.description ?? null,
+                      status: editGoal.status,
+                    }
+                  : null
+              }
+              onClose={() => setEditGoal(null)}
+              onSaved={() => void loadGoals()}
+            />
 
             {/* Completed goals: collapsible */}
             <section className="overflow-hidden rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
@@ -1401,7 +666,7 @@ export default function ClientGoals() {
                 className="w-full flex items-center justify-between py-3 px-4 hover:bg-[color:var(--fc-glass-highlight)] transition-colors text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent)]/80">Archive</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80">Archive</p>
                   <h3 className="text-sm font-semibold fc-text-primary tracking-tight">Completed goals</h3>
                   <p className="text-xs fc-text-dim mt-0.5">{completedGoalsList.length} completed</p>
                 </div>
@@ -1418,7 +683,7 @@ export default function ClientGoals() {
                       <GoalCard
                         key={goal.id}
                         goal={goal as Goal}
-                        isAutoTracked={isPresetGoal(goal)}
+                        isAutoTracked={goalHasAutoSync(goal)}
                         compact
                       />
                     ))
@@ -1427,818 +692,42 @@ export default function ClientGoals() {
               </div>
             </section>
 
-              {/* Custom Goal Form Modal */}
-              <CustomGoalForm
-                isOpen={showCustomGoalForm}
-                onClose={() => setShowCustomGoalForm(false)}
-                onSubmit={async (goalData) => {
-                  if (!user) return;
-                  try {
-                    const { pillar: _pillar, ...restGoal } = goalData;
-                    const { error } = await supabase.from("goals").insert({
-                      ...restGoal,
-                      client_id: user.id,
-                      pillar: _pillar ?? "general",
-                      start_date: new Date().toISOString().split("T")[0],
-                    });
-                    if (error) throw error;
-                    await loadGoals();
-                  } catch (error) {
-                    console.error("Error creating custom goal:", error);
-                    throw error;
-                  }
-                }}
-              />
-
-              {/* Preset Goal Selection Modal */}
-              {showPresetSelection && !selectedPreset && fabPortalReady
-                ? createPortal(
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                      <GlassCard
-                        elevation={2}
-                        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowPresetSelection(false);
-                            setSelectedPreset(null);
-                          }}
-                          className="absolute top-4 right-4 rounded-lg p-1 fc-text-dim hover:fc-text-primary transition-colors"
-                          aria-label="Close"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                        <h2
-                          className="text-lg font-semibold text-center mb-2"
-                          style={{ color: "var(--fc-text-primary)" }}
-                        >
-                          Select Your Goal
-                        </h2>
-                        <p
-                          className="text-center mb-4"
-                          style={{
-                            color: "var(--fc-text-dim)",
-                          }}
-                        >
-                          Choose what you want to achieve
-                        </p>
-                        <div className="flex justify-center mb-6">
-                          <div className="space-y-2 w-full max-w-xs">
-                            <Label className="text-sm font-medium fc-text-subtle">Pillar</Label>
-                            <Select
-                              value={addGoalPillar}
-                              onValueChange={(v) => setAddGoalPillar(v as Goal["pillar"])}
-                            >
-                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="training">Training</SelectItem>
-                                <SelectItem value="nutrition">Nutrition</SelectItem>
-                                <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
-                                <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
-                                <SelectItem value="general">General</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Group goals by category */}
-                        {[
-                          "Body Composition",
-                          "Strength & Performance",
-                          "Consistency & Adherence",
-                        ].map((category) => {
-                          const goalsInCategory = PRESET_GOALS.filter(
-                            (g) => g.subcategory === category
-                          );
-
-                          return (
-                            <div key={category} className="mb-10">
-                              <h3
-                                className="text-base font-semibold mb-4"
-                                style={{ color: "var(--fc-text-primary)" }}
-                              >
-                                {category}
-                              </h3>
-                              <div className="grid grid-cols-2 gap-4 mb-8">
-                                {goalsInCategory.map((preset) => (
-                                  <button
-                                    key={preset.id}
-                                    onClick={() => {
-                                      setSelectedPreset(preset.id);
-                                      setCustomizing(true);
-                                    }}
-                                    className="flex flex-col items-center p-4 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all"
-                                    style={{
-                                      background: "var(--fc-glass-highlight)",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    <span className="text-4xl mb-2">
-                                      {preset.emoji}
-                                    </span>
-                                    <span
-                                      className="font-bold text-center text-sm"
-                                      style={{
-                                        color: "var(--fc-text-primary)",
-                                      }}
-                                    >
-                                      {preset.title}
-                                    </span>
-                                    <span
-                                      className="text-xs text-center mt-1"
-                                      style={{
-                                        color: "var(--fc-text-subtle)",
-                                      }}
-                                    >
-                                      {preset.description}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        <Button
-                          onClick={() => {
-                            setShowPresetSelection(false);
-                            setSelectedPreset(null);
-                          }}
-                          variant="outline"
-                          className="w-full"
-                        >
-                          Cancel
-                        </Button>
-                      </GlassCard>
-                    </div>,
-                    document.body
-                  )
-                : null}
-
-              {/* Customization Modal */}
-              {customizing && selectedPreset && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <GlassCard
-                    elevation={2}
-                    className="w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
-                  >
-                    {(() => {
-                      const preset = PRESET_GOALS.find(
-                        (p) => p.id === selectedPreset
-                      );
-                      if (!preset) return null;
-
-                      return (
-                        <>
-                          <div className="text-center mb-8">
-                            <span className="text-5xl block mb-2">
-                              {preset.emoji}
-                            </span>
-                            <h2
-                              className="text-lg font-semibold"
-                              style={{ color: "var(--fc-text-primary)" }}
-                            >
-                              {preset.title}
-                            </h2>
-                          </div>
-
-                          <form
-                            onSubmit={(e) => handleCreateCustomGoal(e, preset)}
-                          >
-                            {/* Target Value Input with Smart Units */}
-                            <div className="mb-6">
-                              <Label
-                                className="block text-sm font-medium mb-2"
-                                style={{
-                                  color: "var(--fc-text-primary)",
-                                }}
-                              >
-                                What&apos;s your target?
-                              </Label>
-                              <div className="flex flex-col gap-2">
-                                {preset.category === "consistency" ? (
-                                  // Consistency goals (workouts per week, days, liters)
-                                  <>
-                                    <Input
-                                      type="number"
-                                      placeholder="Enter number"
-                                      value={customForm.targetValue}
-                                      onChange={(e) =>
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetValue: e.target.value,
-                                        })
-                                      }
-                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
-                                      required
-                                    />
-                                    <Select
-                                      value={customForm.targetUnit}
-                                      onValueChange={(value) =>
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetUnit: value,
-                                        })
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full rounded-xl border-[color:var(--fc-glass-border)]">
-                                        <SelectValue
-                                          placeholder={preset.suggestedUnit}
-                                        />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {preset.id === "workout-consistency" ? (
-                                          <>
-                                            <SelectItem value="per week">
-                                              per week
-                                            </SelectItem>
-                                            <SelectItem value="per month">
-                                              per month
-                                            </SelectItem>
-                                          </>
-                                        ) : preset.id ===
-                                          "nutrition-tracking" ? (
-                                          <>
-                                            <SelectItem value="days/week">
-                                              days per week
-                                            </SelectItem>
-                                            <SelectItem value="days/month">
-                                              days per month
-                                            </SelectItem>
-                                          </>
-                                        ) : preset.id === "water-intake" ? (
-                                          <>
-                                            <SelectItem value="liters">
-                                              liters
-                                            </SelectItem>
-                                            <SelectItem value="glasses">
-                                              glasses
-                                            </SelectItem>
-                                            <SelectItem value="ml">
-                                              ml
-                                            </SelectItem>
-                                          </>
-                                        ) : null}
-                                      </SelectContent>
-                                    </Select>
-                                  </>
-                                ) : preset.id === "body-recomp" ? (
-                                  <div className="flex flex-col gap-2">
-                                    <Input
-                                      type="number"
-                                      placeholder="Muscle (kg)"
-                                      value={
-                                        customForm.targetValue.split("/")[0] ||
-                                        ""
-                                      }
-                                      onChange={(e) => {
-                                        const muscle = e.target.value;
-                                        const fat =
-                                          customForm.targetValue.split(
-                                            "/"
-                                          )[1] || "0";
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetValue: `${muscle}/${fat}`,
-                                        });
-                                      }}
-                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
-                                    />
-                                    <span
-                                      className="hidden"
-                                      style={{
-color: "var(--fc-text-subtle)",
-                                      }}
-                                    >
-                                      /
-                                    </span>
-                                    <Input
-                                      type="number"
-                                      placeholder="Fat (%)"
-                                      value={
-                                        customForm.targetValue.split("/")[1] ||
-                                        ""
-                                      }
-                                      onChange={(e) => {
-                                        const muscle =
-                                          customForm.targetValue.split(
-                                            "/"
-                                          )[0] || "0";
-                                        const fat = e.target.value;
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetValue: `${muscle}/${fat}`,
-                                        });
-                                      }}
-                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
-                                    />
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Input
-                                      type="number"
-                                      placeholder="Enter number"
-                                      value={customForm.targetValue}
-                                      onChange={(e) =>
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetValue: e.target.value,
-                                        })
-                                      }
-                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
-                                      required
-                                    />
-                                    <Select
-                                      value={customForm.targetUnit}
-                                      onValueChange={(value) =>
-                                        setCustomForm({
-                                          ...customForm,
-                                          targetUnit: value,
-                                        })
-                                      }
-                                    >
-                                      <SelectTrigger className="w-full rounded-xl border-[color:var(--fc-glass-border)]">
-                                        <SelectValue
-                                          placeholder={preset.suggestedUnit}
-                                        />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {preset.id === "fat-loss" ||
-                                        preset.id === "body-recomp" ? (
-                                          <>
-                                            <SelectItem value="%">%</SelectItem>
-                                            <SelectItem value="kg">
-                                              kg
-                                            </SelectItem>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <SelectItem value="kg">
-                                              kg
-                                            </SelectItem>
-                                            <SelectItem value="lbs">
-                                              lbs
-                                            </SelectItem>
-                                            <SelectItem value="reps">
-                                              reps
-                                            </SelectItem>
-                                          </>
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </>
-                                )}
-                              </div>
-                              <p
-                                className="text-xs mt-1"
-                                style={{
-                                  color: "var(--fc-text-subtle)",
-                                }}
-                              >
-                                Suggested: {preset.suggestedUnit}
-                              </p>
-                            </div>
-
-                            {/* Target Date Input */}
-                            <div className="mb-6">
-                              <Label
-                                className="block text-sm font-medium mb-2"
-                                style={{
-                                  color: "var(--fc-text-primary)",
-                                }}
-                              >
-                                When do you want to reach it?{" "}
-                                <span
-                                  className="text-xs font-normal"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.5)"
-                                      : "rgba(0,0,0,0.5)",
-                                  }}
-                                >
-                                  (Optional)
-                                </span>
-                              </Label>
-                              <Input
-                                type="date"
-                                value={customForm.targetDate}
-                                onChange={(e) =>
-                                  setCustomForm({
-                                    ...customForm,
-                                    targetDate: e.target.value,
-                                  })
-                                }
-                                className="w-full rounded-xl border-[color:var(--fc-glass-border)]"
-                              />
-                            </div>
-
-                            {/* Priority Selection */}
-                            <div className="mb-8">
-                              <Label
-                                className="block text-sm font-medium mb-3"
-                                style={{
-                                  color: "var(--fc-text-primary)",
-                                }}
-                              >
-                                Priority (optional)
-                              </Label>
-                              <div className="flex gap-4">
-                                {["low", "medium", "high"].map((level) => (
-                                  <label
-                                    key={level}
-                                    className="flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="priority"
-                                      value={level}
-                                      checked={customForm.priority === level}
-                                      onChange={(e) =>
-                                        setCustomForm({
-                                          ...customForm,
-                                          priority: e.target.value,
-                                        })
-                                      }
-                                      className="w-4 h-4"
-                                    />
-                                    <span
-                                      className="text-sm capitalize"
-                                      style={{
-                                        color: "var(--fc-text-primary)",
-                                      }}
-                                    >
-                                      {level}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Buttons */}
-                            <div className="flex gap-2">
-                              <Button
-                                type="submit"
-                                className="flex-1"
-                                style={{
-                                  background:
-                                    getSemanticColor("success").gradient,
-                                }}
-                              >
-                                Create Goal
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setCustomizing(false);
-                                  setSelectedPreset(null);
-                                  setCustomForm({
-                                    targetValue: "",
-                                    targetUnit: "",
-                                    targetDate: "",
-                                    priority: "high",
-                                  });
-                                }}
-                                className="flex-1"
-                              >
-                                Back
-                              </Button>
-                            </div>
-                          </form>
-                        </>
-                      );
-                    })()}
-                  </GlassCard>
-                </div>
-              )}
-
-              {/* Create/Edit Goal Form Modal */}
-              {showCreateForm && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <Card className="fc-surface rounded-2xl shadow-2xl border-0 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <CardHeader className="border-b border-[color:var(--fc-glass-border)]">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-2xl font-bold fc-text-primary">
-                            {editingGoal ? "Edit Goal" : "Create New Goal"}
-                          </CardTitle>
-                          <CardDescription className="fc-text-dim">
-                            {editingGoal
-                              ? "Update your goal details"
-                              : "Set a new goal to track your progress"}
-                          </CardDescription>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setShowCreateForm(false);
-                            setEditingGoal(null);
-                            resetForm();
-                          }}
-                          className="fc-text-dim hover:fc-text-primary"
-                        >
-                          <XCircle className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <form
-                        onSubmit={
-                          editingGoal ? handleUpdateGoal : handleCreateGoal
-                        }
-                        className="space-y-6"
-                      >
-                        {!editingGoal && (
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="pillar"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Pillar
-                            </Label>
-                            <Select
-                              value={formData.pillar}
-                              onValueChange={(value) =>
-                                setFormData({
-                                  ...formData,
-                                  pillar: value as Goal["pillar"],
-                                })
-                              }
-                            >
-                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="training">Training</SelectItem>
-                                <SelectItem value="nutrition">Nutrition</SelectItem>
-                                <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
-                                <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
-                                <SelectItem value="general">General</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="title"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Goal Title
-                            </Label>
-                            <Input
-                              id="title"
-                              value={formData.title}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  title: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., Complete 30 workouts this month"
-                              className="rounded-xl border-[color:var(--fc-glass-border)]"
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="category"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Category
-                            </Label>
-                            <Select
-                              value={formData.category}
-                              onValueChange={(value) =>
-                                setFormData({
-                                  ...formData,
-                                  category: value as Goal["category"],
-                                })
-                              }
-                            >
-                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {goalCategories.map((category) => (
-                                  <SelectItem
-                                    key={category.id}
-                                    value={category.id}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <category.icon
-                                        className={`w-4 h-4 ${category.color}`}
-                                      />
-                                      {category.name}
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="description"
-                            className="text-sm font-medium fc-text-primary"
-                          >
-                            Description
-                          </Label>
-                          <Textarea
-                            id="description"
-                            value={formData.description}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                description: e.target.value,
-                              })
-                            }
-                            placeholder="Describe your goal and why it's important to you..."
-                            rows={3}
-                            className="rounded-xl border-[color:var(--fc-glass-border)]"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="type"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Goal Type
-                            </Label>
-                            <Select
-                              value={formData.type}
-                              onValueChange={(value) =>
-                                setFormData({
-                                  ...formData,
-                                  type: value as Goal["type"],
-                                })
-                              }
-                            >
-                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="target">
-                                  Target Value
-                                </SelectItem>
-                                <SelectItem value="habit">Habit</SelectItem>
-                                <SelectItem value="milestone">
-                                  Milestone
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {formData.type === "target" && (
-                            <>
-                              <div className="space-y-2">
-                                <Label
-                                  htmlFor="target_value"
-                                  className="text-sm font-medium fc-text-primary"
-                                >
-                                  Target Value
-                                </Label>
-                                <Input
-                                  id="target_value"
-                                  type="number"
-                                  value={formData.target_value}
-                                  onChange={(e) =>
-                                    setFormData({
-                                      ...formData,
-                                      target_value: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., 30"
-                                  className="rounded-xl border-[color:var(--fc-glass-border)]"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label
-                                  htmlFor="target_unit"
-                                  className="text-sm font-medium fc-text-primary"
-                                >
-                                  Unit
-                                </Label>
-                                <Input
-                                  id="target_unit"
-                                  value={formData.target_unit}
-                                  onChange={(e) =>
-                                    setFormData({
-                                      ...formData,
-                                      target_unit: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., workouts, kg, days"
-                                  className="rounded-xl border-[color:var(--fc-glass-border)]"
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="target_date"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Target Date (Optional)
-                            </Label>
-                            <Input
-                              id="target_date"
-                              type="date"
-                              value={formData.target_date}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  target_date: e.target.value,
-                                })
-                              }
-                              className="rounded-xl border-[color:var(--fc-glass-border)]"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="priority"
-                              className="text-sm font-medium fc-text-primary"
-                            >
-                              Priority
-                            </Label>
-                            <Select
-                              value={formData.priority}
-                              onValueChange={(value) =>
-                                setFormData({
-                                  ...formData,
-                                  priority: value as Goal["priority"],
-                                })
-                              }
-                            >
-                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="low">Low</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-4">
-                          <Button
-                            type="submit"
-                            className="flex-1 bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-xl px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                          >
-                            <Rocket className="w-4 h-4 mr-2" />
-                            {editingGoal ? "Update Goal" : "Create Goal"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setShowCreateForm(false);
-                              setEditingGoal(null);
-                              resetForm();
-                            }}
-                            className="px-6 py-3 border-[color:var(--fc-glass-border)] fc-text-primary rounded-xl font-semibold hover:bg-[color:var(--fc-glass-highlight)] transition-all duration-300"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
         </ClientPageShell>
       </AnimatedBackground>
 
+      {/*
+        Phase 0b Task 6 — "Add new goal" FAB migration.
+        Spec ref: design-system-v4 §6.21 Floating Action Button.
+        Was: <div className="fixed bottom-24 right-4 z-40 pointer-events-auto">
+               <button className="fc-fab group">
+                 <Plus className="w-8 h-8 text-white" /> ...
+        Now:  the wrapper <div> is removed; the button uses the v4 atomic
+              `fab-action` class (lime gradient, dark glyph #061018, position
+              fixed, z-index 40, bottom 96px) directly. The Plus glyph drops
+              `text-white` so it inherits the dark glyph color from
+              `.fab-action`. The `group` class stays — required for the
+              existing hover-tooltip span behavior.
+        Note: createPortal still mounts to document.body; `position: fixed`
+              positions to the viewport regardless of portal target.
+        Phase 0b Task 6.5 cleanup: removed stale Plus `w-8 h-8` classes
+              because `.fab-action svg` enforces the rendered 24px size.
+      */}
       {fabPortalReady
         ? createPortal(
-            <div className="fixed bottom-24 right-4 z-40 pointer-events-auto">
-              <button
-                type="button"
-                onClick={() => setShowPresetSelection(true)}
-                className="fc-fab group"
-                aria-label="Add new goal"
-              >
-                <Plus className="w-8 h-8 text-white" />
-                <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-3 py-1.5 rounded-xl text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap fc-text-primary">
-                  Add goal
-                </span>
-              </button>
-            </div>,
+            <button
+              type="button"
+              onClick={() => {
+                setGoalWizardInitialCategory(null);
+                setGoalWizardOpen(true);
+              }}
+              className="fab-action group"
+              aria-label="Add new goal"
+            >
+              <Plus />
+              <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-3 py-1.5 rounded-xl text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap fc-text-primary">
+                Add goal
+              </span>
+            </button>,
             document.body
           )
         : null}

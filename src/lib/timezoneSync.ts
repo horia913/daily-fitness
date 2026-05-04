@@ -1,10 +1,10 @@
+import { fetchApi } from "@/lib/apiClient";
 /**
  * Canonical timezone sync: auto-detect on client boot/login, persist to profiles.timezone
  * at most once per session per user. No manual timezone UI; no duplicate updates.
  *
- * IMPORTANT: Do NOT invoke syncProfileTimezoneOnce from AuthContext or on every auth init.
- * If timezone sync is reintroduced, call it only from the profile/settings page or on
- * first-ever login — not on every page load.
+ * Call from AuthProvider after profile is loaded (`syncProfileTimezoneOnce` in AuthContext),
+ * or from a single other owner — not on every route change.
  */
 
 const FALLBACK_TZ = 'UTC'
@@ -55,7 +55,7 @@ export async function syncProfileTimezoneOnce(
   }
 
   try {
-    const res = await fetch('/api/user/timezone', {
+    const res = await fetchApi('/api/user/timezone', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timezone: detected }),

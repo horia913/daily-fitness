@@ -30,7 +30,7 @@ function PhotosRedirectInner() {
 
 export default function ProgressPhotosRedirectPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <Suspense fallback={<div className="p-6 text-center text-sm fc-text-dim">Loading…</div>}>
         <PhotosRedirectInner />
       </Suspense>

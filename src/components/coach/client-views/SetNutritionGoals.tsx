@@ -3,15 +3,20 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Target, Info } from "lucide-react";
+import { Target, Info, Check, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientNutritionMode, getClientNutritionGoals, type NutritionMode } from "@/lib/nutritionLogService";
 import { useToast } from "@/components/ui/toast-provider";
+import { fetchApi } from "@/lib/apiClient";
+import sec from "@/components/coach/client-detail/coachClientDetailUi.module.css";
+import nut from "@/components/coach/client-views/SetNutritionGoalsCoach.module.css";
 
 interface SetNutritionGoalsProps {
   clientId: string;
   coachId?: string; // optional: if not passed, uses current user (coach) from auth
+  /** Coach client Nutrition tab (v6 section chrome). */
+  layoutVariant?: "default" | "coach";
 }
 
 interface NutritionGoalsForm {
@@ -22,7 +27,11 @@ interface NutritionGoalsForm {
   water: string;
 }
 
-export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutritionGoalsProps) {
+export function SetNutritionGoals({
+  clientId,
+  coachId: coachIdProp,
+  layoutVariant = "default",
+}: SetNutritionGoalsProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
   const coachId = coachIdProp ?? user?.id ?? "";
@@ -37,6 +46,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
     fat: "",
     water: "",
   });
+  const [hasDbTargets, setHasDbTargets] = useState(false);
   
   useEffect(() => {
     loadData();
@@ -80,6 +90,15 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
           fat: existingGoals.fat?.toString() || "",
           water: existingGoals.water_ml?.toString() || "",
         });
+        const has =
+          (existingGoals.calories != null && existingGoals.calories > 0) ||
+          (existingGoals.protein != null && existingGoals.protein > 0) ||
+          (existingGoals.carbs != null && existingGoals.carbs > 0) ||
+          (existingGoals.fat != null && existingGoals.fat > 0) ||
+          (existingGoals.water_ml != null && existingGoals.water_ml > 0);
+        setHasDbTargets(!!has);
+      } else {
+        setHasDbTargets(false);
       }
     } catch (error) {
       console.error('Error loading nutrition goals:', error);
@@ -129,7 +148,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
       if (formData.fat.trim() && Number(formData.fat) > 0) body.fat = Number(formData.fat);
       if (formData.water.trim() && Number(formData.water) > 0) body.water_ml = Number(formData.water);
       
-      const res = await fetch(`/api/coach/clients/${clientId}/nutrition-goals`, {
+      const res = await fetchApi(`/api/coach/clients/${clientId}/nutrition-goals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -167,7 +186,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
     try {
       setSaving(true);
       
-      const res = await fetch(`/api/coach/clients/${clientId}/nutrition-goals`, {
+      const res = await fetchApi(`/api/coach/clients/${clientId}/nutrition-goals`, {
         method: 'DELETE',
       });
       
@@ -220,7 +239,7 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
   
   if (loading) {
     return (
-      <div className="fc-card-shell p-6">
+      <div className={layoutVariant === "coach" ? sec.section : "fc-card-shell p-6"}>
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
           <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded"></div>
@@ -229,7 +248,124 @@ export function SetNutritionGoals({ clientId, coachId: coachIdProp }: SetNutriti
       </div>
     );
   }
-  
+
+  if (layoutVariant === "coach") {
+    const modeLabel = getModeLabel(nutritionMode ?? "none");
+    const targetsPill =
+      hasDbTargets || nutritionMode === "goal_based" || nutritionMode === "hybrid" ? (
+        <span className={nut.pillGood}>Active</span>
+      ) : (
+        <span className={nut.pillMuted}>No targets set</span>
+      );
+
+    return (
+      <section className={sec.section} data-nutrition-goals>
+        <div className={sec.sectionHead}>
+          <div>
+            <p className={sec.eyebrowGood}>TARGETS</p>
+            <h2 className={sec.sectionTitle} style={{ marginTop: 4 }}>
+              Daily macro targets
+            </h2>
+          </div>
+          {targetsPill}
+        </div>
+
+        <div className={nut.infoStrip}>
+          <Info className="w-[13px] h-[13px] shrink-0 text-[color:var(--fc-set-type-straight)] mt-0.5" />
+          <p className={nut.infoText}>
+            Current mode <strong>{modeLabel}</strong> · Setting macro targets enables goal-based logging on the{" "}
+            <strong>Fuel</strong> screen.
+          </p>
+        </div>
+
+        <div className={nut.grid2}>
+          <div className={nut.field}>
+            <label className={nut.labelRow}>
+              Calories<span className={nut.unit}>kcal/day</span>
+            </label>
+            <input
+              type="number"
+              className={nut.input}
+              value={formData.calories}
+              onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+              placeholder="e.g., 2200"
+              min={0}
+              step={1}
+            />
+          </div>
+          <div className={nut.field}>
+            <label className={nut.labelRow}>
+              Protein<span className={nut.unit}>g/day</span>
+            </label>
+            <input
+              type="number"
+              className={nut.input}
+              value={formData.protein}
+              onChange={(e) => setFormData({ ...formData, protein: e.target.value })}
+              placeholder="e.g., 180"
+              min={0}
+              step={0.1}
+            />
+          </div>
+          <div className={nut.field}>
+            <label className={nut.labelRow}>
+              Carbs<span className={nut.unit}>g/day</span>
+            </label>
+            <input
+              type="number"
+              className={nut.input}
+              value={formData.carbs}
+              onChange={(e) => setFormData({ ...formData, carbs: e.target.value })}
+              placeholder="e.g., 250"
+              min={0}
+              step={0.1}
+            />
+          </div>
+          <div className={nut.field}>
+            <label className={nut.labelRow}>
+              Fat<span className={nut.unit}>g/day</span>
+            </label>
+            <input
+              type="number"
+              className={nut.input}
+              value={formData.fat}
+              onChange={(e) => setFormData({ ...formData, fat: e.target.value })}
+              placeholder="e.g., 70"
+              min={0}
+              step={0.1}
+            />
+          </div>
+        </div>
+
+        <div className={nut.field}>
+          <label className={nut.labelRow}>
+            Water<span className={nut.unit}>ml/day · optional</span>
+          </label>
+          <input
+            type="number"
+            className={nut.input}
+            value={formData.water}
+            onChange={(e) => setFormData({ ...formData, water: e.target.value })}
+            placeholder="e.g., 2500"
+            min={0}
+            step={50}
+          />
+        </div>
+
+        <div className={nut.grid2}>
+          <button type="button" className={nut.btnPrimary} onClick={handleSave} disabled={saving}>
+            <Check className="w-4 h-4" strokeWidth={2.5} />
+            {saving ? "Saving…" : "Set targets"}
+          </button>
+          <button type="button" className={nut.btnDanger} onClick={handleRemoveAll} disabled={saving}>
+            <Trash2 className="w-4 h-4" strokeWidth={2.5} />
+            Remove all
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="fc-card-shell" data-nutrition-goals>
       <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">

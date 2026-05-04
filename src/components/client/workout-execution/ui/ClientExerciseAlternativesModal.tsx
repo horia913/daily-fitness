@@ -5,6 +5,9 @@ import { X } from "lucide-react";
 import WorkoutTemplateService, {
   type ExerciseAlternative,
 } from "@/lib/workoutTemplateService";
+import { Eyebrow, IconButton } from "@/components/client-ui";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const REASON_LABEL: Record<ExerciseAlternative["reason"], string> = {
   equipment: "Equipment",
@@ -13,15 +16,15 @@ const REASON_LABEL: Record<ExerciseAlternative["reason"], string> = {
   preference: "Preference",
 };
 
-const REASON_BADGE: Record<ExerciseAlternative["reason"], string> = {
+const REASON_BADGE_CLASS: Record<ExerciseAlternative["reason"], string> = {
   equipment:
-    "rounded-full border border-cyan-500/30 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium uppercase text-cyan-300",
+    "border-cyan-500/30 bg-cyan-500/15 text-[10px] font-medium uppercase text-cyan-300",
   difficulty:
-    "rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-300",
+    "border-amber-500/30 bg-amber-500/15 text-[10px] font-medium uppercase text-amber-300",
   injury:
-    "rounded-full border border-red-500/30 bg-red-500/15 px-2 py-0.5 text-[10px] font-medium uppercase text-red-300",
+    "border-red-500/30 bg-red-500/15 text-[10px] font-medium uppercase text-red-300",
   preference:
-    "rounded-full border border-gray-500/30 bg-gray-500/15 px-2 py-0.5 text-[10px] font-medium uppercase text-gray-300",
+    "border-gray-500/30 bg-gray-500/15 text-[10px] font-medium uppercase text-gray-300",
 };
 
 export interface ClientExerciseAlternativesModalProps {
@@ -80,17 +83,22 @@ export default function ClientExerciseAlternativesModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div className="max-h-[min(85vh,32rem)] w-full max-w-sm overflow-y-auto rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 backdrop-blur-md">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-wider text-cyan-300">
+          <Eyebrow
+            tone="cyan"
+            density="section"
+            className="!mb-0 !text-cyan-300"
+          >
             SWAP EXERCISE
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-1.5 text-cyan-100 transition-colors hover:bg-white/10"
+          </Eyebrow>
+          <IconButton
+            size="sm"
+            variant="ghost"
+            className="text-cyan-100 hover:bg-white/10"
             aria-label="Close"
+            onClick={onClose}
           >
             <X className="h-5 w-5" />
-          </button>
+          </IconButton>
         </div>
 
         <p className="mb-3 text-sm text-gray-400">
@@ -132,11 +140,15 @@ export default function ClientExerciseAlternativesModal({
                         </p>
                       ) : null}
                     </div>
-                    <span
-                      className={`inline-flex flex-shrink-0 self-start ${REASON_BADGE[alt.reason]}`}
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "inline-flex flex-shrink-0 self-start rounded-full border px-2 py-0.5",
+                        REASON_BADGE_CLASS[alt.reason],
+                      )}
                     >
                       {REASON_LABEL[alt.reason]}
-                    </span>
+                    </Badge>
                   </div>
                 </button>
               );

@@ -1,11 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell } from "@/components/client-ui/ClientPageShell";
+import { ClientScoreInsightsSection } from "@/components/client/ClientScoreInsightsSection";
+import { usePageData } from "@/hooks/usePageData";
+import {
+  fetchDashboardPageData,
+  type DashboardPageData,
+} from "@/lib/clientDashboardPageData";
+import { tierBackdropVariant } from "@/lib/tierBackdrop";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/button";
 import {
   User,
   Target,
@@ -15,6 +24,7 @@ import {
   Trophy,
   CreditCard,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 
 interface NavCard {
@@ -74,6 +84,26 @@ export default function MePage() {
   const userName = profile?.first_name || user?.email?.split("@")[0] || "there";
   const avatarUrl = profile?.avatar_url;
 
+  const fetchFn = useCallback(async (): Promise<DashboardPageData> => {
+    if (!user?.id) {
+      return {
+        dashboard: null,
+        athleteScore: null,
+        hasCheckInToday: null,
+        todayWellnessLog: null,
+        checkinStreak: 0,
+        hasScheduledCheckInThisPeriod: false,
+        scoreError: null,
+      };
+    }
+    return fetchDashboardPageData(user.id);
+  }, [user?.id]);
+
+  const { data: pageData, loading: dashboardLoading, error, refetch } = usePageData(
+    fetchFn,
+    [user?.id],
+  );
+
   const getAvatarUrl = () => {
     if (avatarUrl) return avatarUrl;
     if (profile?.first_name) {
@@ -86,7 +116,10 @@ export default function MePage() {
     <ProtectedRoute requiredRole="client">
       <div className="relative fc-app-bg isolate min-h-screen">
         <AnimatedBackground>
-          <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
+          <ClientPageShell
+            className="max-w-lg px-4 pb-32 pt-6"
+            backdrop={tierBackdropVariant(pageData?.athleteScore?.tier)}
+          >
             {/* Header */}
             <div className="mb-4">
               <h1 className="text-xl font-bold fc-text-primary mb-4">Me</h1>
@@ -115,7 +148,42 @@ export default function MePage() {
               </div>
             </div>
 
-            <nav className="flex flex-col border-y border-[color:var(--fc-glass-border)]" aria-label="Account">
+            {error ? (
+              <div className="mb-8 flex flex-col items-center border-t border-[var(--fc-glass-border)] pt-8 text-center">
+                <AlertTriangle
+                  className="mb-3 h-10 w-10 text-[var(--fc-status-error)]"
+                  aria-hidden
+                />
+                <h2 className="mb-2 text-lg font-semibold fc-text-primary">
+                  Couldn&apos;t load this page
+                </h2>
+                <p className="mb-4 text-sm fc-text-dim">{error}</p>
+                <Button
+                  type="button"
+                  className="fc-btn fc-btn-primary"
+                  onClick={() => void refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : dashboardLoading ? (
+              <div className="mb-8 border-t border-[var(--fc-glass-border)] pt-6">
+                <Skeleton className="mb-4 h-5 w-40" />
+                <Skeleton className="mx-auto mb-4 h-40 w-40 rounded-full" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+              </div>
+            ) : (
+              <ClientScoreInsightsSection
+                userId={user?.id ?? null}
+                athleteScore={pageData?.athleteScore ?? null}
+                scoreError={pageData?.scoreError ?? null}
+              />
+            )}
+
+            <nav
+              className="flex flex-col border-y border-[color:var(--fc-glass-border)]"
+              aria-label="Account"
+            >
               {NAV_CARDS.map((card) => {
                 const Icon = card.icon;
                 return (

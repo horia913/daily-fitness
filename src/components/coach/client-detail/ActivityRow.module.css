@@ -1,0 +1,68 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 11px;
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--fc-set-type-straight-soft);
+  color: var(--fc-set-type-straight);
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.name {
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--fc-text-primary);
+}
+
+.pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--fc-glass-border);
+  color: var(--fc-text-subtle);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pillMod {
+  border-color: color-mix(in srgb, var(--fc-effort-medium) 35%, var(--fc-glass-border));
+  color: var(--fc-effort-medium);
+  background: color-mix(in srgb, var(--fc-effort-medium) 10%, transparent);
+}
+
+.pillVig {
+  border-color: color-mix(in srgb, var(--fc-effort-max) 35%, var(--fc-glass-border));
+  color: var(--fc-effort-max);
+  background: color-mix(in srgb, var(--fc-effort-max) 10%, transparent);
+}
+
+.stats {
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fc-text-subtle);
+  margin-top: 3px;
+}

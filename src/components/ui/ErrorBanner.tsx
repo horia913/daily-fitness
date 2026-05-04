@@ -3,6 +3,13 @@ import { AlertCircle, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/**
+ * Migration note:
+ * - `ErrorBanner` is the production error strip currently in use.
+ * - `Banner` (`components/ui/Banner.tsx`) is the v4 superset intended to eventually replace `ErrorBanner`.
+ * - For new error UI, prefer `Banner` with `variant="error"`.
+ * - Existing `ErrorBanner` consumers migrate during the future Phase 3 mockup-fidelity pass (no ad-hoc migrations).
+ */
 interface ErrorBannerProps {
   title?: string;
   message?: string;

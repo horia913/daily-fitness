@@ -1,17 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCoachClient } from "@/contexts/CoachClientContext";
 import { WeekReviewModal } from "@/components/coach/WeekReviewModal";
-import { Mail, Dumbbell, TrendingUp, Trophy, Heart, Smile } from "lucide-react";
+import {
+  Dumbbell,
+  TrendingUp,
+  Trophy,
+  Heart,
+  Utensils,
+  MessageCircle,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import GlassCard from "@/components/ui/GlassCard";
-import { attentionCardSurfaceStyle } from "@/lib/coachClientAttention";
 import type { AttentionLevel } from "@/lib/coachClientAttention";
 import { deltaTone, adherenceTierFromPercent } from "@/lib/coachWorkoutAdherence";
 import { cn } from "@/lib/utils";
+import ClientHeaderCard from "@/components/coach/client-detail/ClientHeaderCard";
+import ov from "./CoachClientDailyReview.module.css";
 
 export type TodayWorkoutJson = {
   logId: string;
@@ -106,6 +114,7 @@ export type WeeklyReviewJson = {
   clientId: string;
   clientTimezone: string;
   hasActiveAssignment: boolean;
+  suppressWeeklyDeltas?: boolean;
   currentWeek: WeeklyReviewBucketJson;
   previousWeek: WeeklyReviewBucketJson;
 } | null;
@@ -114,7 +123,11 @@ type Props = {
   clientId: string;
   name: string;
   email: string;
+  phone?: string | null;
   attention: { level: AttentionLevel; reasons: string[] };
+  streak: number;
+  weeklyProgress: { current: number; goal: number };
+  lastCheckinDate: string | null;
   trainedToday: boolean;
   todayWorkout: TodayWorkoutJson;
   nextScheduledWorkout: NextScheduledJson;
@@ -131,18 +144,57 @@ function tierColor(tier: "green" | "amber" | "red" | null) {
   return "text-[color:var(--fc-text-dim)]";
 }
 
-function fmtDelta(n: number | null, suffix = "", _lowerBetter = false): string {
-  if (n === null || Number.isNaN(n)) return "";
-  if (n === 0) return ` ±0${suffix}`;
-  const sign = n > 0 ? "+" : "";
-  return ` (${sign}${n}${suffix})`;
+function formatRangeDate(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatVolume(kg: number): string {
+  if (!Number.isFinite(kg)) return "0";
+  if (Math.abs(kg) >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+  return `${Math.round(kg).toLocaleString()}`;
+}
+
+function daysBetweenYmd(fromYmd: string, toYmd: string): number | null {
+  const a = new Date(`${fromYmd}T12:00:00Z`).getTime();
+  const b = new Date(`${toYmd}T12:00:00Z`).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.floor((b - a) / (86400 * 1000));
+}
+
+function checkinDeltaRow(
+  delta: number | null,
+  lowerBetter: boolean,
+  suffix = ""
+): { sym: string; text: string; color: string } {
+  if (delta == null || Number.isNaN(delta)) {
+    return { sym: "—", text: "", color: "var(--fc-text-quaternary)" };
+  }
+  if (delta === 0) {
+    return { sym: "—", text: `0${suffix}`, color: "var(--fc-text-quaternary)" };
+  }
+  const tone = deltaTone(delta, lowerBetter);
+  const sym = delta > 0 ? "▲" : "▼";
+  const sign = delta > 0 ? "+" : "";
+  if (tone === "green") {
+    return { sym, text: `${sign}${delta}${suffix}`, color: "var(--fc-effort-easy)" };
+  }
+  if (tone === "red") {
+    return { sym, text: `${sign}${delta}${suffix}`, color: "var(--fc-effort-max)" };
+  }
+  return { sym, text: `${sign}${delta}${suffix}`, color: "var(--fc-text-quaternary)" };
 }
 
 export default function CoachClientDailyReview({
   clientId,
   name,
   email,
+  phone = null,
   attention,
+  streak,
+  weeklyProgress,
+  lastCheckinDate,
   trainedToday,
   todayWorkout,
   nextScheduledWorkout,
@@ -156,16 +208,50 @@ export default function CoachClientDailyReview({
   const router = useRouter();
   const [reviewOpen, setReviewOpen] = useState(false);
 
-  const attentionLine =
+  const adherencePct = useMemo(() => {
+    const g = weeklyProgress.goal;
+    if (!g || g <= 0) return null;
+    return Math.round((weeklyProgress.current / g) * 100);
+  }, [weeklyProgress.current, weeklyProgress.goal]);
+
+  const alertCount = attention.reasons.length;
+
+  const attentionDetail = useMemo(() => {
+    const parts = attention.reasons.filter((r) => !r.startsWith("Flagged at-risk"));
+    const tail = parts.length ? parts.join(" · ") : "review compliance";
+    const checkInBit =
+      lastCheckinDate && weeklyReview?.clientTimezone
+        ? (() => {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, "0");
+            const d = String(today.getDate()).padStart(2, "0");
+            const todayStr = `${y}-${m}-${d}`;
+            const diff = daysBetweenYmd(lastCheckinDate, todayStr);
+            if (diff == null) return "";
+            if (diff === 0) return " · last check-in today";
+            return ` · last check-in ${diff}d ago`;
+          })()
+        : lastCheckinDate
+          ? ""
+          : " · no recent check-in";
+    return `${tail}${checkInBit}`;
+  }, [attention.reasons, lastCheckinDate, weeklyReview?.clientTimezone]);
+
+  const flaggedForHeader =
+    attention.level === "urgent" ||
+    (adherencePct !== null && adherencePct < 40);
+
+  const headerAlertSecondary =
     attention.reasons.length > 0
-      ? attention.reasons.slice(0, 2).join(" · ")
-      : null;
+      ? attentionDetail
+      : adherencePct != null
+        ? `compliance · ${adherencePct}% weekly adherence${lastCheckinDate ? "" : " · no recent check-in"}`
+        : "compliance · review client";
 
-  const adherenceTier = adherenceTierFromPercent(
-    todayWorkout?.adherencePercent ?? null
-  );
+  const adherenceTier = adherenceTierFromPercent(todayWorkout?.adherencePercent ?? null);
 
-  const openEmail = () => {
+  const openMessage = () => {
     if (email) {
       window.open(`mailto:${email}`, "_blank");
     } else {
@@ -179,59 +265,8 @@ export default function CoachClientDailyReview({
     program?.currentWeek ??
     1;
 
-  const formatRangeDate = (ymd: string): string => {
-    const d = new Date(`${ymd}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return ymd;
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const formatVolume = (kg: number): string => {
-    if (!Number.isFinite(kg)) return "0 kg";
-    if (Math.abs(kg) >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-    return `${Math.round(kg).toLocaleString()} kg`;
-  };
-
-  const deltaBadge = (
-    current: number | null,
-    previous: number | null,
-    lowerBetter = false
-  ): { text: string; className: string } | null => {
-    if (current == null || previous == null) return null;
-    const delta = current - previous;
-    if (delta === 0) {
-      return {
-        text: "—",
-        className:
-          "border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-dim)]",
-      };
-    }
-    const sign = delta > 0 ? "+" : "";
-    const tone = deltaTone(delta, lowerBetter);
-    if (tone === "green") {
-      return {
-        text: `${sign}${delta}`,
-        className:
-          "border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] text-[color:var(--fc-status-success)]",
-      };
-    }
-    return {
-      text: `${sign}${delta}`,
-      className:
-        "border border-[color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-warning)_12%,transparent)] text-[color:var(--fc-status-warning)]",
-    };
-  };
-
   const currentWeek = weeklyReview?.currentWeek ?? null;
-  const previousWeek = weeklyReview?.previousWeek ?? null;
-  const hasPreviousWeekData = !!previousWeek && (
-    previousWeek.workouts.completed > 0 ||
-    previousWeek.workouts.planned > 0 ||
-    previousWeek.volume.totalKg > 0 ||
-    previousWeek.prs.count > 0 ||
-    previousWeek.checkIns.daily.submitted > 0 ||
-    previousWeek.checkIns.daily.avgMood != null ||
-    previousWeek.checkIns.scheduled.submitted
-  );
+
   const weekJustStarted = !!currentWeek && (
     currentWeek.workouts.completed === 0 &&
     currentWeek.workouts.planned === 0 &&
@@ -242,400 +277,463 @@ export default function CoachClientDailyReview({
     currentWeek.checkIns.daily.avgMood == null
   );
 
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("") || "?";
+  const weekHeadline = (() => {
+    if (!currentWeek) return "";
+    if (weekJustStarted) return "Week just started";
+    if (
+      currentWeek.workouts.planned > 0 &&
+      currentWeek.workouts.completed >= currentWeek.workouts.planned
+    ) {
+      return "Week complete";
+    }
+    return "Week in progress";
+  })();
+
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+
+  const todayMeta = new Date().toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  const latestCheckInMeta = latestCheckIn
+    ? (() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, "0");
+        const d = String(today.getDate()).padStart(2, "0");
+        const todayStr = `${y}-${m}-${d}`;
+        const diff = daysBetweenYmd(latestCheckIn.date, todayStr);
+        if (diff === 0) return "Today";
+        if (diff != null) return `${diff}d ago`;
+        return "";
+      })()
+    : "";
+
+  const programProgressDisplay =
+    program?.programProgressPercent != null
+      ? program.programProgressPercent
+      : program?.currentWeek != null &&
+          program?.durationWeeks != null &&
+          program.durationWeeks > 0
+        ? Math.min(100, Math.round((program.currentWeek / program.durationWeeks) * 100))
+        : null;
+
+  const programStatusLabel = program
+    ? program.behindOnWeeklyWorkouts
+      ? "Behind"
+      : programProgressDisplay != null && programProgressDisplay >= 95
+        ? "Ahead"
+        : "On track"
+    : "";
+
+  const nutritionEmpty =
+    !nutrition?.planName &&
+    (nutrition?.compliance7dPct == null || Number.isNaN(nutrition.compliance7dPct));
 
   return (
-    <div className="fc-page mx-auto flex min-w-0 w-full max-w-6xl flex-col gap-[var(--fc-gap-sections)] pb-8">
-      <GlassCard elevation={2} className="fc-card-shell flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-        <div className="flex min-w-0 items-center gap-4">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-accent)_14%,transparent)] text-sm font-bold text-[color:var(--fc-accent)]"
-            aria-hidden
-          >
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-[color:var(--fc-text-primary)] sm:text-2xl">
-              {name}
-            </h1>
-            {email ? (
-              <p className="mt-0.5 truncate text-sm text-[color:var(--fc-text-dim)]">{email}</p>
-            ) : (
-              <p className="mt-0.5 text-sm text-[color:var(--fc-text-dim)]">No email on file</p>
-            )}
-          </div>
+    <div className={ov.page}>
+      <ClientHeaderCard
+        clientId={clientId}
+        name={name}
+        email={email}
+        initials={initials}
+        adherencePct={adherencePct}
+        streakDays={streak}
+        alertCount={alertCount}
+        trainedToday={trainedToday}
+        attentionLevel={attention.level}
+        attentionDetail={flaggedForHeader ? headerAlertSecondary : null}
+        phone={phone}
+        onMessage={openMessage}
+      />
+
+      {/* Today */}
+      <section className={ov.section}>
+        <div className={ov.sectionHead}>
+          <span className={ov.eyebrow}>Today</span>
+          <span className={ov.meta}>{todayMeta}</span>
         </div>
-        {trainedToday ? (
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--fc-status-success)_12%,transparent)] px-3 py-1 text-xs font-medium text-[color:var(--fc-status-success)]">
-            Trained today
-          </span>
-        ) : (
-          <span className="inline-flex w-fit items-center rounded-full border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-3 py-1 text-xs font-medium text-[color:var(--fc-text-dim)]">
-            No session logged today
-          </span>
-        )}
-      </GlassCard>
-
-      {attentionLine && (
-        <GlassCard
-          elevation={2}
-          className="fc-card-shell !p-3 text-xs sm:!p-4 sm:text-sm"
-          surfaceStyle={attentionCardSurfaceStyle(attention.level)}
-        >
-          <span className="line-clamp-3 text-[color:var(--fc-text-primary)]">{attentionLine}</span>
-        </GlassCard>
-      )}
-
-      <GlassCard elevation={2} className="fc-card-shell space-y-4 p-4 sm:p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-          Today
-        </h2>
         {trainedToday && todayWorkout ? (
-          <div className="space-y-2 text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[color:var(--fc-status-success)]" aria-hidden>
-                ●
-              </span>
-              <span className="font-semibold text-[color:var(--fc-text-primary)]">{todayWorkout.workoutName}</span>
-              <span className="text-xs text-[color:var(--fc-text-dim)]">
-                {todayWorkout.durationMinutes != null ? `${todayWorkout.durationMinutes} min` : "—"}
+          <div className={ov.sessionRow} style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+            <div className={ov.sessionIcon} aria-hidden>
+              <Dumbbell className="h-[13px] w-[13px]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12.5px] font-medium text-[color:var(--fc-text-primary)]">
+                <b>{todayWorkout.workoutName}</b>
+              </p>
+              <p className="mt-1 font-mono text-[10px] text-[color:var(--fc-text-subtle)]">
+                Today
+                {todayWorkout.durationMinutes != null ? ` · ${todayWorkout.durationMinutes}min` : ""}
                 {todayWorkout.totalSets != null ? ` · ${todayWorkout.totalSets} sets` : ""}
-              </span>
-            </div>
-            <div className="text-xs sm:text-sm">
-              <span className="text-[color:var(--fc-text-dim)]">Volume: </span>
-              <span className="text-[color:var(--fc-text-primary)] tabular-nums">
                 {todayWorkout.totalVolume != null
-                  ? `${Math.round(Number(todayWorkout.totalVolume)).toLocaleString()} kg`
-                  : "—"}
-              </span>
-              {todayWorkout.volumeDeltaKg != null && (
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    todayWorkout.volumeDeltaKg > 0
-                      ? "text-[color:var(--fc-status-success)]"
-                      : todayWorkout.volumeDeltaKg < 0
-                        ? "text-[color:var(--fc-status-error)]"
-                        : "text-[color:var(--fc-text-dim)]",
-                  )}
-                >
-                  {todayWorkout.volumeDeltaKg > 0 ? " +" : " "}
-                  {todayWorkout.volumeDeltaKg} kg
-                </span>
+                  ? ` · ${Math.round(Number(todayWorkout.totalVolume)).toLocaleString()} kg`
+                  : ""}
+              </p>
+              {todayWorkout.adherencePercent != null && (
+                <p className="mt-1 text-[11px]">
+                  <span className="text-[color:var(--fc-text-subtle)]">Target: </span>
+                  <span className={cn("font-medium", tierColor(adherenceTier))}>
+                    {Math.round(todayWorkout.adherencePercent)}% sets on target
+                  </span>
+                </p>
               )}
+              <Link
+                href={`/coach/clients/${clientId}/workout-logs/${todayWorkout.logId}`}
+                className="mt-2 inline-flex items-center gap-0.5 font-mono text-[10px] font-medium text-[color:var(--fc-set-type-straight)]"
+              >
+                Open
+                <span aria-hidden>›</span>
+              </Link>
             </div>
-            {todayWorkout.adherencePercent != null && (
-              <div className="text-xs sm:text-sm">
-                <span className="text-[color:var(--fc-text-dim)]">Target: </span>
-                <span className={cn("font-medium", tierColor(adherenceTier))}>
-                  {Math.round(todayWorkout.adherencePercent)}% sets on target
-                  {adherenceTier === "green"
-                    ? " · On target"
-                    : adherenceTier === "amber"
-                      ? " · Close"
-                      : " · Below target"}
-                </span>
-              </div>
-            )}
-            <Link
-              href={`/coach/clients/${clientId}/workout-logs/${todayWorkout.logId}`}
-              className="inline-flex text-xs font-medium text-[color:var(--fc-accent)] hover:underline"
-            >
-              View full log →
-            </Link>
           </div>
         ) : (
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)]">
-              <span className="text-[color:var(--fc-text-subtle)]" aria-hidden>
-                ○
-              </span>
-              <span>No workout logged today</span>
+          <div className={ov.todayEmpty}>
+            <div className={ov.todayEmptyIcon}>
+              <Dumbbell className="h-4 w-4 text-[color:var(--fc-text-quaternary)]" aria-hidden />
             </div>
-            {nextScheduledWorkout && (
-              <p className="text-xs text-[color:var(--fc-text-dim)]">
-                Next scheduled: <span className="text-[color:var(--fc-text-primary)]">{nextScheduledWorkout.dayName}</span>{" "}
-                — {nextScheduledWorkout.workoutName}
+            <p className="text-[12.5px] font-medium text-[color:var(--fc-text-primary)]">
+              No workout logged yet
+            </p>
+            {nextScheduledWorkout ? (
+              <p className="mt-0.5 text-[11px] text-[color:var(--fc-text-subtle)]">
+                Next scheduled ·{" "}
+                <b style={{ color: "var(--fc-set-type-straight)" }}>{nextScheduledWorkout.dayName}</b>
+                {" — "}
+                {nextScheduledWorkout.workoutName}
               </p>
-            )}
+            ) : null}
           </div>
         )}
-      </GlassCard>
+      </section>
 
-      <GlassCard elevation={2} className="fc-card-shell space-y-4 p-4 sm:p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-            This week
-          </h2>
+      {/* This week */}
+      <section className={ov.section}>
+        <div className={ov.sectionHead}>
+          <div>
+            <span className={ov.eyebrow}>This week</span>
+            <h2 className={cn(ov.sectionTitle, "mt-1")}>{weekHeadline}</h2>
+          </div>
           {currentWeek ? (
-            <p className="text-xs text-[color:var(--fc-text-dim)]">
-              Mon {formatRangeDate(currentWeek.weekStart)} — Sun {formatRangeDate(currentWeek.weekEnd)}
-            </p>
+            <span className={ov.meta}>
+              {formatRangeDate(currentWeek.weekStart)} — {formatRangeDate(currentWeek.weekEnd)}
+            </span>
           ) : null}
         </div>
         {currentWeek ? (
-          <>
-            <div className="rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] p-4">
-              {!weeklyReview?.hasActiveAssignment ? (
-                <p className="text-xs text-[color:var(--fc-text-dim)]">
-                  No active program — workout and volume stats stay at zero until you assign one.
-                </p>
-              ) : (
-                <>
-                  {weekJustStarted && (
-                    <p className="mb-3 text-xs text-[color:var(--fc-text-dim)]">Week just started</p>
-                  )}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {[
-                      {
-                        key: "workouts",
-                        icon: <Dumbbell className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
-                        value: `${currentWeek.workouts.completed}/${currentWeek.workouts.planned}`,
-                        label: "Workouts",
-                        delta: hasPreviousWeekData
-                          ? deltaBadge(currentWeek.workouts.completed, previousWeek?.workouts.completed ?? null)
-                          : null,
-                        onClick: () => {
-                          router.push(`/coach/clients/${clientId}/workout-logs`);
-                        },
-                        sub: null as string | null,
-                      },
-                      {
-                        key: "volume",
-                        icon: <TrendingUp className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
-                        value: formatVolume(currentWeek.volume.totalKg),
-                        label: "Volume",
-                        delta: hasPreviousWeekData
-                          ? deltaBadge(Math.round(currentWeek.volume.totalKg), Math.round(previousWeek?.volume.totalKg ?? 0))
-                          : null,
-                        onClick: () => {
-                          router.push(`/coach/clients/${clientId}/stats`);
-                        },
-                        sub: null as string | null,
-                      },
-                      {
-                        key: "prs",
-                        icon: <Trophy className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
-                        value: `${currentWeek.prs.count}`,
-                        label: "PRs",
-                        delta: hasPreviousWeekData
-                          ? deltaBadge(currentWeek.prs.count, previousWeek?.prs.count ?? null)
-                          : null,
-                        onClick: () => {
-                          router.push(`/coach/clients/${clientId}/stats`);
-                        },
-                        sub: null as string | null,
-                      },
-                      {
-                        key: "checkins",
-                        icon: <Heart className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
-                        value: `${currentWeek.checkIns.daily.submitted}/7`,
-                        label: "Check-ins",
-                        delta: hasPreviousWeekData
-                          ? deltaBadge(currentWeek.checkIns.daily.submitted, previousWeek?.checkIns.daily.submitted ?? null)
-                          : null,
-                        onClick: () => {
-                          router.push(`/coach/clients/${clientId}/check-ins`);
-                        },
-                        sub: `Wkly: ${currentWeek.checkIns.scheduled.submitted ? "done" : "pending"}`,
-                      },
-                      ...(currentWeek.checkIns.daily.avgMood != null
-                        ? [{
-                            key: "mood",
-                            icon: <Smile className="h-3.5 w-3.5 text-[color:var(--fc-accent)]" aria-hidden />,
-                            value: `${Math.round(currentWeek.checkIns.daily.avgMood * 10) / 10}/10`,
-                            label: "Avg mood",
-                            delta: hasPreviousWeekData
-                              ? deltaBadge(
-                                  Math.round((currentWeek.checkIns.daily.avgMood ?? 0) * 10),
-                                  previousWeek?.checkIns.daily.avgMood != null
-                                    ? Math.round(previousWeek.checkIns.daily.avgMood * 10)
-                                    : null
-                                )
-                              : null,
-                            onClick: () => {
-                              router.push(`/coach/clients/${clientId}/check-ins`);
-                            },
-                            sub: null as string | null,
-                          }]
-                        : []),
-                    ].map((tile) => (
-                      <button
-                        key={tile.key}
-                        type="button"
-                        onClick={tile.onClick}
-                        className="min-h-[96px] rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-sunken)] p-3 text-left transition-colors hover:border-[color:var(--fc-accent)] hover:bg-[color:var(--fc-glass-highlight)]"
-                      >
-                        <div className="mb-2">{tile.icon}</div>
-                        <p className="text-xl font-bold tabular-nums text-[color:var(--fc-text-primary)]">{tile.value}</p>
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-[color:var(--fc-text-dim)]">
-                          {tile.label}
-                        </p>
-                        {tile.sub ? (
-                          <p className="mt-1 text-[10px] text-[color:var(--fc-text-dim)]">{tile.sub}</p>
-                        ) : null}
-                        {tile.delta ? (
-                          <span className={`mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ${tile.delta.className}`}>
-                            {tile.delta.text}
-                          </span>
-                        ) : null}
-                      </button>
-                    ))}
+          !weeklyReview?.hasActiveAssignment ? (
+            <p className="text-xs text-[color:var(--fc-text-subtle)]">
+              No active program — stats stay at zero until you assign one.
+            </p>
+          ) : (
+            <div className={ov.tileGrid4}>
+              <button
+                type="button"
+                className={ov.tile}
+                onClick={() => router.push(`/coach/clients/${clientId}/workout-logs`)}
+              >
+                <div
+                  className={ov.tileIcon}
+                  style={{
+                    background: "var(--fc-set-type-straight-soft)",
+                    color: "var(--fc-set-type-straight)",
+                  }}
+                >
+                  <Dumbbell className="h-3 w-3" />
+                </div>
+                <div>
+                  <span
+                    className={cn(
+                      ov.tileNum,
+                      currentWeek.workouts.completed > 0 ? ov.tileNumAccentCyan : undefined,
+                    )}
+                    style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
+                  >
+                    {currentWeek.workouts.completed}/{currentWeek.workouts.planned}
+                  </span>
+                  <span className={ov.tileUnit}>sessions</span>
+                </div>
+                <div className={ov.tileLabel}>Workouts</div>
+              </button>
+              <button
+                type="button"
+                className={ov.tile}
+                onClick={() => router.push(`/coach/clients/${clientId}/stats`)}
+              >
+                <div
+                  className={ov.tileIcon}
+                  style={{
+                    background: "var(--fc-meal-dinner-soft)",
+                    color: "var(--fc-meal-dinner)",
+                  }}
+                >
+                  <TrendingUp className="h-3 w-3" />
+                </div>
+                <div>
+                  <span
+                    className={cn(
+                      ov.tileNum,
+                      currentWeek.volume.totalKg > 0 ? ov.tileNumAccentPurple : undefined,
+                    )}
+                    style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
+                  >
+                    {formatVolume(currentWeek.volume.totalKg)}
+                  </span>
+                  <span className={ov.tileUnit}>kg</span>
+                </div>
+                <div className={ov.tileLabel}>Volume</div>
+              </button>
+              <button
+                type="button"
+                className={ov.tile}
+                onClick={() => router.push(`/coach/clients/${clientId}/stats`)}
+              >
+                <div
+                  className={ov.tileIcon}
+                  style={{
+                    background: "var(--fc-effort-medium-soft)",
+                    color: "var(--fc-effort-medium)",
+                  }}
+                >
+                  <Trophy className="h-3 w-3" />
+                </div>
+                <div>
+                  <span
+                    className={cn(
+                      ov.tileNum,
+                      currentWeek.prs.count > 0 ? ov.tileNumAccentWarn : undefined,
+                    )}
+                    style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
+                  >
+                    {currentWeek.prs.count}
+                  </span>
+                </div>
+                <div className={ov.tileLabel}>PRs</div>
+              </button>
+              <button
+                type="button"
+                className={ov.tile}
+                onClick={() => router.push(`/coach/clients/${clientId}/progress`)}
+              >
+                <div
+                  className={ov.tileIcon}
+                  style={{
+                    background: "var(--fc-accent-lime-soft)",
+                    color: "var(--fc-accent-lime-2)",
+                  }}
+                >
+                  <Heart className="h-3 w-3" />
+                </div>
+                <div>
+                  <span
+                    className={cn(
+                      ov.tileNum,
+                      currentWeek.checkIns.daily.submitted > 0 ? ov.tileNumAccentLime : undefined,
+                    )}
+                    style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
+                  >
+                    {currentWeek.checkIns.daily.submitted}/{currentWeek.checkIns.daily.total}
+                  </span>
+                </div>
+                <div className={ov.tileLabel}>Check-ins</div>
+              </button>
+            </div>
+          )
+        ) : (
+          <p className="text-xs text-[color:var(--fc-text-subtle)]">Weekly review unavailable</p>
+        )}
+      </section>
+
+      {/* Latest check-in */}
+      <section className={ov.section}>
+        <div className={ov.sectionHead}>
+          <span className={ov.eyebrow}>Latest check-in</span>
+          {latestCheckIn ? <span className={ov.meta}>{latestCheckInMeta}</span> : null}
+        </div>
+        {latestCheckIn ? (
+          <div className={ov.checkinStrip}>
+            {(
+              [
+                {
+                  key: "sleep",
+                  label: "Sleep",
+                  value: latestCheckIn.sleepHours,
+                  unit: "h",
+                  delta: latestCheckIn.sleepDelta,
+                  lowerBetter: false,
+                },
+                {
+                  key: "stress",
+                  label: "Stress",
+                  value: latestCheckIn.stressLevel,
+                  unit: "/10",
+                  delta: latestCheckIn.stressDelta,
+                  lowerBetter: true,
+                },
+                {
+                  key: "soreness",
+                  label: "Soreness",
+                  value: latestCheckIn.sorenessLevel,
+                  unit: "/10",
+                  delta: latestCheckIn.sorenessDelta,
+                  lowerBetter: true,
+                },
+              ] as const
+            ).map((col) => {
+              const d = checkinDeltaRow(
+                col.delta,
+                col.lowerBetter,
+                col.key === "sleep" ? "h" : ""
+              );
+              return (
+                <div key={col.key} className={ov.checkinCell}>
+                  <div className={ov.checkinLabel}>{col.label}</div>
+                  <div className={ov.checkinValueRow}>
+                    <span
+                      className={ov.checkinValue}
+                      style={{ fontFamily: "var(--f-display, var(--font-geist-sans))" }}
+                    >
+                      {col.value != null ? col.value : "—"}
+                    </span>
+                    {col.value != null ? (
+                      <span className={ov.checkinUnit}>{col.unit}</span>
+                    ) : null}
                   </div>
-                </>
+                  <div className={ov.checkinDelta} style={{ color: d.color }}>
+                    {d.sym} {d.text}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-center text-xs text-[color:var(--fc-text-subtle)]">
+            No check-in yet · request one
+          </p>
+        )}
+      </section>
+
+      {/* Active program */}
+      <section className={ov.section}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[color:var(--fc-set-type-straight)]">
+            Active program
+          </span>
+          {program ? (
+            <span
+              className={cn(
+                ov.statusPill,
+                program.behindOnWeeklyWorkouts
+                  ? ov.statusCrit
+                  : programStatusLabel === "Ahead"
+                    ? ov.statusCyan
+                    : ov.statusGood,
               )}
+            >
+              {programStatusLabel}
+            </span>
+          ) : null}
+        </div>
+        {program ? (
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <h3
+                className="max-w-[70%] truncate text-[14px] font-semibold text-[color:var(--fc-text-primary)]"
+                style={{ fontFamily: "var(--f-headline, var(--font-geist-sans))" }}
+              >
+                {program.name}
+              </h3>
+              {program.currentWeek != null && program.durationWeeks != null ? (
+                <span className="shrink-0 font-mono text-[10px] text-[color:var(--fc-text-quaternary)]">
+                  W{program.currentWeek}/{program.durationWeeks}
+                </span>
+              ) : null}
+            </div>
+            {programProgressDisplay != null ? (
+              <div className={ov.progBar}>
+                <div className={ov.progFill} style={{ width: `${programProgressDisplay}%` }} />
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[color:var(--fc-text-subtle)]">
+              <span>
+                {programProgressDisplay != null ? `${programProgressDisplay}% complete` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => setReviewOpen(true)}
+                className="inline-flex items-center gap-0.5 font-medium text-[color:var(--fc-set-type-straight)]"
+              >
+                Review week
+                <span aria-hidden className="text-[10px]">
+                  →
+                </span>
+              </button>
             </div>
           </>
         ) : (
-          <p className="text-xs text-[color:var(--fc-text-dim)]">Weekly review unavailable</p>
+          <p className="text-sm text-[color:var(--fc-text-subtle)]">
+            No active program · Assign one
+          </p>
         )}
-      </GlassCard>
+      </section>
 
-      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-          Latest check-in
-        </h2>
-        {latestCheckIn ? (
-          <div className="space-y-1 text-xs sm:text-sm leading-relaxed text-[color:var(--fc-text-primary)]">
-            <p>
-              <span className="text-[color:var(--fc-text-dim)]">Sleep </span>
-              <span className="font-medium tabular-nums">
-                {latestCheckIn.sleepHours != null ? `${latestCheckIn.sleepHours}h` : "—"}
-              </span>
-              {latestCheckIn.sleepDelta != null && (
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    latestCheckIn.sleepDelta >= 0
-                      ? "text-[color:var(--fc-status-success)]"
-                      : "text-[color:var(--fc-status-error)]",
-                  )}
-                >
-                  {fmtDelta(latestCheckIn.sleepDelta, "h")}
-                </span>
-              )}
-              <span className="text-[color:var(--fc-text-dim)]"> · Stress </span>
-              <span className="font-medium tabular-nums">
-                {latestCheckIn.stressLevel != null ? `${latestCheckIn.stressLevel}/10` : "—"}
-              </span>
-              {latestCheckIn.stressDelta != null && (
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    deltaTone(latestCheckIn.stressDelta, true) === "green"
-                      ? "text-[color:var(--fc-status-success)]"
-                      : deltaTone(latestCheckIn.stressDelta, true) === "red"
-                        ? "text-[color:var(--fc-status-error)]"
-                        : "text-[color:var(--fc-text-dim)]",
-                  )}
-                >
-                  {fmtDelta(latestCheckIn.stressDelta, "", true)}
-                </span>
-              )}
-              <span className="text-[color:var(--fc-text-dim)]"> · Soreness </span>
-              <span className="font-medium tabular-nums">
-                {latestCheckIn.sorenessLevel != null
-                  ? `${latestCheckIn.sorenessLevel}/10`
-                  : "—"}
-              </span>
-              {latestCheckIn.sorenessDelta != null && (
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    deltaTone(latestCheckIn.sorenessDelta, true) === "green"
-                      ? "text-[color:var(--fc-status-success)]"
-                      : deltaTone(latestCheckIn.sorenessDelta, true) === "red"
-                        ? "text-[color:var(--fc-status-error)]"
-                        : "text-[color:var(--fc-text-dim)]",
-                  )}
-                >
-                  {fmtDelta(latestCheckIn.sorenessDelta, "", true)}
-                </span>
-              )}
+      {/* Nutrition */}
+      <section className={ov.section}>
+        <div className={ov.sectionHead}>
+          <span className={cn(ov.eyebrow, ov.eyebrowGood)}>Nutrition</span>
+        </div>
+        {nutritionEmpty ? (
+          <div className="flex flex-col gap-3">
+            <span className={ov.pillMutedTag}>No plan</span>
+            <div className={ov.todayEmpty}>
+              <div
+                className={ov.todayEmptyIcon}
+                style={{
+                  background: "var(--fc-effort-easy-soft)",
+                  color: "var(--fc-effort-easy)",
+                }}
+              >
+                <Utensils className="h-4 w-4" aria-hidden />
+              </div>
+              <p className="text-[12.5px] text-[color:var(--fc-text-primary)]">
+                No meal plan assigned · Assign a plan or set macro targets
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {nutrition?.planName ? (
+              <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">{nutrition.planName}</p>
+            ) : null}
+            <p className="text-xs text-[color:var(--fc-text-subtle)]">
+              {nutrition?.compliance7dPct != null
+                ? `${nutrition.compliance7dPct}% compliance (7d)`
+                : "Compliance —"}
+              {` · ${nutrition?.mealsLoggedToday ?? 0} meal${
+                nutrition?.mealsLoggedToday === 1 ? "" : "s"
+              } logged today`}
             </p>
           </div>
-        ) : (
-          <p className="text-xs text-[color:var(--fc-text-dim)]">No check-in yet</p>
         )}
-      </GlassCard>
+      </section>
 
-      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-          Program
-        </h2>
-        {program ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate font-medium text-[color:var(--fc-text-primary)]">{program.name}</span>
-              {program.currentWeek != null && program.durationWeeks != null && (
-                <span className="shrink-0 text-xs text-[color:var(--fc-text-dim)]">
-                  W{program.currentWeek}/{program.durationWeeks}
-                </span>
-              )}
-            </div>
-            {program.programProgressPercent != null && (
-              <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--fc-glass-border)]">
-                <div
-                  className="h-full rounded-full bg-[color:var(--fc-accent)]"
-                  style={{ width: `${program.programProgressPercent}%` }}
-                />
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="text-xs font-medium text-[color:var(--fc-accent)] hover:underline"
-                onClick={() => setReviewOpen(true)}
-              >
-                Review week →
-              </button>
-              {program.behindOnWeeklyWorkouts ? (
-                <span className="text-xs font-medium text-[color:var(--fc-status-warning)]">Behind schedule</span>
-              ) : (
-                <span className="text-xs font-medium text-[color:var(--fc-status-success)]">On track</span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <p className="text-xs text-[color:var(--fc-text-dim)]">No active program</p>
-        )}
-      </GlassCard>
-
-      <GlassCard elevation={2} className="fc-card-shell space-y-3 p-4 sm:p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-          Nutrition
-        </h2>
-        {nutrition ? (
-          <p className="text-xs sm:text-sm text-[color:var(--fc-text-primary)]">
-            {nutrition.planName ? (
-              <span className="font-medium text-[color:var(--fc-text-primary)]">{nutrition.planName}</span>
-            ) : null}
-            {nutrition.planName ? " · " : ""}
-            {nutrition.compliance7dPct != null
-              ? `${nutrition.compliance7dPct}% compliance (7d)`
-              : "Compliance —"}
-            {` · ${nutrition.mealsLoggedToday} meal${nutrition.mealsLoggedToday === 1 ? "" : "s"} logged today`}
-          </p>
-        ) : (
-          <p className="text-xs text-[color:var(--fc-text-dim)]">No meal plan</p>
-        )}
-      </GlassCard>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="fc-btn fc-btn-secondary inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-medium"
-          onClick={openEmail}
-        >
-          <Mail className="h-4 w-4" aria-hidden />
-          Email client
+      <div className={ov.actionRow}>
+        <button type="button" className={ov.btnOutline} onClick={openMessage}>
+          <MessageCircle className="h-[13px] w-[13px]" aria-hidden />
+          Message
         </button>
+        <Link href={`/coach/clients/${clientId}/workouts`} className={ov.btnCyan}>
+          <SlidersHorizontal className="h-[13px] w-[13px]" aria-hidden />
+          Adjust plan
+        </Link>
       </div>
 
       {program && (

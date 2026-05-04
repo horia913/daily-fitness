@@ -3,20 +3,25 @@
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
+  Eye,
   Dumbbell,
   Utensils,
   TrendingUp,
-  ClipboardCheck,
+  CalendarCheck,
   User,
-  ArrowLeft,
+  ChevronLeft,
 } from "lucide-react";
+import styles from "./CoachClientTabBar.module.css";
+
+type TabAccent = "cyan" | "good" | "purple";
 
 type TabDef = {
   label: string;
+  shortLabel: string;
   href: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof Eye;
   isActive: (pathname: string) => boolean;
+  activeAccent: TabAccent;
 };
 
 function buildTabs(clientId: string): TabDef[] {
@@ -24,55 +29,57 @@ function buildTabs(clientId: string): TabDef[] {
   return [
     {
       label: "Overview",
+      shortLabel: "Home",
       href: base,
-      icon: LayoutDashboard,
+      icon: Eye,
       isActive: (pathname) => pathname === base,
+      activeAccent: "cyan",
     },
     {
       label: "Training",
+      shortLabel: "Train",
       href: `${base}/workouts`,
       icon: Dumbbell,
       isActive: (pathname) =>
         pathname.startsWith(`${base}/workouts`) ||
         pathname.startsWith(`${base}/workout-logs`) ||
         pathname.includes(`${base}/programs/`),
+      activeAccent: "cyan",
     },
     {
       label: "Stats",
+      shortLabel: "Stats",
       href: `${base}/stats`,
       icon: TrendingUp,
       isActive: (pathname) => pathname.startsWith(`${base}/stats`),
+      activeAccent: "cyan",
     },
     {
       label: "Nutrition",
+      shortLabel: "Meals",
       href: `${base}/meals`,
       icon: Utensils,
       isActive: (pathname) => pathname.startsWith(`${base}/meals`),
+      activeAccent: "good",
     },
     {
       label: "Check-ins",
+      shortLabel: "Checks",
       href: `${base}/progress`,
-      icon: ClipboardCheck,
+      icon: CalendarCheck,
       isActive: (pathname) => pathname.startsWith(`${base}/progress`),
+      activeAccent: "purple",
     },
     {
       label: "Profile",
+      shortLabel: "Prof",
       href: `${base}/profile`,
       icon: User,
       isActive: (pathname) => pathname.startsWith(`${base}/profile`),
+      activeAccent: "cyan",
     },
   ];
 }
-
-/** Shorter labels on narrow screens so tabs are not truncated (e.g. "Progres…"). */
-const TAB_SHORT_LABEL: Record<string, string> = {
-  Overview: "Home",
-  Training: "Train",
-  Stats: "Stats",
-  Nutrition: "Meals",
-  "Check-ins": "Checks",
-  Profile: "Prof",
-};
 
 export default function CoachClientTabBar({ clientId }: { clientId: string }) {
   const pathname = usePathname() ?? "";
@@ -80,41 +87,44 @@ export default function CoachClientTabBar({ clientId }: { clientId: string }) {
   const tabs = buildTabs(clientId);
 
   return (
-    <div className="sticky top-0 z-20 -mx-1 mb-4 sm:mx-0 sm:mb-6">
-      <nav
-        className="flex min-h-[44px] items-stretch gap-0.5 overflow-x-auto rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-surface-card)_88%,transparent)] px-1 py-1 shadow-[0_1px_0_var(--fc-surface-card-border)] backdrop-blur-md scrollbar-hide sm:gap-1"
-        role="tablist"
-        aria-label="Client sections"
-      >
+    <div className={cn(styles.sticky, "-mx-1 sm:mx-0")}>
+      <nav className={styles.nav} role="tablist" aria-label="Client sections">
         <button
           type="button"
           aria-label="Back to client list"
           onClick={() => router.push("/coach/clients")}
-          className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl px-2 fc-text-dim transition-colors hover:bg-[color:var(--fc-glass-highlight)] hover:fc-text-primary sm:px-3"
+          className={styles.back}
         >
-          <ArrowLeft className="h-5 w-5" aria-hidden />
+          <ChevronLeft className="h-[18px] w-[18px]" aria-hidden />
         </button>
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = tab.isActive(pathname);
+          const activeClass =
+            tab.activeAccent === "good"
+              ? styles.tabActiveGood
+              : tab.activeAccent === "purple"
+                ? styles.tabActivePurple
+                : styles.tabActiveCyan;
+          const dotClass =
+            tab.activeAccent === "good"
+              ? styles.glowDotGood
+              : tab.activeAccent === "purple"
+                ? styles.glowDotPurple
+                : styles.glowDotCyan;
           return (
             <button
               key={tab.href}
               type="button"
               aria-label={tab.label}
+              aria-current={active ? "page" : undefined}
               onClick={() => router.push(tab.href)}
-              className={cn(
-                "flex min-h-[44px] shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-transparent px-2 py-2.5 text-sm font-medium transition-colors sm:gap-2 sm:px-4",
-                active
-                  ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_45%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_12%,transparent)] font-semibold text-[color:var(--fc-accent-cyan)]"
-                  : "fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] hover:fc-text-primary",
-              )}
+              className={cn(styles.tab, active && styles.tabActive, active && activeClass)}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" aria-hidden />
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">
-                {TAB_SHORT_LABEL[tab.label] ?? tab.label}
-              </span>
+              <Icon className={styles.tabIcon} aria-hidden />
+              <span className={styles.tabLabelLong}>{tab.label}</span>
+              <span className={styles.tabLabelShort}>{tab.shortLabel}</span>
+              {active ? <span className={cn(styles.glowDot, dotClass)} aria-hidden /> : null}
             </button>
           );
         })}

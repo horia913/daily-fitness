@@ -7,8 +7,16 @@ import { notificationService } from '@/lib/notifications'
 import NotificationCenter from './NotificationCenter'
 import { usePathname } from 'next/navigation'
 import { isLiveWorkoutRoute } from '@/lib/workoutMode'
+import { isPushNotificationsEnabled } from '@/lib/pushNotificationsEnabled'
 
 export default function NotificationBell() {
+  if (!isPushNotificationsEnabled()) {
+    return null
+  }
+  return <NotificationBellInner />
+}
+
+function NotificationBellInner() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotificationCenter, setShowNotificationCenter] = useState(false)
   const [permissionGranted, setPermissionGranted] = useState(false)
@@ -48,7 +56,7 @@ export default function NotificationBell() {
           if (permission === 'granted') {
             // Send a welcome notification
             new Notification('🔔 Notifications Enabled!', {
-              body: 'You\'ll now receive workout reminders and achievement notifications.',
+              body: "You'll now receive notifications from your coach.",
             })
             updateUnreadCount()
           }

@@ -11,7 +11,6 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft,
   BarChart3,
   TrendingUp,
   TrendingDown,
@@ -38,10 +37,13 @@ import {
 import { ExerciseProgressionChart } from "@/components/progress/ExerciseProgressionChart";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { getWeeklyVolume, getWorkoutsWithVolumeForSleepAnalysis, type VolumeStats, type WorkoutWithVolumeForSleep } from "@/lib/volumeAnalytics";
+import { resolveStatsTabTimezone } from "@/lib/clientAnalyticsService";
 import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
 import { VolumeTrendChart } from "@/components/progress/VolumeTrendChart";
 import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
 import { cn } from "@/lib/utils";
+import { PsHero, PsSegmented, PsSectionEyebrow } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 import {
   getActivitiesByDateRange,
   ACTIVITY_META,
@@ -410,7 +412,20 @@ function AnalyticsPageContent() {
   const loadVolumeStats = async () => {
     if (!user?.id) return;
     try {
-      const stats = await getWeeklyVolume(user.id, 26); // 6 months = 26 weeks
+      const [{ data: paRow }, { data: profRow }] = await Promise.all([
+        supabase
+          .from("program_assignments")
+          .select("timezone_snapshot")
+          .eq("client_id", user.id)
+          .eq("status", "active")
+          .maybeSingle(),
+        supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+      ]);
+      const tz = resolveStatsTabTimezone(
+        paRow?.timezone_snapshot as string | undefined,
+        profRow?.timezone as string | undefined,
+      );
+      const stats = await getWeeklyVolume(user.id, 26, tz);
       setVolumeStats(stats);
     } catch (error) {
       console.error("Error loading volume stats:", error);
@@ -610,79 +625,54 @@ function AnalyticsPageContent() {
     };
   }, [wellnessStats, workoutsForSleepAnalysis]);
 
-  const rangeChipBase =
-    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const rangeChipActive = "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
-  const rangeChipInactive = "bg-[color:var(--fc-glass-highlight)] fc-text-dim border-[color:var(--fc-glass-border)]";
-
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
       <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-        <div className="fc-card-shell backdrop-blur-[8px] p-4 mb-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
+        <div className={ps.psV1}>
+          <PsHero
+            glow="purple"
+            onBack={() => router.push("/client/progress")}
+            backAriaLabel="Back to progress hub"
+            eyebrow="Performance · analytics"
+            eyebrowColor="#A78BFA"
+            title="Overview"
+            subtitle="Training insights for the range you select"
+          >
+            <PsSegmented
+              ariaLabel="Analytics time range"
+              options={[
+                { value: "1M" as const, label: "1M" },
+                { value: "3M" as const, label: "3M" },
+                { value: "6M" as const, label: "6M" },
+                { value: "1Y" as const, label: "1Y" },
+                { value: "ALL" as const, label: "All" },
+              ]}
+              value={timeRange}
+              onChange={setTimeRange}
+            />
+            <div
+              className={cn(ps.psSegWrap, "grid grid-cols-2")}
+              role="tablist"
+              aria-label="Analytics mode"
+            >
+              <a
+                href="#strength-exercises"
+                className={cn(ps.psSegBtn, ps.psSegBtnActive, "inline-flex items-center justify-center gap-1 no-underline")}
+              >
+                <Search className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                Exercises
+              </a>
               <button
                 type="button"
-                onClick={() => router.push("/client/progress")}
-                className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim hover:fc-text-primary transition-colors"
-                aria-label="Back"
+                className={ps.psSegBtn}
+                onClick={() => router.push("/client/progress/personal-records")}
               >
-                <ArrowLeft className="w-4 h-4" />
+                PRs
               </button>
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--fc-accent)_15%,transparent)] text-[color:var(--fc-accent)] shrink-0">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle block mb-0.5">
-                    Performance
-                  </span>
-                  <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
-                    Analytics <span className="fc-text-dim font-normal">· Overview</span>
-                  </h1>
-                  <p className="text-xs fc-text-dim mt-0.5">Training insights for the range you select.</p>
-                </div>
-              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="-mx-1 px-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex flex-wrap gap-2 min-w-min">
-                  {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((range) => (
-                    <button
-                      key={range}
-                      type="button"
-                      onClick={() => setTimeRange(range)}
-                      className={cn(
-                        rangeChipBase,
-                        timeRange === range ? rangeChipActive : rangeChipInactive
-                      )}
-                    >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href="#strength-exercises"
-                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)] font-semibold shrink-0"
-                >
-                  <Search className="mr-1 h-3.5 w-3.5" />
-                  Exercises
-                </a>
-                <button
-                  type="button"
-                  onClick={() => router.push("/client/progress/personal-records")}
-                  className="inline-flex items-center h-9 text-xs px-3 rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim hover:fc-text-primary shrink-0"
-                >
-                  PRs
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          </PsHero>
 
         {loadError && !loading ? (
           <div className="fc-card-shell p-4 text-center">
@@ -890,9 +880,9 @@ function AnalyticsPageContent() {
 
                 {topProgressions.length > 0 && (
                   <div>
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
-                      Biggest Gains
-                    </h3>
+                    <PsSectionEyebrow accent="cyan" className="mb-2">
+                      Biggest gains
+                    </PsSectionEyebrow>
                     <div className="flex flex-col gap-4">
                       {topProgressions.map((prog) => (
                         <ExerciseProgressionChart
@@ -908,9 +898,9 @@ function AnalyticsPageContent() {
 
                 {compoundProgressions.length > 0 && (
                   <div className="fc-card-shell backdrop-blur-[8px] p-4">
-                    <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
-                      Estimated 1RM — Compound Lifts
-                    </h3>
+                    <PsSectionEyebrow accent="purple" className="mb-2">
+                      Estimated 1RM — compound lifts
+                    </PsSectionEyebrow>
                     <div className="grid grid-cols-2 gap-3">
                       {compoundProgressions.map((prog) => (
                         <div
@@ -930,17 +920,17 @@ function AnalyticsPageContent() {
                 )}
 
                 <div id="strength-exercises">
-                  <h3 className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
-                    All Exercises
-                  </h3>
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-[color:var(--fc-text-dim)]" />
+                  <PsSectionEyebrow accent="cyan" className="mb-2">
+                    All exercises
+                  </PsSectionEyebrow>
+                  <div className={ps.psSearchWrap}>
+                    <Search className="pointer-events-none absolute left-[11px] top-1/2 h-3 w-3 -translate-y-1/2" style={{ color: "var(--ps-t3)" }} aria-hidden />
                     <Input
                       type="text"
                       placeholder="Search exercises..."
                       value={exerciseSearchQuery}
                       onChange={(e) => setExerciseSearchQuery(e.target.value)}
-                      className="fc-input pl-9 rounded-xl"
+                      className={cn(ps.psSearchInput, "pl-8")}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1154,7 +1144,7 @@ function AnalyticsPageContent() {
             {/* Sleep vs Performance Insight Card */}
             <div className="fc-card-shell backdrop-blur-[8px] p-4">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <BarChart3 className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1271,7 +1261,7 @@ function AnalyticsPageContent() {
             {/* Goal Completion */}
             <div className="fc-card-shell backdrop-blur-[8px] p-4">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-primary)_25%,transparent)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_color-mix(in_srgb,var(--fc-accent-cyan)_25%,transparent)]">
                   <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1288,7 +1278,7 @@ function AnalyticsPageContent() {
                 <div className="relative w-20 h-20 flex-shrink-0">
                   <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
                     <circle cx="40" cy="40" r="33" fill="none" stroke="var(--fc-glass-border)" strokeWidth="5" />
-                    <circle cx="40" cy="40" r="33" fill="none" stroke="var(--fc-accent-primary)" strokeWidth="5" strokeLinecap="round"
+                    <circle cx="40" cy="40" r="33" fill="none" stroke="var(--fc-accent-cyan)" strokeWidth="5" strokeLinecap="round"
                       strokeDasharray={`${completionPercentage * 2.073} 999`} />
                   </svg>
                   <span className="absolute inset-0 flex items-center justify-center text-lg font-black text-[color:var(--fc-text-primary)]">
@@ -1373,7 +1363,7 @@ function AnalyticsPageContent() {
                                 {byWeek[w].minutes}
                               </span>
                               <div
-                                className="w-full rounded-t-md bg-[color:var(--fc-accent)] transition-all duration-500"
+                                className="w-full rounded-t-md bg-[color:var(--fc-accent-cyan)] transition-all duration-500"
                                 style={{ height: `${Math.max(pct, 4)}%` }}
                               />
                               <span className="text-[9px] fc-text-dim">{label}</span>
@@ -1398,7 +1388,7 @@ function AnalyticsPageContent() {
                               </span>
                               <div className="flex-1 h-2 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-[color:var(--fc-accent)] transition-all duration-500"
+                                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)] transition-all duration-500"
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
@@ -1444,6 +1434,7 @@ function AnalyticsPageContent() {
             </div>
           </div>
         )}
+        </div>
       </ClientPageShell>
 
       <style jsx>{`
@@ -1474,7 +1465,7 @@ function AnalyticsPageContent() {
 
 export default function AnalyticsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <Suspense
         fallback={
           <AnimatedBackground>

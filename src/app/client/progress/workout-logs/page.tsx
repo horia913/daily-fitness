@@ -9,8 +9,11 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { ArrowLeft, FileText, Download } from "lucide-react";
+import { FileText, Download, ChevronRight } from "lucide-react";
+import { PsHero, PsSegmented } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
 
 interface WorkoutLog {
@@ -373,17 +376,29 @@ export default function WorkoutLogsPage() {
       .reduce((sum, log) => sum + durationMinutesForLog(log), 0);
   }, [workoutLogs]);
 
-  const thisMonthSummaryLine = useMemo(() => {
-    const vol =
-      thisMonthWeight >= 1000
-        ? `${(thisMonthWeight / 1000).toFixed(1)}k kg`
-        : `${Math.round(thisMonthWeight)} kg`;
-    return `${thisMonthCount} workout${thisMonthCount === 1 ? "" : "s"} · ${formatDurationLabel(thisMonthDurationMinutes)} · ${vol}`;
-  }, [thisMonthCount, thisMonthDurationMinutes, thisMonthWeight]);
+  const groupedByMonth = useMemo(() => {
+    const map = new Map<string, WorkoutLog[]>();
+    for (const log of filteredLogs) {
+      const d = log.completed_at ? new Date(log.completed_at) : new Date(log.started_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(log);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, logs]) => ({
+        key,
+        logs,
+        label: new Date(`${key}-01T12:00:00`).toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        }),
+      }));
+  }, [filteredLogs]);
 
   if (error && !loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -408,7 +423,7 @@ export default function WorkoutLogsPage() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -420,86 +435,113 @@ export default function WorkoutLogsPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-          <header className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress")}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-              aria-label="Back to progress"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">
-              Workout History
-            </h1>
-          </header>
+          <div className={ps.psV1}>
+            <PsHero
+              glow="cyan"
+              onBack={() => router.push("/client/progress")}
+              backAriaLabel="Back to progress hub"
+              eyebrow="Progress · history"
+              eyebrowColor="#4FE3E8"
+              title="Workout history"
+              subtitle="Every session you've logged"
+            />
 
-          {workoutLogs.length > 0 && (
-            <section className="mb-4 border-b border-[color:var(--fc-glass-border)] pb-4">
-              <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
-                This month
-              </p>
-              <p className="text-sm font-medium fc-text-primary leading-snug">
-                {thisMonthSummaryLine}
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/client/progress/personal-records")}
-                className="mt-2 text-left text-xs font-medium fc-text-primary hover:opacity-80 bg-transparent border-0 p-0 cursor-pointer"
-              >
-                View PRs →
-              </button>
-            </section>
-          )}
+            {workoutLogs.length > 0 && (
+              <section className="mb-3 mt-4">
+                <div className={ps.psMonthSummary}>
+                  <p
+                    className={cn(ps.psFontMono, "text-[9.5px] uppercase")}
+                    style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
+                  >
+                    This month
+                  </p>
+                  <p className={cn(ps.psFontBody, "text-sm leading-snug")} style={{ color: "var(--ps-t2)" }}>
+                    <span className={cn(ps.psFontDisplay, "text-xl font-bold tabular-nums")} style={{ color: "var(--ps-t1)" }}>
+                      {thisMonthCount} workout{thisMonthCount === 1 ? "" : "s"}
+                    </span>
+                    <span style={{ color: "var(--ps-t4)" }}> · </span>
+                    <span>{formatDurationLabel(thisMonthDurationMinutes)}</span>
+                    <span style={{ color: "var(--ps-t4)" }}> · </span>
+                    <span className={cn(ps.psFontDisplay, "font-bold tabular-nums")} style={{ color: "var(--ps-t1)" }}>
+                      {thisMonthWeight >= 1000
+                        ? `${(thisMonthWeight / 1000).toFixed(1)}k`
+                        : Math.round(thisMonthWeight)}
+                    </span>
+                    <span className={cn(ps.psFontBody, "text-[11.5px] font-normal")} style={{ color: "var(--ps-t2)" }}>
+                      {" "}
+                      kg vol
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/client/progress/personal-records")}
+                    className={cn(ps.psFontBody, "mt-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-[11px] font-medium")}
+                    style={{ color: "var(--ps-cyan)" }}
+                  >
+                    View PRs
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              </section>
+            )}
 
-          {workoutLogs.length > 0 && (
-            <div
-              role="tablist"
-              aria-label="Time range"
-              className="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1.5 bg-[color:var(--fc-bg-base)]/90 py-2 backdrop-blur-sm px-1"
-            >
-              {(["all", "this_month", "this_week"] as const).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={timeFilter === key}
-                  onClick={() => setTimeFilter(key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors border ${
-                    timeFilter === key
-                      ? "fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary"
-                      : "border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                  }`}
-                >
-                  {key === "all" ? "All time" : key === "this_month" ? "This month" : "This week"}
-                </button>
-              ))}
-            </div>
-          )}
+            {workoutLogs.length > 0 && (
+              <div className="sticky top-0 z-10 -mx-0 mb-3 bg-[color:var(--fc-bg-base)]/95 py-2 backdrop-blur-sm">
+                <PsSegmented
+                  ariaLabel="Time range"
+                  options={[
+                    { value: "all" as const, label: "All time" },
+                    { value: "this_month" as const, label: "This month" },
+                    { value: "this_week" as const, label: "This week" },
+                  ]}
+                  value={timeFilter}
+                  onChange={setTimeFilter}
+                />
+              </div>
+            )}
 
-          {filteredLogs.length === 0 ? (
-            <div className="py-8 px-2 text-center border-y border-[color:var(--fc-glass-border)]">
-              <FileText className="mx-auto mb-2 h-8 w-8 fc-text-dim opacity-70" aria-hidden />
-              <p className="text-sm font-semibold fc-text-primary mb-1">
-                {workoutLogs.length === 0 ? "No workouts yet" : "No workouts in this range"}
-              </p>
-              <p className="text-sm fc-text-dim">
-                {workoutLogs.length === 0
-                  ? "Complete a workout and your history will show up here."
-                  : "Try another time filter."}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-              {filteredLogs.map((log) => (
-                <WorkoutLogCard key={log.id} log={log} />
-              ))}
-            </div>
-          )}
+            {filteredLogs.length === 0 ? (
+              <div className={cn(ps.psChartCard, "py-8 text-center")}>
+                <FileText className="mx-auto mb-2 h-8 w-8 opacity-60" style={{ color: "var(--ps-t3)" }} aria-hidden />
+                <p className={cn(ps.psFontBody, "mb-1 text-sm font-semibold")} style={{ color: "var(--ps-t1)" }}>
+                  {workoutLogs.length === 0 ? "No workouts yet" : "No workouts in this range"}
+                </p>
+                <p className={cn(ps.psFontBody, "text-sm")} style={{ color: "var(--ps-t3)" }}>
+                  {workoutLogs.length === 0
+                    ? "Complete a workout and your history will show up here."
+                    : "Try another time filter."}
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {groupedByMonth.map((group) => (
+                  <div key={group.key}>
+                    <div className="mb-2 flex items-center gap-2 px-1 pt-1.5">
+                      <span
+                        className={cn(ps.psFontMono, "shrink-0 text-[10px] uppercase")}
+                        style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
+                      >
+                        {group.label}
+                      </span>
+                      <div className="h-px min-w-0 flex-1" style={{ background: "var(--ps-line-2)" }} aria-hidden />
+                      <span className={cn(ps.psFontMono, "shrink-0 text-[9.5px]")} style={{ color: "var(--ps-t4)", letterSpacing: "0.06em" }}>
+                        {group.logs.length} session{group.logs.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {group.logs.map((log) => (
+                        <WorkoutLogCard key={log.id} log={log} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {filteredLogs.length > 0 && (
             <button

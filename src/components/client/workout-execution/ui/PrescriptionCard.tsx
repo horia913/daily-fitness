@@ -3,33 +3,159 @@
 import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Badge } from "@/components/ui/badge";
 import type { SetType } from "@/types/workoutSetEntries";
 import { SetTypeBadge } from "./SetTypeBadge";
+
+/** Optional visual tone for a stat — used by Target effort (Hard/Max/etc.). */
+export type PrescriptionItemTone =
+  | "default"
+  | "effort-easy"
+  | "effort-medium"
+  | "effort-hard"
+  | "effort-max";
 
 export type PrescriptionItem = {
   label: string;
   value: string | number;
   unit?: string;
   icon: LucideIcon;
+  /** Visual tone (color of `value`). Default = white. */
+  tone?: PrescriptionItemTone;
+  /** Mark stat as semantic so layout can prioritise (e.g. Target effort). */
+  kind?: "default" | "target-effort";
 };
 
 export interface PrescriptionCardProps {
-  /** Single-exercise: that name. Multi-exercise: compound line e.g. "A + B + 2 more" (no actions on this row). */
   exerciseTitle: string;
   setType: SetType | string;
-  /** e.g. "SUPERSET · EXERCISE 1 OF 2" when block has multiple exercises. */
   multiExerciseHint?: string;
   prescriptionItems: PrescriptionItem[];
-  /** Applied to the prescription grid (e.g. `sm:grid-cols-3`). */
   prescriptionGridClassName?: string;
   coachNotes?: string;
   formCues?: string;
-  logSectionTitle?: string;
+  /** Right side of rx-log-head (set prev/next + “1 / 10”). */
+  logNavRight?: React.ReactNode;
   logSectionContent?: React.ReactNode;
-  /** Single-exercise blocks: progression + previous session inside the cyan card (below title). */
-  topAccessory?: React.ReactNode;
-  /** Video + alternatives inline with the title (single-exercise blocks; multi-exercise uses per-section headers). */
+  /** Last session + progression (inside card, mock rx-prev). */
+  lastSessionSlot?: React.ReactNode;
   titleActions?: React.ReactNode;
+  /** Neutral muscle / group pill (mock .tag.muscle). */
+  muscleGroupTag?: string | null;
+}
+
+function effortToneColorVar(
+  tone: PrescriptionItemTone | undefined,
+): string | null {
+  switch (tone) {
+    case "effort-easy":
+      return "var(--fc-effort-easy)";
+    case "effort-medium":
+      return "var(--fc-effort-medium)";
+    case "effort-hard":
+      return "var(--fc-effort-hard)";
+    case "effort-max":
+      return "var(--fc-effort-max)";
+    default:
+      return null;
+  }
+}
+
+function isTempoItem(item: PrescriptionItem): boolean {
+  return String(item.label).trim().toLowerCase().startsWith("tempo");
+}
+
+/** Sets / Reps / Rest (+ optional single target effort + tempos) — workout-exec-v6 target-grid Option B. */
+function canUseCompactTargetGrid(items: PrescriptionItem[]): boolean {
+  const sets = items.find((i) => i.label === "Sets");
+  const reps = items.find((i) => i.label === "Reps");
+  const rest = items.find(
+    (i) => i.label === "Rest" || i.label === "Rest between",
+  );
+  if (!sets || !reps || !rest) return false;
+  const targets = items.filter((i) => i.kind === "target-effort");
+  if (targets.length > 1) return false;
+  return items.every((it) => {
+    if (it.label === "Sets") return it === sets;
+    if (it.label === "Reps") return it === reps;
+    if (it.label === "Rest" || it.label === "Rest between") return it === rest;
+    if (it.kind === "target-effort") return targets.includes(it);
+    if (isTempoItem(it)) return true;
+    return false;
+  });
+}
+
+function PrescriptionStatCell({
+  item,
+  className,
+}: {
+  item: PrescriptionItem;
+  className?: string;
+}) {
+  const Icon = item.icon;
+  const tempoLike = isTempoItem(item);
+  const isTargetEffort = item.kind === "target-effort";
+  return (
+    <div className={cn("min-w-0", className)}>
+      <div className="mb-1 flex items-center gap-1.5">
+        <Icon
+          className="size-[11px] shrink-0 text-zinc-500"
+          aria-hidden
+        />
+        <Eyebrow
+          tone="zinc"
+          density="section"
+          className="!mb-0 !text-[9.5px] !font-bold !tracking-[0.1em] !text-zinc-500"
+        >
+          {item.label}
+        </Eyebrow>
+      </div>
+      <div
+        className={cn(
+          "text-[28px] font-bold leading-[0.9] tracking-[-0.02em] text-white",
+          tempoLike &&
+            "font-mono text-[22px] font-bold tracking-[0.06em]",
+          isTargetEffort &&
+            "text-[22px] font-semibold tracking-[-0.01em]",
+        )}
+        style={
+          isTargetEffort
+            ? {
+                fontFamily:
+                  "var(--font-bricolage-grotesque, var(--font-sans))",
+                color: effortToneColorVar(item.tone) ?? undefined,
+              }
+            : undefined
+        }
+      >
+        <span>{item.value}</span>
+        {item.unit ? (
+          <span
+            className="ml-0.5 text-[13px] font-medium text-zinc-400"
+            style={
+              isTargetEffort ? { color: "var(--fc-text-dim)" } : undefined
+            }
+          >
+            {item.unit}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RxDivider({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "h-px bg-[color:var(--fc-glass-border)] opacity-90",
+        "my-[18px] w-[calc(100%+40px)] -mx-5",
+        className,
+      )}
+      aria-hidden
+    />
+  );
 }
 
 export function PrescriptionCard({
@@ -40,12 +166,14 @@ export function PrescriptionCard({
   prescriptionGridClassName,
   coachNotes,
   formCues,
-  logSectionTitle,
+  logNavRight,
   logSectionContent,
-  topAccessory,
+  lastSessionSlot,
   titleActions,
+  muscleGroupTag,
 }: PrescriptionCardProps) {
   const hasRx = prescriptionItems.length > 0;
+  const useCompactGrid = canUseCompactTargetGrid(prescriptionItems);
   const hasLog =
     logSectionContent !== undefined &&
     logSectionContent !== null &&
@@ -54,126 +182,219 @@ export function PrescriptionCard({
   const hasFormCues = Boolean(formCues && formCues.trim().length > 0);
   const hasNotesRegion = hasCoachNotes || hasFormCues;
   const hasTitle = Boolean(exerciseTitle?.trim());
-  const hasTopAccessory = Boolean(topAccessory);
+  const hasLastSession = Boolean(lastSessionSlot);
 
   if (!hasTitle && !hasRx && !hasLog) return null;
 
-  const hasMiddleContent = hasRx || hasNotesRegion;
-  const showDividerBeforeLog = hasLog && hasMiddleContent;
+  const headEyebrowText = multiExerciseHint ?? "Exercise · Up now";
 
   return (
-    <div className="fc-card-shell p-4">
+    <div
+      className={cn(
+        "relative mx-4 mb-4 overflow-hidden rounded-[28px] border border-[color:var(--fc-glass-border)] px-5 pb-5 pt-[22px]",
+        "shadow-[0_30px_60px_-25px_rgba(0,0,0,0.5)]",
+        "bg-[linear-gradient(180deg,#112335_0%,#0E1F2E_100%)]",
+      )}
+      style={{
+        boxShadow:
+          "0 30px 60px -25px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
+        backgroundImage: `radial-gradient(ellipse 70% 40% at 50% 0%, rgba(127,232,154,0.04), transparent 70%), linear-gradient(180deg, #112335 0%, #0E1F2E 100%)`,
+      }}
+    >
+      <div
+        className="pointer-events-none absolute right-0 top-0 h-[200px] w-[200px] opacity-100"
+        style={{
+          backgroundImage: `repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 9px)`,
+        }}
+        aria-hidden
+      />
+
       {hasTitle ? (
-        <>
-          <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 break-words text-xl font-bold text-white">
+        <div className="relative mb-3.5 flex justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Eyebrow
+              tone="lime"
+              density="default"
+              className="!mb-2 !text-[10.5px] !font-bold !tracking-[0.14em]"
+            >
+              {headEyebrowText}
+            </Eyebrow>
+            <h2
+              className="mb-2.5 break-words text-[26px] font-bold leading-[1.05] tracking-[-0.025em] text-white"
+              style={{
+                fontFamily:
+                  "var(--font-bricolage-grotesque, var(--font-sans), ui-sans-serif)",
+              }}
+            >
               {exerciseTitle}
             </h2>
-            {titleActions ? (
-              <div className="flex shrink-0 items-center pt-0.5">
-                {titleActions}
-              </div>
-            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+              <SetTypeBadge setType={setType} />
+              {muscleGroupTag?.trim() ? (
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-300"
+                >
+                  {muscleGroupTag.trim()}
+                </Badge>
+              ) : null}
+            </div>
           </div>
-          <div className="mt-2">
-            <SetTypeBadge setType={setType} />
-          </div>
-          {multiExerciseHint ? (
-            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-              {multiExerciseHint}
-            </p>
+          {titleActions ? (
+            <div className="relative flex shrink-0 items-start pt-0.5">
+              {titleActions}
+            </div>
           ) : null}
-          {topAccessory ? (
-            <div className="mt-2 min-w-0">{topAccessory}</div>
-          ) : null}
-          {(hasRx || hasNotesRegion || hasLog || hasTopAccessory) ? (
-            <div className="my-3 h-px bg-cyan-500/28" aria-hidden />
-          ) : null}
+        </div>
+      ) : null}
+
+      {hasLastSession ? (
+        <>
+          <RxDivider />
+          <Eyebrow
+            tone="zinc"
+            density="section"
+            className="relative !mb-2.5 !text-[9.5px] !font-bold !tracking-[0.16em] !text-zinc-400"
+          >
+            Last session
+          </Eyebrow>
+          <div className="relative">{lastSessionSlot}</div>
         </>
       ) : null}
 
       {hasRx ? (
         <>
-          <div className="mb-3 text-xs uppercase tracking-wider text-cyan-300">
-            YOUR TARGET TODAY
-          </div>
+          <RxDivider />
+          <Eyebrow
+            tone="cyan"
+            density="section"
+            className="relative !mb-3 !text-[9.5px] !font-bold !tracking-[0.16em] !text-cyan-300/95"
+          >
+            Your target today
+          </Eyebrow>
           <div
             className={cn(
-              "grid grid-cols-2 gap-3",
+              "relative grid grid-cols-2 gap-x-6 gap-y-4",
               prescriptionGridClassName,
             )}
           >
-            {prescriptionItems.map((item, index) => {
-              const Icon = item.icon;
-              const key = `${item.label}-${index}`;
-              return (
-                <div key={key} className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <Icon
-                      className="size-[14px] shrink-0 text-cyan-400/95"
-                      aria-hidden
+            {useCompactGrid ? (
+              (() => {
+                const sets = prescriptionItems.find((i) => i.label === "Sets")!;
+                const reps = prescriptionItems.find((i) => i.label === "Reps")!;
+                const rest = prescriptionItems.find(
+                  (i) => i.label === "Rest" || i.label === "Rest between",
+                )!;
+                const target = prescriptionItems.find(
+                  (i) => i.kind === "target-effort",
+                );
+                const tempos = prescriptionItems.filter(isTempoItem);
+                const row2Right = target ?? tempos[0] ?? null;
+                const trailingTempos =
+                  target != null ? tempos : tempos.slice(1);
+                return (
+                  <>
+                    <PrescriptionStatCell key="rx-sets" item={sets} />
+                    <PrescriptionStatCell key="rx-reps" item={reps} />
+                    <PrescriptionStatCell
+                      key="rx-rest"
+                      item={rest}
+                      className={!row2Right ? "col-span-2" : undefined}
                     />
-                    <span className="text-xs text-gray-400">{item.label}</span>
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-baseline gap-1">
-                    <span className="text-xl font-bold text-white">
-                      {item.value}
-                    </span>
-                    {item.unit ? (
-                      <span className="text-xs text-gray-400">{item.unit}</span>
+                    {row2Right ? (
+                      <PrescriptionStatCell key="rx-row2-right" item={row2Right} />
                     ) : null}
-                  </div>
-                </div>
-              );
-            })}
+                    {trailingTempos.map((t, ti) => (
+                      <PrescriptionStatCell
+                        key={`rx-tempo-${ti}-${t.label}`}
+                        item={t}
+                        className="col-span-2"
+                      />
+                    ))}
+                  </>
+                );
+              })()
+            ) : (
+              prescriptionItems.map((item, index) => {
+                const tempoLike = isTempoItem(item);
+                return (
+                  <PrescriptionStatCell
+                    key={`${item.label}-${index}`}
+                    item={item}
+                    className={tempoLike ? "col-span-2" : undefined}
+                  />
+                );
+              })
+            )}
           </div>
         </>
       ) : null}
 
       {hasNotesRegion ? (
-        <div className={cn(hasRx && "mt-4")}>
-          <div className="mb-2 text-xs uppercase tracking-wider text-cyan-300">
-            COACH NOTES
-          </div>
-          <div className="rounded-r border-l-2 border-cyan-500/50 bg-cyan-500/10 py-2 pl-3">
+        <>
+          <RxDivider className="mt-5" />
+          <div className="relative rounded-r-[10px] border-l-2 border-cyan-400/80 bg-cyan-500/[0.05] py-2.5 pl-3.5 pr-3">
+            <Eyebrow
+              tone="cyan"
+              density="section"
+              className="!mb-1 !text-[9.5px] !font-bold !tracking-[0.16em] !text-cyan-300"
+            >
+              Coach notes
+            </Eyebrow>
             {hasCoachNotes ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-300">
+              <p className="whitespace-pre-line text-[13px] font-medium leading-relaxed text-zinc-100">
                 {coachNotes}
               </p>
             ) : null}
-
             {hasCoachNotes && hasFormCues ? (
-              <div className="my-2 h-px bg-cyan-500/28" aria-hidden />
+              <div className="my-2 h-px bg-cyan-500/25" aria-hidden />
             ) : null}
-
             {hasFormCues ? (
               <>
                 {hasCoachNotes ? (
-                  <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">
-                    FORM CUES
-                  </p>
+                  <Eyebrow
+                    tone="zinc"
+                    density="section"
+                    className="mb-1 !text-[10px] !text-zinc-500"
+                  >
+                    Form cues
+                  </Eyebrow>
                 ) : null}
-                <p className="whitespace-pre-line text-xs leading-relaxed text-gray-400">
+                <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-400">
                   {formCues}
                 </p>
               </>
             ) : null}
           </div>
-        </div>
-      ) : null}
-
-      {showDividerBeforeLog ? (
-        <div className="my-4 h-px bg-cyan-500/28" aria-hidden />
+        </>
       ) : null}
 
       {hasLog ? (
         <>
-          {logSectionTitle ? (
-            <div className="mb-3 text-xs uppercase tracking-wider text-cyan-300">
-              {logSectionTitle}
+          {hasRx || hasNotesRegion || hasLastSession ? <RxDivider /> : null}
+          <div
+            className="relative -mx-5 -mb-5 mt-[18px] rounded-b-[28px] border-t border-[color:var(--fc-glass-border)] px-5 pb-5 pt-[18px]"
+            style={{
+              background: `
+                radial-gradient(ellipse 80% 60% at 100% 100%, rgba(197,255,74,0.07), transparent 65%),
+                radial-gradient(ellipse 60% 50% at 0% 0%, rgba(127,232,154,0.05), transparent 65%)
+              `,
+            }}
+          >
+            <div className="mb-3.5 flex items-center justify-between gap-2">
+              <Eyebrow
+                tone="lime"
+                density="section"
+                className="!mb-0 !text-[9.5px] !font-bold !tracking-[0.16em] !text-[var(--fc-accent-lime)]"
+              >
+                Log set
+              </Eyebrow>
+              {logNavRight ? (
+                <div className="flex shrink-0 items-center">{logNavRight}</div>
+              ) : null}
             </div>
-          ) : null}
-          <div className="space-y-3">{logSectionContent}</div>
+            <div className="space-y-3">{logSectionContent}</div>
+          </div>
         </>
       ) : null}
     </div>

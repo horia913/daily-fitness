@@ -10,13 +10,17 @@ interface ProgressStep {
   description?: string
 }
 
-interface ProgressIndicatorProps {
+interface WizardStepIndicatorProps {
   steps: ProgressStep[]
   currentStep: number
   className?: string
 }
 
-export function ProgressIndicator({ steps, currentStep, className }: ProgressIndicatorProps) {
+export function WizardStepIndicator({
+  steps,
+  currentStep,
+  className,
+}: WizardStepIndicatorProps) {
   return (
     <div className={cn("w-full", className)}>
       <div className="flex items-center justify-between">
@@ -27,7 +31,7 @@ export function ProgressIndicator({ steps, currentStep, className }: ProgressInd
           const isUpcoming = stepNumber > currentStep
 
           return (
-            <div key={step.id} className="flex flex-col items-center flex-1">
+            <div key={step.id || `${step.title}-${index}`} className="flex flex-col items-center flex-1">
               {/* Step Circle */}
               <div className="relative">
                 <div

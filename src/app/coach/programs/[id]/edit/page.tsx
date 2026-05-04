@@ -7,10 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { CoachPageShell } from "@/components/coach-ui/CoachPageShell";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -35,25 +33,37 @@ import WorkoutTemplateService, {
 import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
-  Target,
   Layers,
   Plus,
   Copy,
-  Dumbbell,
+  X,
+  Check,
+  Sparkles,
+  LayoutGrid,
+  Info,
+  CalendarDays,
+  MoreHorizontal,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { useExerciseLibrary } from "@/hooks/useCoachData";
 import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
+import ProgramProgressionGrid from "@/components/coach/ProgramProgressionGrid";
 import ProgramVolumeCalculator from "@/components/coach/ProgramVolumeCalculator";
 import ProgressionSuggestionsModal from "@/components/coach/ProgressionSuggestionsModal";
 import { TrainingBlockService } from "@/lib/trainingBlockService";
-import { TrainingBlock } from "@/types/trainingBlock";
+import { TrainingBlock, TRAINING_BLOCK_GOALS, type TrainingBlockGoal } from "@/types/trainingBlock";
 import { TrainingBlockHeader } from "@/components/coach/programs/TrainingBlockHeader";
 import { TrainingBlockModal } from "@/components/coach/programs/TrainingBlockModal";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
+import { ProgramProgressionService } from "@/lib/programProgressionService";
+import {
+  sumTrainingBlockWeeksFromRows,
+  resolveProgramTotalDisplayWeeks,
+} from "@/lib/programDurationResolver";
+import type { ProgramProgressionGridRow as GridRow, ProgressionGridCellRef } from "@/hooks/useProgramProgressionGrid";
+import css from "@/components/coach/programs/programEditV1.module.css";
 
 /** program_day 1–7 = Mon–Sun (1 = Monday) */
 const PROGRAM_DAY_SHORT_LABELS = [
@@ -72,38 +82,19 @@ function programDayLabel(dayNum: number): string {
   return `Day ${dayNum}`;
 }
 
-function goalDotClassForGoal(goal?: string | null): string {
-  const g = (goal || "custom").toLowerCase();
-  const map: Record<string, string> = {
-    hypertrophy: "bg-cyan-400",
-    strength: "bg-amber-400",
-    power: "bg-orange-400",
-    accumulation: "bg-emerald-400",
-    conditioning: "bg-teal-400",
-    sport_specific: "bg-purple-400",
-    deload: "bg-gray-400",
-    peaking: "bg-purple-400",
-    general_fitness: "bg-emerald-400",
-    custom: "bg-gray-400",
-  };
-  return map[g] ?? "bg-gray-400";
-}
-
-function goalBarClassForGoal(goal?: string | null): string {
-  const g = (goal || "custom").toLowerCase();
-  const map: Record<string, string> = {
-    hypertrophy: "bg-cyan-400/60",
-    strength: "bg-amber-400/60",
-    power: "bg-orange-400/60",
-    accumulation: "bg-emerald-400/60",
-    conditioning: "bg-teal-400/60",
-    sport_specific: "bg-purple-400/60",
-    deload: "bg-gray-400/60",
-    peaking: "bg-purple-400/60",
-    general_fitness: "bg-emerald-400/60",
-    custom: "bg-gray-400/60",
-  };
-  return map[g] ?? "bg-gray-400/60";
+function coachDifficultyLabel(level: string): string {
+  switch (level) {
+    case "beginner":
+      return "Beginner";
+    case "intermediate":
+      return "Intermediate";
+    case "advanced":
+      return "Athlete";
+    case "athlete":
+      return "Elite";
+    default:
+      return level;
+  }
 }
 
 /** Match schedule rows to the active block using week ranges (program_schedule.training_block_id is not authoritative). */
@@ -133,144 +124,6 @@ interface Program {
   created_at: string;
   updated_at: string;
 }
-
-// Helper function to generate block-type-specific summary
-const getBlockSummary = (block: any): string => {
-  if (!block) return "";
-
-  const blockType = block.set_type || "";
-  const exercises = block.exercises || [];
-  const exerciseCount = exercises.length;
-
-  switch (blockType) {
-    case "straight_set": {
-      const sets = block.total_sets || 3;
-      const reps = block.reps_per_set || "10-12";
-      const rest = block.rest_seconds || 60;
-      // Get tempo and prescribed RPE (`rir` column) from first exercise if available
-      const firstExercise = exercises[0];
-      const tempo = firstExercise?.tempo;
-      const prescribedRpe = firstExercise?.rir;
-      let summary = `${sets} sets × ${reps} reps • ${rest}s rest`;
-      if (tempo) summary += ` • Tempo ${tempo}`;
-      if (prescribedRpe !== undefined && prescribedRpe !== null)
-        summary += ` • RPE ${prescribedRpe}`;
-      return summary;
-    }
-
-    case "superset":
-      return `Superset • ${exerciseCount} exercises • ${
-        block.total_sets || 3
-      } sets`;
-
-    case "giant_set":
-      return `Giant Set • ${exerciseCount} exercises • ${
-        block.total_sets || 3
-      } sets`;
-
-    case "pre_exhaust":
-      return `Pre-Exhaust • Isolation → Compound • ${
-        block.total_sets || 3
-      } sets`;
-
-    case "drop_set": {
-      // Aggregate drop sets from all exercises in the block
-      const allDropSets: any[] = [];
-      exercises.forEach((ex: any) => {
-        if (ex.drop_sets && Array.isArray(ex.drop_sets)) {
-          allDropSets.push(...ex.drop_sets);
-        }
-      });
-      // Also check block-level drop_sets if available
-      if (block.drop_sets && Array.isArray(block.drop_sets)) {
-        allDropSets.push(...block.drop_sets);
-      }
-      const uniqueDropCount = new Set(
-        allDropSets.map((ds: any) => ds.drop_order),
-      ).size;
-      return `${uniqueDropCount} drops • ${block.total_sets || 3} sets`;
-    }
-
-    case "cluster_set": {
-      // Get cluster set config from first exercise
-      const firstExercise = exercises.find(
-        (ex: any) => ex.cluster_sets && ex.cluster_sets.length > 0,
-      );
-      if (firstExercise?.cluster_sets?.[0]) {
-        const config = firstExercise.cluster_sets[0];
-        return `${config.clusters_per_set || 4} clusters × ${
-          config.reps_per_cluster || 3
-        } reps • ${config.intra_cluster_rest || 10}s intra-rest`;
-      }
-      // Fallback to block-level
-      if (block.cluster_sets?.[0]) {
-        const config = block.cluster_sets[0];
-        return `${config.clusters_per_set || 4} clusters × ${
-          config.reps_per_cluster || 3
-        } reps • ${config.intra_cluster_rest || 10}s intra-rest`;
-      }
-      return `Cluster Set • ${block.total_sets || 3} sets`;
-    }
-
-    case "rest_pause": {
-      // Get rest-pause config from first exercise
-      const firstExercise = exercises.find(
-        (ex: any) => ex.rest_pause_sets && ex.rest_pause_sets.length > 0,
-      );
-      if (firstExercise?.rest_pause_sets?.[0]) {
-        const config = firstExercise.rest_pause_sets[0];
-        return `Rest-Pause • ${
-          config.rest_pause_duration || 15
-        }s pauses • max ${config.max_rest_pauses || 3}`;
-      }
-      // Fallback to block-level
-      if (block.rest_pause_sets?.[0]) {
-        const config = block.rest_pause_sets[0];
-        return `Rest-Pause • ${
-          config.rest_pause_duration || 15
-        }s pauses • max ${config.max_rest_pauses || 3}`;
-      }
-      return `Rest-Pause • ${block.total_sets || 3} sets`;
-    }
-
-    case "tabata": {
-      const protocol = block.time_protocol;
-      const work =
-        protocol?.work_seconds || block.block_parameters?.work_seconds || 20;
-      const rest =
-        protocol?.rest_seconds || block.block_parameters?.rest_seconds || 10;
-      const rounds = protocol?.rounds || block.block_parameters?.rounds || 8;
-      return `Tabata • ${work}s/${rest}s • ${rounds} rounds`;
-    }
-
-    case "emom": {
-      const protocol = block.time_protocol;
-      const duration =
-        protocol?.total_duration_minutes ||
-        Math.floor((block.duration_seconds || 1200) / 60);
-      return `EMOM • ${duration} minutes`;
-    }
-
-    case "amrap": {
-      const protocol = block.time_protocol;
-      const duration =
-        protocol?.total_duration_minutes ||
-        Math.floor((block.duration_seconds || 900) / 60);
-      return `AMRAP • ${duration} minutes`;
-    }
-
-    case "for_time": {
-      const protocol = block.time_protocol;
-      const duration =
-        protocol?.total_duration_minutes ||
-        Math.floor((block.duration_seconds || 720) / 60);
-      return `For Time • ${duration} min cap`;
-    }
-
-    default:
-      return `${block.total_sets || 3} sets`;
-  }
-};
 
 function EditProgramContent() {
   const params = useParams();
@@ -315,6 +168,9 @@ function EditProgramContent() {
   const weekBlocksLoadSeq = useRef(0);
   const [selectedScheduleForProgression, setSelectedScheduleForProgression] =
     useState<ProgramSchedule | null>(null);
+  const [showPerWorkoutProgressionEditor, setShowPerWorkoutProgressionEditor] =
+    useState(false);
+  const [deepEditorDirty, setDeepEditorDirty] = useState(false);
   const [showProgressionSuggestions, setShowProgressionSuggestions] =
     useState(false);
   const [lastDeloadWeek, setLastDeloadWeek] = useState<number>(0);
@@ -346,6 +202,32 @@ function EditProgramContent() {
 
   // The absolute week number to use for DB reads/writes this render cycle
   const absoluteSelectedWeek = blockStartWeek + selectedWeek - 1;
+
+  const programDisplayWeeks = useMemo(
+    () =>
+      resolveProgramTotalDisplayWeeks({
+        sumTrainingBlockWeeks: sumTrainingBlockWeeksFromRows(trainingBlocks),
+        assignmentDurationWeeks: null,
+        assignmentTotalDays: null,
+      }),
+    [trainingBlocks],
+  );
+
+  const distinctTemplateCount = useMemo(() => {
+    const ids = new Set(
+      (schedule || [])
+        .map((s) => s.template_id)
+        .filter((id): id is string => Boolean(id) && id !== "rest"),
+    );
+    return ids.size;
+  }, [schedule]);
+
+  const [progressionReloadKey, setProgressionReloadKey] = useState(0);
+
+  const programDayToday = useMemo(() => {
+    const d = new Date().getDay();
+    return d === 0 ? 7 : d;
+  }, []);
 
   const scheduleKey = useCallback(
     (week: number, day: number, blockId: string | null) =>
@@ -391,6 +273,35 @@ function EditProgramContent() {
         .join(","),
     [schedule],
   );
+
+  const templatesForVolumeCalculator = useMemo(() => {
+    const byId = new Map(templates.map((t) => [t.id, t]));
+    const scheduleTemplateIds = [
+      ...new Set(
+        (schedule || [])
+          .map((s) => s.template_id)
+          .filter((id): id is string => Boolean(id) && id !== "rest"),
+      ),
+    ];
+
+    return scheduleTemplateIds.map((templateId) => {
+      const base = byId.get(templateId);
+      const scheduleRow = schedule.find((s) => s.template_id === templateId);
+      return {
+        id: templateId,
+        name: base?.name || scheduleRow?.template_name || "Template",
+        category: (base?.category as string | null | undefined) ?? "",
+        difficulty_level:
+          (base?.difficulty_level as string | undefined) ??
+          form?.difficulty_level ??
+          "beginner",
+        blocks:
+          volumeTemplateBlocks[templateId] ??
+          templateBlocks[templateId] ??
+          [],
+      };
+    });
+  }, [templates, schedule, volumeTemplateBlocks, templateBlocks, form?.difficulty_level]);
 
   useEffect(() => {
     setVolumeTemplateBlocks({});
@@ -727,11 +638,18 @@ function EditProgramContent() {
   const handleDayTemplateChange = async (day: number, v: string) => {
     if (!form?.id) return;
     if (v === "rest") {
-      await WorkoutTemplateService.removeProgramSchedule(
-        form.id,
-        day,
-        absoluteSelectedWeek,
-      );
+      try {
+        await WorkoutTemplateService.removeProgramSchedule(
+          form.id,
+          day,
+          absoluteSelectedWeek,
+        );
+      } catch (e: unknown) {
+        const msg =
+          e instanceof Error ? e.message : "Failed to remove schedule cell.";
+        addToast({ title: msg, variant: "destructive" });
+        return;
+      }
       setSchedule((prev) =>
         prev.filter(
           (s) =>
@@ -797,11 +715,19 @@ function EditProgramContent() {
     setScheduleCellSaving(true);
     try {
       if (scheduleEditor.templateId === "rest") {
-        await WorkoutTemplateService.removeProgramSchedule(
-          form.id,
-          scheduleEditor.day,
-          scheduleEditor.week,
-        );
+        try {
+          await WorkoutTemplateService.removeProgramSchedule(
+            form.id,
+            scheduleEditor.day,
+            scheduleEditor.week,
+          );
+        } catch (e: unknown) {
+          const msg =
+            e instanceof Error ? e.message : "Failed to remove schedule cell.";
+          addToast({ title: msg, variant: "destructive" });
+          setScheduleCellSaving(false);
+          return;
+        }
         setSchedule((prev) =>
           prev.filter(
             (row) =>
@@ -845,27 +771,185 @@ function EditProgramContent() {
     }
   }, [form?.id, scheduleEditor, addToast, trainingBlocks]);
 
-  const handleCopyFromWeekOne = useCallback(async () => {
-    if (!form?.id) return;
-    const { error: copyError } = await supabase.rpc("copy_week_schedule", {
-      p_program_id: form.id,
-      p_source_week: 1,
-      p_total_weeks: form.duration_weeks,
-    });
-    if (copyError) {
-      addToast({
-        title: `Could not copy week 1 to other weeks: ${copyError.message}`,
-        variant: "destructive",
+  const handleCopyWeekAcrossActiveBlock = useCallback(
+    async (absoluteSourceWeek: number) => {
+      if (!form?.id || !activeBlock) return;
+      const idx = trainingBlocks.findIndex((b) => b.id === activeBlock.id);
+      if (idx < 0) return;
+      let blockStart = 1;
+      for (let i = 0; i < idx; i++) blockStart += trainingBlocks[i].duration_weeks;
+      const { error: copyError } = await supabase.rpc("copy_week_schedule", {
+        p_program_id: form.id,
+        p_source_week: absoluteSourceWeek,
+        p_total_weeks: activeBlock.duration_weeks,
+        p_block_start_week: blockStart,
+        p_training_block_id: activeBlock.id,
       });
+      if (copyError) {
+        addToast({
+          title: `Could not copy week: ${copyError.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      try {
+        await WorkoutTemplateService.propagateAllScheduleSlotsToSnapshots(form.id);
+      } catch (e: unknown) {
+        const msg =
+          e instanceof Error ? e.message : "Propagation failed after copy.";
+        addToast({ title: msg, variant: "destructive" });
+        return;
+      }
+      const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
+      setSchedule(sched || []);
+      addToast({ title: "Week copied across the other weeks in this block." });
+    },
+    [form?.id, activeBlock, trainingBlocks, addToast],
+  );
+
+  /** Header “Copy week”: use first week of the active block as the source pattern. */
+  const handleCopyFromWeekOne = useCallback(async () => {
+    if (!activeBlock) return;
+    const idx = trainingBlocks.findIndex((b) => b.id === activeBlock.id);
+    if (idx < 0) return;
+    let blockStart = 1;
+    for (let i = 0; i < idx; i++) blockStart += trainingBlocks[i].duration_weeks;
+    await handleCopyWeekAcrossActiveBlock(blockStart);
+  }, [activeBlock, trainingBlocks, handleCopyWeekAcrossActiveBlock]);
+
+  const handleDuplicateBlock = useCallback(
+    async (block: TrainingBlock) => {
+      if (!form?.id) return;
+      try {
+        await TrainingBlockService.createTrainingBlock({
+          program_id: form.id,
+          name: `${block.name} (copy)`,
+          goal: block.goal,
+          custom_goal_label: block.custom_goal_label ?? null,
+          duration_weeks: block.duration_weeks,
+          progression_profile: block.progression_profile ?? "none",
+          notes: block.notes ?? null,
+        });
+        const blocks = await refreshBlocks();
+        const created = [...blocks].sort(
+          (a, b) => (a.block_order || 0) - (b.block_order || 0),
+        )[blocks.length - 1];
+        if (created) setActiveBlockId(created.id);
+        addToast({ title: "Block duplicated." });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Could not duplicate block.";
+        addToast({ title: msg, variant: "destructive" });
+      }
+    },
+    [form?.id, addToast],
+  );
+
+  const handleSkipProgression = useCallback(async () => {
+    if (!form?.id || !activeBlockId) return;
+    const idx = trainingBlocks.findIndex((b) => b.id === activeBlockId);
+    if (idx < 0) return;
+    let blockStart = 1;
+    for (let i = 0; i < idx; i++) blockStart += trainingBlocks[i].duration_weeks;
+    const blockEnd = blockStart + (trainingBlocks[idx].duration_weeks || 0) - 1;
+    const scheduleIds = schedule
+      .filter((s) => {
+        const w = s.week_number || 1;
+        return (
+          w >= blockStart &&
+          w <= blockEnd &&
+          Boolean(s.template_id) &&
+          s.template_id !== "rest" &&
+          scheduleRowMatchesActiveBlock(s, activeBlockId, trainingBlocks)
+        );
+      })
+      .map((s) => s.id)
+      .filter(Boolean) as string[];
+    if (scheduleIds.length === 0) {
+      addToast({ title: "No scheduled workouts in this block to clear." });
       return;
     }
-    await WorkoutTemplateService.propagateAllScheduleSlotsToSnapshots(form.id);
-    const sched = await WorkoutTemplateService.getProgramSchedule(form.id);
-    setSchedule(sched || []);
-    addToast({
-      title: "Copied week 1 schedule across all weeks.",
-    });
-  }, [form?.id, form?.duration_weeks, addToast]);
+    if (
+      !window.confirm(
+        "Clear all progression rules for scheduled workouts in this training block?",
+      )
+    ) {
+      return;
+    }
+    const ok = await ProgramProgressionService.deleteProgressionRulesForSchedules(scheduleIds);
+    if (!ok) {
+      addToast({ title: "Could not clear progression.", variant: "destructive" });
+      return;
+    }
+    setProgressionReloadKey((k) => k + 1);
+    addToast({ title: "Progression cleared for this block." });
+  }, [form?.id, activeBlockId, trainingBlocks, schedule, addToast]);
+
+  const openPerWorkoutEditorForWeekDay = useCallback(
+    (absoluteWeek: number, programDay: number) => {
+      const block = TrainingBlockService.getBlockForWeekFromBlocks(
+        trainingBlocks,
+        absoluteWeek,
+      );
+      if (block?.id) setActiveBlockId(block.id);
+
+      let relativeWeek = absoluteWeek;
+      if (block?.id) {
+        let priorWeeks = 0;
+        for (const b of trainingBlocks) {
+          if (b.id === block.id) break;
+          priorWeeks += b.duration_weeks;
+        }
+        relativeWeek = Math.max(1, absoluteWeek - priorWeeks);
+      }
+      setSelectedWeek(relativeWeek);
+
+      const scheduleItem = schedule.find(
+        (s) =>
+          (s.week_number || 1) === absoluteWeek && s.program_day === programDay,
+      );
+      setSelectedScheduleForProgression(scheduleItem || null);
+      setShowPerWorkoutProgressionEditor(true);
+    },
+    [schedule, trainingBlocks],
+  );
+
+  const handleConfigureGridRow = useCallback(
+    (row: GridRow) => {
+      const week = row.defaultWeek || 1;
+      openPerWorkoutEditorForWeekDay(week, row.day);
+    },
+    [openPerWorkoutEditorForWeekDay],
+  );
+
+  const handleOpenGridCellFullEditor = useCallback(
+    (cell: ProgressionGridCellRef) => {
+      openPerWorkoutEditorForWeekDay(cell.weekNumber, cell.day);
+    },
+    [openPerWorkoutEditorForWeekDay],
+  );
+
+  const requestClosePerWorkoutEditor = useCallback(() => {
+    if (deepEditorDirty) {
+      const ok = window.confirm(
+        "You have unsaved progression changes. Close without saving?",
+      );
+      if (!ok) return;
+    }
+    setShowPerWorkoutProgressionEditor(false);
+    setDeepEditorDirty(false);
+  }, [deepEditorDirty]);
+
+  useEffect(() => {
+    if (!showPerWorkoutProgressionEditor) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        requestClosePerWorkoutEditor();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showPerWorkoutProgressionEditor, requestClosePerWorkoutEditor]);
 
   if (loading || !form) {
     return (
@@ -880,46 +964,77 @@ function EditProgramContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6">
-        <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-accent)] flex items-center justify-center flex-shrink-0">
-                <Dumbbell className="h-5 w-5 sm:h-6 sm:w-6" />
+      <CoachPageShell
+        widthVariant="data-7xl"
+        className={cn("p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6", css.wrap)}
+      >
+        <div className={cn(css.hero, css.heroGlowCyan)}>
+          <div className="relative z-[1] flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={css.eyebrow}>Editing program</span>
+                {form.is_active ? (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{
+                      fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                      background: "rgba(52,211,153,0.12)",
+                      color: "#34D399",
+                    }}
+                  >
+                    Active
+                  </span>
+                ) : (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{
+                      fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                      background: "rgba(245,194,66,0.12)",
+                      color: "#F5C242",
+                    }}
+                  >
+                    Draft
+                  </span>
+                )}
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                    Edit program
-                  </h1>
-                  {form.is_active ? (
-                    <Badge className="fc-badge bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)] border-[color:var(--fc-status-success)]/30">
-                      Active
-                    </Badge>
-                  ) : (
-                    <Badge className="fc-badge bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-dim)] border-[color:var(--fc-glass-border)]">
-                      Draft
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1 truncate">
-                  {form.name}
-                </p>
-              </div>
+              <h1 className={cn(css.heroTitle, "truncate")}>{form.name}</h1>
+              <p
+                className="text-xs text-[var(--pe-t3)]"
+                style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+              >
+                {form.category || "—"} · {programDisplayWeeks} weeks ·{" "}
+                {coachDifficultyLabel(form.difficulty_level)} level
+              </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="fc-btn fc-btn-ghost shrink-0 self-start sm:self-auto"
+            <button
+              type="button"
               onClick={() => router.push("/coach/programs")}
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--pe-line)] px-3 text-[11px] font-medium text-[var(--pe-t2)] hover:text-[var(--pe-t1)] hover:bg-white/[0.04] transition-colors"
+              style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
             >
-              <ArrowLeft className="w-4 h-4 mr-1" />
+              <ArrowLeft className="w-3.5 h-3.5" />
               Back
-            </Button>
+            </button>
           </div>
-        </GlassCard>
+          <div
+            className="relative z-[1] mt-4 grid grid-cols-3 gap-2 border-t border-[var(--pe-line)] pt-4"
+            style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+          >
+            <div className="text-center sm:text-left">
+              <div className={cn(css.statNum, "text-[var(--pe-cyan)]")}>{trainingBlocks.length}</div>
+              <div className={css.statLbl}>Blocks</div>
+            </div>
+            <div className="text-center sm:text-left">
+              <div className={cn(css.statNum, "text-[var(--pe-t1)]")}>{programDisplayWeeks}</div>
+              <div className={css.statLbl}>Weeks</div>
+            </div>
+            <div className="text-center sm:text-left">
+              <div className={cn(css.statNum, "text-[#C5FF4A]")}>{distinctTemplateCount}</div>
+              <div className={css.statLbl}>Templates</div>
+            </div>
+          </div>
+        </div>
 
-        {/* Training Block Header — goal/duration for single block, timeline for multi */}
         {trainingBlocks.length > 0 && (
           <TrainingBlockHeader
             trainingBlocks={trainingBlocks}
@@ -940,109 +1055,120 @@ function EditProgramContent() {
             onDeleteBlock={handleDeleteBlockFromHeader}
             onUpdateBlock={handleUpdateBlock}
             onMoveBlock={handleMoveBlock}
+            onDuplicateBlock={handleDuplicateBlock}
           />
         )}
 
-        <div className="border-b border-[color:var(--fc-glass-border)] -mx-3 sm:mx-0 px-3 sm:px-0">
-          <nav
-            className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-            role="tablist"
-            aria-label="Program sections"
-          >
-            {[
-              { id: "basic" as const, label: "Info" },
-              { id: "schedule" as const, label: "Schedule" },
-              { id: "progression" as const, label: "Progression" },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "bg-transparent border-none cursor-pointer",
-                    "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 min-h-[44px] rounded-t-xl",
-                    "border-b-2 -mb-[1px]",
-                    isActive
-                      ? "text-[color:var(--fc-accent)] border-[color:var(--fc-accent)]"
-                      : "text-[color:var(--fc-text-dim)] border-transparent hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)]",
-                  )}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+        <div className={css.subTabs} role="tablist" aria-label="Program sections">
+          {(
+            [
+              { id: "basic" as const, label: "Info", Icon: Info },
+              { id: "schedule" as const, label: "Schedule", Icon: CalendarDays },
+              { id: "progression" as const, label: "Progression", Icon: Layers },
+            ] as const
+          ).map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.Icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                disabled={false}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(css.subTab, isActive && css.subTabActive)}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
           {/* Tab Content */}
           {activeTab === "basic" && (
             <div role="tabpanel" className="space-y-4">
-              <GlassCard elevation={1} className="fc-card-shell p-4 sm:p-6 space-y-4">
-                {/* Program Name */}
+              <div className={css.formCard}>
+                <p
+                  className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--pe-t3)]"
+                  style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                >
+                  Block details
+                </p>
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
-                    Program name *
+                  <label
+                    className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pe-t3)]"
+                    style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                  >
+                    Program name <span className="text-[#FF5A5F]">*</span>
                   </label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="h-9 text-sm"
+                    className="h-10 border border-[var(--pe-line)] bg-[var(--pe-card-2)] text-[12.5px] text-[var(--pe-t1)] placeholder:text-[var(--pe-t4)] rounded-[10px] px-[11px] focus-visible:border-[var(--pe-cyan)] focus-visible:ring-[3px] focus-visible:ring-[rgba(79,227,232,0.12)]"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                   />
                 </div>
-
-                {/* Description */}
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
+                  <label
+                    className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pe-t3)]"
+                    style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                  >
                     Description
                   </label>
                   <Textarea
                     value={form.description || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    rows={4}
-                    className="text-sm resize-none"
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={3}
+                    placeholder="Optional — describe goals and structure"
+                    className="min-h-[64px] resize-none border border-[var(--pe-line)] bg-[var(--pe-card-2)] text-[12.5px] text-[var(--pe-t1)] placeholder:italic placeholder:text-[var(--pe-t4)] rounded-[10px] px-[11px] py-2 focus-visible:border-[var(--pe-cyan)] focus-visible:ring-[3px] focus-visible:ring-[rgba(79,227,232,0.12)]"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                   />
                 </div>
-
-                {/* Difficulty & Duration */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
+                    <label
+                      className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pe-t3)]"
+                      style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                    >
                       Difficulty
                     </label>
                     <Select
                       value={form.difficulty_level}
-                      onValueChange={(v) =>
-                        setForm({ ...form, difficulty_level: v as any })
-                      }
+                      onValueChange={(v) => setForm({ ...form, difficulty_level: v as any })}
                     >
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-10 border-[var(--pe-line)] bg-[var(--pe-card-2)] text-[12.5px] text-[var(--pe-t1)] rounded-[10px] focus:ring-[3px] focus:ring-[rgba(79,227,232,0.12)]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="beginner">Beginner</SelectItem>
                         <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                        <SelectItem value="athlete">Athlete</SelectItem>
+                        <SelectItem value="advanced">Athlete</SelectItem>
+                        <SelectItem value="athlete">Elite</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
-                      Duration (weeks)
+                    <label
+                      className="mb-1.5 flex flex-wrap items-baseline gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pe-t3)]"
+                      style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                    >
+                      Duration
+                      <span
+                        className="normal-case font-normal text-[var(--pe-t4)]"
+                        style={{ letterSpacing: "0.06em" }}
+                      >
+                        weeks
+                      </span>
                     </label>
                     {trainingBlocks.length > 1 ? (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)] min-h-9">
-                        <Layers className="w-4 h-4 flex-shrink-0 text-[color:var(--fc-text-dim)] opacity-60" />
+                      <div className="flex min-h-10 items-center gap-2 rounded-[10px] border border-[var(--pe-line)] bg-[var(--pe-card-2)] px-3 py-2 text-[12.5px] text-[var(--pe-t3)]">
+                        <Layers className="h-4 w-4 shrink-0 opacity-60" />
                         <span>
                           {trainingBlocks.reduce((sum, b) => sum + b.duration_weeks, 0)} weeks
-                          <span className="ml-1.5 text-xs text-[color:var(--fc-text-dim)] opacity-70">
-                            (across {trainingBlocks.length} block{trainingBlocks.length !== 1 ? "s" : ""} — edit each block to adjust)
+                          <span className="ml-1.5 text-[11px] opacity-80">
+                            (across {trainingBlocks.length} block{trainingBlocks.length !== 1 ? "s" : ""})
                           </span>
                         </span>
                       </div>
@@ -1058,46 +1184,37 @@ function EditProgramContent() {
                             duration_weeks: parseInt(e.target.value || "1", 10),
                           })
                         }
-                        className="h-9 text-sm"
+                        className="h-10 border border-[var(--pe-line)] bg-[var(--pe-card-2)] text-[12.5px] text-[var(--pe-t1)] rounded-[10px] px-[11px] focus-visible:border-[var(--pe-cyan)] focus-visible:ring-[3px] focus-visible:ring-[rgba(79,227,232,0.12)]"
                       />
                     )}
                   </div>
                 </div>
-
-                {/* Category */}
                 <div>
-                  <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)] block mb-1.5">
+                  <label
+                    className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pe-t3)]"
+                    style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                  >
                     Category{" "}
-                    <span className="normal-case text-[color:var(--fc-text-dim)] font-normal opacity-70">
-                      (optional)
-                    </span>
+                    <span className="normal-case font-normal text-[var(--pe-t4)]">(optional)</span>
                   </label>
                   <Select
                     value={categoryId || "none"}
                     onValueChange={(v) => {
                       if (v === "none") {
                         setCategoryId("");
-                        setForm({
-                          ...form,
-                          category: null,
-                        });
+                        setForm({ ...form, category: null });
                       } else {
                         setCategoryId(v);
                         const selectedCat = categories.find((c) => c.id === v);
-                        setForm({
-                          ...form,
-                          category: selectedCat?.name || null,
-                        });
+                        setForm({ ...form, category: selectedCat?.name || null });
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className="h-10 border-[var(--pe-line)] bg-[var(--pe-card-2)] text-[12.5px] text-[var(--pe-t1)] rounded-[10px]">
                       <SelectValue placeholder="Select category (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">
-                        None (No progression guidelines)
-                      </SelectItem>
+                      <SelectItem value="none">None (No progression guidelines)</SelectItem>
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.name}
@@ -1105,196 +1222,295 @@ function EditProgramContent() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {categories.length === 0 && (
-                    <p className="text-xs fc-text-dim mt-1">
-                      No categories available. Create categories in the
-                      Categories section.
+                  {categories.length === 0 ? (
+                    <p className="mt-1 text-xs text-[var(--pe-t3)]">
+                      No categories available. Create categories in the Categories section.
                     </p>
-                  )}
+                  ) : null}
                 </div>
-
-                {/* Active Toggle */}
-                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-[color:var(--fc-glass-border)] pt-2">
+                <div
+                  className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5"
+                  style={{ borderColor: "var(--pe-line-2)", background: "var(--pe-card-2)" }}
+                >
                   <div className="min-w-0">
-                    <span className="block text-sm font-medium text-[color:var(--fc-text-primary)]">
+                    <span
+                      className="block text-[12.5px] font-semibold text-[var(--pe-t1)]"
+                      style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                    >
                       Active
                     </span>
-                    <p className="mt-0.5 text-xs text-[color:var(--fc-text-dim)]">
-                      Visible to clients and available for assignment.
+                    <p
+                      className="mt-0.5 text-[11px] text-[var(--pe-t3)]"
+                      style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                    >
+                      Visible to clients · available for assignment
                     </p>
                   </div>
                   <Switch
                     checked={form.is_active}
-                    onCheckedChange={(checked) =>
-                      setForm({ ...form, is_active: checked })
-                    }
-                    className="shrink-0"
+                    onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+                    className="shrink-0 data-[state=checked]:bg-[#4FE3E8] data-[state=unchecked]:bg-white/10"
                   />
-                </label>
-              </GlassCard>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    router.push(`/coach/programs/${form.id}`)
-                  }
-                  className="fc-btn fc-btn-ghost"
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/coach/programs/${form.id}`)}
+                  className="h-10 rounded-lg px-4 text-[12.5px] font-semibold text-[var(--pe-t2)] hover:text-[var(--pe-t1)] transition-colors"
+                  style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                 >
                   Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={onSave}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onSave()}
                   disabled={saving || !form.name.trim()}
-                  className="fc-btn fc-btn-primary"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[12.5px] font-semibold text-[#0a1a18] disabled:opacity-50 transition-opacity"
+                  style={{
+                    fontFamily: "var(--font-geist-sans, Geist, sans-serif)",
+                    background: "linear-gradient(90deg, #C5FF4A, #7FE89A)",
+                  }}
                 >
+                  <Check className="h-4 w-4" />
                   {saving ? "Saving..." : "Save"}
-                </Button>
+                </button>
               </div>
             </div>
           )}
 
           {activeTab === "schedule" && (
             <div role="tabpanel" className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">
-                    Week-at-a-glance schedule
+                  <h2
+                    className="text-sm font-bold text-[var(--pe-t1)] sm:text-base"
+                    style={{ fontFamily: "var(--f-headline, Bricolage Grotesque, sans-serif)" }}
+                  >
+                    Week-at-a-glance
                   </h2>
-                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
-                    Click any cell to assign a template, mark optional, or rest.
+                  <p
+                    className="mt-0.5 text-[11px] text-[var(--pe-t3)]"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                  >
+                    Tap a day to assign a workout, mark optional, or rest.
                   </p>
                 </div>
-                <Button
+                <button
                   type="button"
-                  size="sm"
-                  className="fc-btn fc-btn-secondary shrink-0"
                   onClick={() => void handleCopyFromWeekOne()}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-lg border border-[var(--pe-line)] px-3 text-[11px] font-semibold text-[var(--pe-t2)] hover:bg-white/[0.04] hover:text-[var(--pe-t1)] transition-colors"
+                  style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                 >
-                  <Copy className="w-3.5 h-3.5 mr-1" />
-                  Copy from week 1
-                </Button>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy week
+                </button>
               </div>
 
-              <div>
+              {activeBlock ? (
+                <div
+                  className="flex items-center gap-2 rounded-[10px] border px-3 py-2"
+                  style={{
+                    borderColor: "rgba(79,227,232,0.18)",
+                    background: "rgba(79,227,232,0.12)",
+                  }}
+                >
+                  <Layers className="w-3.5 h-3.5 shrink-0 text-[var(--pe-cyan)]" />
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-cyan)]"
+                    style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                  >
+                    Block {trainingBlocks.findIndex((b) => b.id === activeBlock.id) + 1} ·{" "}
+                    {TRAINING_BLOCK_GOALS[(activeBlock.goal || "custom") as TrainingBlockGoal] ??
+                      activeBlock.goal}{" "}
+                    · Wks {blockStartWeek}–{blockStartWeek + activeBlock.duration_weeks - 1}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="space-y-3">
                 {(() => {
-                  const effectiveBlocks =
-                    trainingBlocks.length > 0
-                      ? trainingBlocks
-                      : [
-                          {
-                            id: "__fallback__",
-                            block_order: 1,
-                            duration_weeks: form.duration_weeks,
-                            goal: "custom",
-                            name: "Block 1",
-                          } as unknown as TrainingBlock,
-                        ];
-
-                  let globalWeekCursor = 1;
-                  return (
-                    <div className="space-y-4">
-                      {effectiveBlocks.map((block, idx) => {
-                        const blockStart = globalWeekCursor;
-                        const blockEnd = blockStart + block.duration_weeks - 1;
-                        globalWeekCursor = blockEnd + 1;
-
-                        const blockRows = Array.from(
-                          { length: block.duration_weeks },
-                          (_, i) => blockStart + i,
-                        );
-
-                        return (
-                          <section key={`${block.id}-${blockStart}`} className="space-y-2">
-                            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
-                              Block {idx + 1} · {(block.goal || "custom").replace(/_/g, " ")} (Weeks {blockStart}-{blockEnd})
-                            </h3>
-
-                            <div className="overflow-x-auto rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]">
-                              <div className="min-w-[860px] p-2">
-                                <div className="grid grid-cols-[110px_repeat(7,minmax(110px,1fr))] gap-2 text-[10px] uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-                                  <div className="sticky left-0 z-20 rounded-md bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
-                                    Week
-                                  </div>
-                                  {PROGRAM_DAY_SHORT_LABELS.map((d) => (
-                                    <div key={d} className="rounded-md px-2 py-2 text-center">
-                                      {d}
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {blockRows.map((absoluteWeek) => (
-                                  <React.Fragment key={`${block.id}-week-${absoluteWeek}`}>
-                                    <div className="sticky left-0 z-10 flex items-center gap-2 rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg)]/90 px-2 py-2 backdrop-blur-sm">
-                                      <span className={cn("h-5 w-1 rounded-full", goalBarClassForGoal(block.goal))} />
-                                      <span className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
-                                        Week {absoluteWeek}
-                                      </span>
-                                    </div>
-
-                                    {Array.from({ length: 7 }, (_, i) => i + 1).map((dayNum) => {
-                                      const cell = scheduleMap.get(
-                                        scheduleKey(absoluteWeek, dayNum, block.id === "__fallback__" ? null : block.id),
-                                      );
-                                      const template = cell
-                                        ? templates.find((t) => t.id === cell.template_id)
-                                        : null;
-                                      const weekHasConfig = weeksWithAnyConfiguredRows.has(absoluteWeek);
-                                      const isEmpty = !cell && !weekHasConfig;
-                                      const isRest = !cell && weekHasConfig;
-                                      return (
-                                        <button
-                                          key={`${absoluteWeek}-${dayNum}`}
-                                          type="button"
-                                          onClick={() =>
-                                            openScheduleEditor(
-                                              absoluteWeek,
-                                              dayNum,
-                                              block.id === "__fallback__" ? null : block.id,
-                                            )
-                                          }
-                                          className={cn(
-                                            "group min-h-[72px] rounded-lg border p-2 text-left transition-colors",
-                                            "hover:border-[color:var(--fc-accent)]/40 hover:bg-[color:var(--fc-accent)]/5",
-                                            isEmpty
-                                              ? "border-dashed border-[color:var(--fc-glass-border)] bg-transparent"
-                                              : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]",
-                                          )}
-                                        >
-                                          {isEmpty ? (
-                                            <div className="h-full flex items-center justify-center text-[color:var(--fc-text-dim)] opacity-60">
-                                              <Plus className="w-4 h-4" />
-                                            </div>
-                                          ) : (
-                                            <div className="space-y-1">
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className={cn("inline-block w-2 h-2 rounded-full", goalDotClassForGoal(block.goal))} />
-                                                {cell?.is_optional ? (
-                                                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--fc-accent)]/20 text-[color:var(--fc-accent)]">
-                                                    Opt
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                              <p className="text-xs font-semibold text-[color:var(--fc-text-primary)] truncate">
-                                                {template?.name || (isRest ? "Rest" : "Optional")}
-                                              </p>
-                                            </div>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </React.Fragment>
-                                ))}
-                              </div>
-                            </div>
-                          </section>
-                        );
-                      })}
-                    </div>
+                  const block =
+                    activeBlock ??
+                    (trainingBlocks[0] as TrainingBlock | undefined) ??
+                    ({
+                      id: "__fallback__",
+                      block_order: 1,
+                      duration_weeks: form.duration_weeks,
+                      goal: "custom",
+                      name: "Block 1",
+                    } as unknown as TrainingBlock);
+                  const bIdx = Math.max(
+                    0,
+                    trainingBlocks.findIndex((x) => x.id === block.id),
                   );
+                  let bStart = 1;
+                  for (let i = 0; i < bIdx; i++) bStart += trainingBlocks[i]?.duration_weeks ?? 0;
+                  const blockRows = Array.from(
+                    { length: block.duration_weeks },
+                    (_, i) => bStart + i,
+                  );
+                  const blockIdForKey = block.id === "__fallback__" ? null : block.id;
+
+                  return blockRows.map((absoluteWeek) => {
+                    const rel = absoluteWeek - bStart + 1;
+                    let wkWorkouts = 0;
+                    let wkRest = 0;
+                    let wkEmpty = 0;
+                    for (let dayNum = 1; dayNum <= 7; dayNum++) {
+                      const cell = scheduleMap.get(
+                        scheduleKey(absoluteWeek, dayNum, blockIdForKey),
+                      );
+                      const weekHasConfig = weeksWithAnyConfiguredRows.has(absoluteWeek);
+                      if (cell?.template_id && cell.template_id !== "rest") wkWorkouts += 1;
+                      else if (cell?.template_id === "rest" || (!cell && weekHasConfig)) wkRest += 1;
+                      else wkEmpty += 1;
+                    }
+                    const complete = wkEmpty === 0 && wkWorkouts + wkRest === 7;
+                    const partial = !complete && wkWorkouts + wkRest > 0;
+                    const emptyWeek = wkWorkouts === 0 && wkRest === 0;
+                    const cardBg = emptyWeek ? "var(--pe-card-2)" : "var(--pe-card)";
+                    const borderStyle = emptyWeek ? "dashed" : "solid";
+
+                    return (
+                      <div
+                        key={`wk-${absoluteWeek}`}
+                        className="rounded-2xl border p-3 space-y-2.5"
+                        style={{
+                          borderColor: "rgba(255,255,255,0.08)",
+                          borderStyle,
+                          background: cardBg,
+                          boxShadow: complete ? "inset 3px 0 0 #34D399" : partial ? "inset 3px 0 0 #4FE3E8" : "inset 3px 0 0 rgba(255,255,255,0.2)",
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p
+                              className="text-sm font-bold text-[var(--pe-t1)]"
+                              style={{ fontFamily: "var(--f-headline, Bricolage Grotesque, sans-serif)" }}
+                            >
+                              Week {rel}
+                            </p>
+                            {emptyWeek ? (
+                              <span
+                                className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--pe-t4)]"
+                                style={{ background: "rgba(255,255,255,0.05)" }}
+                              >
+                                Empty
+                              </span>
+                            ) : (
+                              <span
+                                className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                                style={{
+                                  fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                                  background: "rgba(52,211,153,0.12)",
+                                  color: "#34D399",
+                                }}
+                              >
+                                {wkWorkouts} workouts · {wkRest} rest
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--pe-t3)] hover:bg-white/[0.06] hover:text-[var(--pe-t1)] transition-colors"
+                              aria-label="Copy this week across block"
+                              onClick={() => void handleCopyWeekAcrossActiveBlock(absoluteWeek)}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--pe-t3)] hover:bg-white/[0.06] hover:text-[var(--pe-t1)] transition-colors opacity-40"
+                              aria-label="Week menu"
+                              disabled
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          {Array.from({ length: 7 }, (_, i) => i + 1).map((dayNum) => {
+                            const cell = scheduleMap.get(
+                              scheduleKey(absoluteWeek, dayNum, blockIdForKey),
+                            );
+                            const template = cell
+                              ? templates.find((t) => t.id === cell.template_id)
+                              : null;
+                            const weekHasConfig = weeksWithAnyConfiguredRows.has(absoluteWeek);
+                            const isEmpty = !cell && !weekHasConfig;
+                            const isRest =
+                              (cell && cell.template_id === "rest") || (!cell && weekHasConfig);
+                            const isTodayRow =
+                              absoluteWeek === absoluteSelectedWeek && dayNum === programDayToday;
+                            return (
+                              <button
+                                key={dayNum}
+                                type="button"
+                                onClick={() =>
+                                  openScheduleEditor(absoluteWeek, dayNum, blockIdForKey)
+                                }
+                                className={cn(
+                                  "flex min-h-[36px] w-full items-center gap-2 rounded-[10px] border px-2 py-1.5 text-left transition-colors",
+                                  isTodayRow
+                                    ? "border-[rgba(79,227,232,0.35)] ring-1 ring-[rgba(79,227,232,0.18)] bg-[rgba(79,227,232,0.04)]"
+                                    : "border-[var(--pe-line-2)] hover:border-[rgba(79,227,232,0.35)]",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "w-8 shrink-0 text-center text-[9.5px] font-semibold uppercase tracking-[0.1em]",
+                                    isTodayRow ? "text-[var(--pe-cyan)]" : "text-[var(--pe-t3)]",
+                                  )}
+                                  style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                                >
+                                  {PROGRAM_DAY_SHORT_LABELS[dayNum - 1]}
+                                </span>
+                                {isEmpty ? (
+                                  <>
+                                    <span
+                                      className="flex-1 text-left text-[12px] italic text-[var(--pe-t4)]"
+                                      style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                                    >
+                                      Tap to add workout
+                                    </span>
+                                    <Plus className="h-[18px] w-[18px] shrink-0 text-[var(--pe-t3)]" />
+                                  </>
+                                ) : isRest ? (
+                                  <>
+                                    <span className="flex-1" />
+                                    <span
+                                      className="rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--pe-t3)]"
+                                      style={{
+                                        fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                                        background: "rgba(255,255,255,0.02)",
+                                      }}
+                                    >
+                                      Rest
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4FE3E8]" />
+                                    <span
+                                      className="flex-1 truncate text-left text-[12px] font-medium text-[var(--pe-t1)]"
+                                      style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                                    >
+                                      {template?.name || "Workout"}
+                                    </span>
+                                    {cell?.is_optional ? (
+                                      <span className="text-[9px] uppercase text-[var(--pe-cyan)]">Opt</span>
+                                    ) : null}
+                                  </>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  });
                 })()}
               </div>
 
@@ -1337,7 +1553,7 @@ function EditProgramContent() {
                           className={cn(
                             "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[color:var(--fc-glass-highlight)]",
                             scheduleEditor.templateId === "rest"
-                              ? "bg-[color:var(--fc-accent)]/10 text-[color:var(--fc-accent)]"
+                              ? "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)]"
                               : "text-[color:var(--fc-text-primary)]",
                           )}
                         >
@@ -1359,7 +1575,7 @@ function EditProgramContent() {
                               className={cn(
                                 "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[color:var(--fc-glass-highlight)]",
                                 scheduleEditor.templateId === t.id
-                                  ? "bg-[color:var(--fc-accent)]/10 text-[color:var(--fc-accent)]"
+                                  ? "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)]"
                                   : "text-[color:var(--fc-text-primary)]",
                               )}
                             >
@@ -1417,14 +1633,7 @@ function EditProgramContent() {
                   programCategory={form.category}
                   programDifficulty={form.difficulty_level}
                   schedule={schedule}
-                  templates={templates.map((t) => ({
-                    ...t,
-                    category: t.category || "",
-                    blocks:
-                      volumeTemplateBlocks[t.id] ??
-                      templateBlocks[t.id] ??
-                      [],
-                  }))}
+                  templates={templatesForVolumeCalculator}
                 />
               )}
             </div>
@@ -1432,44 +1641,128 @@ function EditProgramContent() {
 
           {activeTab === "progression" && (
             <div role="tabpanel" className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base sm:text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                  Progression rules
-                </h2>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="fc-btn fc-btn-ghost"
+              <div className="space-y-3">
+                <div>
+                  <h2
+                    className="text-sm font-bold text-[var(--pe-t1)] sm:text-base"
+                    style={{ fontFamily: "var(--f-headline, Bricolage Grotesque, sans-serif)" }}
+                  >
+                    Progression rules
+                  </h2>
+                  <p
+                    className="mt-0.5 text-[11px] text-[var(--pe-t3)]"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                  >
+                    Configure week-by-week % · RPE · reps
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    "grid grid-cols-1 gap-1.5",
+                    form?.category ? "sm:grid-cols-3" : "sm:grid-cols-2",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowPerWorkoutProgressionEditor(true)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--pe-line)] text-[11px] font-semibold text-[var(--pe-t2)] hover:bg-white/[0.04] hover:text-[var(--pe-t1)] transition-colors"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    Per-workout
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSkipProgression()}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--pe-line)] text-[11px] font-semibold text-[var(--pe-t2)] hover:bg-white/[0.04] hover:text-[var(--pe-t1)] transition-colors"
+                    style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                   >
                     Skip
-                  </Button>
-                  {form && form.category && (
-                    <Button
+                  </button>
+                  {form?.category ? (
+                    <button
+                      type="button"
                       onClick={() => setShowProgressionSuggestions(true)}
-                      variant="outline"
-                      size="sm"
-                      className="fc-btn fc-btn-secondary"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-[rgba(79,227,232,0.18)] text-[11px] font-semibold text-[#0a1a26] transition-colors hover:bg-[#4FE3E8]"
+                      style={{ fontFamily: "var(--font-geist-sans, Geist, sans-serif)" }}
                     >
-                      <Target className="w-3.5 h-3.5 mr-1" />
-                      Suggestions
-                    </Button>
-                  )}
+                      <Sparkles className="w-4 h-4" />
+                      Suggest
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
-              {schedule.filter(
-                (s) =>
-                  (s.week_number || 1) === absoluteSelectedWeek &&
-                  scheduleRowMatchesActiveBlock(s, activeBlockId, trainingBlocks),
-              ).length === 0 ? (
-                <GlassCard elevation={1} className="fc-card-shell py-10 text-center">
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    No workouts for week {selectedWeek}. Use the Schedule tab first.
-                  </p>
-                </GlassCard>
-              ) : (
-                <div className="space-y-3">
+              <ProgramProgressionGrid
+                programId={form.id}
+                durationWeeks={programDisplayWeeks}
+                schedule={schedule}
+                onConfigureRow={handleConfigureGridRow}
+                onOpenFullEditorCell={handleOpenGridCellFullEditor}
+                reloadSignal={progressionReloadKey}
+                accentWeekNumber={absoluteSelectedWeek}
+              />
+            </div>
+          )}
+
+          {/* Progression Suggestions Modal */}
+          {form && form.category && (
+            <ProgressionSuggestionsModal
+              isOpen={showProgressionSuggestions}
+              onClose={() => setShowProgressionSuggestions(false)}
+              programId={form.id}
+              currentWeek={selectedWeek}
+              category={form.category}
+              difficulty={form.difficulty_level}
+              lastDeloadWeek={lastDeloadWeek}
+            />
+          )}
+
+          {/* Training Block Modal */}
+          {form && showBlockModal && (
+            <TrainingBlockModal
+              isOpen={showBlockModal}
+              block={editingBlock}
+              programId={form.id}
+              nextBlockOrder={trainingBlocks.length + 1}
+              onSave={handleBlockSaved}
+              onDelete={syncAfterTrainingBlockRemoved}
+              onClose={() => {
+                setShowBlockModal(false);
+                setEditingBlock(null);
+              }}
+            />
+          )}
+          {showPerWorkoutProgressionEditor && (
+            <div
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={requestClosePerWorkoutEditor}
+            >
+              <div
+                className="w-full max-w-6xl max-h-[90vh] h-full sm:h-auto fc-modal fc-card p-4 sm:p-6 flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      Per-workout deep editor
+                    </h3>
+                    <p className="text-xs text-[color:var(--fc-text-dim)]">
+                      Configure full progression fields for the selected week/day.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={requestClosePerWorkoutEditor}
+                    aria-label="Close deep editor"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-3 flex-shrink-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="text-xs font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">
                       Week
@@ -1482,23 +1775,19 @@ function EditProgramContent() {
                         setSelectedScheduleForProgression(null);
                       }}
                     >
-                      <SelectTrigger className="w-28 h-9 text-sm rounded-lg [&>svg]:text-[color:var(--fc-accent)]">
+                      <SelectTrigger className="w-28 h-9 text-sm rounded-lg [&>svg]:text-[color:var(--fc-accent-cyan)]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="z-[10000]" position="popper">
-                        {Array.from(
-                          { length: maxWeeks },
-                          (_, i) => (
-                            <SelectItem key={i + 1} value={(i + 1).toString()}>
-                              Week {i + 1}
-                            </SelectItem>
-                          ),
-                        )}
+                        {Array.from({ length: maxWeeks }, (_, i) => (
+                          <SelectItem key={i + 1} value={(i + 1).toString()}>
+                            Week {i + 1}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Day Selector */}
                   <div className="flex flex-wrap gap-2">
                     {schedule
                       .filter(
@@ -1535,8 +1824,9 @@ function EditProgramContent() {
                         );
                       })}
                   </div>
+                </div>
 
-                  {/* Progression Rules Editor */}
+                <div className="flex-1 min-h-0 overflow-y-auto pt-3">
                   {selectedScheduleForProgression && form?.id ? (
                     <ProgramProgressionRulesEditor
                       programId={form.id}
@@ -1575,12 +1865,11 @@ function EditProgramContent() {
                           );
                         })
                         .map((s) => ({ id: s.id, week_number: s.week_number }))}
+                      onDirtyStateChange={(dirty) => setDeepEditorDirty(dirty)}
                       onUpdate={() => {
                         load().catch(console.error);
                       }}
                       onApplied={() => {
-                        // Auto-navigate to Week 2 of the block so the coach immediately
-                        // sees the generated values without having to click manually.
                         const week2AbsoluteWeek = absoluteSelectedWeek + 1;
                         const anchor =
                           TrainingBlockService.getBlockForWeekFromBlocks(
@@ -1611,37 +1900,8 @@ function EditProgramContent() {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-          )}
-
-          {/* Progression Suggestions Modal */}
-          {form && form.category && (
-            <ProgressionSuggestionsModal
-              isOpen={showProgressionSuggestions}
-              onClose={() => setShowProgressionSuggestions(false)}
-              programId={form.id}
-              currentWeek={selectedWeek}
-              category={form.category}
-              difficulty={form.difficulty_level}
-              lastDeloadWeek={lastDeloadWeek}
-            />
-          )}
-
-          {/* Training Block Modal */}
-          {form && showBlockModal && (
-            <TrainingBlockModal
-              isOpen={showBlockModal}
-              block={editingBlock}
-              programId={form.id}
-              nextBlockOrder={trainingBlocks.length + 1}
-              onSave={handleBlockSaved}
-              onDelete={syncAfterTrainingBlockRemoved}
-              onClose={() => {
-                setShowBlockModal(false);
-                setEditingBlock(null);
-              }}
-            />
           )}
       </CoachPageShell>
     </AnimatedBackground>

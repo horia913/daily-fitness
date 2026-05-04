@@ -23,7 +23,7 @@ export default function CoachCompliancePage() {
           <AnalyticsNav />
           <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] flex items-center justify-center flex-shrink-0">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center flex-shrink-0">
                 <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div className="min-w-0">

@@ -36,6 +36,7 @@ import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
 import {
   getPhotosForDate,
   uploadPhoto,
@@ -621,7 +622,7 @@ function BodyMetricsPageContent() {
 
   if (loadError && !loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
@@ -637,7 +638,7 @@ function BodyMetricsPageContent() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
@@ -648,15 +649,16 @@ function BodyMetricsPageContent() {
     );
   }
 
-  const tabChipBase =
-    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const tabChipActive = "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
-  const tabChipInactive = "bg-[color:var(--fc-glass-highlight)] fc-text-dim border-[color:var(--fc-glass-border)]";
+  const tabChipBase = checkinSuiteStyles.pillTab;
+  const tabChipActive = checkinSuiteStyles.pillTabActive;
+  const tabChipInactive = "";
 
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+      <ClientPageShell
+        className={cn("relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden", checkinSuiteStyles.root)}
+      >
         {/* Header */}
         <div className="mb-4 flex items-center gap-3">
           <button
@@ -801,7 +803,7 @@ function BodyMetricsPageContent() {
           }
           return goalCards.length > 0 ? (
             <section className="mb-4 space-y-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-2">Goal progress</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-2">Goal progress</h2>
               <div>{goalCards}</div>
             </section>
           ) : null;
@@ -811,7 +813,7 @@ function BodyMetricsPageContent() {
         {activeTab === "overview" && nutritionVsBodyInsight && (
           <section className="mb-4 space-y-2 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Activity className="h-4 w-4 text-[color:var(--fc-accent)]" />
+              <Activity className="h-4 w-4 text-[color:var(--fc-accent-cyan)]" />
               <h2 className="text-sm font-semibold fc-text-primary">Nutrition &amp; body composition</h2>
               <span className="text-xs fc-text-dim">Last 30 days</span>
             </div>
@@ -838,7 +840,7 @@ function BodyMetricsPageContent() {
           <main className="space-y-4">
             {/* Last vs current comparison */}
             <section className="space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Body check-in</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Body check-in</h2>
               {previous && daysSincePrevious != null && (
                 <p className="text-xs fc-text-dim mb-2">
                   Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
@@ -918,14 +920,14 @@ function BodyMetricsPageContent() {
                 const range = maxW - minW || 1;
                 return (
                   <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Weight trend (last 3 months)</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Weight trend (last 3 months)</p>
                     <div className="flex h-10 items-end gap-0.5">
                       {sparkData.map((m, i) => {
                         const h = ((m.weight - minW) / range) * 100;
                         return (
                           <div
                             key={`${m.date}-${i}`}
-                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent)]/50"
+                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent-cyan)]/50"
                             style={{ height: `${Math.max(h, 4)}%` }}
                             title={`${m.weight.toFixed(1)} kg · ${new Date(m.date).toLocaleDateString()}`}
                           />
@@ -940,7 +942,7 @@ function BodyMetricsPageContent() {
                       <p className="mt-2 text-sm">
                         <button
                           type="button"
-                          className="text-[color:var(--fc-accent)] hover:underline"
+                          className="text-[color:var(--fc-accent-cyan)] hover:underline"
                           onClick={() => router.push("/client/nutrition")}
                         >
                           How&apos;s your nutrition?
@@ -965,7 +967,7 @@ function BodyMetricsPageContent() {
                 if (rows.length === 0) return null;
                 return (
                   <div className="mt-3 border-t border-[color:var(--fc-glass-border)] pt-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Measurements</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Measurements</p>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[240px] text-sm fc-text-primary">
                         <thead>
@@ -1007,7 +1009,7 @@ function BodyMetricsPageContent() {
                     onClick={() => setTab("photos")}
                     className="w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
                       Progress photos
                     </p>
                     <p className="mb-2 text-xs fc-text-dim">Tap to open Photos</p>
@@ -1042,7 +1044,7 @@ function BodyMetricsPageContent() {
 
         {activeTab === "weight-bf" && metrics.length > 0 && (
                 <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-3">
                     Weight &amp; body fat
                   </p>
                   <div className="flex items-baseline gap-2 mb-3 flex-wrap">
@@ -1262,7 +1264,7 @@ function BodyMetricsPageContent() {
 
                       return (
                         <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 mb-2">
-                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
+                          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
                             Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -1470,7 +1472,7 @@ function BodyMetricsPageContent() {
         {activeTab === "history" && metrics.length > 0 && (
             <div className="flex flex-col border-t border-[color:var(--fc-glass-border)] pt-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Log history</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Log history</h3>
                 <ListFilter className="h-4 w-4 fc-text-subtle" />
               </div>
               <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
@@ -1546,7 +1548,7 @@ function BodyMetricsPageContent() {
         {activeTab === "photos" && user && (
           <div className="space-y-4 border-t border-[color:var(--fc-glass-border)] pt-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Photos</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Photos</p>
               {photoTimeline.length >= 2 && (
                 <button
                   type="button"
@@ -1560,7 +1562,7 @@ function BodyMetricsPageContent() {
             </div>
 
             <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80 mb-3">
                 Today&apos;s photos
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -1612,7 +1614,7 @@ function BodyMetricsPageContent() {
                     step="0.1"
                     value={photoUploadWeight}
                     onChange={(e) => setPhotoUploadWeight(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]/40"
                     placeholder="From latest log"
                   />
                 </div>
@@ -1622,7 +1624,7 @@ function BodyMetricsPageContent() {
                     type="text"
                     value={photoUploadNotes}
                     onChange={(e) => setPhotoUploadNotes(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent)]/40"
+                    className="h-11 w-full rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-3 text-sm fc-text-primary placeholder:fc-text-subtle focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]/40"
                     placeholder="Add notes"
                   />
                 </div>
@@ -1649,7 +1651,7 @@ function BodyMetricsPageContent() {
 
             {photoTimeline.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">Timeline</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">Timeline</p>
                 {photoTimeline.map((entry) => {
                   const isExpanded = photoTimelineSelectedDate === entry.date;
                   const photos = isExpanded ? photoTimelineSelectedPhotos : [];
@@ -1721,14 +1723,19 @@ function BodyMetricsPageContent() {
           </div>
         )}
 
-        {/* FAB */}
+        {/*
+          Phase 0b 6-FAB extension — body-metrics FAB migration.
+          Spec ref: design-system-v4 §6.21. Was: absolute bottom-24 right-4,
+          fc-btn fc-btn-primary, h-14 w-14 rounded-2xl, Plus w-8 h-8.
+          Now: fab-action (fixed, bottom 96px, right 16px, 56px circle, lime).
+        */}
         <button
           type="button"
           onClick={() => setShowLogModal(true)}
-          className="fc-btn fc-btn-primary fc-press absolute bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl"
+          className="fab-action"
           aria-label="Log metrics"
         >
-          <Plus className="w-8 h-8" />
+          <Plus />
         </button>
       </ClientPageShell>
 
@@ -1744,14 +1751,12 @@ function BodyMetricsPageContent() {
           }}
           lastMeasurement={latest ?? undefined}
           onAchievementsUnlocked={(raw) => {
-            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
-              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
             const mapped: Achievement[] = raw.map((a) => ({
               id: a.templateId,
               name: a.templateName,
               description: a.description ?? "",
               icon: a.templateIcon ?? "🏆",
-              rarity: tierToRarity(a.tier),
+              tier: (a.tier ?? null) as Achievement["tier"],
               unlocked: true,
             }));
             setNewAchievementsQueue(mapped);
@@ -1929,7 +1934,7 @@ function BodyMetricsPageContent() {
 
 export default function BodyMetricsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <Suspense
         fallback={
           <AnimatedBackground>

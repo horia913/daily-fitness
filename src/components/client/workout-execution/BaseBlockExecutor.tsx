@@ -4,6 +4,7 @@ import React from "react";
 import { ChevronLeft } from "lucide-react";
 import type { PrescriptionItem } from "./ui/PrescriptionCard";
 import { PrescriptionCard } from "./ui/PrescriptionCard";
+import { useWorkoutExecutionChrome } from "./WorkoutExecutionChromeContext";
 import { InstructionsBox } from "./ui/InstructionsBox";
 import { NavigationControls } from "./ui/NavigationControls";
 import { ProgressionNudge } from "./ui/ProgressionNudge";
@@ -20,6 +21,7 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   exerciseName: string;
   prescriptionItems?: PrescriptionItem[];
   /** Keep 2 columns even with 5+ items (e.g. speed work). */
+  /** Phone 3 target grid is strictly 2 columns (+ tempo span). */
   prescriptionGridMode?: "default" | "two-column-only";
   instructions?: string;
   /** Set-entry specific coach notes (higher priority). */
@@ -31,8 +33,8 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   progressLabel?: string;
   loggingInputs: React.ReactNode;
   logButton: React.ReactNode;
-  /** Second region header inside unified PrescriptionCard (e.g. LOG SET 2). */
-  logSectionTitle: string;
+  /** Right side of LOG SET row (set navigator). */
+  logNavRight?: React.ReactNode;
   showNavigation?: boolean;
   currentExercise?: WorkoutBlockExercise;
   showRestTimer?: boolean;
@@ -57,7 +59,7 @@ export function BaseBlockExecutorLayout({
   progressLabel: _progressLabel = "Set",
   loggingInputs,
   logButton,
-  logSectionTitle,
+  logNavRight,
   showNavigation = true,
   currentExercise,
   showRestTimer: _showRestTimer = false,
@@ -74,6 +76,9 @@ export function BaseBlockExecutorLayout({
   onWorkoutBack,
   aboveStickyContent,
 }: BaseBlockExecutorLayoutProps) {
+  const chrome = useWorkoutExecutionChrome();
+  const hideCompactBack = chrome?.hideCompactBack ?? false;
+
   const normalizeNoteValue = (value: unknown): string | undefined => {
     if (value == null) return undefined;
     if (typeof value === "string") {
@@ -170,11 +175,35 @@ export function BaseBlockExecutorLayout({
     </>
   );
 
+  const muscleGroupTag =
+    (currentExercise as { exercise?: { primary_muscle_group?: string | null } })
+      ?.exercise?.primary_muscle_group ?? null;
+
+  const previousPerfForExercise =
+    currentExercise?.exercise_id && previousPerformanceMap
+      ? (previousPerformanceMap.get(currentExercise.exercise_id) ?? null)
+      : null;
+  const showLastSessionSlot = Boolean(
+    previousPerfForExercise?.lastWorkout != null ||
+      (progressionSuggestion &&
+        progressionSuggestion.type !== "first_time"),
+  );
+  const lastSessionSlot = showLastSessionSlot ? (
+    <ProgressionNudge
+      className="!mb-0 border-0 bg-transparent px-0 py-0 shadow-none"
+      suggestion={progressionSuggestion}
+      previousPerformance={previousPerfForExercise}
+      previousSessionSetNumber={currentSet}
+      showPreviousSession={exerciseCount === 1}
+      onApplySuggestion={onApplySuggestion}
+    />
+  ) : undefined;
+
   return (
     <div className="flex flex-col border-b border-white/5">
       {/* Scroll is the app <main>; avoid nested overflow-y here or the middle pane gets no height and won’t scroll. */}
-      <div className="flex flex-col gap-3 px-4 pb-2 pt-1">
-        {onWorkoutBack ? (
+      <div className="flex flex-col gap-3 px-0 pb-2 pt-1 sm:px-1">
+        {onWorkoutBack && !hideCompactBack ? (
           <button
             type="button"
             onClick={onWorkoutBack}
@@ -184,20 +213,6 @@ export function BaseBlockExecutorLayout({
             <ChevronLeft className="h-5 w-5" aria-hidden />
           </button>
         ) : null}
-        {exerciseCount !== 1 ? (
-          <ProgressionNudge
-            suggestion={progressionSuggestion}
-            previousPerformance={
-              currentExercise?.exercise_id && previousPerformanceMap
-                ? (previousPerformanceMap.get(currentExercise.exercise_id) ??
-                  null)
-                : null
-            }
-            previousSessionSetNumber={currentSet}
-            showPreviousSession={false}
-            onApplySuggestion={onApplySuggestion}
-          />
-        ) : null}
 
         <PrescriptionCard
           exerciseTitle={
@@ -205,6 +220,7 @@ export function BaseBlockExecutorLayout({
           }
           setType={setType}
           multiExerciseHint={multiExerciseHint}
+          muscleGroupTag={muscleGroupTag}
           titleActions={
             exerciseCount === 1 && currentExercise ? (
               <ExerciseActionButtons
@@ -214,29 +230,12 @@ export function BaseBlockExecutorLayout({
               />
             ) : null
           }
-          topAccessory={
-            exerciseCount === 1 ? (
-              <ProgressionNudge
-                className="mb-0"
-                suggestion={progressionSuggestion}
-                previousPerformance={
-                  currentExercise?.exercise_id && previousPerformanceMap
-                    ? (previousPerformanceMap.get(
-                        currentExercise.exercise_id,
-                      ) ?? null)
-                    : null
-                }
-                previousSessionSetNumber={currentSet}
-                showPreviousSession
-                onApplySuggestion={onApplySuggestion}
-              />
-            ) : undefined
-          }
+          lastSessionSlot={lastSessionSlot ?? undefined}
           prescriptionItems={resolvedPrescriptionItems}
           prescriptionGridClassName={prescriptionGridClassName}
           coachNotes={resolvedCoachNotes}
           formCues={resolvedFormCues}
-          logSectionTitle={logSectionTitle}
+          logNavRight={logNavRight}
           logSectionContent={logSectionContent}
         />
 

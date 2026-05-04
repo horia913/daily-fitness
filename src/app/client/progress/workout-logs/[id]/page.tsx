@@ -11,7 +11,6 @@ import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Button } from "@/components/ui/button";
 import {
-  ChevronLeft,
   MoreHorizontal,
   Clock,
   Share2,
@@ -20,10 +19,19 @@ import {
   Trophy,
   ChevronRight,
   AlertCircle,
+  Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { normalizeSetType } from "@/lib/setTypeUtils";
 import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
+import { cn } from "@/lib/utils";
+import {
+  formatPersonalRecordCaption,
+  formatPersonalRecordImprovementSuffix,
+} from "@/lib/personalRecordDisplay";
+import { ProgramEditSetTypePill } from "@/components/coach/programs/ProgramEditSetTypePill";
+import { PsHero, PsRpePill, PsSectionEyebrow } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 
 interface WorkoutSet {
   id: string;
@@ -489,24 +497,30 @@ export default function WorkoutLogDetailPage() {
     switch (normalizedType) {
       case "drop_set":
         return (
-          <div key={set.id} className={`grid grid-cols-[2rem_1fr] gap-2 py-2 px-2 rounded-lg text-sm ${rowBg}`}>
-            <span className="fc-text-dim font-mono">{n}</span>
-            <div>
-              <span className="font-medium fc-text-primary">
+          <div key={set.id} className={cn(ps.psDropRow, rowBg)}>
+            <span className={cn(ps.psFontMono, "text-[11px]")} style={{ color: "var(--ps-t3)" }}>
+              {n}
+            </span>
+            <div className="min-w-0">
+              <span className={cn(ps.psFontMono, "text-[11px] font-medium")} style={{ color: "var(--ps-t1)", letterSpacing: "0.04em" }}>
                 {set.dropset_initial_weight || set.weight || 0} kg × {set.dropset_initial_reps || set.reps || 0}
+                {set.dropset_final_weight != null && (
+                  <>
+                    <span className="mx-1" style={{ color: "var(--ps-t4)" }}>
+                      →
+                    </span>
+                    <span>
+                      {set.dropset_final_weight} kg × {set.dropset_final_reps || 0}
+                    </span>
+                  </>
+                )}
+                {set.dropset_percentage != null && set.dropset_percentage > 0 ? (
+                  <span className={ps.psDropTag}>−{Math.round(set.dropset_percentage)}% drop</span>
+                ) : null}
               </span>
-              {set.dropset_final_weight != null && (
-                <>
-                  <span className="mx-1.5 fc-text-dim">→</span>
-                  <span className="font-medium fc-text-primary">
-                    {set.dropset_final_weight} kg × {set.dropset_final_reps || 0}
-                  </span>
-                </>
-              )}
-              {set.dropset_percentage != null && set.dropset_percentage > 0 && (
-                <span className="ml-2 text-xs fc-text-dim">({set.dropset_percentage}% drop)</span>
-              )}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+            </div>
+            <div className="justify-self-end">
+              <PsRpePill value={set.rpe} />
             </div>
           </div>
         );
@@ -529,7 +543,7 @@ export default function WorkoutLogDetailPage() {
                   </span>
                 </>
               )}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </div>
           </div>
         );
@@ -561,7 +575,7 @@ export default function WorkoutLogDetailPage() {
             <span className="fc-text-dim font-mono">{n}</span>
             <span className="font-medium fc-text-primary">
               {set.weight || 0} kg × {set.reps || 0}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </span>
           </div>
         );
@@ -580,7 +594,7 @@ export default function WorkoutLogDetailPage() {
               <span className="font-medium fc-text-primary">
                 {set.preexhaust_compound_weight || 0} kg × {set.preexhaust_compound_reps || 0}
               </span>
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </div>
           </div>
         );
@@ -592,7 +606,7 @@ export default function WorkoutLogDetailPage() {
             <span className="font-medium fc-text-primary">
               {set.weight || 0} kg × {set.reps || 0}
               {set.cluster_number != null && <span className="ml-1 fc-text-dim text-xs">(cluster {set.cluster_number})</span>}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </span>
           </div>
         );
@@ -614,7 +628,7 @@ export default function WorkoutLogDetailPage() {
                   <span className="ml-1.5 text-xs fc-text-dim">(pause #{set.rest_pause_number || 1})</span>
                 </>
               )}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </div>
           </div>
         );
@@ -628,7 +642,7 @@ export default function WorkoutLogDetailPage() {
               {set.emom_total_duration_sec != null && (
                 <span className="ml-2 text-xs fc-text-dim">({fmtSec(set.emom_total_duration_sec)})</span>
               )}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </span>
           </div>
         );
@@ -660,7 +674,7 @@ export default function WorkoutLogDetailPage() {
               {set.amrap_duration_seconds != null && (
                 <span className="ml-2 text-xs fc-text-dim">({fmtSec(set.amrap_duration_seconds)})</span>
               )}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </div>
           </div>
         );
@@ -675,7 +689,7 @@ export default function WorkoutLogDetailPage() {
                 {set.weight || 0} kg × {set.fortime_total_reps || set.reps || 0}
               </span>
               {timeTaken && <span className="ml-2 text-xs fc-text-dim">(in {timeTaken})</span>}
-              {set.rpe != null && <span className="ml-2 fc-text-warning text-xs">RPE {set.rpe}</span>}
+              <span className="ml-2 inline-flex justify-end"><PsRpePill value={set.rpe} /></span>
             </div>
           </div>
         );
@@ -683,13 +697,25 @@ export default function WorkoutLogDetailPage() {
 
       default:
         return (
-          <div key={set.id} className={`grid grid-cols-[2rem_3fr_3fr_2fr] gap-2 py-2 px-2 rounded-lg text-sm items-center ${rowBg}`}>
-            <span className="fc-text-dim font-mono">{n}</span>
-            <span className="font-medium fc-text-primary">{set.weight || 0} kg</span>
-            <span className="font-medium fc-text-primary">{set.reps || 0}</span>
-            {set.rpe != null
-              ? <span className="fc-text-warning text-xs">RPE {set.rpe}</span>
-              : <span />}
+          <div key={set.id} className={cn(ps.psSetsBody, rowBg)}>
+            <span className={cn(ps.psFontMono, "text-[11px]")} style={{ color: "var(--ps-t3)" }}>
+              {n}
+            </span>
+            <span className={cn(ps.psFontDisplay, "text-[15px] font-bold tabular-nums")} style={{ color: "var(--ps-t1)" }}>
+              {set.weight || 0}
+              <span className={cn(ps.psFontMono, "ml-0.5 text-[9px] font-normal")} style={{ color: "var(--ps-t3)" }}>
+                kg
+              </span>
+            </span>
+            <span
+              className={cn(ps.psFontDisplay, "text-center text-[15px] font-bold tabular-nums")}
+              style={{ color: "var(--ps-t1)" }}
+            >
+              {set.reps || 0}
+            </span>
+            <div className="flex justify-end">
+              <PsRpePill value={set.rpe} />
+            </div>
           </div>
         );
     }
@@ -945,7 +971,7 @@ export default function WorkoutLogDetailPage() {
 
   if (loadError) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -967,7 +993,7 @@ export default function WorkoutLogDetailPage() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -980,7 +1006,7 @@ export default function WorkoutLogDetailPage() {
 
   if (!workoutLog) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -1025,65 +1051,67 @@ export default function WorkoutLogDetailPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-36 pt-6 space-y-4">
-            {/* Top bar + session meta */}
-            <div className="fc-card-shell p-3">
-              <div className="flex items-center justify-between gap-2">
+            <div className={ps.psV1}>
+            <PsHero
+              glow="cyan"
+              onBack={() => router.push("/client/progress/workout-logs")}
+              backAriaLabel="Back to workout history"
+              eyebrow={
+                completedDate
+                  ? `Session · ${completedDate.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}`
+                  : "Session"
+              }
+              eyebrowColor="#4FE3E8"
+              title={workoutName}
+              titleCompact
+              rightSlot={
                 <button
                   type="button"
-                  onClick={() => router.push("/client/progress/workout-logs")}
-                  className="fc-surface w-9 h-9 flex items-center justify-center rounded-lg shrink-0 border border-[color:var(--fc-glass-border)]"
-                  aria-label="Back to logs"
-                >
-                  <ChevronLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
-                </button>
-                <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
-                  <div className="text-center min-w-0">
-                    <h1 className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--fc-text-dim)]">
-                      Session
-                    </h1>
-                    <p className="text-sm font-bold font-mono text-[color:var(--fc-text-primary)] truncate">
-                      {completedDate
-                        ? completedDate.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="p-2 rounded-lg fc-glass border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors shrink-0"
+                  className={ps.psHeroIconBtn}
                   aria-label="More options"
                 >
-                  <MoreHorizontal className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+                  <MoreHorizontal className="h-4 w-4" strokeWidth={2} />
                 </button>
-              </div>
-            </div>
+              }
+            />
 
-            {/* Workout summary */}
-            <div className="fc-card-shell p-4 sm:p-5">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className={cn(ps.psSessionCard, "relative z-[1] mt-4")}>
+              <div>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  className={
                     isAbandoned
-                      ? "text-[color:var(--fc-status-warning)] bg-[color:var(--fc-status-warning)]/10 border border-[color:var(--fc-status-warning)]/30"
-                      : "fc-status-success bg-[color:var(--fc-status-success)]/10 border border-[color:var(--fc-status-success)]/30"
-                  }`}
+                      ? "inline-flex items-center gap-1 rounded-[5px] border px-1.5 py-0.5 font-mono text-[8.5px] font-semibold uppercase tracking-[0.08em]"
+                      : ps.psCompletedBadge
+                  }
+                  style={
+                    isAbandoned
+                      ? {
+                          borderColor: "var(--ps-warning-dim)",
+                          background: "var(--ps-warning-soft)",
+                          color: "var(--ps-warning)",
+                        }
+                      : undefined
+                  }
                 >
+                  {!isAbandoned && (
+                    <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={3} aria-hidden />
+                  )}
                   {isAbandoned ? "Incomplete" : "Completed"}
                 </span>
               </div>
-              <h2 className="text-xl font-bold tracking-tight fc-text-primary mb-1 leading-snug break-words">
-                {workoutName}
-              </h2>
-              <p className="fc-text-dim flex flex-wrap items-center gap-1.5 text-xs mb-3">
-                <Clock className="w-3.5 h-3.5 fc-text-workouts shrink-0" />
+              <p
+                className={cn(ps.psFontMono, "flex flex-wrap items-center gap-1.5 text-[10.5px]")}
+                style={{ color: "var(--ps-t3)" }}
+              >
+                <Clock className="h-2.5 w-2.5 shrink-0" aria-hidden />
                 <span>
                   {completedDate
                     ? completedDate.toLocaleDateString("en-US", {
@@ -1092,24 +1120,42 @@ export default function WorkoutLogDetailPage() {
                         day: "numeric",
                       })
                     : "—"}
-                  {durationM > 0 && ` · ${durationStr}`}
+                  {durationM > 0 ? ` · ${durationStr}` : ""}
                 </span>
               </p>
 
-              {/* Inline stats */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs pt-3 border-t border-[color:var(--fc-glass-border)]">
-                <span className="fc-text-subtle">
-                  <span className="font-mono font-bold fc-text-primary tabular-nums">{totalStats.totalSets}</span> sets
-                </span>
-                <span className="fc-text-subtle">
-                  <span className="font-mono font-bold fc-text-primary tabular-nums">{totalStats.totalReps}</span> reps
-                </span>
-                <span className="fc-text-subtle">
-                  <span className="font-mono font-bold fc-text-primary tabular-nums">
+              <div
+                className="grid grid-cols-3 gap-2 border-t pt-2.5 text-center"
+                style={{ borderColor: "var(--ps-line-2)", paddingTop: 10 }}
+              >
+                <div>
+                  <p className={cn(ps.psFontDisplay, "text-[22px] font-bold tabular-nums")} style={{ color: "var(--ps-lime)" }}>
+                    {totalStats.totalSets}
+                  </p>
+                  <p className={cn(ps.psFontMono, "mt-1 text-[9px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.12em" }}>
+                    Sets
+                  </p>
+                </div>
+                <div>
+                  <p className={cn(ps.psFontDisplay, "text-[22px] font-bold tabular-nums")} style={{ color: "var(--ps-cyan)" }}>
+                    {totalStats.totalReps}
+                  </p>
+                  <p className={cn(ps.psFontMono, "mt-1 text-[9px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.12em" }}>
+                    Reps
+                  </p>
+                </div>
+                <div>
+                  <p className={cn(ps.psFontDisplay, "text-[22px] font-bold tabular-nums")} style={{ color: "var(--ps-t1)" }}>
                     {totalStats.totalWeight.toLocaleString()}
-                  </span>{" "}
-                  kg vol
-                </span>
+                    <span className={cn(ps.psFontMono, "text-[11px] font-normal")} style={{ color: "var(--ps-t3)" }}>
+                      {" "}
+                      kg
+                    </span>
+                  </p>
+                  <p className={cn(ps.psFontMono, "mt-1 text-[9px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.12em" }}>
+                    Volume
+                  </p>
+                </div>
               </div>
 
               {difficultyRating != null && difficultyRating > 0 && (
@@ -1121,7 +1167,7 @@ export default function WorkoutLogDetailPage() {
                         key={i}
                         className={`w-2 h-2 rounded-full ${
                           i < difficultyRating
-                            ? "bg-[color:var(--fc-accent)]"
+                            ? "bg-[color:var(--fc-accent-cyan)]"
                             : "bg-[color:var(--fc-glass-border)]"
                         }`}
                       />
@@ -1150,8 +1196,21 @@ export default function WorkoutLogDetailPage() {
                   {personalRecords.map((pr: any) => {
                     const exerciseName = pr.exercises?.name || "Exercise";
                     const improvement = pr.previous_record_value
-                      ? pr.record_value - pr.previous_record_value
+                      ? Number(pr.record_value) - Number(pr.previous_record_value)
                       : null;
+                    const caption = formatPersonalRecordCaption(
+                      pr.record_type,
+                      pr.record_value,
+                      pr.record_unit
+                    );
+                    const impSuffix =
+                      improvement != null && improvement > 0
+                        ? formatPersonalRecordImprovementSuffix(
+                            pr.record_type,
+                            improvement,
+                            pr.record_unit
+                          )
+                        : "";
                     return (
                       <div
                         key={pr.id}
@@ -1163,13 +1222,13 @@ export default function WorkoutLogDetailPage() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs font-bold font-mono fc-text-primary tabular-nums">
-                            {pr.record_value} {pr.record_unit || "kg"}
+                            {caption}
                           </p>
-                          {improvement != null && improvement > 0 && (
+                          {impSuffix ? (
                             <p className="text-[10px] font-medium text-[color:var(--fc-status-success)]">
-                              +{improvement} {pr.record_unit || "kg"}
+                              {impSuffix}
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -1188,11 +1247,10 @@ export default function WorkoutLogDetailPage() {
 
             {/* Exercise Breakdown — all expanded, card-per-exercise with table layout */}
             {!(isAbandoned && hasNoSets) && (
-              <section className="space-y-3">
-                <h3 className="text-sm uppercase tracking-wider mb-2 font-bold flex items-center gap-2 px-0.5 fc-text-primary">
-                  Exercises
-                  <span className="h-px flex-1 bg-[color:var(--fc-glass-border)]" />
-                </h3>
+              <section className="mt-4 space-y-3">
+                <PsSectionEyebrow accent="lime" className="px-0.5">
+                  Exercises · {totalStats.uniqueExercises}
+                </PsSectionEyebrow>
                 {blockGroups.map((block) => {
                   const normalizedType = normalizeSetType(block.set_type);
                   const firstExerciseName =
@@ -1210,31 +1268,41 @@ export default function WorkoutLogDetailPage() {
                   const sortedSets = [...block.sets].sort(sortSets);
 
                   const bestSet = getBestSet(block.sets);
-                  const bestStr = bestSet
-                    ? `Best: ${bestSet.weight || 0} kg × ${bestSet.reps || 0}`
-                    : null;
+                  const bestWeight = bestSet ? bestSet.weight || 0 : 0;
+                  const bestReps = bestSet ? bestSet.reps || 0 : 0;
 
                   return (
-                    <div
-                      key={block.set_entry_id}
-                      className="fc-card-shell overflow-hidden"
-                    >
-                      {/* Card header */}
-                      <div className="p-5 pb-3">
-                        <span className="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest fc-text-workouts bg-[color:var(--fc-domain-workouts)]/10 border border-[color:var(--fc-domain-workouts)]/20 mb-2">
-                          {formatBlockType(normalizedType)}
-                        </span>
-                        <h4 className="font-bold text-lg fc-text-primary leading-tight">
+                    <div key={block.set_entry_id} className={ps.psExerciseCard}>
+                      <div>
+                        <div className="mb-2">
+                          <ProgramEditSetTypePill setType={block.set_type} />
+                        </div>
+                        <h4
+                          className={cn(ps.psFontHeadline, "text-[15px] font-semibold leading-snug")}
+                          style={{ color: "var(--ps-t1)" }}
+                        >
                           {isMultiExerciseBlock
                             ? Array.from(block.exerciseNames.values()).join(" + ") || formatBlockType(normalizedType)
                             : firstExerciseName}
                         </h4>
-                        <p className="text-xs fc-text-dim mt-1">
-                          {block.totalSets} sets{bestStr ? ` · ${bestStr}` : ""}
+                        <p
+                          className={cn(ps.psFontMono, "mt-1 text-[9.5px] leading-snug")}
+                          style={{ color: "var(--ps-t3)" }}
+                        >
+                          <strong style={{ color: "var(--ps-t1)", fontWeight: 500 }}>{block.totalSets} sets</strong>
+                          {bestSet ? (
+                            <>
+                              {" "}
+                              · best{" "}
+                              <strong style={{ color: "var(--ps-t1)", fontWeight: 500 }}>
+                                {bestWeight} kg × {bestReps}
+                              </strong>
+                            </>
+                          ) : null}
                         </p>
                       </div>
 
-                      <div className="px-3 pb-3">
+                      <div className="pb-0.5">
                         {block.sets.length === 0 ? (
                           renderTemplateExercises(block, block.exerciseNames)
                         ) : isMultiExerciseBlock ? (
@@ -1259,32 +1327,45 @@ export default function WorkoutLogDetailPage() {
                                 )}
                                 {/* Table header */}
                                 {showTableHeader ? (
-                                  <div className="grid grid-cols-[2rem_3fr_3fr_2fr] gap-2 pb-1.5 mb-1 border-b border-[color:var(--fc-glass-border)]">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">#</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">Weight</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">Reps</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">RPE</span>
+                                  <div className={cn(ps.psSetsGrid, "mb-1")}>
+                                    <div className={ps.psSetsHead}>
+                                      <span className={cn(ps.psFontMono, "text-[9px] font-medium uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                                        #
+                                      </span>
+                                      <span className={cn(ps.psFontMono, "text-[9px] font-medium uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                                        Weight
+                                      </span>
+                                      <span className={cn(ps.psFontMono, "text-center text-[9px] font-medium uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                                        Reps
+                                      </span>
+                                      <span className={cn(ps.psFontMono, "text-right text-[9px] font-medium uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                                        RPE
+                                      </span>
+                                    </div>
+                                    {[...exercise.sets].sort(sortSets).map((set, idx) =>
+                                      renderSetRow(set, block.set_type, block.exerciseNames, undefined, idx)
+                                    )}
                                   </div>
                                 ) : (
-                                  <div className="grid grid-cols-[2rem_1fr] gap-2 pb-1.5 mb-1 border-b border-[color:var(--fc-glass-border)]">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">#</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">Details</span>
-                                  </div>
+                                  <>
+                                    <div className="grid grid-cols-[2rem_1fr] gap-2 pb-1.5 mb-1 border-b border-[color:var(--fc-glass-border)]">
+                                      <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">#</span>
+                                      <span className="text-[10px] font-bold uppercase tracking-widest fc-text-subtle">Details</span>
+                                    </div>
+                                    {[...exercise.sets].sort(sortSets).map((set, idx) =>
+                                      renderSetRow(set, block.set_type, block.exerciseNames, undefined, idx)
+                                    )}
+                                  </>
                                 )}
-                                {/* Set rows */}
-                                {[...exercise.sets].sort(sortSets).map((set, idx) =>
-                                  renderSetRow(set, block.set_type, block.exerciseNames, undefined, idx)
-                                )}
-                                {/* View progression link */}
                                 <button
                                   type="button"
                                   onClick={() => router.push(`/client/progress/analytics?exerciseId=${exercise.exercise_id}#strength-exercises`)}
-                                  className="mt-3 w-full text-left flex items-center justify-between p-3 rounded-xl bg-[color:var(--fc-surface-sunken)] border border-[color:var(--fc-glass-border)] group transition-colors hover:border-[color:var(--fc-accent)]/40"
+                                  className={ps.psProgCta}
                                 >
-                                  <span className="text-sm font-medium text-[color:var(--fc-accent)]">
+                                  <span className={ps.psProgCtaLabel}>
                                     View progression for {exercise.exercise_name}
                                   </span>
-                                  <ChevronRight className="w-4 h-4 text-[color:var(--fc-accent)] group-hover:translate-x-0.5 transition-transform" />
+                                  <ChevronRight className="h-[13px] w-[13px] shrink-0" style={{ color: "var(--ps-cyan)" }} aria-hidden />
                                 </button>
                               </div>
                             ))}
@@ -1309,6 +1390,8 @@ export default function WorkoutLogDetailPage() {
                 })}
               </section>
             )}
+
+            </div>
 
             <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 z-50 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm">
               <div className="max-w-lg mx-auto w-full grid grid-cols-2 sm:grid-cols-3 gap-2">

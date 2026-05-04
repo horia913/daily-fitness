@@ -2,7 +2,9 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 
 export interface WorkoutLogCardLog {
   id: string;
@@ -25,15 +27,7 @@ interface WorkoutLogCardProps {
   log: WorkoutLogCardLog;
 }
 
-function formatDateLabel(date: Date): string {
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getExerciseNames(log: WorkoutLogCardLog, maxNames = 4): string {
+function getExerciseNames(log: WorkoutLogCardLog, maxNames = 3): string {
   const names = [
     ...new Set(
       (log.workout_set_logs || [])
@@ -43,7 +37,7 @@ function getExerciseNames(log: WorkoutLogCardLog, maxNames = 4): string {
   ];
   const slice = names.slice(0, maxNames);
   const joined = slice.join(" · ");
-  if (names.length > maxNames) return `${joined}...`;
+  if (names.length > maxNames) return `${joined}…`;
   return joined;
 }
 
@@ -65,45 +59,66 @@ export function WorkoutLogCard({ log }: WorkoutLogCardProps) {
 
   const volumeKg = Math.round(log.totalWeight);
   const detailUrl = `/client/progress/workout-logs/${log.id}`;
-  const rating = log.overall_difficulty_rating;
   const exercisePreview = getExerciseNames(log);
+  const hasLoggedSets = log.totalSets > 0;
 
-  const statsLine = [
-    log.programContext ? `Day ${log.programContext.dayNumber}` : null,
-    duration != null ? `${duration} min` : null,
-    `${log.totalSets} sets`,
-    `${volumeKg.toLocaleString()} kg`,
-    rating != null && rating > 0 ? `${rating}/5` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const dayName = completedDate.toLocaleDateString("en-US", { weekday: "short" });
+  const dayNum = completedDate.getDate();
+  const monthAbbr = completedDate.toLocaleDateString("en-US", { month: "short" });
+
+  const boldIf = (cond: boolean, content: React.ReactNode) => (
+    <span style={{ fontWeight: cond ? 500 : 400, color: cond ? "var(--ps-t1)" : "var(--ps-t3)" }}>{content}</span>
+  );
 
   return (
     <button
       type="button"
       onClick={() => router.push(detailUrl)}
-      className="flex w-full min-h-[52px] items-center gap-3 py-3 pl-3 pr-1 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--fc-accent-cyan)] border-l-2 border-l-[color:var(--fc-domain-workouts)] sm:pl-4"
+      className={ps.psLogRow}
     >
-      <Calendar
-        className="h-4 w-4 shrink-0 text-[color:var(--fc-text-dim)]"
+      <span
+        className={cn(ps.psLogStripe, !hasLoggedSets && ps.psLogStripeMuted)}
         aria-hidden
       />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--fc-text-dim)]">
-          {formatDateLabel(completedDate)}
-        </p>
-        <p className="truncate text-sm font-semibold text-[color:var(--fc-text-primary)]">
+      <div className={ps.psLogDateCol}>
+        <span className={cn(ps.psFontMono, "text-[9px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+          {dayName}
+        </span>
+        <span className={cn(ps.psFontDisplay, "text-xl font-bold leading-none tabular-nums")} style={{ color: "var(--ps-t1)" }}>
+          {dayNum}
+        </span>
+        <span className={cn(ps.psFontMono, "text-[9px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+          {monthAbbr}
+        </span>
+      </div>
+      <div className={ps.psLogInfo}>
+        <p
+          className={cn(ps.psFontBody, "truncate text-[13px] font-semibold leading-tight")}
+          style={{ color: "var(--ps-t1)", fontWeight: hasLoggedSets ? 600 : 500 }}
+        >
           {workoutName}
         </p>
-        <p className="mt-0.5 text-xs text-[color:var(--fc-text-dim)]">{statsLine}</p>
-        {exercisePreview ? (
-          <p className="mt-1 line-clamp-1 text-xs text-[color:var(--fc-text-dim)]">
+        <p
+          className={cn(ps.psFontMono, "text-[9.5px] leading-snug")}
+          style={{ color: "var(--ps-t3)", letterSpacing: "0.04em" }}
+        >
+          {boldIf(log.totalSets > 0, `${log.totalSets} sets`)}
+          <span style={{ color: "var(--ps-t4)" }}> · </span>
+          {boldIf(volumeKg > 0, `${volumeKg.toLocaleString()} kg`)}
+          <span style={{ color: "var(--ps-t4)" }}> · </span>
+          {boldIf(duration != null && duration > 0, duration != null && duration > 0 ? `${duration} min` : "0 min")}
+        </p>
+        {exercisePreview && hasLoggedSets ? (
+          <p
+            className={cn(ps.psFontBody, "line-clamp-1 text-[10.5px] leading-snug")}
+            style={{ color: "var(--ps-t3)", marginTop: 2 }}
+          >
             {exercisePreview}
           </p>
         ) : null}
       </div>
       <ChevronRight
-        className="h-5 w-5 shrink-0 text-[color:var(--fc-text-dim)]"
+        className={cn(ps.psNavChevron, "h-[14px] w-[14px] self-center")}
         aria-hidden
       />
     </button>

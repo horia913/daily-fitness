@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,23 +9,21 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
-  Award,
-  Dumbbell,
   ChevronRight,
   Scale,
   Timer,
-  BarChart3,
   Download,
   Settings,
-  Accessibility,
   FileText,
   Trophy,
   Camera,
   AlertTriangle,
-  Apple,
   Clock,
   TrendingUp,
   Flame,
+  Star,
+  Zap,
+  LineChart,
 } from "lucide-react";
 import { ClientPageShell } from "@/components/client-ui";
 import {
@@ -35,6 +34,8 @@ import {
 } from "@/lib/progressStatsService";
 import { withTimeout } from "@/lib/withTimeout";
 import { cn } from "@/lib/utils";
+import { PsHero, PsSectionEyebrow } from "@/components/client/progress-suite";
+import ps from "@/components/client/progress-suite/progressSuiteV1.module.css";
 
 function formatMonthHubHours(totalMinutes: number): string {
   if (totalMinutes <= 0) return "—";
@@ -50,23 +51,110 @@ function formatMonthHubVolume(kg: number): string {
   if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
   return `${Math.round(kg).toLocaleString()}kg`;
 }
+type HubTile = "cyan" | "lime" | "warning" | "good" | "purple" | "pink" | "orange";
+type HubBadge = "cyan" | "lime" | "warning" | "good" | "pink";
+
+const HUB_TILE: Record<HubTile, string> = {
+  cyan: ps.psIconTileCyan,
+  lime: ps.psIconTileLime,
+  warning: ps.psIconTileWarning,
+  good: ps.psIconTileGood,
+  purple: ps.psIconTilePurple,
+  pink: ps.psIconTilePink,
+  orange: ps.psIconTileOrange,
+};
+
+const HUB_BADGE: Record<HubBadge, string> = {
+  cyan: ps.psBadgeCyan,
+  lime: ps.psBadgeLime,
+  warning: ps.psBadgeWarning,
+  good: ps.psBadgeGood,
+  pink: ps.psBadgePink,
+};
+
 const HUB_NAV_ITEMS: {
   href: string;
   title: string;
   description: string;
-  icon: typeof BarChart3;
-  iconClass: string;
-  getBadge?: (stats: ProgressStats) => string | null;
+  icon: LucideIcon;
+  tile: HubTile;
+  getBadge?: (stats: ProgressStats) => { text: string; variant: HubBadge } | null;
 }[] = [
-  { href: "/client/progress/workout-logs", title: "Workout History", description: "View past workouts and training volume", icon: FileText, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]", getBadge: (s) => (s.totalWorkouts > 0 ? `${s.totalWorkouts} total` : null) },
-  { href: "/client/progress/performance", title: "Performance tests", description: "Benchmarks and tests", icon: Timer, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-workouts)_10%,transparent)] text-[color:var(--fc-domain-workouts)] border border-[color-mix(in_srgb,var(--fc-domain-workouts)_20%,transparent)]", getBadge: () => null },
-  { href: "/client/progress/body-metrics", title: "Body metrics", description: "Weight and measurements", icon: Scale, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-success)_10%,transparent)] text-[color:var(--fc-status-success)] border border-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)]", getBadge: (s) => (s.currentWeight != null ? "Logged" : null) },
-  { href: "/client/progress/mobility", title: "Mobility", description: "Screening and flexibility", icon: Accessibility, iconClass: "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]", getBadge: () => null },
-  { href: "/client/progress/personal-records", title: "Personal records", description: "PRs and lifts", icon: Dumbbell, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] text-[color:var(--fc-status-warning)] border border-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)]", getBadge: (s) => (s.personalRecords > 0 ? `${s.personalRecords} PRs` : null) },
-  { href: "/client/progress/achievements", title: "Achievements", description: "Badges and milestones", icon: Award, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-warning)_10%,transparent)] text-[color:var(--fc-status-warning)] border border-[color-mix(in_srgb,var(--fc-status-warning)_20%,transparent)]", getBadge: (s) => (s.achievementsUnlocked > 0 ? `${s.achievementsUnlocked} Earned` : null) },
-  { href: "/client/progress/leaderboard", title: "Leaderboard", description: "Rankings and scores", icon: Trophy, iconClass: "bg-[color-mix(in_srgb,var(--fc-status-error)_10%,transparent)] text-[color:var(--fc-status-error)] border border-[color-mix(in_srgb,var(--fc-status-error)_20%,transparent)]", getBadge: (s) => (s.bestLeaderboardRank != null ? `#${s.bestLeaderboardRank}` : null) },
-  { href: "/client/progress/body-metrics?tab=photos", title: "Photos", description: "Progress photos", icon: Camera, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-habits)_10%,transparent)] text-[color:var(--fc-domain-habits)] border border-[color-mix(in_srgb,var(--fc-domain-habits)_20%,transparent)]", getBadge: () => null },
-  { href: "/client/progress/nutrition", title: "Nutrition", description: "Fuel and macro trends", icon: Apple, iconClass: "bg-[color-mix(in_srgb,var(--fc-domain-meals)_10%,transparent)] text-[color:var(--fc-domain-meals)] border border-[color-mix(in_srgb,var(--fc-domain-meals)_20%,transparent)]", getBadge: () => null },
+  {
+    href: "/client/progress/workout-logs",
+    title: "Workout history",
+    description: "View past workouts and training volume",
+    icon: FileText,
+    tile: "cyan",
+    getBadge: (s) =>
+      s.totalWorkouts > 0 ? { text: `${s.totalWorkouts} total`, variant: "cyan" } : null,
+  },
+  {
+    href: "/client/progress/performance",
+    title: "Performance tests",
+    description: "Benchmarks and tests",
+    icon: Timer,
+    tile: "warning",
+  },
+  {
+    href: "/client/progress/body-metrics",
+    title: "Body metrics",
+    description: "Weight and measurements",
+    icon: Scale,
+    tile: "good",
+    getBadge: (s) =>
+      s.currentWeight != null ? { text: "Logged", variant: "good" } : null,
+  },
+  {
+    href: "/client/progress/mobility",
+    title: "Mobility",
+    description: "Screening and flexibility",
+    icon: Zap,
+    tile: "purple",
+  },
+  {
+    href: "/client/progress/personal-records",
+    title: "Personal records",
+    description: "PRs and lifts",
+    icon: Star,
+    tile: "lime",
+    getBadge: (s) =>
+      s.personalRecords > 0 ? { text: `${s.personalRecords} PRs`, variant: "lime" } : null,
+  },
+  {
+    href: "/client/progress/achievements",
+    title: "Achievements",
+    description: "Badges and milestones",
+    icon: Trophy,
+    tile: "warning",
+    getBadge: (s) =>
+      s.achievementsUnlocked > 0
+        ? { text: `${s.achievementsUnlocked} earned`, variant: "warning" }
+        : null,
+  },
+  {
+    href: "/client/progress/leaderboard",
+    title: "Leaderboard",
+    description: "Rankings and scores",
+    icon: Star,
+    tile: "pink",
+    getBadge: (s) =>
+      s.bestLeaderboardRank != null ? { text: `#${s.bestLeaderboardRank}`, variant: "pink" } : null,
+  },
+  {
+    href: "/client/progress/body-metrics?tab=photos",
+    title: "Photos",
+    description: "Progress photos",
+    icon: Camera,
+    tile: "orange",
+  },
+  {
+    href: "/client/progress/nutrition",
+    title: "Nutrition",
+    description: "Fuel and macro trends",
+    icon: Flame,
+    tile: "good",
+  },
 ];
 
 function ProgressHubContent() {
@@ -169,292 +257,303 @@ function ProgressHubContent() {
     );
   }
 
+  const CYAN = "#4FE3E8";
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
       <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-        <header className="mb-4 flex items-start justify-between gap-3 border-b border-[color:var(--fc-glass-border)] pb-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold fc-text-primary tracking-tight">
-              Progress Hub
-            </h1>
-            <p className="mt-1 text-sm fc-text-dim">
-              Insights into your physical progress
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push("/client/profile")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-text-dim transition-colors hover:fc-text-primary"
-            aria-label="Open profile"
-          >
-            <Settings className="h-5 w-5" />
-          </button>
-        </header>
+        <div className={ps.psV1}>
+          <PsHero
+            glow="cyan"
+            eyebrow="Progress hub"
+            eyebrowColor={CYAN}
+            title="Your progress"
+            subtitle="Insights into your physical progress"
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => router.push("/client/profile")}
+                className={ps.psHeroIconBtn}
+                aria-label="Open profile"
+              >
+                <Settings className="h-4 w-4" strokeWidth={2} />
+              </button>
+            }
+          />
 
-        {/* This month — scannable snapshot + weekly bars */}
-        <section className="mb-6">
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]">
-                This month
-              </span>
-              <span className="text-xs fc-text-dim">{hub.monthYearLabel}</span>
-            </div>
+          {/* UI-6 This month hero */}
+          <section className="mb-4 mt-4">
+            <div className={ps.psMonthHero}>
+              <div className="relative z-[1] flex flex-row items-start justify-between gap-2">
+                <div>
+                  <div className={ps.psEyebrowRow}>
+                    <span
+                      className={ps.psEyebrowDot}
+                      style={{ color: CYAN, backgroundColor: CYAN }}
+                      aria-hidden
+                    />
+                    <span
+                      className={ps.psEyebrowText}
+                      style={{ color: CYAN }}
+                    >
+                      This month
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-2">
+                    <span
+                      className={cn(
+                        ps.psFontDisplay,
+                        "text-[48px] font-bold leading-none tabular-nums",
+                      )}
+                      style={{ color: "var(--ps-t1)" }}
+                    >
+                      {loading ? "—" : hub.workouts}
+                    </span>
+                    <span
+                      className={cn(ps.psFontBody, "text-[13px]")}
+                      style={{ color: "var(--ps-t2)" }}
+                    >
+                      workouts
+                    </span>
+                  </div>
+                </div>
+                <span
+                  className={cn(ps.psFontMono, "text-[10px] uppercase shrink-0")}
+                  style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
+                >
+                  {hub.monthYearLabel.replace(" ", "\u00A0")}
+                </span>
+              </div>
 
-            <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-3xl font-bold fc-text-primary tabular-nums">
-                {loading ? "—" : hub.workouts}
-              </span>
-              <span className="text-sm fc-text-dim">workouts</span>
-            </div>
-
-            <div className="grid grid-cols-5 gap-2 mb-4">
-              <div className="flex flex-col items-center gap-1 min-w-0">
-                <Dumbbell className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
-                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
-                  {loading ? "—" : hub.workouts}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
-                  Workouts
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-0">
-                <Clock className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
-                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
-                  {loading ? "—" : formatMonthHubHours(hub.totalDurationMinutes)}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
-                  Hours
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-0">
-                <TrendingUp className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
-                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
-                  {loading ? "—" : formatMonthHubVolume(hub.volumeKg)}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
-                  Volume
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-0">
-                <Trophy className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
-                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
-                  {loading ? "—" : hub.newPRs > 0 ? hub.newPRs : "—"}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
-                  New PRs
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 min-w-0">
-                <Flame className="w-4 h-4 text-[color:var(--fc-accent)] shrink-0" aria-hidden />
-                <span className="text-sm font-semibold fc-text-primary tabular-nums text-center leading-tight">
-                  {loading ? "—" : hub.streakDays}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-wider fc-text-dim text-center leading-tight">
-                  Streak
-                </span>
-              </div>
-            </div>
-
-            {!loading && hub.workouts === 0 ? (
-              <p className="text-sm fc-text-dim text-center py-6">
-                No workouts logged this month yet
-              </p>
-            ) : (
-              <div className="mt-2">
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em] fc-text-dim mb-1">
-                  Workouts per week
-                </p>
-                <div className="flex justify-between gap-1">
-                  {(() => {
-                    const counts = hub.weeklyWorkoutCounts;
-                    const maxC = Math.max(...counts, 1);
-                    const barMaxPx = 64;
-                    return counts.map((count, i) => {
-                      const isCurrent = i === hub.currentWeekIndex;
-                      const isPast = i < hub.currentWeekIndex;
-                      const barBg = isCurrent
-                        ? "bg-[color:var(--fc-accent)]"
-                        : isPast
-                          ? "bg-[color-mix(in_srgb,var(--fc-accent)_60%,transparent)]"
-                          : "bg-[color-mix(in_srgb,var(--fc-accent)_25%,transparent)]";
-                      const hPx = loading
-                        ? 12
-                        : Math.max(4, (count / maxC) * barMaxPx);
-                      const countDisplay = loading ? "—" : String(count);
-                      const title = `Week ${i + 1}: ${count} workout${count !== 1 ? "s" : ""}`;
-                      return (
-                        <div
-                          key={i}
-                          className="flex flex-col items-center flex-1 min-w-0"
-                          title={title}
-                        >
-                          <span className="text-[10px] font-bold tabular-nums fc-text-primary mb-1">
-                            {countDisplay}
-                          </span>
-                          <div className="w-full min-h-16 flex flex-col justify-end">
-                            <div
-                              className={cn(
-                                "w-full rounded-t-sm transition-colors",
-                                loading
-                                  ? "bg-[color:var(--fc-glass-highlight)] animate-pulse"
-                                  : barBg
-                              )}
-                              style={{ height: `${hPx}px` }}
-                            />
-                          </div>
-                          <span className="text-[9px] uppercase fc-text-primary mt-0.5">
-                            W{i + 1}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })()}
+              <div className="relative z-[1] grid grid-cols-4 gap-2">
+                <div className={ps.psStatTile}>
+                  <FileText className="h-3.5 w-3.5" style={{ color: CYAN }} aria-hidden />
+                  <span
+                    className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    {loading ? "—" : hub.workouts > 0 ? hub.workouts : "—"}
+                  </span>
+                  <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                    Workouts
+                  </span>
+                </div>
+                <div className={ps.psStatTile}>
+                  <Clock className="h-3.5 w-3.5" style={{ color: CYAN }} aria-hidden />
+                  <span
+                    className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    {loading ? "—" : formatMonthHubHours(hub.totalDurationMinutes)}
+                  </span>
+                  <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                    Hours
+                  </span>
+                </div>
+                <div className={ps.psStatTile}>
+                  <TrendingUp className="h-3.5 w-3.5" style={{ color: "var(--ps-lime)" }} aria-hidden />
+                  <span
+                    className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    {loading ? "—" : formatMonthHubVolume(hub.volumeKg)}
+                  </span>
+                  <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                    Vol kg
+                  </span>
+                </div>
+                <div className={ps.psStatTile}>
+                  <Trophy className="h-3.5 w-3.5" style={{ color: "var(--ps-warning)" }} aria-hidden />
+                  <span
+                    className={cn(ps.psFontDisplay, "text-base font-bold tabular-nums")}
+                    style={{ color: "var(--ps-t1)" }}
+                  >
+                    {loading ? "—" : hub.newPRs > 0 ? hub.newPRs : "—"}
+                  </span>
+                  <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.1em" }}>
+                    New PRs
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
-        </section>
 
-        {/* Quick stats — single horizontal strip (activity hub pattern) */}
-        <section className="mb-6">
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3">
-            <div className="flex items-center justify-between gap-1">
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {loading
-                    ? "—"
-                    : `${stats.weeklyWorkouts.completed}/${stats.weeklyWorkouts.goal || 0}`}
+              {!loading && hub.workouts === 0 ? (
+                <p className="relative z-[1] text-center text-sm" style={{ color: "var(--ps-t3)" }}>
+                  No workouts logged this month yet
                 </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  This week
-                </p>
-              </div>
-              <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
-              <div className="flex-1 min-w-0 text-center px-0.5">
-                <p className="text-base font-semibold fc-text-primary">
-                  {loading ? (
-                    "—"
-                  ) : stats.volumeThisWeek >= 1000 ? (
-                    <span className="tabular-nums">
-                      {(stats.volumeThisWeek / 1000).toFixed(1)}t
-                    </span>
-                  ) : (
-                    <>
-                      <span className="tabular-nums">
-                        {Math.round(stats.volumeThisWeek).toLocaleString()}
-                      </span>
-                      <span className="fc-text-primary"> kg</span>
-                    </>
-                  )}
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5 leading-tight">
-                  Volume
-                  {!loading && stats.volumeLastWeek > 0
-                    ? stats.volumeThisWeek > stats.volumeLastWeek
-                      ? ` · ↑${Math.round(stats.volumeThisWeek - stats.volumeLastWeek)}`
-                      : stats.volumeThisWeek < stats.volumeLastWeek
-                        ? ` · ↓${Math.round(stats.volumeLastWeek - stats.volumeThisWeek)}`
-                        : " · →"
-                    : ""}
-                </p>
-              </div>
-              <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-base font-semibold fc-text-primary tabular-nums">
-                  {loading ? "—" : stats.personalRecords}
-                </p>
-                <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                  PRs
-                </p>
-              </div>
-              {stats.bestLeaderboardRank != null && (
-                <>
-                  <div className="w-px h-8 bg-[color:var(--fc-glass-border)] shrink-0" aria-hidden />
-                  <div className="flex-1 min-w-0 text-center">
-                    <p className="text-base font-semibold fc-text-primary tabular-nums">
-                      {loading ? "—" : `#${stats.bestLeaderboardRank}`}
-                    </p>
-                    <p className="text-[10px] uppercase tracking-wider fc-text-dim mt-0.5">
-                      Best rank
-                    </p>
+              ) : (
+                <div className="relative z-[1] border-t pt-2" style={{ borderColor: "var(--ps-line-2)", paddingTop: 8 }}>
+                  <p
+                    className={cn(ps.psFontMono, "mb-2 text-[9px] uppercase")}
+                    style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
+                  >
+                    Workouts per week
+                  </p>
+                  <div className="flex justify-between gap-1.5">
+                    {(() => {
+                      const counts = hub.weeklyWorkoutCounts;
+                      const maxC = Math.max(...counts, 1);
+                      const barMaxPx = 56;
+                      return counts.map((count, i) => {
+                        const isCurrent = i === hub.currentWeekIndex;
+                        const hPx = loading ? 4 : Math.max(4, (count / maxC) * barMaxPx);
+                        const countDisplay = loading ? "—" : String(count);
+                        const labelNum = count === 0 ? "var(--ps-t4)" : "var(--ps-t1)";
+                        return (
+                          <div key={i} className="flex min-w-0 flex-1 flex-col items-center">
+                            <span
+                              className={cn(ps.psFontDisplay, "mb-1 text-sm font-bold tabular-nums")}
+                              style={{ color: labelNum }}
+                            >
+                              {countDisplay}
+                            </span>
+                            <div className="flex h-[72px] w-full flex-col justify-end">
+                              <div
+                                className="w-full rounded-t-[6px] transition-opacity"
+                                style={{
+                                  height: `${hPx}px`,
+                                  minHeight: 4,
+                                  opacity: isCurrent ? 1 : count > 0 ? 0.75 : 0.35,
+                                  background: `linear-gradient(180deg, ${CYAN} 0%, #34A8AD 100%)`,
+                                  boxShadow: isCurrent ? `0 0 0 1px ${CYAN}` : undefined,
+                                }}
+                              />
+                            </div>
+                            <span
+                              className={cn(ps.psFontMono, "mt-1 text-[9px]")}
+                              style={{ color: "var(--ps-t3)" }}
+                            >
+                              W{i + 1}
+                            </span>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
-                </>
+                </div>
               )}
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Promoted entry to full analytics (mobile-friendly single tap) */}
-        <section className="mb-6">
-          <button
-            type="button"
-            onClick={() => router.push("/client/progress/analytics")}
-            className="flex w-full min-h-[56px] items-center gap-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] active:opacity-90"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--fc-accent-primary)_10%,transparent)] text-[color:var(--fc-accent-primary)] border border-[color-mix(in_srgb,var(--fc-accent-primary)_20%,transparent)]">
-              <BarChart3 className="h-5 w-5" aria-hidden />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold fc-text-primary">Full analytics</h2>
-              <p className="text-xs fc-text-dim mt-0.5">
-                Charts, strength, volume, and wellness trends
+          {/* UI-7 Quick stats */}
+          <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className={ps.psQuickTile}>
+              <p className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")} style={{ color: CYAN }}>
+                {loading ? (
+                  "—"
+                ) : (
+                  <>
+                    {stats.weeklyWorkouts.completed}
+                    <span className="text-[13px] font-normal" style={{ color: "var(--ps-t4)" }}>
+                      /{stats.weeklyWorkouts.goal || 0}
+                    </span>
+                  </>
+                )}
               </p>
+              <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}>
+                This week
+              </span>
             </div>
-            <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" aria-hidden />
-          </button>
-        </section>
+            <div className={ps.psQuickTile}>
+              <p className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")} style={{ color: "var(--ps-lime)" }}>
+                {loading ? "—" : Math.round(stats.volumeThisWeek).toLocaleString()}
+              </p>
+              <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}>
+                Vol kg
+              </span>
+            </div>
+            <div className={ps.psQuickTile}>
+              <p className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")} style={{ color: "var(--ps-t1)" }}>
+                {loading ? "—" : stats.personalRecords}
+              </p>
+              <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}>
+                PRs
+              </span>
+            </div>
+            <div className={ps.psQuickTile}>
+              <p className={cn(ps.psFontDisplay, "text-lg font-bold tabular-nums")} style={{ color: "var(--ps-warning)" }}>
+                {loading ? "—" : stats.bestLeaderboardRank != null ? `#${stats.bestLeaderboardRank}` : "—"}
+              </p>
+              <span className={cn(ps.psFontMono, "text-[8.5px] uppercase")} style={{ color: "var(--ps-t3)", letterSpacing: "0.08em" }}>
+                Best rank
+              </span>
+            </div>
+          </section>
 
-        {/* Hub links — flat rows */}
-        <section className="mb-6 flex flex-col divide-y divide-[color:var(--fc-glass-border)]">
-          {HUB_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const badge = item.getBadge?.(stats) ?? null;
-            return (
-              <button
-                key={item.href}
-                type="button"
-                onClick={() => router.push(item.href)}
-                className="block w-full text-left"
-              >
-                <div className="flex min-h-[52px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-[color:var(--fc-glass-highlight)] active:fc-glass-soft">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.iconClass}`}
+          {/* UI-8 Full analytics CTA */}
+          <section className="mb-4">
+            <button
+              type="button"
+              onClick={() => router.push("/client/progress/analytics")}
+              className={ps.psAnalyticsCta}
+            >
+              <div className={ps.psAnalyticsIconSolid}>
+                <LineChart className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+              </div>
+              <div className="relative z-[1] min-w-0 flex-1">
+                <p className={cn(ps.psFontHeadline, "text-[15px] font-bold leading-tight")} style={{ color: "var(--ps-t1)" }}>
+                  Full analytics
+                </p>
+                <p className={cn(ps.psFontBody, "mt-0.5 text-[11px] leading-snug")} style={{ color: "var(--ps-t3)" }}>
+                  Charts, strength, volume &amp; wellness trends
+                </p>
+              </div>
+              <ChevronRight className="relative z-[1] h-5 w-5 shrink-0" style={{ color: "var(--ps-purple)" }} aria-hidden />
+            </button>
+          </section>
+
+          {/* UI-9 Detail nav */}
+          <section className="mb-6">
+            <PsSectionEyebrow className="mb-2 px-1">Detail views</PsSectionEyebrow>
+            <div className="flex flex-col gap-2">
+              {HUB_NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const badge = item.getBadge?.(stats) ?? null;
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => router.push(item.href)}
+                    className={ps.psNavRow}
                   >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold fc-text-primary">{item.title}</h3>
-                      {badge && (
-                        <span className="rounded border border-[color:var(--fc-glass-border)] px-2 py-0.5 font-mono text-[10px] fc-text-primary">
-                          {badge}
-                        </span>
-                      )}
+                    <div className={cn(ps.psIconTile, HUB_TILE[item.tile])}>
+                      <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
                     </div>
-                    <p className="line-clamp-1 text-xs fc-text-dim">{item.description}</p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={cn(ps.psFontBody, "text-[13.5px] font-semibold leading-tight")} style={{ color: "var(--ps-t1)" }}>
+                          {item.title}
+                        </span>
+                        {badge ? (
+                          <span className={cn(ps.psBadge, HUB_BADGE[badge.variant])}>{badge.text}</span>
+                        ) : null}
+                      </div>
+                      <p className={cn(ps.psFontBody, "line-clamp-1 text-[11px] leading-snug")} style={{ color: "var(--ps-t3)" }}>
+                        {item.description}
+                      </p>
+                    </div>
+                    <ChevronRight className={cn(ps.psNavChevron, "h-4 w-4")} aria-hidden />
+                  </button>
+                );
+              })}
+              <div className={cn(ps.psNavRowStatic, "opacity-70")} aria-disabled>
+                <div className={cn(ps.psIconTile, ps.psIconTileCyan)} style={{ opacity: 0.55 }}>
+                  <Download className="h-4 w-4" aria-hidden />
                 </div>
-              </button>
-            );
-          })}
-          <div className="flex min-h-[52px] items-center gap-3 py-2.5 opacity-80">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim">
-              <Download className="h-5 w-5" />
+                <div className="min-w-0 flex-1">
+                  <span className={cn(ps.psFontBody, "text-[13.5px] font-semibold")} style={{ color: "var(--ps-t3)" }}>
+                    Export
+                  </span>
+                  <p className={cn(ps.psFontBody, "line-clamp-1 text-[11px]")} style={{ color: "var(--ps-t4)" }}>
+                    Share your progress with your coach
+                  </p>
+                </div>
+                <ChevronRight className={cn(ps.psNavChevron, "h-4 w-4")} aria-hidden />
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold fc-text-dim">Export</h3>
-              <p className="line-clamp-1 text-xs fc-text-subtle">
-                Share your progress with your coach
-              </p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 fc-text-dim" />
-          </div>
-        </section>
-
+          </section>
+        </div>
       </ClientPageShell>
     </AnimatedBackground>
   );
@@ -462,7 +561,7 @@ function ProgressHubContent() {
 
 export default function ProgressHub() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <ProgressHubContent />
     </ProtectedRoute>
   );

@@ -26,6 +26,13 @@ import ExerciseItem from "./ExerciseItem";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
+import { ProgramEditSetTypePill } from "@/components/coach/programs/ProgramEditSetTypePill";
+import wt from "@/components/coach/workouts/workoutTemplateEditV1.module.css";
+import {
+  workoutTemplateSetTypeAccent,
+  type WorkoutTemplateSetAccent,
+} from "@/components/coach/workouts/workoutTemplateSetTypeAccent";
+import { cn } from "@/lib/utils";
 
 interface ExerciseBlockCardProps {
   exercise: any; // WorkoutTemplateExercise with all its data
@@ -43,6 +50,8 @@ interface ExerciseBlockCardProps {
   children?: React.ReactNode;
   /** Tighter padding in template editor */
   compact?: boolean;
+  /** Coach template page editor v1 visuals (drag handle is on parent row). */
+  coachEditorV1?: boolean;
 }
 
 // Block type styles with colors and icons
@@ -135,6 +144,7 @@ export default function ExerciseBlockCard({
   onToggleExpand,
   children,
   compact = false,
+  coachEditorV1 = false,
 }: ExerciseBlockCardProps) {
   const isCollapsible =
     renderMode === "form" && onToggleExpand != null;
@@ -529,6 +539,166 @@ export default function ExerciseBlockCard({
   const nestedExercises = getNestedExercises();
   const showNestedExercises =
     isComplex && nestedExercises.length > 0 && showExpanded;
+
+  const accent: WorkoutTemplateSetAccent =
+    workoutTemplateSetTypeAccent(exerciseType);
+  const expWrapClass =
+    accent === "cyan"
+      ? cn(wt.exExpandedWrap, wt.exExpandedWrapCyan)
+      : accent === "purple"
+        ? cn(wt.exExpandedWrap, wt.exExpandedWrapPurple)
+        : accent === "warning"
+          ? cn(wt.exExpandedWrap, wt.exExpandedWrapWarning)
+          : cn(wt.exExpandedWrap, wt.exExpandedWrapGood);
+
+  const subLetterClass = (() => {
+    if (accent === "cyan") return cn(wt.subLetter, "bg-[var(--cyan-soft)] text-[var(--cyan)]");
+    if (accent === "purple")
+      return cn(wt.subLetter, "bg-[var(--purple-soft)] text-[var(--purple)]");
+    if (accent === "warning")
+      return cn(wt.subLetter, "bg-[var(--warning-soft)] text-[var(--warning)]");
+    return cn(wt.subLetter, "bg-[var(--good-soft)] text-[var(--good)]");
+  })();
+
+  if (coachEditorV1 && compact && renderMode === "form") {
+    const headerRow = (
+      <div
+        className={cn(
+          "flex items-stretch min-w-0",
+          showExpanded && wt.exHeaderRow,
+        )}
+      >
+        <div className={wt.exBadge}>{index + 1}</div>
+        <div
+          className={cn(wt.exBody, isCollapsible && "cursor-pointer")}
+          onClick={isCollapsible ? onToggleExpand : undefined}
+          role={isCollapsible ? "button" : undefined}
+          tabIndex={isCollapsible ? 0 : undefined}
+          onKeyDown={
+            isCollapsible
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onToggleExpand?.();
+                  }
+                }
+              : undefined
+          }
+          aria-expanded={isCollapsible ? isExpanded : undefined}
+        >
+          <div className={wt.exTitleRow}>
+            <span className={wt.exName}>
+              {isComplex &&
+              exerciseType !== "superset" &&
+              exerciseType !== "pre_exhaustion"
+                ? `${styleConfig.label} ${index + 1}`
+                : mainExerciseName}
+            </span>
+            <ProgramEditSetTypePill setType={exerciseType} />
+          </div>
+          <p className={wt.exMeta}>{renderExerciseSummary()}</p>
+          {exercise.notes && (
+            <p className="text-[10px] text-[var(--t3)] mt-0.5 line-clamp-2">
+              Note: {exercise.notes}
+            </p>
+          )}
+        </div>
+        {renderMode === "form" && (
+          <div className={wt.exActions}>
+            {isCollapsible && (
+              <button
+                type="button"
+                className={wt.exIconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand?.();
+                }}
+                aria-label={isExpanded ? "Collapse" : "Expand"}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {onEdit && !showExpanded && (
+              <button
+                type="button"
+                className={wt.exIconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(exercise);
+                }}
+                aria-label="Edit exercise"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className={cn(wt.exIconBtn, wt.exIconBtnDanger)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(exercise.id);
+                }}
+                aria-label="Remove exercise"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+
+    if (showExpanded) {
+      return (
+        <div className={expWrapClass}>
+          {headerRow}
+          {showNestedExercises && (
+            <div className={wt.subExList}>
+              {nestedExercises.map((row: any, i: number) => (
+                <div key={i} className={wt.subExRow}>
+                  <div className={wt.subExTop}>
+                    <span className={subLetterClass}>
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className={wt.subExName}>
+                      {row.name || getExerciseName(row.exercise_id)}
+                    </span>
+                  </div>
+                  <div className={wt.subExMeta}>
+                    {[
+                      row.sets != null && row.sets !== ""
+                        ? `${row.sets} sets`
+                        : null,
+                      row.reps ? `${row.reps} reps` : null,
+                      row.load_percentage
+                        ? `Load ${row.load_percentage}%`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {children && (
+            <div className={wt.exExpandedBody}>{children}</div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={wt.exCard}>
+        {headerRow}
+      </div>
+    );
+  }
 
   return (
     <div

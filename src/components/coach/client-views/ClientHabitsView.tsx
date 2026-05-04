@@ -1,151 +1,229 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Flame, Droplet, Footprints, Heart, CheckCircle, TrendingUp } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { HabitTracker } from '@/lib/habitTracker'
+import { fetchClientHabits, type ClientHabitWithTemplate } from '@/lib/habitTemplateService'
+import {
+  addCalendarDaysYmd,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from '@/lib/clientZonedCalendar'
+import type { WellnessLogDay } from '@/lib/habitAutoTracking'
+import { STUB_SOURCE_TYPES, workoutLogsToCompletedYmds } from '@/lib/habitAutoTracking'
+import { isClientHabitCompleteOnDay, wellnessRowsToMap } from '@/lib/coachHabitsAdherence'
+import { HabitLucideIcon } from '@/components/client/habitLucideIcon'
+import { useCoachClient } from '@/contexts/CoachClientContext'
+import { cn } from '@/lib/utils'
+import HabitCard from '@/components/coach/client-detail/HabitCard'
+import EmptyStateBlock from '@/components/coach/client-detail/EmptyStateBlock'
+import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
+import { Star } from 'lucide-react'
+
+type WindowMode = 7 | 30
+
+function sourceBadgeLabel(sourceType: string): { kind: 'auto' | 'manual'; text: string } {
+  if (sourceType === 'manual') return { kind: 'manual', text: 'Manual' }
+  if (STUB_SOURCE_TYPES.has(sourceType)) return { kind: 'manual', text: 'Manual' }
+  if (sourceType === 'workout_logged') return { kind: 'auto', text: 'Auto-tracked from workouts' }
+  if (sourceType === 'wellness_check') return { kind: 'auto', text: 'Auto-tracked from check-in' }
+  if (sourceType === 'wellness_field') return { kind: 'auto', text: 'Auto-tracked from wellness' }
+  return { kind: 'auto', text: `Auto-tracked (${sourceType})` }
+}
+
+function mergedTarget(h: ClientHabitWithTemplate): Record<string, unknown> {
+  return { ...h.template.default_target, ...h.target }
+}
+
+function formatTargetRow(h: ClientHabitWithTemplate): string {
+  const t = mergedTarget(h)
+  const st = h.template.source_type
+  if (st === 'water_log' && typeof t.liters === 'number') return `Target: ${t.liters}L / day`
+  if (st === 'meal_completion_count' && typeof t.min_meals === 'number')
+    return `Target: at least ${t.min_meals} meals / day`
+  if (st === 'nutrition_field') {
+    const field = String((h.template.source_config as { field?: string })?.field ?? '')
+    if (field === 'calories' && typeof t.calories === 'number') return `Target: ${Math.round(t.calories)} kcal / day`
+    if (field === 'protein_g' && typeof t.protein_g === 'number') return `Target: ${Math.round(t.protein_g)} g protein / day`
+  }
+  if (st === 'wellness_field') {
+    const field = String(h.template.source_config?.field ?? '')
+    if (field === 'sleep_hours' && typeof t.hours === 'number') return `Target: ${t.hours}h sleep / night`
+    if (field === 'steps' && typeof t.steps === 'number') return `Target: ${Math.round(Number(t.steps)).toLocaleString()} steps / day`
+    if (field === 'sleep_quality' && typeof t.quality === 'number') return `Target: sleep quality ≥ ${t.quality} / 5`
+    if (field === 'stress_level' && typeof t.max_stress === 'number') return `Target: stress ≤ ${t.max_stress} / 5`
+  }
+  if (st === 'workout_logged') return 'Target: 1 workout / day'
+  const keys = Object.keys(t).filter((k) => t[k] != null && t[k] !== '')
+  if (keys.length === 0) return 'Target: —'
+  return `Target: ${keys.map((k) => `${k}: ${String(t[k])}`).join(', ')}`
+}
+
+function logKeysForHabit(habitId: string, ymds: Set<string>): Set<string> {
+  return new Set([...ymds].map((d) => `${habitId}|${d}`))
+}
+
+function currentStreakFromDays(orderedYmds: string[], doneByYmd: Map<string, boolean>): number {
+  let n = 0
+  for (let i = orderedYmds.length - 1; i >= 0; i--) {
+    const y = orderedYmds[i]!
+    if (doneByYmd.get(y)) n += 1
+    else break
+  }
+  return n
+}
 
 interface ClientHabitsViewProps {
   clientId: string
+  /** Optional; falls back to CoachClientContext or profile. */
+  clientName?: string
+  /** Coach v6 habit cards (Check-ins + Profile Habits). */
+  layoutVariant?: 'default' | 'coachV6'
 }
 
-interface HabitData {
-  id: string
-  name: string
-  icon: any
-  gradient: string
-  current: string
-  target: string
-  streak: number
-  weekData: boolean[]
-  completionRate: number
-  stats?: {
-    currentStreak: number
-    longestStreak: number
-    totalCompletions: number
-    completionRate: number
+function habitIconVariant(sourceType: string, field: string): 'warn' | 'cyan' | 'purple' | 'good' {
+  if (sourceType === 'water_log') return 'warn'
+  if (sourceType === 'workout_logged') return 'cyan'
+  if (sourceType === 'nutrition_field' || sourceType === 'meal_completion_count') return 'good'
+  if (sourceType === 'wellness_field') {
+    if (field.includes('sleep')) return 'purple'
+    return 'warn'
   }
+  return 'cyan'
 }
 
-export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
-  const [habits, setHabits] = useState<HabitData[]>([])
+export function HabitsList(props: Omit<ClientHabitsViewProps, 'layoutVariant'>) {
+  return <ClientHabitsView {...props} layoutVariant="coachV6" />
+}
+
+export default function ClientHabitsView({
+  clientId,
+  clientName: clientNameProp,
+  layoutVariant = 'default',
+}: ClientHabitsViewProps) {
+  const { clientName: ctxName } = useCoachClient()
+  const [windowDays, setWindowDays] = useState<WindowMode>(7)
+  const [displayName, setDisplayName] = useState(clientNameProp ?? ctxName ?? 'Client')
+  const [tz, setTz] = useState('Europe/Bucharest')
+  const [habits, setHabits] = useState<ClientHabitWithTemplate[]>([])
+  const [logsByHabit, setLogsByHabit] = useState<Map<string, Set<string>>>(new Map())
+  const [wellnessRows, setWellnessRows] = useState<WellnessLogDay[]>([])
+  const [workoutRows, setWorkoutRows] = useState<{ completed_at: string | null }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadHabits()
-  }, [clientId])
+    if (clientNameProp) setDisplayName(clientNameProp)
+    else if (ctxName) setDisplayName(ctxName)
+  }, [clientNameProp, ctxName])
 
-  const loadHabits = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true)
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, timezone')
+        .eq('id', clientId)
+        .maybeSingle()
 
-      // Fetch assignments without embed to avoid RLS/500 on habit_assignments+habits join
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('habit_assignments')
-        .select('id, habit_id, start_date')
-        .eq('client_id', clientId)
-        .eq('is_active', true)
+      const clientTz = normalizeClientTimezone(
+        typeof prof?.timezone === 'string' ? prof.timezone : undefined
+      )
+      setTz(clientTz)
+      if (prof && !clientNameProp && !ctxName) {
+        const fn = prof.first_name ?? ''
+        const ln = prof.last_name ?? ''
+        const n = `${fn} ${ln}`.trim()
+        if (n) setDisplayName(n)
+      }
 
-      if (assignmentsError || !assignments || assignments.length === 0) {
-        setHabits([])
-        setLoading(false)
+      const list = await fetchClientHabits(clientId)
+      setHabits(list)
+      const habitIds = list.map((h) => h.id)
+      if (habitIds.length === 0) {
+        setLogsByHabit(new Map())
+        setWellnessRows([])
+        setWorkoutRows([])
         return
       }
 
-      // Fetch habit details in a separate query (coach can read their habits)
-      const habitIds = [...new Set(assignments.map((a: { habit_id: string }) => a.habit_id))]
-      const { data: habitsRows } = await supabase
-        .from('habits')
-        .select('id, name, description, frequency_type, target_days, icon')
-        .in('id', habitIds)
-      const habitMap = new Map((habitsRows ?? []).map((h: { id: string; name?: string; description?: string; frequency_type?: string; target_days?: number; icon?: string }) => [h.id, h]))
+      const todayYmd = zonedCalendarDateString(new Date(), clientTz)
+      const startYmd = addCalendarDaysYmd(todayYmd, -(windowDays - 1))
 
-      // Get habit logs for last 30 days for analytics
-      const assignmentIds = assignments.map((a: { id: string }) => a.id)
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      const startDate = thirtyDaysAgo.toISOString().split('T')[0]
+      const [logsRes, wellRes, woRes] = await Promise.all([
+        supabase
+          .from('habit_logs')
+          .select('habit_id, log_date')
+          .eq('client_id', clientId)
+          .in('habit_id', habitIds)
+          .gte('log_date', startYmd)
+          .lte('log_date', todayYmd),
+        supabase
+          .from('daily_wellness_logs')
+          .select(
+            'log_date, sleep_hours, sleep_quality, stress_level, soreness_level, energy_level, steps'
+          )
+          .eq('client_id', clientId)
+          .gte('log_date', startYmd)
+          .lte('log_date', todayYmd),
+        supabase
+          .from('workout_logs')
+          .select('completed_at')
+          .eq('client_id', clientId)
+          .gte('completed_at', `${startYmd}T00:00:00.000Z`)
+          .not('completed_at', 'is', null),
+      ])
 
-      const { data: logs, error: logsError } = await supabase
-        .from('habit_logs')
-        .select('assignment_id, log_date')
-        .in('assignment_id', assignmentIds)
-        .gte('log_date', startDate)
-        .order('log_date', { ascending: false })
-
-      if (logsError) throw logsError
-
-      // Get last 7 days for week view
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      const weekStartDate = sevenDaysAgo.toISOString().split('T')[0]
-
-      const { data: weekLogs } = await supabase
-        .from('habit_logs')
-        .select('assignment_id, log_date')
-        .in('assignment_id', assignmentIds)
-        .gte('log_date', weekStartDate)
-
-      type HabitRow = { id: string; name?: string; description?: string; frequency_type?: string; target_days?: number; icon?: string }
-      // Process each habit assignment
-      const habitsData: HabitData[] = await Promise.all(
-        assignments.map(async (assignment: { id: string; habit_id: string }) => {
-          const habit: HabitRow = habitMap.get(assignment.habit_id) ?? { id: assignment.habit_id }
-          const assignmentLogs = (logs || []).filter(l => l.assignment_id === assignment.id)
-          const weekAssignmentLogs = (weekLogs || []).filter(l => l.assignment_id === assignment.id)
-
-          // Calculate week data (last 7 days)
-          const weekData: boolean[] = []
-          for (let i = 6; i >= 0; i--) {
-            const date = new Date()
-            date.setDate(date.getDate() - i)
-            const dateStr = date.toISOString().split('T')[0]
-            weekData.push(weekAssignmentLogs.some(l => l.log_date === dateStr))
-          }
-
-          // Calculate stats using HabitTracker
-          const entries = assignmentLogs.map((log: any) => ({
-            id: log.id || '',
-            user_habit_id: assignment.id,
-            entry_date: log.log_date,
-            completed_value: 1,
-            target_value: 1,
-            is_completed: true,
-            created_at: log.log_date,
-            updated_at: log.log_date
-          }))
-
-          const stats = HabitTracker.calculateStreak(entries)
-          const completionRate = Math.round((weekData.filter(d => d).length / 7) * 100)
-
-          // Determine icon based on habit name
-          let Icon = Heart
-          if (habit.name?.toLowerCase().includes('water')) Icon = Droplet
-          else if (habit.name?.toLowerCase().includes('step')) Icon = Footprints
-          else if (habit.name?.toLowerCase().includes('cardio') || habit.name?.toLowerCase().includes('exercise')) Icon = Flame
-
-          return {
-            id: assignment.id,
-            name: habit.name || 'Habit',
-            icon: Icon,
-            gradient: 'from-indigo-500 to-purple-600',
-            current: `${stats.totalCompletions} completions`,
-            target: `${habit.target_days || 7} days/week`,
-            streak: stats.currentStreak,
-            weekData,
-            completionRate,
-            stats
-          }
-        })
-      )
-
-      setHabits(habitsData)
-    } catch (error) {
-      console.error('Error loading habits:', error)
+      const m = new Map<string, Set<string>>()
+      for (const row of logsRes.data ?? []) {
+        const hid = (row as { habit_id: string }).habit_id
+        const d = (row as { log_date: string }).log_date
+        const s = m.get(hid) ?? new Set<string>()
+        s.add(d)
+        m.set(hid, s)
+      }
+      setLogsByHabit(m)
+      setWellnessRows((wellRes.data ?? []) as WellnessLogDay[])
+      setWorkoutRows((woRes.data ?? []) as { completed_at: string | null }[])
+    } catch (e) {
+      console.error('[ClientHabitsView]', e)
+      setHabits([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [clientId, windowDays, clientNameProp, ctxName])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const dayList = useMemo(() => {
+    const clientTz = normalizeClientTimezone(tz)
+    const todayYmd = zonedCalendarDateString(new Date(), clientTz)
+    const days: string[] = []
+    for (let i = windowDays - 1; i >= 0; i--) {
+      days.push(addCalendarDaysYmd(todayYmd, -i))
+    }
+    return days
+  }, [tz, windowDays])
+
+  const todayYmd = useMemo(
+    () => zonedCalendarDateString(new Date(), normalizeClientTimezone(tz)),
+    [tz]
+  )
+
+  const wellnessMap = useMemo(() => wellnessRowsToMap(wellnessRows), [wellnessRows])
+  const workoutYmds = useMemo(
+    () => workoutLogsToCompletedYmds(workoutRows, normalizeClientTimezone(tz)),
+    [workoutRows, tz]
+  )
+
+  const sourceDataBase = useMemo(
+    () => ({
+      clientTimezone: normalizeClientTimezone(tz),
+      wellnessByYmd: wellnessMap,
+      workoutCompletedYmds: workoutYmds,
+    }),
+    [tz, wellnessMap, workoutYmds]
+  )
 
   if (loading) {
     return (
@@ -153,7 +231,7 @@ export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-32 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl animate-pulse"
+            className="h-36 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl animate-pulse"
           />
         ))}
       </div>
@@ -161,179 +239,233 @@ export default function ClientHabitsView({ clientId }: ClientHabitsViewProps) {
   }
 
   if (habits.length === 0) {
+    if (layoutVariant === 'coachV6') {
+      return (
+        <EmptyStateBlock
+          icon={Star}
+          title="No habits set up"
+          description="Encourage your client to add habits in their app."
+        />
+      )
+    }
     return (
-      <div className="fc-card-shell p-8 text-center">
-        <div className="mx-auto mb-4 fc-icon-tile fc-icon-habits w-14 h-14">
-          <Flame className="w-6 h-6" />
-        </div>
-        <h3 className="text-lg font-semibold fc-text-primary mb-2">
-          No Active Habits
-        </h3>
+      <div className="fc-card-shell p-8 text-center rounded-2xl border border-[color:var(--fc-glass-border)]">
         <p className="text-sm fc-text-dim">
-          Assign a habit to start tracking consistency.
+          {displayName} hasn&apos;t set any habits yet.
         </p>
       </div>
     )
   }
 
-  const avgCompletion = Math.round(
-    habits.reduce((sum, habit) => sum + habit.completionRate, 0) / habits.length
-  )
-  const activeStreaks = habits.filter((habit) => habit.streak > 0).length
+  if (layoutVariant === 'coachV6') {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className={sec.sectionTitle}>Habits</h2>
+            <p className="text-sm text-[color:var(--fc-text-subtle)] mt-1">
+              {displayName} · {habits.length} active habit{habits.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className={sec.rangeRow}>
+            {([7, 30] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`${sec.rangeTab} ${windowDays === d ? sec.rangeTabActive : ''}`}
+                onClick={() => setWindowDays(d)}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3">
+          {habits.map((habit) => {
+            const badge = sourceBadgeLabel(habit.template.source_type)
+            const ymdSet = logsByHabit.get(habit.id) ?? new Set<string>()
+            const logKeys = logKeysForHabit(habit.id, ymdSet)
+            const doneByYmd = new Map<string, boolean>()
+            for (const ymd of dayList) {
+              doneByYmd.set(ymd, isClientHabitCompleteOnDay(habit, ymd, sourceDataBase, logKeys))
+            }
+            const total = dayList.length
+            const completedCount = dayList.filter((y) => doneByYmd.get(y)).length
+            const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0
+            const streak = currentStreakFromDays(dayList, doneByYmd)
+            let lastYmd: string | null = null
+            for (let i = dayList.length - 1; i >= 0; i--) {
+              const y = dayList[i]!
+              if (doneByYmd.get(y)) {
+                lastYmd = y
+                break
+              }
+            }
+            const field = String((habit.template.source_config as { field?: string })?.field ?? '')
+            const iv = habitIconVariant(habit.template.source_type, field)
+            const doneFlags = dayList.map((y) => Boolean(doneByYmd.get(y)))
+            const lastText = lastYmd
+              ? `Last: ${new Date(`${lastYmd}T12:00:00`).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}`
+              : 'Never logged'
+            return (
+              <HabitCard
+                key={habit.id}
+                name={habit.template.name}
+                targetLine={formatTargetRow(habit)}
+                badgeKind={badge.kind}
+                badgeText={badge.text}
+                Icon={(p) => <HabitLucideIcon name={habit.template.icon} {...p} />}
+                iconVariant={iv}
+                doneFlags={doneFlags}
+                completedLeft={
+                  <>
+                    Completed: <b>
+                      {completedCount}/{total}
+                    </b>{' '}
+                    ({pct}%)
+                    {windowDays === 30 ? (
+                      <>
+                        {' '}
+                        · Best streak: <b>{streak}</b>d
+                      </>
+                    ) : null}
+                  </>
+                }
+                lastLabel={lastText}
+              />
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-          <div className="flex items-center gap-3">
-            <div className="fc-icon-tile fc-icon-habits">
-              <Flame className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="fc-pill fc-pill-glass fc-text-habits text-xs">
-                Habits
-              </span>
-              <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                Consistency Overview
-              </h3>
-              <p className="text-sm fc-text-dim">
-                Weekly adherence and streak momentum
-              </p>
-            </div>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold fc-text-primary">Habits</h2>
+          <p className="text-sm fc-text-dim mt-1">
+            {displayName} · {habits.length} active habit{habits.length === 1 ? '' : 's'}
+          </p>
         </div>
-        <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-            <p className="text-3xl font-bold fc-text-primary">{habits.length}</p>
-            <p className="text-sm fc-text-dim">Active Habits</p>
-          </div>
-          <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-            <p className="text-3xl font-bold fc-text-primary">{activeStreaks}</p>
-            <p className="text-sm fc-text-dim">Streaks Running</p>
-          </div>
-          <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-            <p className="text-3xl font-bold fc-text-primary">{avgCompletion}%</p>
-            <p className="text-sm fc-text-dim">Avg Completion</p>
-          </div>
+        <div className="flex rounded-xl border border-[color:var(--fc-glass-border)] p-0.5 bg-[color:var(--fc-glass-soft)]">
+          {([7, 30] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setWindowDays(d)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                windowDays === d
+                  ? 'bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)]'
+                  : 'fc-text-dim hover:fc-text-primary'
+              )}
+            >
+              Last {d} days
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-          <div className="flex items-center gap-3">
-            <div className="fc-icon-tile fc-icon-habits">
-              <CheckCircle className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="fc-pill fc-pill-glass fc-text-habits text-xs">
-                Weekly Tracking
-              </span>
-              <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                Habit Activity
-              </h3>
-            </div>
-            <span className="ml-auto fc-pill fc-pill-glass fc-text-habits text-xs">
-              {habits.length}
-            </span>
-          </div>
-        </div>
-        <div className="px-2 py-1">
-      {habits.map((habit) => {
-        const Icon = habit.icon
-        
-        return (
-          <div
-            key={habit.id}
-            className="border-b border-[color:var(--fc-glass-border)] px-2 py-3 last:border-b-0"
-          >
-            <div className="flex items-start gap-4">
-              <div className="fc-icon-tile fc-icon-habits">
-                <Icon className="w-6 h-6" />
-              </div>
+      <div className="space-y-4">
+        {habits.map((habit) => {
+          const badge = sourceBadgeLabel(habit.template.source_type)
+          const ymdSet = logsByHabit.get(habit.id) ?? new Set<string>()
+          const logKeys = logKeysForHabit(habit.id, ymdSet)
+          const doneByYmd = new Map<string, boolean>()
+          for (const ymd of dayList) {
+            doneByYmd.set(
+              ymd,
+              isClientHabitCompleteOnDay(habit, ymd, sourceDataBase, logKeys)
+            )
+          }
+          const total = dayList.length
+          const completedCount = dayList.filter((y) => doneByYmd.get(y)).length
+          const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0
+          const streak = currentStreakFromDays(dayList, doneByYmd)
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold fc-text-primary">{habit.name}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="fc-pill fc-pill-glass fc-text-warning text-xs">
-                      {habit.streak} day streak
+          let lastYmd: string | null = null
+          for (let i = dayList.length - 1; i >= 0; i--) {
+            const y = dayList[i]!
+            if (doneByYmd.get(y)) {
+              lastYmd = y
+              break
+            }
+          }
+
+          return (
+            <article
+              key={habit.id}
+              className="rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4 space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <div className="fc-icon-tile fc-icon-habits shrink-0">
+                  <HabitLucideIcon name={habit.template.icon} className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-semibold fc-text-primary">{habit.template.name}</h3>
+                    <span
+                      className={cn(
+                        'text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border',
+                        badge.kind === 'auto'
+                          ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                          : 'border-[color:var(--fc-glass-border)] fc-text-dim'
+                      )}
+                    >
+                      {badge.text}
                     </span>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <span className="text-sm fc-text-subtle">
-                    Current: <span className="font-semibold fc-text-primary">{habit.current}</span>
-                  </span>
-                  <span className="text-sm fc-text-subtle">
-                    Target: <span className="font-semibold fc-text-primary">{habit.target}</span>
-                  </span>
-                  <span className="fc-pill fc-pill-glass fc-text-success text-xs">
-                    {habit.completionRate}% this week
-                  </span>
-                </div>
-
-                {/* Analytics Section */}
-                {habit.stats && (
-                  <div className="mb-3 p-3 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="w-4 h-4 fc-text-subtle" />
-                      <span className="text-xs font-semibold fc-text-subtle">
-                        Analytics (Last 30 Days)
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <span className="fc-text-subtle">Longest:</span>
-                        <span className="font-semibold ml-1 fc-text-primary">
-                          {habit.stats.longestStreak} days
-                        </span>
-                      </div>
-                      <div>
-                        <span className="fc-text-subtle">Total:</span>
-                        <span className="font-semibold ml-1 fc-text-primary">
-                          {habit.stats.totalCompletions}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="fc-text-subtle">Rate:</span>
-                        <span className="font-semibold ml-1 fc-text-primary">
-                          {Math.round(habit.stats.completionRate)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 7-Day Visual */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs fc-text-subtle">
-                    <span>Last 7 days</span>
-                    <span>{habit.weekData.filter(Boolean).length}/7</span>
-                  </div>
-                  <div className="flex gap-2">
-                  {habit.weekData.map((completed, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 flex items-center justify-center h-8 rounded-xl border ${
-                        completed
-                          ? 'bg-[color:var(--fc-domain-habits)] fc-text-primary border-transparent'
-                          : 'fc-glass-soft border-[color:var(--fc-glass-border)] fc-text-subtle'
-                      }`}
-                    >
-                      {completed && <CheckCircle className="w-4 h-4" />}
-                    </div>
-                  ))}
-                  </div>
+                  <p className="text-xs fc-text-dim mt-1">{formatTargetRow(habit)}</p>
                 </div>
               </div>
-            </div>
-          </div>
-        )
-      })}
-        </div>
+
+              <div className="flex flex-wrap gap-1 justify-start" aria-label="Completion strip">
+                {dayList.map((ymd) => {
+                  const done = Boolean(doneByYmd.get(ymd))
+                  const isToday = ymd === todayYmd
+                  return (
+                    <div
+                      key={ymd}
+                      title={ymd}
+                      className={cn(
+                        windowDays === 30 ? 'h-5 w-5 rounded-sm' : 'h-8 w-8 rounded-lg',
+                        'border shrink-0',
+                        done
+                          ? 'bg-[color:var(--fc-domain-habits)] border-transparent'
+                          : 'bg-transparent border-[color:var(--fc-glass-border)]',
+                        isToday && 'ring-2 ring-cyan-500/60 ring-offset-1 ring-offset-[color:var(--fc-surface)]'
+                      )}
+                    />
+                  )
+                })}
+              </div>
+
+              <div className="text-xs fc-text-subtle space-y-1">
+                <p>
+                  Completed: {completedCount}/{total} days ({pct}%)
+                  {streak > 0 ? ` · Current streak: ${streak} day${streak === 1 ? '' : 's'}` : null}
+                </p>
+                <p>
+                  Last logged:{' '}
+                  {lastYmd
+                    ? new Date(`${lastYmd}T12:00:00`).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : 'Never logged'}
+                </p>
+              </div>
+            </article>
+          )
+        })}
       </div>
     </div>
   )
 }
-

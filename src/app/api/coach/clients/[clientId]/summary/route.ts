@@ -19,11 +19,10 @@ import {
 } from '@/lib/coachClientSummaryServer';
 import {
   addCalendarDaysYmd,
+  diffCalendarDaysYmd,
   zonedCalendarDateString,
   zonedDayInclusiveUtcBounds,
   mondayYmdOfZonedWeekContaining,
-} from '@/lib/programWeekCalendar';
-import {
   computeCurrentProgramWeekForAssignment,
   normalizeClientTimezone,
 } from '@/lib/programWeekCalendar';
@@ -158,7 +157,22 @@ export async function GET(
     const currentWeekIso = zonedDayInclusiveUtcBounds(currentWeekStart, clientTz);
     const currentWeekEndIso = zonedDayInclusiveUtcBounds(currentWeekEnd, clientTz);
     const previousWeekIso = zonedDayInclusiveUtcBounds(previousWeekStart, clientTz);
-    const previousWeekEndIso = zonedDayInclusiveUtcBounds(previousWeekEnd, clientTz);
+
+    /** Mon=0 … Sun=6 — calendar days from current Monday to today (client TZ). */
+    const daysElapsedIntoCurrentWeek = Math.max(
+      0,
+      Math.min(6, diffCalendarDaysYmd(currentWeekStart, todayStr))
+    );
+    /** Like-for-like delta baseline: same Mon–(today DOW) slice of last calendar week. */
+    const previousWeekTruncatedEnd = addCalendarDaysYmd(
+      previousWeekStart,
+      daysElapsedIntoCurrentWeek
+    );
+    const previousWeekTruncatedEndIso = zonedDayInclusiveUtcBounds(
+      previousWeekTruncatedEnd,
+      clientTz
+    );
+    const suppressWeeklyDeltas = daysElapsedIntoCurrentWeek === 0;
 
     const [
       workoutCounters,
@@ -462,7 +476,10 @@ export async function GET(
       const bucket = bucketByIsoRange(
         row.completed_at,
         { startIso: currentWeekIso.startIso, endIso: currentWeekEndIso.endIso },
-        { startIso: previousWeekIso.startIso, endIso: previousWeekEndIso.endIso }
+        {
+          startIso: previousWeekIso.startIso,
+          endIso: previousWeekTruncatedEndIso.endIso,
+        }
       );
       if (bucket === 'current') currentWorkoutIds.push(row.id);
       if (bucket === 'previous') previousWorkoutIds.push(row.id);
@@ -501,7 +518,7 @@ export async function GET(
       const bucket = bucketByYmdRange(
         row.achieved_date,
         { start: currentWeekStart, end: currentWeekEnd },
-        { start: previousWeekStart, end: previousWeekEnd }
+        { start: previousWeekStart, end: previousWeekTruncatedEnd }
       );
       if (!bucket) continue;
       const exerciseName = Array.isArray(row.exercises)
@@ -530,7 +547,7 @@ export async function GET(
       const bucket = bucketByYmdRange(
         row.log_date,
         { start: currentWeekStart, end: currentWeekEnd },
-        { start: previousWeekStart, end: previousWeekEnd }
+        { start: previousWeekStart, end: previousWeekTruncatedEnd }
       );
       if (!bucket) continue;
       if (bucket === 'current') currentWellness.push(row);
@@ -547,7 +564,7 @@ export async function GET(
       const bucket = bucketByYmdRange(
         row.measured_date,
         { start: currentWeekStart, end: currentWeekEnd },
-        { start: previousWeekStart, end: previousWeekEnd }
+        { start: previousWeekStart, end: previousWeekTruncatedEnd }
       );
       if (!bucket) continue;
       if (bucket === 'current') currentBodyRows.push(row);
@@ -747,6 +764,7 @@ export async function GET(
         clientId,
         clientTimezone: clientTz,
         hasActiveAssignment: Boolean(pa),
+        suppressWeeklyDeltas,
         currentWeek: currentWeekReview,
         previousWeek: previousWeekReview,
       },

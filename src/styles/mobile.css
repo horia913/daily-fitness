@@ -2,10 +2,10 @@
 
 /* Base mobile styles - only essential, non-conflicting styles */
 @media (max-width: 768px) {
-  /* Ensure proper touch targets */
-  button, 
-  [role="button"], 
-  input[type="button"], 
+  /* Ensure proper touch targets (exclude dense workout log +/- — see LargeInput fc-logset-step-btn) */
+  button:not(.fc-logset-step-btn),
+  [role="button"],
+  input[type="button"],
   input[type="submit"] {
     min-height: 44px;
     min-width: 44px;
@@ -19,8 +19,8 @@
     touch-action: manipulation;
   }
 
-  /* Prevent zoom on input focus */
-  input[type="text"],
+  /* Prevent zoom on input focus (16px+). Exclude workout log numerals — see LargeInput. */
+  input[type="text"]:not(.fc-logset-num),
   input[type="email"],
   input[type="password"],
   input[type="number"],
@@ -92,10 +92,7 @@
     padding: 0.75rem;
   }
 
-  /* Grid adjustments */
-  .grid {
-    gap: 0.75rem;
-  }
+  /* Grid: do not set `.grid { gap }` — it overrides Tailwind `gap-*` on every `grid` utility. */
 
   .grid-cols-2 {
     grid-template-columns: repeat(2, 1fr);

@@ -4,6 +4,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Save } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import wt from '@/components/coach/workouts/workoutTemplateEditV1.module.css';
+import { cn } from '@/lib/utils';
 
 export interface ActionButtonsProps {
   onCancel: () => void;
@@ -12,6 +14,8 @@ export interface ActionButtonsProps {
   loading: boolean;
   /** When truthy, submit button label is "Update Template"; otherwise "Create Template". */
   template?: unknown;
+  /** Coach template editor v1 — lime save, top fade, ghost cancel. */
+  visualVariant?: "default" | "coachV1";
 }
 
 export function ActionButtons({
@@ -19,9 +23,35 @@ export function ActionButtons({
   onSubmit,
   loading,
   template,
+  visualVariant = 'default',
 }: ActionButtonsProps) {
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles?.() ?? {};
+
+  if (visualVariant === 'coachV1') {
+    return (
+      <div className={wt.saveBar}>
+        <div className={wt.saveBarInner}>
+          <button type="button" className={wt.btnGhostCancel} onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            onClick={() => onSubmit()}
+            className={wt.btnLimeSave}
+          >
+            <Save className="w-4 h-4" strokeWidth={2.25} />
+            {loading
+              ? 'Saving...'
+              : template
+                ? 'Update template'
+                : 'Create template'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

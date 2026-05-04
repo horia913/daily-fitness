@@ -11,7 +11,6 @@ import {
 import { BodyMeasurement, getClientMeasurements } from "@/lib/measurementService";
 import { WellnessTrendsCard } from "@/components/client/WellnessTrendsCard";
 import { CheckInConfigEditor } from "@/components/coach/CheckInConfigEditor";
-import ClientAdherenceView from "@/components/coach/client-views/ClientAdherenceView";
 import { getWeekStartMonday } from "./clientProgressHubUtils";
 
 interface ClientProgressWellnessSectionProps {
@@ -135,8 +134,6 @@ export default function ClientProgressWellnessSection({
 
   return (
     <div className="space-y-6">
-      <ClientAdherenceView clientId={clientId} />
-
       <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
         <h3 className="text-lg font-semibold fc-text-primary mb-3">This week (wellness logs)</h3>
         {thisWeekWellnessSummary ? (
@@ -163,8 +160,7 @@ export default function ClientProgressWellnessSection({
             </p>
             {wellnessStats && wellnessStats.loggedDays > 0 && (
               <p className="text-xs fc-text-dim mt-2">
-                Logged {wellnessStats.loggedDays} of last 7 days (same window as the adherence strip
-                above).
+                Daily wellness check-ins logged in the past 7 days: {wellnessStats.loggedDays} of 7.
               </p>
             )}
           </>
@@ -215,7 +211,7 @@ export default function ClientProgressWellnessSection({
                   return (
                     <div
                       key={i}
-                      className="flex-1 rounded bg-[color:var(--fc-accent)]/40 min-h-[4px]"
+                      className="flex-1 rounded bg-[color:var(--fc-accent-cyan)]/40 min-h-[4px]"
                       style={{ height: `${(avg / 5) * 100}%` }}
                       title={`${avg.toFixed(1)}/5`}
                     />

@@ -100,6 +100,163 @@
   --fc-list-row-min-height: 48px;
   --fc-list-row-py: 12px;
   --fc-list-row-px: 16px;
+
+  /* ============================================================
+     v4 ADDITIVE TOKENS — added in Phase 0a (2026-04-26)
+     Light-theme values mirror dark per user policy
+     (Phases 1–8 are dark-theme-first; light theme deferred to a
+     dedicated post-Phase-8 pass). Each new value is flagged
+     [verify-light-theme] so the future pass can audit them.
+     Refs: design-system-v4 §2.2, §2.3, §2.6, §2.7, §2.8, §2.9
+     ============================================================ */
+  /* §2.3 Accent — lime (action) */
+  --fc-accent-lime:        #C5FF4A; /* [verify-light-theme] */
+  --fc-accent-lime-2:      #7FE89A; /* [verify-light-theme] */
+  --fc-accent-lime-soft:   rgba(197, 255, 74, 0.13); /* [verify-light-theme] */
+  --fc-accent-lime-glow:   rgba(197, 255, 74, 0.38); /* [verify-light-theme] */
+  /* §2.3 Accent — gold (achievement) */
+  --fc-accent-gold:        #F5C242; /* [verify-light-theme] */
+  --fc-accent-gold-soft:   rgba(245, 194, 66, 0.13); /* [verify-light-theme] */
+  /* §2.3 / §2.8 Sub-tier — bronze, silver, diamond
+     (diamond added Phase 1 Screen 1 — V5 v4→v5 extension; scalar fallback for
+      icon/border use only — badge visual is a gradient, see .tier-badge[data-tier="diamond"]) */
+  --fc-accent-bronze:      #CD7F32; /* [verify-light-theme] */
+  --fc-accent-silver:      #C0C0C0; /* [verify-light-theme] */
+  --fc-accent-diamond:     #BFE6F2; /* [verify-light-theme] */
+  /* §2.2 Text tier extensions */
+  --fc-text-quaternary:    rgba(255, 255, 255, 0.26); /* [verify-light-theme] */
+  --fc-text-disabled:      rgba(255, 255, 255, 0.14); /* [verify-light-theme] */
+  /* §2.9 Macro variance */
+  --fc-macro-on-target:    var(--fc-status-success); /* [verify-light-theme] */
+  --fc-macro-near-target:  var(--fc-status-warning); /* [verify-light-theme] */
+  --fc-macro-off-target:   var(--fc-status-error); /* [verify-light-theme] */
+  /* §2.6 Pillar tokens (aliases — role mapping, no new color) */
+  --fc-pillar-training:    var(--fc-domain-workouts); /* [verify-light-theme] */
+  --fc-pillar-nutrition:   var(--fc-domain-meals); /* [verify-light-theme] */
+  --fc-pillar-checkins:    var(--fc-status-info); /* [verify-light-theme] */
+  --fc-pillar-lifestyle:   var(--fc-accent-purple); /* [verify-light-theme] */
+  --fc-pillar-general:     var(--fc-text-subtle); /* [verify-light-theme] */
+  /* §2.7 Achievement rarity (aliases) */
+  --fc-rarity-common:      var(--fc-text-dim); /* [verify-light-theme] */
+  --fc-rarity-uncommon:    var(--fc-status-success); /* [verify-light-theme] */
+  --fc-rarity-rare:        var(--fc-accent-cyan); /* [verify-light-theme] */
+  --fc-rarity-epic:        var(--fc-accent-purple); /* [verify-light-theme] */
+  --fc-rarity-legendary:   var(--fc-accent-gold); /* [verify-light-theme] */
+
+  /* Gym console — client card state (coach /gym-console).
+     Lifting / pending reuse lime + gold; done uses aqua straight token; noprog indigo; stalled unique. */
+  --fc-border-hi:          var(--fc-glass-border-strong);
+  --fc-divider:            rgba(255, 255, 255, 0.06);
+  --fc-state-lifting:      var(--fc-accent-lime);
+  --fc-state-lifting-soft: rgba(197, 255, 74, 0.1);
+  --fc-state-lifting-border: rgba(197, 255, 74, 0.25);
+  --fc-state-pending:      var(--fc-accent-gold);
+  --fc-state-pending-soft: rgba(245, 194, 66, 0.1);
+  --fc-state-pending-border: rgba(245, 194, 66, 0.25);
+  --fc-state-done:         var(--fc-set-type-straight);
+  --fc-state-done-soft:    var(--fc-set-type-straight-soft);
+  --fc-state-done-border:  var(--fc-set-type-straight-border);
+  --fc-state-noprog:       #818cf8;
+  --fc-state-noprog-soft:  rgba(129, 140, 248, 0.1);
+  --fc-state-noprog-border: rgba(129, 140, 248, 0.25);
+  --fc-state-stalled:      #ff8c5a;
+  --fc-state-stalled-soft: rgba(255, 140, 90, 0.12);
+  --fc-state-stalled-border: rgba(255, 140, 90, 0.3);
+
+  /* Per-set effort tier tokens (workout-exec-v6).
+     Bands map to RPE upper bounds: Easy ≤4, Medium ≤6, Hard ≤8, Max ≤10.
+     See SetEffortPicker / rpeToEffortTier (src/lib/workoutEffortLabels.ts). */
+  --fc-effort-easy:         #34D399; /* [verify-light-theme] */
+  --fc-effort-easy-soft:    rgba(52, 211, 153, 0.14); /* [verify-light-theme] */
+  --fc-effort-easy-border:  rgba(52, 211, 153, 0.30); /* [verify-light-theme] */
+  --fc-effort-medium:       #F5C242; /* [verify-light-theme] */
+  --fc-effort-medium-soft:  rgba(245, 194, 66, 0.14); /* [verify-light-theme] */
+  --fc-effort-medium-border:rgba(245, 194, 66, 0.30); /* [verify-light-theme] */
+  --fc-effort-hard:         #F59E42; /* [verify-light-theme] */
+  --fc-effort-hard-soft:    rgba(245, 158, 66, 0.14); /* [verify-light-theme] */
+  --fc-effort-hard-border:  rgba(245, 158, 66, 0.30); /* [verify-light-theme] */
+  --fc-effort-max:          #FF5A5F; /* [verify-light-theme] */
+  --fc-effort-max-soft:     rgba(255, 90, 95, 0.14); /* [verify-light-theme] */
+  --fc-effort-max-border:   rgba(255, 90, 95, 0.30); /* [verify-light-theme] */
+
+  /* Set-type tier badges — mirror .dark for light theme until audited */
+  --fc-set-type-straight:        #0891b2;
+  --fc-set-type-straight-soft:   rgba(8, 145, 178, 0.12);
+  --fc-set-type-straight-border: rgba(8, 145, 178, 0.28);
+  --fc-set-type-dropset:         #4f46e5;
+  --fc-set-type-dropset-soft:    rgba(79, 70, 229, 0.12);
+  --fc-set-type-dropset-border:  rgba(79, 70, 229, 0.28);
+  --fc-set-type-superset:        #7c3aed;
+  --fc-set-type-superset-soft:   rgba(124, 58, 237, 0.12);
+  --fc-set-type-superset-border: rgba(124, 58, 237, 0.28);
+  --fc-set-type-giantset:        #db2777;
+  --fc-set-type-giantset-soft:   rgba(219, 39, 119, 0.12);
+  --fc-set-type-giantset-border: rgba(219, 39, 119, 0.28);
+  --fc-set-type-preexhaust:      #d97706;
+  --fc-set-type-preexhaust-soft: rgba(217, 119, 6, 0.12);
+  --fc-set-type-preexhaust-border: rgba(217, 119, 6, 0.28);
+  --fc-set-type-cluster:         #6d28d9;
+  --fc-set-type-cluster-soft:    rgba(109, 40, 217, 0.12);
+  --fc-set-type-cluster-border:  rgba(109, 40, 217, 0.28);
+  --fc-set-type-restpause:       #e11d48;
+  --fc-set-type-restpause-soft:  rgba(225, 29, 72, 0.1);
+  --fc-set-type-restpause-border: rgba(225, 29, 72, 0.26);
+  --fc-set-type-amrap:           #65a30d;
+  --fc-set-type-amrap-soft:      rgba(101, 163, 13, 0.12);
+  --fc-set-type-amrap-border:    rgba(101, 163, 13, 0.28);
+  --fc-set-type-emom:            #0e7490;
+  --fc-set-type-emom-soft:       rgba(14, 116, 144, 0.1);
+  --fc-set-type-emom-border:     rgba(14, 116, 144, 0.26);
+  --fc-set-type-fortime:         #ca8a04;
+  --fc-set-type-fortime-soft:    rgba(202, 138, 4, 0.12);
+  --fc-set-type-fortime-border:  rgba(202, 138, 4, 0.28);
+  --fc-set-type-tabata:          #dc2626;
+  --fc-set-type-tabata-soft:     rgba(220, 38, 38, 0.1);
+  --fc-set-type-tabata-border:   rgba(220, 38, 38, 0.26);
+  --fc-set-type-endurance:       #0d9488;
+  --fc-set-type-endurance-soft:  rgba(13, 148, 136, 0.1);
+  --fc-set-type-endurance-border: rgba(13, 148, 136, 0.26);
+  --fc-set-type-speedwork:       #ea580c;
+  --fc-set-type-speedwork-soft:  rgba(234, 88, 12, 0.12);
+  --fc-set-type-speedwork-border: rgba(234, 88, 12, 0.28);
+
+  /* Nutrition / Fuel — macro + meal-type (nutrition-v1) */
+  --fc-macro-protein:       #ff6b6b;
+  --fc-macro-protein-soft:  rgba(255, 107, 107, 0.14);
+  --fc-macro-protein-mid:   #ff8787;
+  --fc-macro-carbs:         #5eead4;
+  --fc-macro-carbs-soft:    rgba(94, 234, 212, 0.14);
+  --fc-macro-carbs-mid:     #7ee7d6;
+  --fc-macro-fat:           #fbbf24;
+  --fc-macro-fat-soft:      rgba(251, 191, 36, 0.14);
+  --fc-macro-fat-mid:       #fcd34d;
+  --fc-meal-breakfast:      #f5c242;
+  --fc-meal-breakfast-soft: rgba(245, 194, 66, 0.12);
+  --fc-meal-lunch:          #ff8c5a;
+  --fc-meal-lunch-soft:     rgba(255, 140, 90, 0.12);
+  --fc-meal-dinner:         #a78bfa;
+  --fc-meal-dinner-soft:    rgba(167, 139, 250, 0.12);
+
+  /* Coach dashboard — action orange + roster severity (coach-dashboard-v1) */
+  --fc-ink: #061018;
+  --fc-coach-action: #ff5a36;
+  --fc-coach-action-2: #ffb13b;
+  --fc-coach-action-soft: rgba(255, 90, 54, 0.14);
+  --fc-coach-action-border: rgba(255, 90, 54, 0.3);
+  --fc-coach-action-glow: rgba(255, 90, 54, 0.4);
+  /* Severity: align critical with existing effort-max; distinct names for coach UI */
+  --fc-sev-critical: var(--fc-effort-max);
+  --fc-sev-critical-soft: var(--fc-effort-max-soft);
+  --fc-sev-critical-border: var(--fc-effort-max-border);
+  --fc-sev-warning: #f5c242;
+  --fc-sev-warning-soft: rgba(245, 194, 66, 0.1);
+  --fc-sev-warning-border: rgba(245, 194, 66, 0.25);
+  --fc-sev-new: #4fe3e8;
+  --fc-sev-new-soft: rgba(79, 227, 232, 0.1);
+  --fc-sev-new-border: rgba(79, 227, 232, 0.25);
+  --fc-sev-good: #34d399;
+  --fc-sev-good-soft: rgba(52, 211, 153, 0.1);
+  --fc-sev-good-border: rgba(52, 211, 153, 0.25);
 }
 
 .dark {
@@ -164,6 +321,156 @@
   --fc-card-shell-warning-border-l: color-mix(in srgb, rgb(251, 191, 36) 55%, transparent);
   --fc-card-shell-info-bg: color-mix(in srgb, rgb(30, 58, 138) 26%, transparent);
   --fc-card-shell-info-border-l: color-mix(in srgb, rgb(96, 165, 250) 48%, transparent);
+
+  /* ============================================================
+     v4 ADDITIVE TOKENS (dark) — added in Phase 0a (2026-04-26)
+     These are the authoritative dark-theme values per
+     design-system-v4 §2.2, §2.3, §2.6, §2.7, §2.8, §2.9.
+     ============================================================ */
+  /* §2.3 Accent — lime (action) */
+  --fc-accent-lime:        #C5FF4A;
+  --fc-accent-lime-2:      #7FE89A;
+  --fc-accent-lime-soft:   rgba(197, 255, 74, 0.13);
+  --fc-accent-lime-glow:   rgba(197, 255, 74, 0.38);
+  /* §2.3 Accent — gold (achievement) */
+  --fc-accent-gold:        #F5C242;
+  --fc-accent-gold-soft:   rgba(245, 194, 66, 0.13);
+  /* §2.3 / §2.8 Sub-tier — bronze, silver, diamond
+     (diamond: scalar fallback only; badge visual is a gradient) */
+  --fc-accent-bronze:      #CD7F32;
+  --fc-accent-silver:      #C0C0C0;
+  --fc-accent-diamond:     #A5DDFF;
+  /* §2.2 Text tier extensions */
+  --fc-text-quaternary:    rgba(255, 255, 255, 0.26);
+  --fc-text-disabled:      rgba(255, 255, 255, 0.14);
+  /* §2.9 Macro variance */
+  --fc-macro-on-target:    var(--fc-status-success);
+  --fc-macro-near-target:  var(--fc-status-warning);
+  --fc-macro-off-target:   var(--fc-status-error);
+  /* §2.6 Pillar tokens (aliases — role mapping, no new color) */
+  --fc-pillar-training:    var(--fc-domain-workouts);
+  --fc-pillar-nutrition:   var(--fc-domain-meals);
+  --fc-pillar-checkins:    var(--fc-status-info);
+  --fc-pillar-lifestyle:   var(--fc-accent-purple);
+  --fc-pillar-general:     var(--fc-text-subtle);
+  /* §2.7 Achievement rarity (aliases) */
+  --fc-rarity-common:      var(--fc-text-dim);
+  --fc-rarity-uncommon:    var(--fc-status-success);
+  --fc-rarity-rare:        var(--fc-accent-cyan);
+  --fc-rarity-epic:        var(--fc-accent-purple);
+  --fc-rarity-legendary:   var(--fc-accent-gold);
+
+  /* Gym console — client card state (dark). */
+  --fc-border-hi:          var(--fc-glass-border-strong);
+  --fc-divider:            rgba(255, 255, 255, 0.06);
+  --fc-state-lifting:      var(--fc-accent-lime);
+  --fc-state-lifting-soft: rgba(197, 255, 74, 0.1);
+  --fc-state-lifting-border: rgba(197, 255, 74, 0.25);
+  --fc-state-pending:      var(--fc-accent-gold);
+  --fc-state-pending-soft: rgba(245, 194, 66, 0.1);
+  --fc-state-pending-border: rgba(245, 194, 66, 0.25);
+  --fc-state-done:         var(--fc-set-type-straight);
+  --fc-state-done-soft:    var(--fc-set-type-straight-soft);
+  --fc-state-done-border:  var(--fc-set-type-straight-border);
+  --fc-state-noprog:       #818cf8;
+  --fc-state-noprog-soft:  rgba(129, 140, 248, 0.1);
+  --fc-state-noprog-border: rgba(129, 140, 248, 0.25);
+  --fc-state-stalled:      #ff8c5a;
+  --fc-state-stalled-soft: rgba(255, 140, 90, 0.12);
+  --fc-state-stalled-border: rgba(255, 140, 90, 0.3);
+
+  /* Per-set effort tier tokens (workout-exec-v6).
+     Bands map to RPE upper bounds: Easy ≤4, Medium ≤6, Hard ≤8, Max ≤10.
+     See SetEffortPicker / rpeToEffortTier (src/lib/workoutEffortLabels.ts). */
+  --fc-effort-easy:         #34D399;
+  --fc-effort-easy-soft:    rgba(52, 211, 153, 0.14);
+  --fc-effort-easy-border:  rgba(52, 211, 153, 0.30);
+  --fc-effort-medium:       #F5C242;
+  --fc-effort-medium-soft:  rgba(245, 194, 66, 0.14);
+  --fc-effort-medium-border:rgba(245, 194, 66, 0.30);
+  --fc-effort-hard:         #F59E42;
+  --fc-effort-hard-soft:    rgba(245, 158, 66, 0.14);
+  --fc-effort-hard-border:  rgba(245, 158, 66, 0.30);
+  --fc-effort-max:          #FF5A5F;
+  --fc-effort-max-soft:     rgba(255, 90, 95, 0.14);
+  --fc-effort-max-border:   rgba(255, 90, 95, 0.30);
+
+  /* Set-type tier badges (workout details / execution — workout-details-v1) */
+  --fc-set-type-straight:        #4fe3e8;
+  --fc-set-type-straight-soft:   rgba(79, 227, 232, 0.13);
+  --fc-set-type-straight-border: rgba(79, 227, 232, 0.3);
+  --fc-set-type-dropset:         #818cf8;
+  --fc-set-type-dropset-soft:    rgba(129, 140, 248, 0.14);
+  --fc-set-type-dropset-border:  rgba(129, 140, 248, 0.3);
+  --fc-set-type-superset:        #a78bfa;
+  --fc-set-type-superset-soft:   rgba(167, 139, 250, 0.13);
+  --fc-set-type-superset-border: rgba(167, 139, 250, 0.3);
+  --fc-set-type-giantset:        #f472b6;
+  --fc-set-type-giantset-soft:   rgba(244, 114, 182, 0.14);
+  --fc-set-type-giantset-border: rgba(244, 114, 182, 0.3);
+  --fc-set-type-preexhaust:      #fbbf24;
+  --fc-set-type-preexhaust-soft: rgba(251, 191, 36, 0.14);
+  --fc-set-type-preexhaust-border: rgba(251, 191, 36, 0.32);
+  --fc-set-type-cluster:         #8b5cf6;
+  --fc-set-type-cluster-soft:    rgba(139, 92, 246, 0.14);
+  --fc-set-type-cluster-border:  rgba(139, 92, 246, 0.3);
+  --fc-set-type-restpause:       #fb7185;
+  --fc-set-type-restpause-soft:  rgba(251, 113, 133, 0.14);
+  --fc-set-type-restpause-border: rgba(251, 113, 133, 0.3);
+  --fc-set-type-amrap:           #bef264;
+  --fc-set-type-amrap-soft:      rgba(190, 242, 100, 0.14);
+  --fc-set-type-amrap-border:    rgba(190, 242, 100, 0.32);
+  --fc-set-type-emom:            #22d3ee;
+  --fc-set-type-emom-soft:       rgba(34, 211, 238, 0.12);
+  --fc-set-type-emom-border:     rgba(34, 211, 238, 0.28);
+  --fc-set-type-fortime:         #eab308;
+  --fc-set-type-fortime-soft:    rgba(234, 179, 8, 0.14);
+  --fc-set-type-fortime-border:  rgba(234, 179, 8, 0.32);
+  --fc-set-type-tabata:          #f87171;
+  --fc-set-type-tabata-soft:     rgba(248, 113, 113, 0.14);
+  --fc-set-type-tabata-border:   rgba(248, 113, 113, 0.3);
+  --fc-set-type-endurance:       #2dd4bf;
+  --fc-set-type-endurance-soft:  rgba(45, 212, 191, 0.12);
+  --fc-set-type-endurance-border: rgba(45, 212, 191, 0.28);
+  --fc-set-type-speedwork:       #fb923c;
+  --fc-set-type-speedwork-soft:  rgba(251, 146, 60, 0.14);
+  --fc-set-type-speedwork-border: rgba(251, 146, 60, 0.3);
+
+  /* Nutrition / Fuel — macro + meal-type (nutrition-v1) */
+  --fc-macro-protein:       #ff6b6b;
+  --fc-macro-protein-soft:  rgba(255, 107, 107, 0.14);
+  --fc-macro-protein-mid:   #ff8a8a;
+  --fc-macro-carbs:         #5eead4;
+  --fc-macro-carbs-soft:    rgba(94, 234, 212, 0.14);
+  --fc-macro-carbs-mid:     #7ff5e1;
+  --fc-macro-fat:           #fbbf24;
+  --fc-macro-fat-soft:      rgba(251, 191, 36, 0.14);
+  --fc-macro-fat-mid:       #fde047;
+  --fc-meal-breakfast:      #f5c242;
+  --fc-meal-breakfast-soft: rgba(245, 194, 66, 0.12);
+  --fc-meal-lunch:          #ff8c5a;
+  --fc-meal-lunch-soft:     rgba(255, 140, 90, 0.12);
+  --fc-meal-dinner:        #a78bfa;
+  --fc-meal-dinner-soft:    rgba(167, 139, 250, 0.12);
+
+  --fc-ink: #061018;
+  --fc-coach-action: #ff5a36;
+  --fc-coach-action-2: #ffb13b;
+  --fc-coach-action-soft: rgba(255, 90, 54, 0.14);
+  --fc-coach-action-border: rgba(255, 90, 54, 0.3);
+  --fc-coach-action-glow: rgba(255, 90, 54, 0.4);
+  --fc-sev-critical: var(--fc-effort-max);
+  --fc-sev-critical-soft: var(--fc-effort-max-soft);
+  --fc-sev-critical-border: var(--fc-effort-max-border);
+  --fc-sev-warning: #f5c242;
+  --fc-sev-warning-soft: rgba(245, 194, 66, 0.1);
+  --fc-sev-warning-border: rgba(245, 194, 66, 0.25);
+  --fc-sev-new: #4fe3e8;
+  --fc-sev-new-soft: rgba(79, 227, 232, 0.1);
+  --fc-sev-new-border: rgba(79, 227, 232, 0.25);
+  --fc-sev-good: #34d399;
+  --fc-sev-good-soft: rgba(52, 211, 153, 0.1);
+  --fc-sev-good-border: rgba(52, 211, 153, 0.25);
 }
 
 /* Page shell: STANDARD density (use on main content wrapper) */
@@ -351,6 +658,13 @@
   border: 1px solid var(--fc-glass-border);
   color: var(--fc-text-primary);
   border-radius: var(--fc-radius-md);
+}
+
+/* Coach PR series picker: native <option> rows often pick up OS/light colors and
+   end up white-on-white with our light text on the closed control. Force list colors. */
+select.fc-pr-series-select option {
+  background-color: var(--fc-surface-card);
+  color: var(--fc-text-primary);
 }
 
 .fc-toast {
@@ -544,6 +858,37 @@
   color: var(--fc-status-inactive);
 }
 
+/* §4.3 — Greeting name personalization (italic + cyan→lime gradient text)
+   Used for "Hey, <em>{name}</em>" personalization on home/dashboard screens
+   (client home, coach home, welcome). Phase 1 Screen 1 (B-J2 decision).
+   Pattern parallels .tier-badge[data-tier="platinum"]: text-clipped gradient. */
+.fc-greeting-name {
+  font-style: italic;
+  background-image: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-lime));
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+
+/* Client dashboard greeting eyebrow — client-screens-v5.html Phone 1 `.greeting .eyebrow` */
+@keyframes fc-client-dash-eyebrow-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+.fc-client-dashboard-eyebrow {
+  color: var(--fc-accent-lime);
+}
+.fc-client-dashboard-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--fc-accent-lime);
+  box-shadow: 0 0 12px var(--fc-accent-lime-glow);
+  animation: fc-client-dash-eyebrow-pulse 2s ease-in-out infinite;
+}
+
 /* Coach attention: subtle full-card tint only (no left stripe) */
 .fc-attention-urgent {
   background: color-mix(in srgb, var(--fc-status-error) 8%, transparent);
@@ -666,7 +1011,7 @@
 
 .fc-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-status-success));
+  background: linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
   border-radius: 4px;
   transition: width 1s cubic-bezier(0.65, 0, 0.35, 1);
 }
@@ -875,7 +1220,7 @@
 
 .fc-bottom-nav-inner {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-around;
   height: 100%;
   padding: 0 4px;
@@ -890,11 +1235,59 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 6px 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
   border-radius: var(--fc-radius-lg);
   transition: all 0.2s ease;
-  min-width: 52px;
   text-decoration: none;
+}
+
+/* Cluster 7: active = cyan dot (mockup Phone 1 `.nav-item.active::before`), no pill */
+.fc-bottom-nav-item--flat {
+  border-radius: 999px;
+}
+.fc-bottom-nav-active-dot {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fc-accent-cyan);
+  box-shadow: 0 0 10px var(--fc-accent-cyan);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Coach routes: v6 bar chrome + orange active (coach-dashboard-v1) */
+.fc-bottom-nav-float[data-coach-context="true"] {
+  bottom: 14px;
+  left: 14px;
+  right: 14px;
+  height: auto;
+  min-height: 60px;
+  padding: 2px 0;
+  background: rgba(7, 16, 26, 0.85);
+  border: 1px solid var(--fc-glass-border-strong);
+  border-radius: 999px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+}
+.fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-inner {
+  padding: 8px 4px;
+}
+.fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-item--flat {
+  padding: 8px 0 6px;
+  gap: 3px;
+}
+.fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-active-dot {
+  background: var(--fc-accent-cyan);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--fc-accent-cyan) 35%, transparent);
+}
+.fc-bottom-nav-float[data-coach-context="true"] .fc-bottom-nav-item--active .fc-bottom-nav-active-dot {
+  background: var(--fc-accent-cyan);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--fc-accent-cyan) 40%, transparent);
 }
 
 .fc-bottom-nav-item:hover .fc-text-dim {
@@ -969,6 +1362,18 @@
   50% {
     transform: scale(1.1);
     opacity: 0.3;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
   }
 }
 
@@ -1170,6 +1575,99 @@
   text-transform: uppercase;
   color: var(--fc-text-dim);
   margin-top: 2px;
+}
+
+/* --- Set type badge (token-driven; used by SetTypeBadge) --- */
+.fc-set-type-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+.fc-set-type-badge[data-set-type="straight_set"] {
+  color: var(--fc-set-type-straight);
+  background: var(--fc-set-type-straight-soft);
+  border-color: var(--fc-set-type-straight-border);
+}
+
+.fc-set-type-badge[data-set-type="drop_set"] {
+  color: var(--fc-set-type-dropset);
+  background: var(--fc-set-type-dropset-soft);
+  border-color: var(--fc-set-type-dropset-border);
+}
+
+.fc-set-type-badge[data-set-type="superset"] {
+  color: var(--fc-set-type-superset);
+  background: var(--fc-set-type-superset-soft);
+  border-color: var(--fc-set-type-superset-border);
+}
+
+.fc-set-type-badge[data-set-type="giant_set"] {
+  color: var(--fc-set-type-giantset);
+  background: var(--fc-set-type-giantset-soft);
+  border-color: var(--fc-set-type-giantset-border);
+}
+
+.fc-set-type-badge[data-set-type="pre_exhaustion"] {
+  color: var(--fc-set-type-preexhaust);
+  background: var(--fc-set-type-preexhaust-soft);
+  border-color: var(--fc-set-type-preexhaust-border);
+}
+
+.fc-set-type-badge[data-set-type="cluster_set"] {
+  color: var(--fc-set-type-cluster);
+  background: var(--fc-set-type-cluster-soft);
+  border-color: var(--fc-set-type-cluster-border);
+}
+
+.fc-set-type-badge[data-set-type="rest_pause"] {
+  color: var(--fc-set-type-restpause);
+  background: var(--fc-set-type-restpause-soft);
+  border-color: var(--fc-set-type-restpause-border);
+}
+
+.fc-set-type-badge[data-set-type="amrap"] {
+  color: var(--fc-set-type-amrap);
+  background: var(--fc-set-type-amrap-soft);
+  border-color: var(--fc-set-type-amrap-border);
+}
+
+.fc-set-type-badge[data-set-type="emom"] {
+  color: var(--fc-set-type-emom);
+  background: var(--fc-set-type-emom-soft);
+  border-color: var(--fc-set-type-emom-border);
+}
+
+.fc-set-type-badge[data-set-type="for_time"] {
+  color: var(--fc-set-type-fortime);
+  background: var(--fc-set-type-fortime-soft);
+  border-color: var(--fc-set-type-fortime-border);
+}
+
+.fc-set-type-badge[data-set-type="tabata"] {
+  color: var(--fc-set-type-tabata);
+  background: var(--fc-set-type-tabata-soft);
+  border-color: var(--fc-set-type-tabata-border);
+}
+
+.fc-set-type-badge[data-set-type="endurance"] {
+  color: var(--fc-set-type-endurance);
+  background: var(--fc-set-type-endurance-soft);
+  border-color: var(--fc-set-type-endurance-border);
+}
+
+.fc-set-type-badge[data-set-type="speed_work"] {
+  color: var(--fc-set-type-speedwork);
+  background: var(--fc-set-type-speedwork-soft);
+  border-color: var(--fc-set-type-speedwork-border);
 }
 
 /* --- Horizontal Action Chips --- */
@@ -1645,4 +2143,582 @@
 .as-ring-center-pop--visible {
   opacity: 1;
   transform: scale(1) translateZ(0);
+}
+
+/* ====================================================================
+   v4 ADDITIVE UTILITY CLASSES — added in Phase 0a (2026-04-26)
+   These classes are ADDITIVE ONLY. They coexist with the existing
+   .fc-attention-*, .fc-fab, .fc-btn-primary etc. — those are NOT
+   modified in Phase 0a (they are Phase 0b migration decisions).
+   Refs: design-system-v4 §3, §6.x
+   ==================================================================== */
+
+/* §6.4 — Hero (action) card with diagonal-line texture overlay */
+.fc-hero-action {
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--fc-accent-lime) 22%, transparent), transparent 50%),
+    radial-gradient(80% 80% at 100% 100%, color-mix(in srgb, var(--fc-accent-lime-2) 14%, transparent), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--fc-accent-lime) 8%, var(--fc-surface-card)), var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-accent-lime) 20%, transparent);
+  border-radius: var(--fc-radius-2xl);
+  padding: 22px;
+  box-shadow:
+    0 30px 60px -25px rgba(0, 0, 0, 0.5),
+    0 20px 50px -20px var(--fc-accent-lime-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+.fc-hero-action::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 8px);
+  pointer-events: none;
+}
+
+/* §6.2 — Status-tinted cards (background tint + tinted border) */
+.fc-card-status-warning {
+  background: color-mix(in srgb, var(--fc-status-warning) 7%, var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-status-warning) 18%, transparent);
+}
+.fc-card-status-error {
+  background: color-mix(in srgb, var(--fc-status-error) 7%, var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-status-error) 18%, transparent);
+}
+.fc-card-status-success {
+  background: color-mix(in srgb, var(--fc-status-success) 6%, var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-status-success) 16%, transparent);
+}
+.fc-card-status-info {
+  background: color-mix(in srgb, var(--fc-accent-cyan) 6%, var(--fc-surface-card));
+  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 16%, transparent);
+}
+
+/* §3 — Atmospheric backdrops (role-based, static radial halos) */
+.fc-backdrop-action-top {
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -20%, var(--fc-accent-lime-soft), transparent 70%),
+    linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
+}
+.fc-backdrop-action-bottom {
+  background:
+    radial-gradient(ellipse 110% 50% at 50% 80%, color-mix(in srgb, var(--fc-accent-lime) 13%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--fc-bg-basalt) 0%, transparent 60%);
+}
+.fc-backdrop-info {
+  background:
+    radial-gradient(ellipse 90% 50% at 50% -20%, color-mix(in srgb, var(--fc-accent-cyan) 6%, transparent), transparent 70%),
+    linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
+}
+.fc-backdrop-warning {
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 10%, color-mix(in srgb, var(--fc-status-warning) 10%, transparent), transparent 65%),
+    linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
+}
+.fc-backdrop-achievement {
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 10%, color-mix(in srgb, var(--fc-accent-gold) 10%, transparent), transparent 65%),
+    linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
+}
+/* Error variant added in Phase 1 Screen 1 to support tier-driven backdrops
+   (V1 decision): "benched" tier maps to `error`. Same shape/opacity as warning
+   and achievement variants — only the color role differs. */
+.fc-backdrop-error {
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 10%, color-mix(in srgb, var(--fc-status-error) 10%, transparent), transparent 65%),
+    linear-gradient(180deg, transparent 0%, var(--fc-bg-basalt) 100%);
+}
+
+/* §6.3 — Pillar/domain stripe (3px left bar, offset 12px top/bottom) */
+.fc-pillar-stripe {
+  position: relative;
+}
+.fc-pillar-stripe::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--pillar-color, var(--fc-text-subtle));
+}
+
+/* §6.20 — Buttons (action / success / pill / ghost-icon) */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(
+    135deg,
+    var(--fc-accent-lime),
+    color-mix(in srgb, var(--fc-accent-lime) 70%, var(--fc-accent-lime-2, #7FE89A))
+  );
+  color: #061018;
+  font-weight: 700;
+  /* workout-exec-v6 mock .log-btn */
+  font-size: 14px;
+  padding: 15px;
+  border-radius: 14px;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  box-shadow:
+    0 12px 30px -8px var(--fc-accent-lime-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.btn-action:hover {
+  filter: brightness(1.05);
+}
+.btn-action:active {
+  transform: scale(0.98);
+}
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.4);
+}
+
+/* Coach primary CTA — orange gradient (coach-dashboard-v1) */
+.btn-action-coach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--fc-coach-action), var(--fc-coach-action-2));
+  color: var(--fc-ink);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 15px;
+  border-radius: 14px;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  box-shadow:
+    0 12px 30px -8px var(--fc-coach-action-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.btn-action-coach:hover {
+  filter: brightness(1.05);
+}
+.btn-action-coach:active {
+  transform: scale(0.98);
+}
+.btn-action-coach:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.35);
+}
+
+.btn-action-sm {
+  padding: 9px 12px;
+  font-size: 12px;
+  border-radius: var(--fc-radius-md);
+  letter-spacing: 0.04em;
+}
+.btn-success {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--fc-status-success);
+  color: #061018;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 14px 18px;
+  border-radius: var(--fc-radius-lg);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+.btn-success:hover { filter: brightness(1.06); }
+.btn-success:active { transform: scale(0.98); }
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fc-accent-cyan);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.btn-pill:hover {
+  background: color-mix(in srgb, var(--fc-accent-cyan) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent);
+}
+.btn-ghost-icon,
+.btn-ghost-icon-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--fc-glass-border);
+  color: var(--fc-text-dim);
+  border-radius: var(--fc-radius-md);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.btn-ghost-icon-sm {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.btn-ghost-icon:hover,
+.btn-ghost-icon-sm:hover {
+  color: var(--fc-text-primary);
+  border-color: var(--fc-glass-border-strong);
+}
+.btn-ghost-icon-sm.danger:hover {
+  color: var(--fc-status-error);
+  border-color: color-mix(in srgb, var(--fc-status-error) 30%, transparent);
+}
+
+/* §6.21 — Floating Action Button (lime, NOT red).
+   Phase 0b Task 6: replaces .fc-fab on create CTAs.
+   Bottom value `calc(64px + 32px) = 96px` matches the proven-working
+   position used by the previous .fc-fab caller wrapper (Tailwind
+   `bottom-24`). Formula: 64px (bottom-nav height) + 32px (clearance). */
+.fab-action {
+  position: fixed;
+  bottom: calc(64px + 32px);
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+  color: #061018;
+  box-shadow: 0 16px 40px -8px var(--fc-accent-lime-glow);
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  z-index: 40;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.fab-action:hover {
+  filter: brightness(1.05);
+  transform: translateY(-2px);
+}
+.fab-action:active {
+  transform: scale(0.96);
+}
+.fab-action svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* §6.22 — Input cell (display-font numeric value + label row) */
+.input-cell {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: var(--fc-radius-lg);
+  padding: 10px 12px;
+  display: block;
+}
+.input-cell .label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--fc-text-subtle);
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.input-cell .num {
+  font-family: var(--font-display, var(--font-number, var(--font-mono, ui-monospace, monospace)));
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--fc-text-primary);
+  font-feature-settings: "tnum";
+}
+
+/* §6.7 — Delta pill */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-feature-settings: "tnum";
+}
+.delta.up      { color: var(--fc-status-success); background: color-mix(in srgb, var(--fc-status-success) 10%, transparent); }
+.delta.down    { color: var(--fc-status-warning); background: color-mix(in srgb, var(--fc-status-warning) 10%, transparent); }
+.delta.neutral { color: var(--fc-text-subtle);    background: rgba(255, 255, 255, 0.05); }
+
+/* §6.12 — Variance pill (variance-aware, paired with target-progress bar) */
+.variance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.variance-pill[data-variance="on-target"]   { color: var(--fc-macro-on-target);   background: color-mix(in srgb, var(--fc-macro-on-target)   10%, transparent); }
+.variance-pill[data-variance="near-target"] { color: var(--fc-macro-near-target); background: color-mix(in srgb, var(--fc-macro-near-target) 10%, transparent); }
+.variance-pill[data-variance="off-target"]  { color: var(--fc-macro-off-target);  background: color-mix(in srgb, var(--fc-macro-off-target)  10%, transparent); }
+
+/* §6.15 — Priority pill */
+.priority-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.priority-pill[data-priority="high"]   { color: var(--fc-status-warning); background: color-mix(in srgb, var(--fc-status-warning) 12%, transparent); }
+.priority-pill[data-priority="medium"] { color: var(--fc-text-dim);       background: rgba(255, 255, 255, 0.05); }
+.priority-pill[data-priority="low"]    { color: var(--fc-text-subtle);    background: rgba(255, 255, 255, 0.03); }
+
+/* §6.16 — System tag (categorical metadata, always cyan) */
+.tag-system {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fc-accent-cyan);
+  background: color-mix(in srgb, var(--fc-accent-cyan) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent);
+}
+
+/* §6.17 — Status tag (status-tinted) */
+.tag-status {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.tag-status[data-status="completed"] { color: var(--fc-status-success); background: color-mix(in srgb, var(--fc-status-success) 12%, transparent); }
+.tag-status[data-status="review"]    { color: var(--fc-status-warning); background: color-mix(in srgb, var(--fc-status-warning) 12%, transparent); }
+.tag-status[data-status="urgent"]    { color: var(--fc-status-error);   background: color-mix(in srgb, var(--fc-status-error)   12%, transparent); }
+.tag-status[data-status="paused"]    { color: var(--fc-text-dim);       background: rgba(255, 255, 255, 0.05); }
+.tag-status[data-status="generated"] { color: var(--fc-status-success); background: color-mix(in srgb, var(--fc-status-success) 12%, transparent); }
+.tag-status[data-status="manual"]    { color: var(--fc-text-subtle);    background: rgba(255, 255, 255, 0.03); }
+
+/* §6.18 — Tier badge (Bronze / Silver / Gold / Platinum) */
+.tier-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.tier-badge[data-tier="bronze"]   { color: var(--fc-accent-bronze); background: color-mix(in srgb, var(--fc-accent-bronze) 14%, transparent); }
+.tier-badge[data-tier="silver"]   { color: var(--fc-accent-silver); background: color-mix(in srgb, var(--fc-accent-silver) 12%, transparent); }
+.tier-badge[data-tier="gold"]     { color: var(--fc-accent-gold);   background: var(--fc-accent-gold-soft); }
+.tier-badge[data-tier="platinum"] {
+  background-image: linear-gradient(90deg, var(--fc-accent-gold), var(--fc-accent-cyan));
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+/* Diamond — fifth sub-tier added Phase 1 Screen 1 (V5 v4→v5 extension).
+   Distinct from platinum (gold→cyan, "warm prestige") — diamond runs cool:
+   cyan→silver→ice ("cold prestige"). Pattern parallels platinum: text-clipped
+   gradient, color: transparent. */
+.tier-badge[data-tier="diamond"] {
+  background-image: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-silver), #E0F2FE);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+
+/* §6.19 — Rarity pill */
+.rarity-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.rarity-pill[data-rarity="common"]    { color: var(--fc-rarity-common); }
+.rarity-pill[data-rarity="uncommon"]  { color: var(--fc-rarity-uncommon);  background: color-mix(in srgb, var(--fc-rarity-uncommon)  10%, transparent); }
+.rarity-pill[data-rarity="rare"]      { color: var(--fc-rarity-rare);      background: color-mix(in srgb, var(--fc-rarity-rare)      10%, transparent); }
+.rarity-pill[data-rarity="epic"]      { color: var(--fc-rarity-epic);      background: color-mix(in srgb, var(--fc-rarity-epic)      10%, transparent); }
+.rarity-pill[data-rarity="legendary"] { color: var(--fc-rarity-legendary); background: var(--fc-accent-gold-soft); }
+
+/* §6.11 — Target-progress bar with variance */
+.target-bar {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.target-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 600ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.target-bar[data-variance="on-target"]   .target-bar-fill { background: var(--fc-macro-on-target); }
+.target-bar[data-variance="near-target"] .target-bar-fill { background: var(--fc-macro-near-target); }
+.target-bar[data-variance="off-target"]  .target-bar-fill { background: var(--fc-macro-off-target); }
+.target-bar-target {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--fc-text-quaternary);
+}
+
+/* §6.9 — Deadline urgency text */
+.deadline[data-urgency="overdue"]  { color: var(--fc-status-error); }
+.deadline[data-urgency="imminent"] { color: var(--fc-status-warning); }
+.deadline[data-urgency="soon"]     { color: var(--fc-text-dim); }
+.deadline[data-urgency="distant"]  { color: var(--fc-text-subtle); }
+.deadline[data-urgency="none"]     { color: var(--fc-text-subtle); }
+
+/* §6.10 — Stale-data text */
+.stale-data[data-staleness="fresh"] { color: var(--fc-text-subtle); }
+.stale-data[data-staleness="aging"] { color: var(--fc-status-warning); }
+.stale-data[data-staleness="stale"] { color: var(--fc-status-error); }
+
+/* §6.14 — Self-authored note (user voice; differs from coach quote zone) */
+.self-note {
+  font-style: italic;
+  color: var(--fc-text-dim);
+  padding: 8px 0 8px 12px;
+  border-left: 2px dashed var(--fc-text-quaternary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* §6.13 — Coach quote zone (system/coach voice) */
+.coach-quote {
+  background: color-mix(in srgb, var(--fc-accent-cyan) 5%, transparent);
+  border-left: 2px solid var(--fc-accent-cyan);
+  border-radius: 2px 10px 10px 2px;
+  padding: 10px 14px;
+  color: var(--fc-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* §6.28 — Difficulty rating (numeric on a session, e.g. "8/10") */
+.difficulty-rating {
+  font-family: var(--font-display, var(--font-number, var(--font-mono, ui-monospace, monospace)));
+  font-weight: 600;
+  font-size: 16px;
+  font-feature-settings: "tnum";
+  color: var(--fc-text-primary);
+}
+.difficulty-rating .scale {
+  color: var(--fc-text-quaternary);
+  font-weight: 500;
+}
+
+/* §6.34 — Filter pill row */
+.filter-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.filter-pills::-webkit-scrollbar {
+  display: none;
+}
+.filter-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fc-text-dim);
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.filter-pill:hover {
+  color: var(--fc-text-primary);
+}
+.filter-pill.active {
+  background: color-mix(in srgb, var(--fc-accent-cyan) 12%, transparent);
+  color: var(--fc-accent-cyan);
+  border-color: color-mix(in srgb, var(--fc-accent-cyan) 30%, transparent);
+}
+
+/* §6.37 — Add-item placeholder (dashed-border CTA at end of a list) */
+.add-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 14px;
+  border: 1px dashed var(--fc-glass-border);
+  border-radius: var(--fc-radius-lg);
+  background: transparent;
+  color: var(--fc-text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.add-placeholder:hover,
+.add-placeholder:focus-visible {
+  border-color: color-mix(in srgb, var(--fc-accent-cyan) 40%, transparent);
+  color: var(--fc-accent-cyan);
+  outline: none;
+}
+
+/* §6.36 — Archive section (collapsed/grouped completed items at bottom of list) */
+.archive-section {
+  margin-top: 32px;
+  opacity: 0.65;
+}
+.archive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--fc-glass-border);
+}
+.archive-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+.archive-count {
+  font-size: 11px;
+  color: var(--fc-text-dim);
 }

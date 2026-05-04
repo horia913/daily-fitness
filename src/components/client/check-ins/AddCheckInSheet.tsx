@@ -1,16 +1,17 @@
 "use client";
 
+import type { ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Dialog,
   DialogPortal,
   DialogOverlay,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Scale } from "lucide-react";
+import { Calendar, Ruler, Accessibility, ImageIcon, Scale, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
 
 function go(href: string) {
   window.location.href = href;
@@ -30,8 +31,59 @@ interface AddCheckInSheetProps {
   frequencyDays?: number;
 }
 
-const rowClass =
-  "flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-white/[0.06] active:bg-white/[0.08] border border-transparent hover:border-[color:var(--fc-glass-border)]";
+function OptionRow({
+  icon,
+  iconWrapStyle,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: ReactNode;
+  iconWrapStyle: React.CSSProperties;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full cursor-pointer items-center gap-2.5 rounded-[13px] border p-3 text-left transition-colors",
+        checkinSuiteStyles.fontBody,
+      )}
+      style={{
+        borderColor: "var(--cs-line-2)",
+        background: "var(--cs-card-2)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#0F2334";
+        e.currentTarget.style.borderColor = "var(--cs-cyan-dim)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "var(--cs-card-2)";
+        e.currentTarget.style.borderColor = "var(--cs-line-2)";
+      }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+        style={iconWrapStyle}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-semibold" style={{ color: "var(--cs-t1)" }}>
+          {title}
+        </span>
+        <span className="mt-0.5 block text-[11px] leading-snug" style={{ color: "var(--cs-t3)" }}>
+          {subtitle}
+        </span>
+      </span>
+      <ChevronRight className="h-[13px] w-[13px] shrink-0" style={{ color: "var(--cs-t4)" }} aria-hidden />
+    </button>
+  );
+}
 
 export function AddCheckInSheet({
   open,
@@ -44,128 +96,106 @@ export function AddCheckInSheet({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay />
+        <DialogOverlay className={checkinSuiteStyles.sheetBackdrop} />
         <DialogPrimitive.Content
           className={cn(
-            "fc-modal fixed left-[50%] top-[50%] z-[51] flex w-[calc(100%-2rem)] max-w-lg max-h-[min(85dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem))] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden rounded-2xl border border-[color:var(--fc-glass-border-strong)] p-0 shadow-lg outline-none duration-200",
+            checkinSuiteStyles.root,
+            "fixed inset-x-0 bottom-0 z-[10021] flex max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-bottom)-12px))] w-full flex-col gap-1.5 overflow-hidden rounded-t-[24px] border-t border-[color:var(--cs-line)] p-0 shadow-2xl outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
-            "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+            "data-[state=closed]:slide-out-to-bottom-4 data-[state=open]:slide-in-from-bottom-4 duration-300",
           )}
+          style={{
+            background: "var(--cs-card)",
+            paddingTop: "18px",
+            paddingLeft: "16px",
+            paddingRight: "16px",
+            paddingBottom: "max(28px, env(safe-area-inset-bottom, 0px))",
+          }}
         >
-          <DialogHeader className="shrink-0 space-y-0 border-b border-[color:var(--fc-glass-border)] px-5 pb-3 pt-5 text-left">
-            <DialogTitle className="fc-text-primary text-lg font-semibold">Add Check-in</DialogTitle>
-            <DialogDescription className="sr-only">
-              Pick a type of check-in or log to open. Options include scheduled check-in, body measurements,
-              mobility, progress photos, or quick weight.
-            </DialogDescription>
-          </DialogHeader>
+          <div className="mx-auto mb-3.5 h-1 w-10 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} aria-hidden />
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
-            <button
-              type="button"
-              className={rowClass}
+          <DialogTitle className={cn(checkinSuiteStyles.fontHeadline, "px-1 pb-2 text-[17px] font-bold")} style={{ color: "var(--cs-t1)" }}>
+            Add check-in
+          </DialogTitle>
+
+          <DialogDescription className="sr-only">
+            Pick a type of check-in or log to open. Options include scheduled check-in, body measurements, mobility,
+            progress photos, or quick weight.
+          </DialogDescription>
+
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain pb-2">
+            <OptionRow
+              title={scheduleTitle}
+              subtitle="Measurements, photos & review"
               onClick={() => {
                 onOpenChange(false);
                 go("/client/check-ins/weekly");
               }}
-            >
-              <span className="text-xl shrink-0" aria-hidden>
-                📊
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium fc-text-primary">{scheduleTitle}</span>
-                <span className="mt-0.5 block text-xs fc-text-dim">Measurements, photos &amp; review</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={rowClass}
+              iconWrapStyle={{ background: "var(--cs-cyan-soft)", color: "var(--cs-cyan)" }}
+              icon={<Calendar className="h-4 w-4" strokeWidth={2} />}
+            />
+            <OptionRow
+              title="Body measurements"
+              subtitle="Weight, body fat, waist"
               onClick={() => {
                 onOpenChange(false);
                 go("/client/progress/body-metrics?from=check-ins");
               }}
-            >
-              <span className="text-xl shrink-0" aria-hidden>
-                📐
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium fc-text-primary">Body Measurements</span>
-                <span className="mt-0.5 block text-xs fc-text-dim">Weight, body fat, waist</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={rowClass}
+              iconWrapStyle={{ background: "var(--cs-warning-soft)", color: "var(--cs-warning)" }}
+              icon={<Ruler className="h-4 w-4" strokeWidth={2} />}
+            />
+            <OptionRow
+              title="Mobility assessment"
+              subtitle="Flexibility & ROM"
               onClick={() => {
                 onOpenChange(false);
                 go("/client/progress/mobility?from=check-ins");
               }}
-            >
-              <span className="text-xl shrink-0" aria-hidden>
-                🤸
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium fc-text-primary">Mobility Assessment</span>
-                <span className="mt-0.5 block text-xs fc-text-dim">Flexibility &amp; ROM</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={rowClass}
+              iconWrapStyle={{ background: "var(--cs-orange-soft)", color: "var(--cs-orange)" }}
+              icon={<Accessibility className="h-4 w-4" strokeWidth={2} />}
+            />
+            <OptionRow
+              title="Progress photos"
+              subtitle="Timeline & compare"
               onClick={() => {
                 onOpenChange(false);
                 go("/client/progress/body-metrics?from=check-ins&tab=photos");
               }}
-            >
-              <span className="text-xl shrink-0" aria-hidden>
-                📸
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium fc-text-primary">Progress Photos</span>
-                <span className="mt-0.5 block text-xs fc-text-dim">Timeline &amp; compare</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={rowClass}
+              iconWrapStyle={{ background: "var(--cs-purple-soft)", color: "var(--cs-purple)" }}
+              icon={<ImageIcon className="h-4 w-4" strokeWidth={2} />}
+            />
+            <OptionRow
+              title="Quick weight log"
+              subtitle="Log without full check-in"
               onClick={() => {
                 onOpenChange(false);
                 onQuickWeight();
               }}
-            >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-domain-workouts)]/15"
-                aria-hidden
-              >
-                <Scale className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium fc-text-primary">Quick Weight Log</span>
-                <span className="mt-0.5 block text-xs fc-text-dim">Log without full check-in</span>
-              </span>
-            </button>
+              iconWrapStyle={{ background: "var(--cs-good-soft)", color: "var(--cs-good)" }}
+              icon={<Scale className="h-4 w-4" strokeWidth={2} />}
+            />
           </div>
 
-          <div
-            className="shrink-0 border-t border-[color:var(--fc-glass-border)] p-3"
+          <button
+            type="button"
+            className={cn(checkinSuiteStyles.fontBody, "mt-1 w-full rounded-[13px] border py-3 text-sm font-medium transition-colors")}
             style={{
-              paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+              borderColor: "var(--cs-line)",
+              background: "transparent",
+              color: "var(--cs-t2)",
+            }}
+            onClick={() => onOpenChange(false)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--cs-t1)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--cs-t2)";
+              e.currentTarget.style.background = "transparent";
             }}
           >
-            <button
-              type="button"
-              className="w-full rounded-xl py-3 text-sm font-medium fc-text-subtle transition-colors hover:bg-white/[0.04] hover:fc-text-primary"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </button>
-          </div>
+            Cancel
+          </button>
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>

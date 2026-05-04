@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+import { WorkoutTemplateConfigCard } from "@/components/coach/workouts/WorkoutTemplateConfigCard";
+import wt from "@/components/coach/workouts/workoutTemplateEditV1.module.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +39,8 @@ interface ExerciseDetailFormProps {
   allowTypeChange?: boolean;
   allowStructureEditing?: boolean;
   allowedBlockTypes?: string[]; // Optional: filter available block types for volume calculator
+  /** Coach workout template editor v1 chrome (config cards, load pill, numeric typography). */
+  coachTemplateV1?: boolean;
 }
 
 const complexGroupLabels: Record<string, string> = {
@@ -60,8 +65,40 @@ export default function ExerciseDetailForm({
   allowTypeChange = true,
   allowStructureEditing = true,
   allowedBlockTypes,
+  coachTemplateV1 = false,
 }: ExerciseDetailFormProps) {
   const theme = { text: "fc-text-primary", textSecondary: "fc-text-subtle" };
+
+  function ConfigBox({
+    exerciseTypeForCard,
+    legacyTitle,
+    legacyIcon,
+    children,
+  }: {
+    exerciseTypeForCard: string;
+    legacyTitle: string;
+    legacyIcon: ReactNode;
+    children: ReactNode;
+  }) {
+    if (coachTemplateV1) {
+      return (
+        <WorkoutTemplateConfigCard exerciseType={exerciseTypeForCard}>
+          {children}
+        </WorkoutTemplateConfigCard>
+      );
+    }
+    return (
+      <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <h4
+          className={`font-semibold ${theme.text} mb-4 flex flex-wrap items-center gap-2`}
+        >
+          {legacyIcon}
+          {legacyTitle}
+        </h4>
+        {children}
+      </div>
+    );
+  }
 
   // Helper function to ensure value is an array
   const ensureArray = <T,>(value: T[] | undefined | null): T[] =>
@@ -165,57 +202,101 @@ export default function ExerciseDetailForm({
       }
     };
 
-    return (
-      <div className={`mt-1 ${className || ""}`}>
-        <div className="flex items-center justify-between mb-2.5 gap-2">
-          <Label className={`text-sm font-medium ${theme.text} shrink-0`}>{label}</Label>
-          <LoadPercentageWeightToggle
-            value={toggleMode}
-            onValueChange={handleToggle}
+    const loadFields =
+      toggleMode === "load" ? (
+        <>
+          <Input
+            type="number"
+            value={
+              loadValue === "" ||
+              loadValue === null ||
+              loadValue === undefined
+                ? ""
+                : String(loadValue)
+            }
+            onChange={(e) => onLoadChange(e.target.value)}
+            placeholder={loadPlaceholder}
+            min="0"
+            max="200"
+            step="1"
+            className={cn(
+              coachTemplateV1 ? "mt-0" : "mt-2",
+              "rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]",
+              coachTemplateV1 && wt.inputLike,
+              coachTemplateV1 && "wt-num-input",
+            )}
           />
-        </div>
-        {toggleMode === "load" ? (
-          <>
-            <Input
-              type="number"
-              value={
-                loadValue === "" ||
-                loadValue === null ||
-                loadValue === undefined
-                  ? ""
-                  : String(loadValue)
-              }
-              onChange={(e) => onLoadChange(e.target.value)}
-              placeholder={loadPlaceholder}
-              min="0"
-              max="200"
-              step="1"
-              className="mt-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
-            />
-            <p className={`text-xs ${theme.textSecondary} mt-1`}>
-              Percentage of estimated 1RM (e.g., 70 = 70% of 1RM)
-            </p>
-          </>
+          <p
+            className={cn(
+              "text-xs mt-1",
+              coachTemplateV1 ? wt.optHelper : theme.textSecondary,
+            )}
+          >
+            Percentage of estimated 1RM (e.g., 70 = 70% of 1RM)
+          </p>
+        </>
+      ) : (
+        <>
+          <Input
+            type="number"
+            value={
+              weightValue === "" ||
+              weightValue === null ||
+              weightValue === undefined
+                ? ""
+                : String(weightValue)
+            }
+            onChange={(e) => onWeightChange(e.target.value)}
+            placeholder={weightPlaceholder}
+            min="0"
+            step="0.1"
+            className={cn(
+              coachTemplateV1 ? "mt-0" : "mt-2",
+              "rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]",
+              coachTemplateV1 && wt.inputLike,
+              coachTemplateV1 && "wt-num-input",
+            )}
+          />
+          <p
+            className={cn(
+              "text-xs mt-1",
+              coachTemplateV1 ? wt.optHelper : theme.textSecondary,
+            )}
+          >
+            {coachTemplateV1
+              ? "Weight in kilograms"
+              : "Specific weight in kilograms"}
+          </p>
+        </>
+      );
+
+    return (
+      <div className={cn("mt-1", className || "")}>
+        {coachTemplateV1 ? (
+          <div className={wt.loadRow}>
+            <div className={wt.loadRowTop}>
+              <Label className={cn(wt.fieldLabel, "mb-0")}>{label}</Label>
+              <LoadPercentageWeightToggle
+                value={toggleMode}
+                onValueChange={handleToggle}
+                visualVariant="coachPill"
+              />
+            </div>
+            {loadFields}
+          </div>
         ) : (
           <>
-            <Input
-              type="number"
-              value={
-                weightValue === "" ||
-                weightValue === null ||
-                weightValue === undefined
-                  ? ""
-                  : String(weightValue)
-              }
-              onChange={(e) => onWeightChange(e.target.value)}
-              placeholder={weightPlaceholder}
-              min="0"
-              step="0.1"
-              className="mt-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
-            />
-            <p className={`text-xs ${theme.textSecondary} mt-1`}>
-              Specific weight in kilograms
-            </p>
+            <div className="flex items-center justify-between mb-2.5 gap-2">
+              <Label className={`text-sm font-medium ${theme.text} shrink-0`}>
+                {label}
+              </Label>
+              <LoadPercentageWeightToggle
+                value={toggleMode}
+                onValueChange={handleToggle}
+                visualVariant="default"
+              />
+            </div>
+            {loadFields}
           </>
         )}
       </div>
@@ -236,8 +317,12 @@ export default function ExerciseDetailForm({
   }, [exerciseType]);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className={cn("space-y-6", coachTemplateV1 && wt.wtCoachForm)}>
+      <div
+        className={cn(
+          coachTemplateV1 ? wt.typeExerciseRow : "grid grid-cols-1 sm:grid-cols-2 gap-4",
+        )}
+      >
         <div>
           <Label className={`text-sm font-medium ${theme.text}`}>
             Exercise Type
@@ -366,14 +451,22 @@ export default function ExerciseDetailForm({
       {/* Straight Set */}
       {exerciseType === "straight_set" && (
         <div className="space-y-5">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4 className={`font-semibold ${theme.text} mb-4 flex flex-wrap items-center gap-2`}>
-              <Dumbbell className="w-4 h-4 fc-text-workouts" />
-              Straight Set Configuration
-            </h4>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <ConfigBox
+            exerciseTypeForCard="straight_set"
+            legacyTitle="Straight Set Configuration"
+            legacyIcon={<Dumbbell className="w-4 h-4 fc-text-workouts" />}
+          >
+            <div
+              className={cn(
+                coachTemplateV1 ? wt.fieldGrid2 : "grid grid-cols-2 gap-3 sm:gap-4",
+              )}
+            >
               <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
+                <Label
+                  className={cn(
+                    coachTemplateV1 ? wt.fieldLabel : `text-sm font-medium ${theme.text}`,
+                  )}
+                >
                   Sets
                 </Label>
                 <Input
@@ -385,26 +478,48 @@ export default function ExerciseDetailForm({
                     })
                   }
                   min="1"
-                  className="mt-2 rounded-xl"
+                  className={cn(
+                    "mt-2 rounded-xl",
+                    coachTemplateV1 && wt.inputLike,
+                    coachTemplateV1 && "wt-num-input",
+                  )}
                 />
               </div>
               <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
+                <Label
+                  className={cn(
+                    coachTemplateV1 ? wt.fieldLabel : `text-sm font-medium ${theme.text}`,
+                  )}
+                >
                   Reps
                 </Label>
                 <Input
                   value={exercise.reps || ""}
                   onChange={(e) => updateExercise({ reps: e.target.value })}
                   placeholder="e.g., 10-12"
-                  className="mt-2 rounded-xl"
+                  className={cn(
+                    "mt-2 rounded-xl",
+                    coachTemplateV1 && wt.inputLike,
+                  )}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-5">
+            <div
+              className={cn(
+                coachTemplateV1 ? cn(wt.fieldGrid2, "mt-0") : "grid grid-cols-2 gap-3 sm:gap-4 mt-5",
+              )}
+            >
               <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Rest (seconds)
+                <Label
+                  className={cn(
+                    coachTemplateV1 ? wt.fieldLabel : `text-sm font-medium ${theme.text}`,
+                  )}
+                >
+                  Rest{" "}
+                  {coachTemplateV1 && (
+                    <span className={wt.optHelper}>opt: sec</span>
+                  )}
                 </Label>
                 <Input
                   type="number"
@@ -419,12 +534,23 @@ export default function ExerciseDetailForm({
                     })
                   }
                   min="0"
-                  className="mt-2 rounded-xl"
+                  className={cn(
+                    "mt-2 rounded-xl",
+                    coachTemplateV1 && wt.inputLike,
+                    coachTemplateV1 && "wt-num-input",
+                  )}
                 />
               </div>
               <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  RPE
+                <Label
+                  className={cn(
+                    coachTemplateV1 ? wt.fieldLabel : `text-sm font-medium ${theme.text}`,
+                  )}
+                >
+                  RPE{" "}
+                  {coachTemplateV1 && (
+                    <span className={wt.optHelper}>opt: 1–10</span>
+                  )}
                 </Label>
                 <Input
                   type="number"
@@ -438,27 +564,50 @@ export default function ExerciseDetailForm({
                   }
                   min={1}
                   max={10}
-                  className="mt-2 rounded-xl"
+                  className={cn(
+                    "mt-2 rounded-xl",
+                    coachTemplateV1 && wt.inputLike,
+                    coachTemplateV1 && "wt-num-input",
+                  )}
                   placeholder="e.g., 8"
                 />
-                <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                  Prescribed difficulty (1–10). Same value is stored for the
-                  client&apos;s workout.
-                </p>
+                {!coachTemplateV1 && (
+                  <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                    Prescribed difficulty (1–10). Same value is stored for the
+                    client&apos;s workout.
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="mt-5">
-              <Label className={`text-sm font-medium ${theme.text}`}>Tempo</Label>
+            <div className={cn(coachTemplateV1 ? "mt-0" : "mt-5")}>
+              <Label
+                className={cn(
+                  coachTemplateV1 ? wt.fieldLabel : `text-sm font-medium ${theme.text}`,
+                )}
+              >
+                Tempo{" "}
+                {coachTemplateV1 && (
+                  <span className={wt.optHelper}>
+                    opt: eccentric · pause · concentric · pause
+                  </span>
+                )}
+              </Label>
               <Input
                 value={exercise.tempo || ""}
                 onChange={(e) => updateExercise({ tempo: e.target.value })}
-                placeholder="e.g., 2-0-1-0"
-                className="mt-2 rounded-xl"
+                placeholder="e.g., 4-0-1-0"
+                className={cn(
+                  "mt-2 rounded-xl",
+                  coachTemplateV1 && wt.inputLike,
+                  coachTemplateV1 && "wt-tempo-input",
+                )}
               />
-              <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                Format: eccentric-pause-concentric-pause
-              </p>
+              {!coachTemplateV1 && (
+                <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                  Format: eccentric-pause-concentric-pause
+                </p>
+              )}
             </div>
 
             {renderLoadWeightField(
@@ -470,25 +619,25 @@ export default function ExerciseDetailForm({
                 updateExercise({ weight_kg: value, load_percentage: "" }),
               mainToggleMode,
               setMainToggleMode,
-              "Load % / Weight"
+              "Load",
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Superset */}
       {exerciseType === "superset" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Zap className="w-4 h-4 fc-text-workouts" />
-              Superset Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Select the second exercise for your superset pair
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="superset"
+            legacyTitle="Superset Configuration"
+            legacyIcon={<Zap className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Select the second exercise for your superset pair
+              </p>
+            )}
             <div>
               <Label className={`text-sm font-medium ${theme.text}`}>
                 Second Exercise
@@ -604,23 +753,23 @@ export default function ExerciseDetailForm({
                 "Second Exercise Load % / Weight"
               )}
             </div>
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* AMRAP */}
       {exerciseType === "amrap" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Rocket className="w-4 h-4 fc-text-workouts" />
-              AMRAP Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              As Many Rounds As Possible - set the time duration
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="amrap"
+            legacyTitle="AMRAP Configuration"
+            legacyIcon={<Rocket className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                As Many Rounds As Possible - set the time duration
+              </p>
+            )}
             <div>
               <Label className={`text-sm font-medium ${theme.text}`}>
                 Duration (minutes)
@@ -653,24 +802,24 @@ export default function ExerciseDetailForm({
               setMainToggleMode,
               "Load % / Weight"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* EMOM */}
       {exerciseType === "emom" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Timer className="w-4 h-4 fc-text-workouts" />
-              EMOM Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Every Minute On the Minute - perform work at the start of each
-              minute
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="emom"
+            legacyTitle="EMOM Configuration"
+            legacyIcon={<Timer className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Every Minute On the Minute - perform work at the start of each
+                minute
+              </p>
+            )}
 
             <div className="mb-4">
               <Label className={`text-sm font-medium ${theme.text}`}>
@@ -793,24 +942,24 @@ export default function ExerciseDetailForm({
               setMainToggleMode,
               "Load % / Weight"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Tabata */}
       {exerciseType === "tabata" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <CloudLightning className="w-4 h-4 fc-text-workouts" />
-              Tabata Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              High-intensity interval training with multiple exercises - fixed
-              timing for all exercises
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="tabata"
+            legacyTitle="Tabata Configuration"
+            legacyIcon={<CloudLightning className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                High-intensity interval training with multiple exercises - fixed
+                timing for all exercises
+              </p>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
               <div>
@@ -1232,23 +1381,23 @@ export default function ExerciseDetailForm({
                 )
               )}
             </div>
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Drop Set */}
       {exerciseType === "drop_set" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <TrendingDown className="w-4 h-4 fc-text-workouts" />
-              Drop Set Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Perform to failure, then immediately reduce weight
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="drop_set"
+            legacyTitle="Drop Set Configuration"
+            legacyIcon={<TrendingDown className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Perform to failure, then immediately reduce weight
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1325,26 +1474,26 @@ export default function ExerciseDetailForm({
                 updateExercise({ weight_kg: value, load_percentage: "" }),
               mainToggleMode,
               setMainToggleMode,
-              "Initial Load % / Weight"
+              "Initial load"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Giant Set */}
       {exerciseType === "giant_set" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Flame className="w-4 h-4 fc-text-workouts" />
-              Giant Set Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Multiple exercises performed consecutively with no rest between
-              them
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="giant_set"
+            legacyTitle="Giant Set Configuration"
+            legacyIcon={<Flame className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Multiple exercises performed consecutively with no rest between
+                them
+              </p>
+            )}
 
             <div className="space-y-4 mb-5">
               <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1575,23 +1724,23 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Cluster Set */}
       {exerciseType === "cluster_set" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Link className="w-4 h-4 fc-text-workouts" />
-              Cluster Set Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Short intra-set rests between small sets of reps
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="cluster_set"
+            legacyTitle="Cluster Set Configuration"
+            legacyIcon={<Link className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Short intra-set rests between small sets of reps
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1682,23 +1831,23 @@ export default function ExerciseDetailForm({
               setMainToggleMode,
               "Load % / Weight"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Rest-Pause */}
       {exerciseType === "rest_pause" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <PauseCircle className="w-4 h-4 fc-text-workouts" />
-              Rest-Pause Set Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Perform to near failure, rest briefly, then perform more reps
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="rest_pause"
+            legacyTitle="Rest-Pause Set Configuration"
+            legacyIcon={<PauseCircle className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Perform to near failure, rest briefly, then perform more reps
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1754,22 +1903,20 @@ export default function ExerciseDetailForm({
                 updateExercise({ weight_kg: value, load_percentage: "" }),
               mainToggleMode,
               setMainToggleMode,
-              "Initial Load % / Weight"
+              "Initial load"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* Pre-Exhaustion */}
       {exerciseType === "pre_exhaustion" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Dumbbell className="w-4 h-4 fc-text-workouts" />
-              Pre-Exhaustion Configuration
-            </h4>
+          <ConfigBox
+            exerciseTypeForCard="pre_exhaustion"
+            legacyTitle="Pre-Exhaustion Configuration"
+            legacyIcon={<Dumbbell className="w-4 h-4 fc-text-workouts" />}
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1881,23 +2028,23 @@ export default function ExerciseDetailForm({
                 "Compound Load % / Weight"
               )}
             </div>
-          </div>
+          </ConfigBox>
         </div>
       )}
 
       {/* For Time */}
       {exerciseType === "for_time" && (
         <div className="space-y-4">
-          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Activity className="w-4 h-4 fc-text-workouts" />
-              For Time Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Complete a set amount of work as fast as possible
-            </p>
+          <ConfigBox
+            exerciseTypeForCard="for_time"
+            legacyTitle="For Time Configuration"
+            legacyIcon={<Activity className="w-4 h-4 fc-text-workouts" />}
+          >
+            {!coachTemplateV1 && (
+              <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                Complete a set amount of work as fast as possible
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
@@ -1948,9 +2095,9 @@ export default function ExerciseDetailForm({
                 updateExercise({ weight_kg: value, load_percentage: "" }),
               mainToggleMode,
               setMainToggleMode,
-              "Load % / Weight"
+              "Load"
             )}
-          </div>
+          </ConfigBox>
         </div>
       )}
 

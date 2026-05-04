@@ -8,12 +8,13 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   ClientPageShell,
   ClientGlassCard,
   SectionHeader,
-  PrimaryButton,
-  SecondaryButton,
+  IconButton,
+  Eyebrow,
 } from "@/components/client-ui";
 import { Stepper } from "@/components/ui/stepper";
 import { RestTimerOverlay } from "@/components/workout/RestTimerOverlay";
@@ -51,13 +52,13 @@ import {
   PRCelebrationModal,
   type PRDetectedPayload,
 } from "@/components/client/workout-execution/ui/PRCelebrationModal";
-import { WorkoutProgressBar } from "@/components/client/workout-execution/ui/WorkoutProgressBar";
+import { ExecProgressSegments } from "@/components/client/workout-execution/ui/ExecProgressSegments";
+import { enrichWorkoutBlocksPrescribedRir } from "@/lib/enrichWorkoutBlocksPrescribedRir";
+import { WorkoutExecutionChromeProvider } from "@/components/client/workout-execution/WorkoutExecutionChromeContext";
 import {
   WorkoutBlock,
   LiveWorkoutBlock,
   LoggedSet,
-  WORKOUT_BLOCK_CONFIGS,
-  type WorkoutBlockType,
 } from "@/types/workoutBlocks";
 import {
   fetchE1RMs,
@@ -70,8 +71,7 @@ import type {
   ClientBlockRecord,
   ClientBlockExerciseRecord,
 } from "./types";
-import { BARBELL_OPTIONS } from "./constants";
-import { isValidUuid, calculatePlateLoading } from "./utils";
+import { isValidUuid } from "./utils";
 import { PreviousPerformanceCard } from "./components/PreviousPerformanceCard";
 import { mapWorkoutBlocksRpcToSetEntries } from "@/lib/workoutBlocksRpcMapper";
 import { collectExerciseIdsDeep } from "@/lib/collectExerciseIdsDeep";
@@ -106,12 +106,8 @@ export default function LiveWorkout() {
 
   // Exercise Display Enhancements
   const [showExerciseImage, setShowExerciseImage] = useState(false);
-  const [showPlateCalculator, setShowPlateCalculator] = useState(false);
   const [showDropSetCalculator, setShowDropSetCalculator] = useState(false);
   const [showClusterTimer, setShowClusterTimer] = useState(false);
-  const [selectedBarbell, setSelectedBarbell] = useState(20);
-  const [targetWeight, setTargetWeight] = useState("");
-  const [showPlateResults, setShowPlateResults] = useState(false);
 
   // Workout Block System
   const [workoutBlocks, setWorkoutBlocks] = useState<LiveWorkoutBlock[]>([]);
@@ -166,16 +162,24 @@ export default function LiveWorkout() {
     useState<Record<string, number>>({});
 
   // Celebration queue: PR shows first, then achievements sequentially
-  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<
+    Achievement[]
+  >([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
-  const [prCelebrationData, setPrCelebrationData] = useState<PRDetectedPayload | null>(null);
+  const [prCelebrationData, setPrCelebrationData] =
+    useState<PRDetectedPayload | null>(null);
   /** Latest body weight (kg) for PR tier multiplier; one fetch per page load */
-  const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(null);
+  const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(
+    null,
+  );
   const pendingAchievementsRef = useRef<Achievement[]>([]);
   const showAchievementsAfterPR = useCallback(() => {
     if (pendingAchievementsRef.current.length > 0) {
       setTimeout(() => {
-        setNewAchievementsQueue((prev) => [...prev, ...pendingAchievementsRef.current]);
+        setNewAchievementsQueue((prev) => [
+          ...prev,
+          ...pendingAchievementsRef.current,
+        ]);
         setAchievementModalIndex(0);
         pendingAchievementsRef.current = [];
       }, 300);
@@ -283,8 +287,6 @@ export default function LiveWorkout() {
 
     return `${loadPercentage}% Load - Suggested: Log first set to calculate`;
   };
-
-  const barbellOptions = BARBELL_OPTIONS;
 
   // Workout Block Handlers
   const handleBlockComplete = (blockId: string, loggedSets: LoggedSet[]) => {
@@ -801,10 +803,7 @@ export default function LiveWorkout() {
               .single(),
           ]);
 
-        if (
-          !setLogsRpcResult.error &&
-          Array.isArray(setLogsRpcResult.data)
-        ) {
+        if (!setLogsRpcResult.error && Array.isArray(setLogsRpcResult.data)) {
           setLogs = setLogsRpcResult.data;
         } else {
           if (setLogsRpcResult.error) {
@@ -831,7 +830,10 @@ export default function LiveWorkout() {
         blockCompletions = blockCompletionsResult.data ?? [];
         startedAt = workoutLogResult.data?.started_at ?? null;
         if (blockCompletionsResult.error) {
-          console.error("Error fetching block completions:", blockCompletionsResult.error);
+          console.error(
+            "Error fetching block completions:",
+            blockCompletionsResult.error,
+          );
         }
       }
 
@@ -1565,7 +1567,7 @@ export default function LiveWorkout() {
             // (stale legacy field). See programStateService.ts for authoritative comment.
             const { data: scheduleSlot } = await supabase
               .from("program_schedule")
-              .select("id")
+              .select("id, week_number")
               .eq("program_id", activeProgramAssignment.program_id)
               .eq("day_number", programDayAssignment.day_number)
               .maybeSingle();
@@ -1581,7 +1583,8 @@ export default function LiveWorkout() {
               if (completionEntry) {
                 addToast({
                   title: "Workout Already Completed",
-                  description: "This program workout has already been completed.",
+                  description:
+                    "This program workout has already been completed.",
                   variant: "default",
                 });
                 window.location.href = "/client/train";
@@ -1715,6 +1718,13 @@ export default function LiveWorkout() {
               programDayAssignment.id;
             (resolvedAssignment as any).program_assignment_id =
               activeProgramAssignment.id;
+            if (scheduleSlot?.id) {
+              (resolvedAssignment as any).program_schedule_id = scheduleSlot.id;
+              const wn = (scheduleSlot as { week_number?: number | null })
+                .week_number;
+              (resolvedAssignment as any).current_week =
+                typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
+            }
           }
         }
 
@@ -1738,6 +1748,75 @@ export default function LiveWorkout() {
         }
       }
 
+      // Train hub often opens /start with workout_assignments.id. Program-day URL sets
+      // program_assignment_id above; this bridge covers the assignment-id path when
+      // program_day_assignments.workout_assignment_id points at this assignment.
+      if (
+        resolvedAssignment &&
+        !(resolvedAssignment as { program_assignment_id?: string })
+          .program_assignment_id
+      ) {
+        const { data: dayRows, error: dayLinkError } = await supabase
+          .from("program_day_assignments")
+          .select("id, program_assignment_id, day_number")
+          .eq("workout_assignment_id", resolvedAssignment.id)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        if (dayLinkError) {
+          console.warn(
+            "[loadAssignment] program_day_assignments bridge:",
+            dayLinkError.message,
+          );
+        }
+        const dayLink = dayRows?.[0];
+        if (dayLink?.program_assignment_id) {
+          const { data: paRow, error: paErr } = await supabase
+            .from("program_assignments")
+            .select("program_id")
+            .eq("id", dayLink.program_assignment_id)
+            .eq("client_id", user.id)
+            .maybeSingle();
+          if (paErr) {
+            console.warn(
+              "[loadAssignment] program_assignments for bridge:",
+              paErr.message,
+            );
+          }
+          if (paRow?.program_id != null) {
+            const { data: slotRow } = await supabase
+              .from("program_schedule")
+              .select("id, week_number")
+              .eq("program_id", paRow.program_id)
+              .eq("day_number", dayLink.day_number)
+              .maybeSingle();
+            (
+              resolvedAssignment as { program_assignment_id?: string }
+            ).program_assignment_id = dayLink.program_assignment_id;
+            (
+              resolvedAssignment as { program_day_assignment_id?: string }
+            ).program_day_assignment_id = dayLink.id;
+            if (slotRow?.id) {
+              (
+                resolvedAssignment as { program_schedule_id?: string }
+              ).program_schedule_id = slotRow.id;
+              const wn = (slotRow as { week_number?: number | null })
+                .week_number;
+              (resolvedAssignment as { current_week?: number }).current_week =
+                typeof wn === "number" && Number.isFinite(wn) ? wn : 1;
+            }
+            console.log(
+              "[loadAssignment] linked program context from workout_assignment_id:",
+              {
+                program_assignment_id: dayLink.program_assignment_id,
+                program_schedule_id: (slotRow as { id?: string } | null)?.id,
+                current_week: (resolvedAssignment as { current_week?: number })
+                  .current_week,
+              },
+            );
+          }
+        }
+      }
+
       // Combine the data
       const combinedAssignment: WorkoutAssignment = {
         id: resolvedAssignment.id,
@@ -1755,9 +1834,11 @@ export default function LiveWorkout() {
       setLoading(false);
       setLoadingStartedAt(null);
 
-      // Check if this is a program assignment - load blocks from progression rules
+      // Program-day resolution attaches program_assignment_id without DB is_program_assignment.
+      // Treat that as a program workout so we load progression blocks + enrich client rules RIR.
       const isProgramAssignment =
-        (resolvedAssignment as any).is_program_assignment === true;
+        (resolvedAssignment as any).is_program_assignment === true ||
+        Boolean((resolvedAssignment as any).program_assignment_id);
       let workoutBlocks: any[] = [];
       /** Raw RPC payload (template path only); used to collect exercise_ids from nested tables. */
       let rpcRawBlocks: unknown = null;
@@ -1802,9 +1883,30 @@ export default function LiveWorkout() {
         );
 
         if (!workoutBlocks || workoutBlocks.length === 0) {
-          throw new Error(
-            "No workout blocks found in progression rules for this program",
+          console.warn(
+            `[workout-start] No progression rules found for template ${templateId}, falling back to base template`,
           );
+          const { data: rpcBlocksFallback, error: rpcFallbackError } =
+            await supabase.rpc("get_workout_blocks", {
+              p_template_id: templateId,
+            });
+          if (rpcFallbackError) {
+            console.error(
+              "[start] get_workout_blocks RPC error (no progression fallback):",
+              rpcFallbackError,
+            );
+            throw new Error(
+              rpcFallbackError.message ||
+                "Failed to load workout blocks from template",
+            );
+          }
+          rpcRawBlocks = rpcBlocksFallback ?? null;
+          workoutBlocks = mapWorkoutBlocksRpcToSetEntries(
+            rpcBlocksFallback ?? [],
+          );
+          if (!workoutBlocks || workoutBlocks.length === 0) {
+            throw new Error("No workout blocks found for this template");
+          }
         }
       } else {
         // Regular workout assignment - load blocks from template
@@ -1829,6 +1931,63 @@ export default function LiveWorkout() {
           throw new Error("No workout blocks found for this template");
         }
       }
+
+      const blockIdsForRir = workoutBlocks
+        .map((b: { id?: string }) => b.id)
+        .filter((id): id is string => Boolean(id));
+      try {
+        await enrichWorkoutBlocksPrescribedRir(supabase, workoutBlocks, {
+          blockIds: blockIdsForRir,
+          programAssignmentId: isProgramAssignment
+            ? ((resolvedAssignment as { program_assignment_id?: string | null })
+                .program_assignment_id ?? null)
+            : null,
+          programScheduleId: isProgramAssignment
+            ? ((resolvedAssignment as { program_schedule_id?: string | null })
+                .program_schedule_id ?? null)
+            : null,
+          weekNumber: isProgramAssignment
+            ? Number(
+                (resolvedAssignment as { current_week?: number | null })
+                  .current_week ?? 1,
+              )
+            : null,
+          workoutAssignmentId: combinedAssignment.id,
+        });
+      } catch (e) {
+        console.warn("[loadAssignment] enrichWorkoutBlocksPrescribedRir:", e);
+      }
+
+      console.log(
+        "[DEBUG] Post-enrichment workoutBlocks:",
+        JSON.stringify(
+          workoutBlocks.map((b: { id?: string; exercises?: unknown[] }) => ({
+            blockId: b.id,
+            exercises: (b.exercises ?? []).map(
+              (e: Record<string, unknown>) => ({
+                id: e.id,
+                name:
+                  (e as { exercise?: { name?: string } }).exercise?.name ??
+                  (e as { name?: string }).name,
+                rir: e.rir,
+                primary_muscle_group:
+                  (e as { exercise?: { primary_muscle_group?: string } })
+                    .exercise?.primary_muscle_group ??
+                  (e as { primary_muscle_group?: string }).primary_muscle_group,
+              }),
+            ),
+          })),
+          null,
+          2,
+        ),
+      );
+      console.log("[DEBUG] enrich RIR context:", {
+        isProgramAssignment,
+        program_assignment_id: (resolvedAssignment as any)
+          .program_assignment_id,
+        program_schedule_id: (resolvedAssignment as any).program_schedule_id,
+        current_week: (resolvedAssignment as any).current_week,
+      });
 
       // Convert WorkoutBlock[] to ClientBlockRecord[] format
       const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
@@ -1871,7 +2030,9 @@ export default function LiveWorkout() {
         new Set(
           [
             ...collectExerciseIdsDeep(workoutBlocks),
-            ...(rpcRawBlocks != null ? collectExerciseIdsDeep(rpcRawBlocks) : []),
+            ...(rpcRawBlocks != null
+              ? collectExerciseIdsDeep(rpcRawBlocks)
+              : []),
           ].filter((id): id is string => Boolean(id)),
         ),
       );
@@ -2030,7 +2191,9 @@ export default function LiveWorkout() {
             rest_pause_sets: blockExercises.flatMap(
               (ex: any) => ex.rest_pause_sets || [],
             ),
-            speed_sets: blockExercises.flatMap((ex: any) => ex.speed_sets || []),
+            speed_sets: blockExercises.flatMap(
+              (ex: any) => ex.speed_sets || [],
+            ),
             endurance_sets: blockExercises.flatMap(
               (ex: any) => ex.endurance_sets || [],
             ),
@@ -2113,7 +2276,8 @@ export default function LiveWorkout() {
       }
 
       if (workoutBlocksConverted.length > 0) {
-        setUseBlockSystem(true);
+        // Block UI: set workoutBlocks before useBlockSystem so a stale abort never
+        // leaves useBlockSystem=true with workoutBlocks=[] (broken Traditional branch).
 
         // ========================================================================
         // WORKOUT SESSION RESUMPTION LOGIC
@@ -2140,30 +2304,51 @@ export default function LiveWorkout() {
 
           // 3. Single RPC for all session/log/progress data (replaces 20+ queries)
           let sessionData: {
-            session?: { id: string; status: string; started_at?: string; assignment_id?: string; program_assignment_id?: string; program_schedule_id?: string } | null;
-            activeLog?: { id: string; started_at?: string; workout_session_id?: string; program_assignment_id?: string; program_schedule_id?: string } | null;
+            session?: {
+              id: string;
+              status: string;
+              started_at?: string;
+              assignment_id?: string;
+              program_assignment_id?: string;
+              program_schedule_id?: string;
+            } | null;
+            activeLog?: {
+              id: string;
+              started_at?: string;
+              workout_session_id?: string;
+              program_assignment_id?: string;
+              program_schedule_id?: string;
+            } | null;
             setLogs?: any[];
             blockCompletions?: { workout_set_entry_id: string }[];
             dayCompletions?: string[];
             coachId?: string | null;
           } = {};
           try {
-            const { data: rpcSession, error: rpcSessionError } = await supabase.rpc(
-              "get_workout_session_data",
-              { p_client_id: user.id, p_assignment_id: actualWorkoutAssignmentId },
-            );
-            if (!rpcSessionError && rpcSession) sessionData = rpcSession as typeof sessionData;
+            const { data: rpcSession, error: rpcSessionError } =
+              await supabase.rpc("get_workout_session_data", {
+                p_client_id: user.id,
+                p_assignment_id: actualWorkoutAssignmentId,
+              });
+            if (!rpcSessionError && rpcSession)
+              sessionData = rpcSession as typeof sessionData;
           } catch (e) {
-            console.warn("⚠️ get_workout_session_data RPC failed (fallback to per-query):", e);
+            console.warn(
+              "⚠️ get_workout_session_data RPC failed (fallback to per-query):",
+              e,
+            );
           }
 
           // Guard: if this program slot is already in dayCompletions, redirect
           const scheduleId = sessionData.activeLog?.program_schedule_id;
-          const dayCompletions = Array.isArray(sessionData.dayCompletions) ? sessionData.dayCompletions : [];
+          const dayCompletions = Array.isArray(sessionData.dayCompletions)
+            ? sessionData.dayCompletions
+            : [];
           if (scheduleId && dayCompletions.includes(scheduleId)) {
             addToast({
               title: "Workout Already Completed",
-              description: "This workout has already been completed. Returning to training.",
+              description:
+                "This workout has already been completed. Returning to training.",
               variant: "default",
             });
             window.location.href = "/client/train";
@@ -2174,9 +2359,13 @@ export default function LiveWorkout() {
             ? {
                 id: sessionData.activeLog.id,
                 started_at: sessionData.activeLog.started_at ?? null,
-                workout_session_id: sessionData.activeLog.workout_session_id ?? null,
+                workout_session_id:
+                  sessionData.activeLog.workout_session_id ?? null,
               }
-            : await findActiveWorkoutLogForToday(actualWorkoutAssignmentId, user.id);
+            : await findActiveWorkoutLogForToday(
+                actualWorkoutAssignmentId,
+                user.id,
+              );
 
           if (activeLog) {
             console.log(
@@ -2186,7 +2375,8 @@ export default function LiveWorkout() {
 
             // 4. Restore progress (use pre-fetched setLogs/blockCompletions when from RPC)
             const prefetched =
-              sessionData.setLogs != null && sessionData.blockCompletions != null
+              sessionData.setLogs != null &&
+              sessionData.blockCompletions != null
                 ? {
                     setLogs: sessionData.setLogs,
                     blockCompletions: sessionData.blockCompletions,
@@ -2208,6 +2398,7 @@ export default function LiveWorkout() {
               // Set restored blocks with progress
               const progress = restoredProgress;
               setWorkoutBlocks(progress.workoutBlocksWithProgress);
+              setUseBlockSystem(true);
               setContentReady(true);
               // Seed parent-owned logged sets so they persist when navigating blocks
               setLoggedSetsByBlockId((prev) => {
@@ -2298,6 +2489,7 @@ export default function LiveWorkout() {
             }),
           );
           setWorkoutBlocks(liveBlocks);
+          setUseBlockSystem(true);
           setContentReady(true);
         }
 
@@ -2400,10 +2592,15 @@ export default function LiveWorkout() {
 
       if (dayAssignment?.program_assignment_id) {
         programAssignmentId = dayAssignment.program_assignment_id;
-        console.log('[loadProgressionSuggestions] found program_assignment_id via program_day_assignments:', programAssignmentId);
+        console.log(
+          "[loadProgressionSuggestions] found program_assignment_id via program_day_assignments:",
+          programAssignmentId,
+        );
       } else {
         // This workout_assignment is not linked to any program (standalone assignment)
-        console.log('[loadProgressionSuggestions] standalone workout — no program_assignment_id found, skipping suggestions');
+        console.log(
+          "[loadProgressionSuggestions] standalone workout — no program_assignment_id found, skipping suggestions",
+        );
         return;
       }
 
@@ -3479,7 +3676,9 @@ export default function LiveWorkout() {
       console.log("[COMPLETE-FLOW] auth session", {
         hasSession: !!session,
         expiresAt: session?.expires_at,
-        isExpired: session ? Date.now() / 1000 > (session.expires_at ?? 0) : "no session",
+        isExpired: session
+          ? Date.now() / 1000 > (session.expires_at ?? 0)
+          : "no session",
       });
 
       const {
@@ -3512,16 +3711,22 @@ export default function LiveWorkout() {
       // Also write to localStorage as fallback for backward compatibility.
       const logIdForComplete =
         workoutLogId ||
-        (sessionId?.startsWith("restored-") ? sessionId.replace("restored-", "") : null);
+        (sessionId?.startsWith("restored-")
+          ? sessionId.replace("restored-", "")
+          : null);
       const params = new URLSearchParams();
       if (logIdForComplete) params.set("logId", logIdForComplete);
       if (sessionId && isUuid(sessionId)) params.set("sessionId", sessionId);
       params.set("duration", String(durationMinutes));
 
       try {
-        localStorage.setItem("workoutDurationMinutes", durationMinutes.toString());
+        localStorage.setItem(
+          "workoutDurationMinutes",
+          durationMinutes.toString(),
+        );
         localStorage.setItem("workoutStartTime", workoutStartTime.toString());
-        if (logIdForComplete) localStorage.setItem("workoutLogIdForComplete", logIdForComplete);
+        if (logIdForComplete)
+          localStorage.setItem("workoutLogIdForComplete", logIdForComplete);
         if (sessionId && isUuid(sessionId)) {
           localStorage.setItem("workoutSessionIdForComplete", sessionId);
         }
@@ -3547,7 +3752,10 @@ export default function LiveWorkout() {
           .eq("id", sessionId)
           .then(() => {})
           .catch((dbError) => {
-            console.warn("⚠️ workout_sessions update failed (non-blocking):", dbError);
+            console.warn(
+              "⚠️ workout_sessions update failed (non-blocking):",
+              dbError,
+            );
           });
       } else if (sessionId) {
         console.warn(
@@ -3574,7 +3782,8 @@ export default function LiveWorkout() {
   React.useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
-      if (!isCompletingWorkoutRef.current || !completionStartedAtRef.current) return;
+      if (!isCompletingWorkoutRef.current || !completionStartedAtRef.current)
+        return;
       const elapsed = Date.now() - completionStartedAtRef.current;
       if (elapsed < 20000) return;
       isCompletingWorkoutRef.current = false;
@@ -3582,12 +3791,14 @@ export default function LiveWorkout() {
       setIsCompletingWorkout(false);
       addToast({
         title: "Still here?",
-        description: "Tap Complete Workout again to finish, or open the completion link from your history.",
+        description:
+          "Tap Complete Workout again to finish, or open the completion link from your history.",
         variant: "destructive",
       });
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
   }, []);
 
   const currentExercise = exercises[currentExerciseIndex];
@@ -3671,7 +3882,9 @@ export default function LiveWorkout() {
     loading: false,
   });
   // Cache of previous performance per exercise (passed to LiveWorkoutBlockExecutor)
-  const [previousPerformanceMap, setPreviousPerformanceMap] = useState<Map<string, any>>(new Map());
+  const [previousPerformanceMap, setPreviousPerformanceMap] = useState<
+    Map<string, any>
+  >(new Map());
   const [forTimeTimeLeft, setForTimeTimeLeft] = useState(0);
   const [forTimeCompletionSecs, setForTimeCompletionSecs] = useState<
     number | null
@@ -3748,10 +3961,12 @@ export default function LiveWorkout() {
     const intervalSets = currentExercise?.meta?.tabata_sets;
     if (!intervalSets || !Array.isArray(intervalSets)) return;
 
-    const currentSet = (intervalSets as unknown[])[timerSetIndex] as {
-      exercises?: Array<{ rest_after?: number; work_seconds?: number }>;
-      rest_between_sets?: number;
-    } | undefined;
+    const currentSet = (intervalSets as unknown[])[timerSetIndex] as
+      | {
+          exercises?: Array<{ rest_after?: number; work_seconds?: number }>;
+          rest_between_sets?: number;
+        }
+      | undefined;
     const currentExerciseInSet = currentSet?.exercises?.[timerExerciseIndex];
 
     if (intervalPhase === "work") {
@@ -3982,7 +4197,7 @@ export default function LiveWorkout() {
     // Serve from cache if already fetched
     if (previousPerformanceMap.has(exerciseId)) {
       const cached = previousPerformanceMap.get(exerciseId);
-      console.log('[fetchPreviousPerformance] served from cache:', cached);
+      console.log("[fetchPreviousPerformance] served from cache:", cached);
       setPreviousPerformance({
         lastWorkout: cached?.lastWorkoutForCard ?? null,
         personalBest: cached?.personalBestForCard ?? null,
@@ -3999,13 +4214,16 @@ export default function LiveWorkout() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setPreviousPerformance({ lastWorkout: null, personalBest: null, loading: false });
+        setPreviousPerformance({
+          lastWorkout: null,
+          personalBest: null,
+          loading: false,
+        });
         return;
       }
 
-      const { getExercisePreviousPerformance } = await import(
-        "@/lib/clientProgressionService"
-      );
+      const { getExercisePreviousPerformance } =
+        await import("@/lib/clientProgressionService");
 
       const resolvedWorkoutAssignmentId = await resolveWorkoutAssignmentId(
         assignment?.id || assignmentId,
@@ -4018,8 +4236,14 @@ export default function LiveWorkout() {
         workoutLogId || undefined,
         resolvedWorkoutAssignmentId,
       );
-      console.log('[fetchPreviousPerformance] result.lastWorkout:', result?.lastWorkout);
-      console.log('[fetchPreviousPerformance] result.personalBest:', result?.personalBest);
+      console.log(
+        "[fetchPreviousPerformance] result.lastWorkout:",
+        result?.lastWorkout,
+      );
+      console.log(
+        "[fetchPreviousPerformance] result.personalBest:",
+        result?.personalBest,
+      );
 
       // Shape the data to match PreviousPerformanceCard's expected interface
       const lastWorkoutForCard = result.lastWorkout
@@ -4044,7 +4268,9 @@ export default function LiveWorkout() {
         lastWorkoutForCard,
         personalBestForCard,
       };
-      setPreviousPerformanceMap((prev) => new Map(prev).set(exerciseId, cached));
+      setPreviousPerformanceMap((prev) =>
+        new Map(prev).set(exerciseId, cached),
+      );
 
       setPreviousPerformance({
         lastWorkout: lastWorkoutForCard,
@@ -4053,7 +4279,11 @@ export default function LiveWorkout() {
       });
     } catch (error) {
       console.error("Failed to fetch previous performance:", error);
-      setPreviousPerformance({ lastWorkout: null, personalBest: null, loading: false });
+      setPreviousPerformance({
+        lastWorkout: null,
+        personalBest: null,
+        loading: false,
+      });
     } finally {
       fetchingPreviousPerformanceRef.current.delete(exerciseId);
     }
@@ -4083,238 +4313,215 @@ export default function LiveWorkout() {
             }
             style={{ gap: "var(--fc-gap-sections)" }}
           >
-              {/* Block system: back + title live in BaseBlockExecutorLayout */}
-              {(!useBlockSystem || workoutBlocks.length === 0) && (
-                <div className="flex items-center gap-3 mb-3">
-                  <button
-                    onClick={() => { window.location.href = "/client/train"; }}
-                    className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full animate-pulse"
-                        style={{ background: "var(--fc-status-success)" }}
-                      />
-                      <span className="text-[10px] uppercase tracking-[0.2em] fc-text-dim font-mono">
-                        Live Session
-                      </span>
-                    </div>
-                    <h1 className="text-base font-bold fc-text-primary leading-tight truncate">
-                      {assignment?.name || "Workout"}
-                    </h1>
+            {/* Block system: back + title live in BaseBlockExecutorLayout */}
+            {(!useBlockSystem || workoutBlocks.length === 0) && (
+              <div className="flex items-center gap-3 mb-3">
+                <IconButton
+                  variant="filled"
+                  size="md"
+                  className="fc-surface !h-9 !w-9 flex-shrink-0 border border-[color:var(--fc-surface-card-border)] fc-text-dim active:scale-95"
+                  aria-label="Back to training"
+                  onClick={() => {
+                    window.location.href = "/client/train";
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </IconButton>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 shrink-0 animate-pulse rounded-full"
+                      style={{ background: "var(--fc-status-success)" }}
+                      aria-hidden
+                    />
+                    <Eyebrow
+                      tone="dim"
+                      density="section"
+                      className="!mb-0 !font-mono !text-[10px] !tracking-[0.2em]"
+                    >
+                      Live Session
+                    </Eyebrow>
                   </div>
+                  <h1 className="text-base font-bold fc-text-primary leading-tight truncate">
+                    {assignment?.name || "Workout"}
+                  </h1>
                 </div>
-              )}
-              {/* Workout Block System */}
-              {loading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                </div>
-              ) : assignment && !contentReady ? (
-                <div className="border-b border-white/5 py-8 text-center">
-                  <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin fc-text-dim" />
-                  <p className="mb-1 text-sm font-medium fc-text-primary">Loading exercises…</p>
-                  <p className="text-xs fc-text-dim">This may take a few seconds.</p>
-                </div>
-              ) : useBlockSystem && workoutBlocks.length > 0 ? (
-                <>
-                  {/* Calculate overall progress */}
-                  {(() => {
-                    // Calculate total expected sets across all blocks
-                    const totalExpectedSets = workoutBlocks.reduce((total, block) => {
-                      // For each exercise in the block, count expected sets
-                      const exercises = block.block.exercises || [];
-                      if (exercises.length === 0) {
-                        // No exercises, use block.total_sets or default to 1
-                        return total + (block.block.total_sets || 1);
-                      }
-                      // Sum sets for each exercise
-                      return total + exercises.reduce((exerciseTotal, exercise) => {
-                        return exerciseTotal + (exercise.sets || block.block.total_sets || 1);
-                      }, 0);
-                    }, 0);
+              </div>
+            )}
+            {/* Workout Block System */}
+            {loading ? (
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            ) : assignment && !contentReady ? (
+              <div className="border-b border-white/5 py-8 text-center">
+                <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin fc-text-dim" />
+                <p className="mb-1 text-sm font-medium fc-text-primary">
+                  Loading exercises…
+                </p>
+                <p className="text-xs fc-text-dim">
+                  This may take a few seconds.
+                </p>
+              </div>
+            ) : useBlockSystem && workoutBlocks.length > 0 ? (
+              <>
+                {(() => {
+                  const currentBlock = workoutBlocks[currentBlockIndex];
+                  const currentExercise =
+                    currentBlock?.block.exercises?.[
+                      currentBlock.currentExerciseIndex ?? 0
+                    ];
+                  const totalSetsInBlock =
+                    currentExercise?.sets ||
+                    currentBlock?.block.total_sets ||
+                    currentBlock?.totalSets ||
+                    1;
+                  const completedInBlock = currentBlock?.completedSets ?? 0;
 
-                    // Calculate total completed sets across all blocks
-                    const totalCompletedSets = Object.values(loggedSetsByBlockId).reduce(
-                      (total, sets) => total + sets.length,
-                      0
-                    );
-
-                    // Calculate overall progress percentage
-                    const overallProgress =
-                      totalExpectedSets > 0
-                        ? (totalCompletedSets / totalExpectedSets) * 100
-                        : 0;
-
-                    // Get current block info
-                    const currentBlock = workoutBlocks[currentBlockIndex];
-                    const currentExercise = currentBlock?.block.exercises?.[currentBlock.currentExerciseIndex ?? 0];
-                    const currentSetNumber = (currentBlock?.completedSets || 0) + 1;
-                    const totalSetsInBlock =
-                      currentExercise?.sets ||
-                      currentBlock?.block.total_sets ||
-                      currentBlock?.totalSets ||
-                      1;
-                    const currentSetType =
-                      (currentBlock?.block.set_type as WorkoutBlockType) || "straight_set";
-                    const currentSetTypeName =
-                      WORKOUT_BLOCK_CONFIGS[currentSetType]?.name ?? "Set";
-
-                    return (
-                      <WorkoutProgressBar
-                        currentBlockIndex={currentBlockIndex}
-                        totalBlocks={workoutBlocks.length}
-                        currentSetNumber={currentSetNumber}
-                        totalSetsInBlock={totalSetsInBlock}
-                        overallProgress={overallProgress}
-                        blockName={currentBlock?.block.set_name}
-                        setTypeName={currentSetTypeName}
+                  return (
+                    <div className="flex items-center justify-between px-5 pb-1 pt-3.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            typeof window !== "undefined" &&
+                            window.confirm("Exit workout? Progress is saved.")
+                          ) {
+                            window.location.href = "/client/train";
+                          }
+                        }}
+                        className="flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white"
+                      >
+                        <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+                        Back
+                      </button>
+                      <ExecProgressSegments
+                        completedSets={completedInBlock}
+                        totalSets={Math.max(1, totalSetsInBlock)}
                       />
-                    );
-                  })()}
-
-                  {/* Flow gap below fixed progress bar so first content isn’t tight to the track */}
-                  <div className="h-2 w-full shrink-0" aria-hidden />
-
-                  <div className="w-full">
-                  {/* Block Progress Indicator */}
-                  {workoutBlocks.length > 1 && (
-                    <div className="mb-2 mt-1">
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                        {workoutBlocks.map((block, index) => {
-                          const isCompleted =
-                            block.isCompleted || index < currentBlockIndex;
-                          const isCurrent = index === currentBlockIndex;
-
-                          return (
-                            <div
-                              key={block.block.id}
-                              className="flex-1 h-1.5 rounded-full transition-all min-w-[20px]"
-                              style={{
-                                background: isCompleted
-                                  ? "var(--fc-status-success)"
-                                  : isCurrent
-                                    ? "var(--fc-domain-workouts)"
-                                    : "var(--fc-surface-sunken)",
-                              }}
-                              title={
-                                block.block.set_name || `Set ${index + 1}`
-                              }
-                            />
-                          );
-                        })}
-                      </div>
                     </div>
-                  )}
-                  <LiveWorkoutBlockExecutor
-                    block={workoutBlocks[currentBlockIndex]}
-                    onBlockComplete={handleBlockComplete}
-                    onNextBlock={handleNextBlock}
-                    onSetLogUpsert={handleSetLogUpsert}
-                    onSetEditSaved={handleSetEditSaved}
-                    loggedSets={(() => {
-                      const block = workoutBlocks[currentBlockIndex];
-                      if (!block?.block?.id) return [];
-                      return (
-                        loggedSetsByBlockId[block.block.id] ??
-                        block.existingSetLogs ??
-                        []
-                      );
-                    })()}
-                    allowSetEditDelete={true}
-                    e1rmMap={e1rmMap}
-                    onE1rmUpdate={(exerciseId, e1rm) => {
-                      setE1rmMap((prev) => ({
-                        ...prev,
-                        [exerciseId]: e1rm,
-                      }));
-                    }}
-                    lastPerformedWeightByExerciseId={
-                      lastPerformedWeightByExerciseId
-                    }
-                    lastSessionWeightByExerciseId={
-                      lastSessionWeightByExerciseId
-                    }
-                    onWeightLogged={(exerciseId: string, weight: number) => {
-                      setLastPerformedWeightByExerciseId((prev) => ({
-                        ...prev,
-                        [exerciseId]: weight,
-                      }));
-                    }}
-                    sessionId={sessionId}
-                    assignmentId={assignment?.id || assignmentId}
-                    allBlocks={workoutBlocks}
-                    currentBlockIndex={currentBlockIndex}
-                    onBlockChange={handleBlockChange}
-                    onSetLogged={handleSetLogged}
-                    onExerciseComplete={handleExerciseComplete}
-                    progressionSuggestions={progressionSuggestions}
-                    previousPerformanceMap={previousPerformanceMap}
-                    onExerciseChanged={(exerciseId) =>
-                      fetchPreviousPerformance(exerciseId).catch((err) =>
-                        console.error("Error fetching previous performance:", err)
-                      )
-                    }
-                    onPlateCalculatorClick={() => setShowPlateCalculator(true)}
-                    onPRDetected={(pr) => setPrCelebrationData(pr)}
-                    onAchievementsUnlocked={(achievements, context) => {
-                      const tierToRarity = (tier: string | null): Achievement["rarity"] => {
-                        if (!tier) return "uncommon";
-                        if (tier === "platinum") return "legendary";
-                        if (tier === "gold") return "epic";
-                        if (tier === "silver") return "rare";
-                        if (tier === "bronze") return "uncommon";
-                        return "common";
-                      };
-                      const mapped: Achievement[] = achievements.map((a) => ({
-                        id: a.templateId,
-                        name: a.templateName ?? "Achievement",
-                        description: a.description ?? (a.nextTier ? `Next: ${(a.nextTier as { label?: string })?.label} — ${a.currentMetricValue ?? 0}/${(a.nextTier as { threshold?: number })?.threshold ?? 0}` : ""),
-                        icon: a.templateIcon ?? "🏆",
-                        rarity: tierToRarity(a.tier),
-                        unlocked: true,
-                      }));
-                      const deferForPr =
-                        prCelebrationData != null ||
-                        context?.prDetectedThisSync === true;
-                      if (deferForPr) {
-                        pendingAchievementsRef.current = [
-                          ...pendingAchievementsRef.current,
-                          ...mapped,
-                        ];
-                      } else {
-                        setNewAchievementsQueue((prev) => [...prev, ...mapped]);
-                        setAchievementModalIndex(0);
+                  );
+                })()}
+
+                {/* Flow gap below fixed progress bar so first content isn’t tight to the track */}
+                <div className="h-2 w-full shrink-0" aria-hidden />
+
+                <div className="w-full">
+                  <WorkoutExecutionChromeProvider
+                    value={{ hideCompactBack: true }}
+                  >
+                    <LiveWorkoutBlockExecutor
+                      block={workoutBlocks[currentBlockIndex]}
+                      onBlockComplete={handleBlockComplete}
+                      onNextBlock={handleNextBlock}
+                      onSetLogUpsert={handleSetLogUpsert}
+                      onSetEditSaved={handleSetEditSaved}
+                      loggedSets={(() => {
+                        const block = workoutBlocks[currentBlockIndex];
+                        if (!block?.block?.id) return [];
+                        return (
+                          loggedSetsByBlockId[block.block.id] ??
+                          block.existingSetLogs ??
+                          []
+                        );
+                      })()}
+                      allowSetEditDelete={true}
+                      e1rmMap={e1rmMap}
+                      onE1rmUpdate={(exerciseId, e1rm) => {
+                        setE1rmMap((prev) => ({
+                          ...prev,
+                          [exerciseId]: e1rm,
+                        }));
+                      }}
+                      lastPerformedWeightByExerciseId={
+                        lastPerformedWeightByExerciseId
                       }
-                    }}
-                    onExitWorkout={() => {
-                      if (
-                        typeof window !== "undefined" &&
-                        window.confirm("Exit workout? Progress is saved.")
-                      ) {
-                        window.location.href = "/client/train";
+                      lastSessionWeightByExerciseId={
+                        lastSessionWeightByExerciseId
                       }
-                    }}
-                    clientBodyWeightKg={clientBodyWeightKg}
-                  />
+                      onWeightLogged={(exerciseId: string, weight: number) => {
+                        setLastPerformedWeightByExerciseId((prev) => ({
+                          ...prev,
+                          [exerciseId]: weight,
+                        }));
+                      }}
+                      sessionId={sessionId}
+                      assignmentId={assignment?.id || assignmentId}
+                      allBlocks={workoutBlocks}
+                      currentBlockIndex={currentBlockIndex}
+                      onBlockChange={handleBlockChange}
+                      onSetLogged={handleSetLogged}
+                      onExerciseComplete={handleExerciseComplete}
+                      progressionSuggestions={progressionSuggestions}
+                      previousPerformanceMap={previousPerformanceMap}
+                      onExerciseChanged={(exerciseId) =>
+                        fetchPreviousPerformance(exerciseId).catch((err) =>
+                          console.error(
+                            "Error fetching previous performance:",
+                            err,
+                          ),
+                        )
+                      }
+                      onPRDetected={(pr) => setPrCelebrationData(pr)}
+                      onAchievementsUnlocked={(achievements, context) => {
+                        const mapped: Achievement[] = achievements.map((a) => ({
+                          id: a.templateId,
+                          name: a.templateName ?? "Achievement",
+                          description:
+                            a.description ??
+                            (a.nextTier
+                              ? `Next: ${(a.nextTier as { label?: string })?.label} — ${a.currentMetricValue ?? 0}/${(a.nextTier as { threshold?: number })?.threshold ?? 0}`
+                              : ""),
+                          icon: a.templateIcon ?? "🏆",
+                          tier: (a.tier ?? null) as Achievement["tier"],
+                          unlocked: true,
+                        }));
+                        const deferForPr =
+                          prCelebrationData != null ||
+                          context?.prDetectedThisSync === true;
+                        if (deferForPr) {
+                          pendingAchievementsRef.current = [
+                            ...pendingAchievementsRef.current,
+                            ...mapped,
+                          ];
+                        } else {
+                          setNewAchievementsQueue((prev) => [
+                            ...prev,
+                            ...mapped,
+                          ]);
+                          setAchievementModalIndex(0);
+                        }
+                      }}
+                      onExitWorkout={() => {
+                        if (
+                          typeof window !== "undefined" &&
+                          window.confirm("Exit workout? Progress is saved.")
+                        ) {
+                          window.location.href = "/client/train";
+                        }
+                      }}
+                      clientBodyWeightKg={clientBodyWeightKg}
+                    />
+                  </WorkoutExecutionChromeProvider>
                   {/* Complete Workout Button - Only show on last block when complete */}
                   {isLastBlockComplete &&
                     currentBlockIndex === workoutBlocks.length - 1 && (
                       <div className="mt-6">
-                        <PrimaryButton
+                        <Button
+                          type="button"
+                          variant="btn-action"
                           disabled={isCompletingWorkout}
                           onClick={async () => {
                             console.log("🔘 Complete Workout button clicked");
                             setShowWorkoutCompletion(false);
                             await completeWorkout();
                           }}
-                          className="w-full h-14 text-lg font-semibold disabled:opacity-70 disabled:pointer-events-none"
+                          className={cn(
+                            "h-14 w-full text-lg font-semibold disabled:pointer-events-none disabled:opacity-70",
+                          )}
                         >
                           {isCompletingWorkout ? (
                             <>
@@ -4327,2304 +4534,644 @@ export default function LiveWorkout() {
                               Complete Workout
                             </>
                           )}
-                        </PrimaryButton>
+                        </Button>
                       </div>
                     )}
-                  </div>
-                </>
-              ) : /* Traditional Workout System */
-              loading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                 </div>
-              ) : currentExercise ? (
-                <div className="space-y-4 sm:space-y-6">
-                  {/* Instruction Card - Only show for types that don't have their own detail cards */}
-                  {currentType !== "giant_set" &&
-                    currentType !== "tabata" &&
-                    currentType !== "amrap" &&
-                    currentType !== "emom" &&
-                    currentType !== "for_time" &&
-                    currentType !== "superset" &&
-                    currentType !== "pre_exhaustion" && (
-                      <ClientGlassCard className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl relative z-30 border-2 border-[color:var(--fc-domain-workouts)]">
-                            <div className="flex items-start gap-3">
-                              <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
-                                <Lightbulb className="w-4 h-4" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-base font-semibold fc-text-primary mb-1">
-                                  How to perform
-                                </div>
-                                <div className="text-base leading-relaxed fc-text-dim rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-sunken)] p-3">
-                                  {typeHelp}
-                                </div>
-                              </div>
-                              {/* Optional tiny illustration placeholder (hidden if not needed) */}
-                              <div className="hidden sm:block shrink-0">
-                                <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border border-white/40 dark:border-white/10"></div>
-                              </div>
-                            </div>
-                      </ClientGlassCard>
-                    )}
-                  {/* AMRAP Flow */}
-                  {currentType === "amrap" && (
-                    <div className="fc-card-shell p-6">
-                      <div>
-                        {!amrapActive ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "16px",
-                            }}
-                          >
-                            {/* Exercise Details Header */}
-                            <div
-                              className="flex items-center"
-                              style={{ gap: "12px" }}
-                            >
-                              <div
-                                className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-cyan)] flex items-center justify-center"
-                              >
-                                <Target className="w-8 h-8 text-white" />
-                              </div>
-                              <div>
-                                <div className="text-xl font-bold fc-text-primary">
-                                  AMRAP Details
-                                </div>
-                                <div className="text-sm fc-text-dim">
-                                  Complete as many reps as possible
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Summary Info */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Duration
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {Number(
-                                    currentExercise?.meta?.amrap_duration ??
-                                      currentExercise?.amrap_duration ??
-                                      10
-                                  )}{" "}
-                                  min
-                                </div>
-                              </div>
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Sets
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {currentExercise?.sets || 1}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Exercise Details */}
-                            <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
-                              <div className="flex items-start gap-3 mb-3">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
-                                  <Dumbbell className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div
-                                      className={`font-bold ${theme.text} text-base`}
-                                    >
-                                      {currentExercise.exercise?.name ||
-                                        "Exercise"}
-                                    </div>
-                                    {/* Utility Icon Buttons */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowPlateCalculator(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 text-sm">
-                                    {currentExercise?.reps && (
-                                      <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                        <span
-                                          className={`text-sm font-bold ${theme.text}`}
-                                        >
-                                          {currentExercise.reps} reps
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                {currentExercise.exercise?.video_url && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      openVideoModal(
-                                        currentExercise.exercise?.video_url ||
-                                          "",
-                                      )
-                                    }
-                                    className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Youtube className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-
-                              {/* Logging Fields */}
-                              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-[color:var(--fc-glass-border)]">
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Weight (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={amrapWeight}
-                                    onChange={(e) =>
-                                      setAmrapWeight(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    step="0.5"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Reps Achieved
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={amrapReps}
-                                    onChange={(e) =>
-                                      setAmrapReps(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Previous Performance Card */}
-                            <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-
-                            {/* Action Buttons */}
-                            <div className="space-y-2">
-                              {/* Primary: Log and Continue */}
-                              <Button
-                                onClick={completeAmrapSet}
-                                className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                                disabled={isLoggingSet}
-                              >
-                                <Check className="w-5 h-5 mr-2" /> Log AMRAP
-                              </Button>
-
-                              {/* Secondary: Start Timer */}
-                              <Button
-                                onClick={() => {
-                                  const minutes =
-                                    Number(
-                                      currentExercise?.meta?.amrap_duration,
-                                    ) ||
-                                    Number(currentExercise?.amrap_duration) ||
-                                    10;
-                                  setAmrapTimeLeft(minutes * 60);
-                                  setAmrapActive(true);
-                                }}
-                                variant="outline"
-                                className="w-full border-2 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl py-4 text-base font-semibold"
-                              >
-                                <Clock className="w-4 h-4 mr-2" /> Start Timer
-                              </Button>
-                            </div>
+              </>
+            ) : /* Traditional Workout System */
+            loading ? (
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            ) : currentExercise ? (
+              <div className="space-y-4 sm:space-y-6">
+                {/* Instruction Card - Only show for types that don't have their own detail cards */}
+                {currentType !== "giant_set" &&
+                  currentType !== "tabata" &&
+                  currentType !== "amrap" &&
+                  currentType !== "emom" &&
+                  currentType !== "for_time" &&
+                  currentType !== "superset" &&
+                  currentType !== "pre_exhaustion" && (
+                    <ClientGlassCard className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl relative z-30 border-2 border-[color:var(--fc-domain-workouts)]">
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                          <Lightbulb className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-base font-semibold fc-text-primary mb-1">
+                            How to perform
                           </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-5xl font-bold text-blue-700 dark:text-blue-300">
-                              {Math.floor(amrapTimeLeft / 60)
-                                .toString()
-                                .padStart(2, "0")}
-                              :
-                              {(amrapTimeLeft % 60).toString().padStart(2, "0")}
-                            </div>
-                            <div className="mt-2 fc-text-dim">
-                              Time Remaining
-                            </div>
-                            <Button
-                              onClick={() => {
-                                setAmrapActive(false);
-                                setAmrapTimeLeft(0);
-                              }}
-                              variant="outline"
-                              className="mt-4"
-                            >
-                              Stop
-                            </Button>
+                          <div className="text-base leading-relaxed fc-text-dim rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-sunken)] p-3">
+                            {typeHelp}
                           </div>
-                        )}
+                        </div>
+                        {/* Optional tiny illustration placeholder (hidden if not needed) */}
+                        <div className="hidden sm:block shrink-0">
+                          <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border border-white/40 dark:border-white/10"></div>
+                        </div>
                       </div>
-                    </div>
+                    </ClientGlassCard>
                   )}
-
-                  {/* EMOM Flow */}
-                  {currentType === "emom" && (
-                    <div className="fc-card-shell fc-card-shell--success p-6">
-                      <div>
-                        {/* Rep-based behaves like AMRAP */}
-                        {currentExercise?.meta?.emom_mode === "rep_based" ? (
-                          !emomRepActive && emomRepTimeLeft === 0 ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "16px",
-                              }}
-                            >
-                              {/* Exercise Details Header */}
-                              <div
-                                className="flex items-center"
-                                style={{ gap: "12px" }}
-                              >
-                                <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-success)] flex items-center justify-center">
-                                  <Clock className="w-8 h-8 text-white" />
-                                </div>
-                                <div>
-                                  <div className="text-xl font-bold fc-text-primary">
-                                    EMOM Details (Rep-Based)
-                                  </div>
-                                  <div className="text-sm fc-text-dim">
-                                    Complete target reps every minute
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Summary Info */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="fc-card-shell fc-card-shell--success p-4">
-                                  <div
-                                    className={`text-sm ${theme.textSecondary} mb-1`}
-                                  >
-                                    Duration
-                                  </div>
-                                  <div
-                                    className={`text-2xl font-bold ${theme.text}`}
-                                  >
-                                    {Number(
-                                      currentExercise?.meta?.emom_duration ??
-                                        currentExercise?.emom_duration ??
-                                        10
-                                    )}{" "}
-                                    min
-                                  </div>
-                                </div>
-                                <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                  <div
-                                    className={`text-sm ${theme.textSecondary} mb-1`}
-                                  >
-                                    Sets
-                                  </div>
-                                  <div
-                                    className={`text-2xl font-bold ${theme.text}`}
-                                  >
-                                    {currentExercise?.sets || 1}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Start Button */}
-                              <Button
-                                onClick={() => {
-                                  const minutes =
-                                    Number(
-                                      currentExercise?.meta?.emom_duration,
-                                    ) ||
-                                    Number(currentExercise?.emom_duration) ||
-                                    10;
-                                  setEmomRepTimeLeft(minutes * 60);
-                                  setEmomRepActive(true);
-                                }}
-                                className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                              >
-                                <Clock className="w-5 h-5 mr-2" /> Start EMOM
-                              </Button>
-                            </div>
-                          ) : emomRepActive ? (
-                            <div className="flex flex-col items-center justify-center py-8">
-                              <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-300">
-                                {Math.floor(emomRepTimeLeft / 60)
-                                  .toString()
-                                  .padStart(2, "0")}
-                                :
-                                {(emomRepTimeLeft % 60)
-                                  .toString()
-                                  .padStart(2, "0")}
-                              </div>
-                              <div className="mt-2 fc-text-dim">
-                                Time Remaining
-                              </div>
-                              <Button
-                                onClick={() => setEmomRepActive(false)}
-                                variant="outline"
-                                className="mt-4"
-                              >
-                                Stop
-                              </Button>
-                            </div>
-                          ) : null
-                        ) : // Time-based with alternating phases
-                        !emomActive && emomTotalLeft === 0 ? (
-                          <div className="space-y-4">
-                            {/* Exercise Details Header */}
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
-                                <Clock className="w-5 h-5 text-white" />
-                              </div>
-                              <div>
-                                <div
-                                  className={`text-xl font-bold ${theme.text}`}
-                                >
-                                  EMOM Details (Time-Based)
-                                </div>
-                                <div
-                                  className={`text-sm ${theme.textSecondary}`}
-                                >
-                                  Work every minute on the minute
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Summary Info */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="fc-card-shell fc-card-shell--success p-4">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Duration
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {Number(
-                                    currentExercise?.meta?.emom_duration ??
-                                      currentExercise?.emom_duration ??
-                                      10
-                                  )}{" "}
-                                  min
-                                </div>
-                              </div>
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Work Time
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {Number(
-                                    currentExercise?.meta?.work_seconds ??
-                                      currentExercise?.work_seconds ??
-                                      40
-                                  )}
-                                  s
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Start Button */}
-                            <Button
-                              onClick={() => {
-                                const minutes =
-                                  Number(
-                                    currentExercise?.meta?.emom_duration,
-                                  ) ||
-                                  Number(currentExercise?.emom_duration) ||
-                                  10;
-                                const workSeconds =
-                                  Number(currentExercise?.meta?.work_seconds) ||
-                                  Number(currentExercise?.work_seconds) ||
-                                  40;
-                                const restSeconds = Math.max(
-                                  0,
-                                  60 - workSeconds,
-                                );
-                                setEmomTotalLeft(minutes * 60);
-                                setEmomPhase("work");
-                                setEmomPhaseLeft(workSeconds);
-                                setEmomActive(true);
-                              }}
-                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                            >
-                              <Clock className="w-5 h-5 mr-2" /> Start EMOM
-                            </Button>
-                          </div>
-                        ) : emomActive ? (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-sm uppercase tracking-wide fc-text-dim mb-1">
-                              Total Remaining
-                            </div>
-                            <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-4">
-                              {Math.floor(emomTotalLeft / 60)
-                                .toString()
-                                .padStart(2, "0")}
-                              :
-                              {(emomTotalLeft % 60).toString().padStart(2, "0")}
-                            </div>
-                            <div
-                              className={`text-5xl font-extrabold ${
-                                emomPhase === "work"
-                                  ? "text-red-600"
-                                  : "text-blue-600"
-                              } dark:${
-                                emomPhase === "work"
-                                  ? "text-red-400"
-                                  : "text-blue-400"
-                              }`}
-                            >
-                              {Math.floor(emomPhaseLeft / 60)
-                                .toString()
-                                .padStart(2, "0")}
-                              :
-                              {(emomPhaseLeft % 60).toString().padStart(2, "0")}
-                            </div>
-                            <div className="mt-2 fc-text-dim">
-                              {emomPhase === "work" ? "Work" : "Rest"} phase
-                            </div>
-                            <Button
-                              onClick={() => setEmomActive(false)}
-                              variant="outline"
-                              className="mt-4"
-                            >
-                              Stop
-                            </Button>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tabata Flow */}
-                  {currentType === "tabata" && (
-                    <div
-                      className="fc-card-shell fc-card-shell--error p-6"
-                    >
-                      <div>
-                        {!intervalActive ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "16px",
-                            }}
-                          >
-                            {/* Exercise Details Card */}
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "16px",
-                              }}
-                            >
-                              {/* Header */}
-                              <div
-                                className="flex items-center"
-                                style={{ gap: "12px" }}
-                              >
-                                <div
-                                  className={`w-14 h-14 rounded-[18px] flex items-center justify-center ${currentType === "tabata" ? "bg-[color:var(--fc-status-error)]" : "bg-[color:var(--fc-accent-primary)]"}`}
-                                >
-                                  <Activity className="w-8 h-8 text-white" />
-                                </div>
-                                <div>
-                                  <div className="text-xl font-bold fc-text-primary">
-                                    {currentType === "tabata"
-                                      ? "Tabata"
-                                      : "Tabata"}{" "}
-                                    Details
-                                  </div>
-                                  <div className="text-sm fc-text-dim">
-                                    Autoplay countdowns for work and rest
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Summary Info */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                                  <div
-                                    className={`text-sm ${theme.textSecondary} mb-1`}
-                                  >
-                                    {currentType === "tabata"
-                                      ? "Rounds per Set"
-                                      : "Total Rounds"}
-                                  </div>
-                                  <div
-                                    className={`text-2xl font-bold ${theme.text}`}
-                                  >
-                                    {currentType === "tabata"
-                                      ? Number(
-                                          currentExercise?.rounds ??
-                                            currentExercise?.meta?.rounds ??
-                                            8
-                                        )
-                                      : Number(currentExercise?.sets ?? 1)}
-                                  </div>
-                                </div>
-                                <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                  <div
-                                    className={`text-sm ${theme.textSecondary} mb-1`}
-                                  >
-                                    {currentType === "tabata"
-                                      ? "Total Sets"
-                                      : "Sets per Round"}
-                                  </div>
-                                  <div
-                                    className={`text-2xl font-bold ${theme.text}`}
-                                  >
-                                    {(() => {
-                                      const sets =
-                                        currentType === "tabata"
-                                          ? currentExercise?.meta
-                                              ?.tabata_sets ||
-                                            currentExercise?.tabata_sets
-                                          : currentExercise?.meta?.tabata_sets;
-                                      return Array.isArray(sets)
-                                        ? sets.length
-                                        : 0;
-                                    })()}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Sets Details */}
-                              {(() => {
-                                const sets =
-                                  currentType === "tabata"
-                                    ? currentExercise?.meta?.tabata_sets ||
-                                      currentExercise?.tabata_sets
-                                    : currentExercise?.meta?.tabata_sets;
-                                return (
-                                  Array.isArray(sets) &&
-                                  sets.length > 0 && (
-                                    <div className="space-y-3">
-                                      {sets.map(
-                                        (set: any, setIndex: number) => (
-                                          <div
-                                            key={setIndex}
-                                            className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                                          >
-                                            {/* Set Header */}
-                                            <div className="flex items-center justify-between mb-3">
-                                              <div
-                                                className={`text-lg font-bold ${theme.text}`}
-                                              >
-                                                Set {setIndex + 1}
-                                              </div>
-                                              {set.rest_between_sets && (
-                                                <div className="px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                                  <div
-                                                    className={`text-xs font-semibold ${theme.text}`}
-                                                  >
-                                                    Rest After Set:{" "}
-                                                    {set.rest_between_sets}s
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-
-                                            {/* Exercises */}
-                                            <div className="space-y-2">
-                                              {Array.isArray(set.exercises) &&
-                                                set.exercises.map(
-                                                  (
-                                                    exercise: any,
-                                                    exerciseIndex: number,
-                                                  ) => {
-                                                    const exerciseInfo =
-                                                      exerciseLookup[
-                                                        exercise.exercise_id
-                                                      ];
-                                                    return (
-                                                      <div
-                                                        key={exerciseIndex}
-                                                        className="fc-card-shell p-3"
-                                                      >
-                                                        <div className="flex items-start gap-3">
-                                                          <div
-                                                            className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                              currentType ===
-                                                              "tabata"
-                                                                ? "bg-gradient-to-br from-red-400 to-orange-500"
-                                                                : "bg-gradient-to-br from-purple-400 to-indigo-500"
-                                                            }`}
-                                                          >
-                                                            <span className="text-white font-bold text-sm">
-                                                              {exerciseIndex +
-                                                                1}
-                                                            </span>
-                                                          </div>
-                                                          <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                              <div
-                                                                className={`font-bold ${theme.text} text-base`}
-                                                              >
-                                                                {exerciseInfo?.name ||
-                                                                  "Unknown Exercise"}
-                                                              </div>
-                                                              {/* Utility Icon Buttons */}
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                  setShowPlateCalculator(
-                                                                    true,
-                                                                  )
-                                                                }
-                                                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                                              >
-                                                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                                              </Button>
-                                                            </div>
-                                                            <div className="flex flex-wrap gap-2 text-sm">
-                                                              {currentType ===
-                                                              "tabata" ? (
-                                                                <>
-                                                                  {/* For Tabata, use global work_seconds and rest_seconds */}
-                                                                  {(currentExercise?.work_seconds ||
-                                                                    currentExercise
-                                                                      ?.meta
-                                                                      ?.work_seconds) && (
-                                                                    <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
-                                                                      <span
-                                                                        className={`font-semibold ${theme.text}`}
-                                                                      >
-                                                                        Work:{" "}
-                                                                        {Number(
-                                                                          currentExercise?.work_seconds ??
-                                                                            currentExercise?.meta
-                                                                              ?.work_seconds ?? 0
-                                                                        )}
-                                                                        s
-                                                                      </span>
-                                                                    </div>
-                                                                  )}
-                                                                  {(currentExercise?.rest_seconds ||
-                                                                    currentExercise
-                                                                      ?.meta
-                                                                      ?.rest_seconds) && (
-                                                                    <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                                                                      <span
-                                                                        className={`font-semibold ${theme.text}`}
-                                                                      >
-                                                                        Rest:{" "}
-                                                                        {Number(
-                                                                          currentExercise?.rest_seconds ??
-                                                                            currentExercise?.meta
-                                                                              ?.rest_seconds ?? 0
-                                                                        )}
-                                                                        s
-                                                                      </span>
-                                                                    </div>
-                                                                  )}
-                                                                </>
-                                                              ) : (
-                                                                <>
-                                                                  {/* Use individual exercise settings */}
-                                                                  {exercise.work_seconds && (
-                                                                    <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
-                                                                      <span
-                                                                        className={`font-semibold ${theme.text}`}
-                                                                      >
-                                                                        Work:{" "}
-                                                                        {
-                                                                          exercise.work_seconds
-                                                                        }
-                                                                        s
-                                                                      </span>
-                                                                    </div>
-                                                                  )}
-                                                                  {exercise.target_reps && (
-                                                                    <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                                                      <span
-                                                                        className={`font-semibold ${theme.text}`}
-                                                                      >
-                                                                        Target:{" "}
-                                                                        {
-                                                                          exercise.target_reps
-                                                                        }{" "}
-                                                                        reps
-                                                                      </span>
-                                                                    </div>
-                                                                  )}
-                                                                  {exercise.rest_after && (
-                                                                    <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                                                                      <span
-                                                                        className={`font-semibold ${theme.text}`}
-                                                                      >
-                                                                        Rest:{" "}
-                                                                        {
-                                                                          exercise.rest_after
-                                                                        }
-                                                                        s
-                                                                      </span>
-                                                                    </div>
-                                                                  )}
-                                                                </>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                          {/* Video Button */}
-                                                          {exerciseInfo?.video_url && (
-                                                            <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => {
-                                                                setCurrentVideoUrl(
-                                                                  exerciseInfo.video_url ||
-                                                                    "",
-                                                                );
-                                                                setShowVideoModal(
-                                                                  true,
-                                                                );
-                                                              }}
-                                                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                            >
-                                                              <Youtube className="w-4 h-4" />
-                                                            </Button>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  },
-                                                )}
-                                            </div>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  )
-                                );
-                              })()}
-                            </div>
-
-                            {/* Start Button */}
-                            <Button
-                              onClick={() => {
-                                setShowTimerModal(true);
-                                setTimerExerciseIndex(0);
-                                setTimerSetIndex(0);
-                                setIntervalMode("tabata");
-                                setIntervalRound(0);
-                                setIntervalPhase("work");
-                                setIntervalActive(true);
-
-                                // Initialize timer with first exercise
-                                const rawSets =
-                                  currentType === "tabata"
-                                    ? currentExercise?.meta?.tabata_sets ??
-                                      currentExercise?.tabata_sets
-                                    : currentExercise?.meta?.tabata_sets;
-                                const sets = Array.isArray(rawSets)
-                                  ? (rawSets as Array<{ exercises?: Array<{ work_seconds?: number }> }>)
-                                  : undefined;
-                                const firstSet = sets?.[0];
-                                const firstExercise = firstSet?.exercises?.[0];
-                                const workTime =
-                                  Number(firstExercise?.work_seconds ?? 20);
-                                setIntervalPhaseLeft(workTime);
-
-                                // Set total rounds
-                                const rounds = currentExercise?.sets || 1;
-                                setIntervalTotalRounds(rounds);
-                              }}
-                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                            >
-                              <Clock className="w-5 h-5 mr-2" /> Start{" "}
-                              Tabata
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-sm fc-text-dim mb-1">
-                              Round{" "}
-                              {Math.min(
-                                intervalRound +
-                                  (intervalPhase === "rest" ? 1 : 1),
-                                intervalTotalRounds,
-                              )}{" "}
-                              / {intervalTotalRounds}
-                            </div>
-                            <div
-                              className={`text-5xl font-extrabold ${
-                                intervalPhase === "work"
-                                  ? "text-purple-700"
-                                  : "text-indigo-700"
-                              } dark:${
-                                intervalPhase === "work"
-                                  ? "text-purple-300"
-                                  : "text-indigo-300"
-                              }`}
-                            >
-                              {Math.floor(intervalPhaseLeft / 60)
-                                .toString()
-                                .padStart(2, "0")}
-                              :
-                              {(intervalPhaseLeft % 60)
-                                .toString()
-                                .padStart(2, "0")}
-                            </div>
-                            <div className="mt-2 fc-text-dim">
-                              {intervalPhase === "work" ? "Work" : "Rest"} phase
-                            </div>
-                            <Button
-                              onClick={() => setIntervalActive(false)}
-                              variant="outline"
-                              className="mt-4"
-                            >
-                              Stop
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cluster Set Flow */}
-                  {currentType === "cluster_set" && (
-                    <div className="fc-card-shell p-6">
-                      <div>
-                        {/* Header */}
+                {/* AMRAP Flow */}
+                {currentType === "amrap" && (
+                  <div className="fc-card-shell p-6">
+                    <div>
+                      {!amrapActive ? (
                         <div
-                          className="flex items-center"
-                          style={{ gap: "12px", marginBottom: "16px" }}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "16px",
+                          }}
                         >
-                          <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-primary)] flex items-center justify-center">
-                            <Dumbbell className="w-8 h-8 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-xl font-bold fc-text-primary">
-                              Cluster Set
-                            </div>
-                            <div className="text-sm fc-text-dim">
-                              Multiple mini-sets with short rest
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Summary Info */}
-                        <div className="grid grid-cols-3 gap-3 mb-4">
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Clusters
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              {Number(
-                                currentExercise?.meta?.clusters_per_set,
-                              ) ||
-                                Number(currentExercise?.clusters_per_set) ||
-                                1}
-                            </div>
-                          </div>
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Reps per Cluster
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              {Number(currentExercise?.meta?.cluster_reps) ||
-                                Number(currentExercise?.cluster_reps) ||
-                                1}
-                            </div>
-                          </div>
-                          <div className="fc-card-shell fc-card-shell--success p-3 relative">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Rest (s)
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              {Number(
-                                currentExercise?.meta?.intra_cluster_rest,
-                              ) ||
-                                Number(currentExercise?.intra_cluster_rest) ||
-                                0}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Exercise Info */}
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-pink-500">
-                            <Dumbbell className="w-4 h-4 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className={`font-bold ${theme.text} text-lg`}
-                              >
-                                {currentExercise.exercise?.name || "Exercise"}
-                              </div>
-                              {/* Utility Icon Buttons */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowPlateCalculator(true)}
-                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                              >
-                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2.5">
-                              {(currentExercise?.reps != null ||
-                                currentExercise?.meta?.cluster_reps != null) && (
-                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                  <span
-                                    className={`text-sm font-bold ${theme.text}`}
-                                  >
-                                    {String(
-                                      currentExercise?.reps ??
-                                        currentExercise?.meta?.cluster_reps ??
-                                        ""
-                                    )}{" "}
-                                    reps
-                                  </span>
-                                </div>
-                              )}
-                              {(currentExercise?.rir ||
-                                currentExercise?.rir === 0) && (
-                                <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                  <span
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
-                                    RPE: {Number(currentExercise.rir)}
-                                  </span>
-                                </div>
-                              )}
-                              {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
-                                <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                  <span
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
-                                    Tempo: {String(currentExercise.tempo)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {currentExercise.exercise?.video_url && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                openVideoModal(
-                                  currentExercise.exercise?.video_url || "",
-                                )
-                              }
-                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Youtube className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Cluster Logging Fields */}
-                        <div className="space-y-3">
-                          <div
-                            className={`text-sm font-semibold ${theme.text} mb-2`}
-                          >
-                            Log Performance
-                          </div>
-                          {clusterWeights.map((w, idx) => (
-                            <div
-                              key={idx}
-                              className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div
-                                  className={`text-sm font-bold ${theme.text}`}
-                                >
-                                  Cluster {idx + 1}
-                                </div>
-                                <div
-                                  className={`text-xs ${theme.textSecondary}`}
-                                >
-                                  Reps:{" "}
-                                  {Number(
-                                    currentExercise?.meta?.cluster_reps,
-                                  ) ||
-                                    Number(currentExercise?.cluster_reps) ||
-                                    1}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label
-                                    className={`block text-xs font-medium ${theme.text} mb-1`}
-                                  >
-                                    Weight (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={w}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setClusterWeights((prev) => {
-                                        const copy = [...prev];
-                                        copy[idx] = val;
-                                        // autofill subsequent clusters if editing first cluster
-                                        if (idx === 0 && val) {
-                                          for (
-                                            let i = 1;
-                                            i < copy.length;
-                                            i++
-                                          ) {
-                                            copy[i] = val;
-                                          }
-                                        }
-                                        // clear subsequent clusters if first cluster is cleared
-                                        else if (idx === 0 && !val) {
-                                          for (
-                                            let i = 1;
-                                            i < copy.length;
-                                            i++
-                                          ) {
-                                            copy[i] = "";
-                                          }
-                                        }
-                                        return copy;
-                                      });
-                                    }}
-                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    step="0.5"
-                                    placeholder={
-                                      idx === 0 ? "Enter weight" : "Auto-filled"
-                                    }
-                                    readOnly={idx > 0}
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    className={`block text-xs font-medium ${theme.text} mb-1`}
-                                  >
-                                    Reps
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={
-                                      Number(
-                                        currentExercise?.meta?.cluster_reps,
-                                      ) ||
-                                      Number(currentExercise?.cluster_reps) ||
-                                      1
-                                    }
-                                    readOnly
-                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Timer Button */}
-                        <div className="flex justify-center mt-6 mb-4">
-                          <Button
-                            onClick={() => setShowClusterTimer(true)}
-                            className="w-full fc-btn fc-btn-primary px-6 py-3 rounded-xl font-semibold"
-                          >
-                            <Clock className="w-4 h-4 mr-2" />
-                            Start Rest Timer
-                          </Button>
-                        </div>
-
-                        {/* Previous Performance Card */}
-                        <div className="mt-4">
-                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-                        </div>
-
-                        {/* Log Button */}
-                        <div className="mt-4">
-                          <Button
-                            onClick={() => {
-                              // TODO: Implement cluster set completion logic
-                              console.log(
-                                "Logging cluster set:",
-                                clusterWeights,
-                              );
-                            }}
-                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                            disabled={clusterWeights.some(
-                              (w) => !w || w === "0",
-                            )}
-                          >
-                            <Check className="w-5 h-5 mr-2" /> Log Cluster Set
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Rest-Pause Flow */}
-                  {currentType === "rest_pause" && (
-                    <div className="fc-card-shell fc-card-shell--success p-6">
-                      <div>
-                        {/* Header */}
-                        <div
-                          className="flex items-center"
-                          style={{ gap: "12px", marginBottom: "16px" }}
-                        >
-                          <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-success)] flex items-center justify-center">
-                            <Dumbbell className="w-8 h-8 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-xl font-bold fc-text-primary">
-                              Rest Pause Set
-                            </div>
-                            <div className="text-sm fc-text-dim">
-                              Main set + mini-sets with rest periods
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Summary Info */}
-                        <div className="grid grid-cols-3 gap-3 mb-4">
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Main Set
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              1
-                            </div>
-                          </div>
-                          <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Mini-sets
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              {restPauseExtraReps.length}
-                            </div>
-                          </div>
-                          <div className="fc-card-shell fc-card-shell--success p-3">
-                            <div
-                              className={`text-xs ${theme.textSecondary} mb-1`}
-                            >
-                              Rest (s)
-                            </div>
-                            <div className={`text-lg font-bold ${theme.text}`}>
-                              {Number(
-                                currentExercise?.meta?.rest_pause_duration,
-                              ) ||
-                                Number(currentExercise?.rest_pause_duration) ||
-                                0}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Exercise Info */}
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-cyan-500">
-                            <Dumbbell className="w-4 h-4 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className={`font-bold ${theme.text} text-lg`}
-                              >
-                                {currentExercise.exercise?.name || "Exercise"}
-                              </div>
-                              {/* Utility Icon Buttons */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowPlateCalculator(true)}
-                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                              >
-                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2.5">
-                              {(currentExercise?.reps != null ||
-                                currentExercise?.meta?.rest_pause_reps != null) && (
-                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                  <span
-                                    className={`text-sm font-bold ${theme.text}`}
-                                  >
-                                    {String(
-                                      currentExercise?.reps ??
-                                        currentExercise?.meta
-                                          ?.rest_pause_reps ??
-                                        ""
-                                    )}{" "}
-                                    reps
-                                  </span>
-                                </div>
-                              )}
-                              {(currentExercise?.rir ||
-                                currentExercise?.rir === 0) && (
-                                <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                  <span
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
-                                    RPE: {Number(currentExercise.rir)}
-                                  </span>
-                                </div>
-                              )}
-                              {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
-                                <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                  <span
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
-                                    Tempo: {String(currentExercise.tempo)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {currentExercise.exercise?.video_url && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                openVideoModal(
-                                  currentExercise.exercise?.video_url || "",
-                                )
-                              }
-                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Youtube className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Main Set Logging */}
-                        <div className="space-y-3 mb-4">
-                          <div
-                            className={`text-sm font-semibold ${theme.text} mb-2`}
-                          >
-                            Main Set
-                          </div>
-                          <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
-                                >
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={
-                                    currentSetData.weight === 0
-                                      ? ""
-                                      : currentSetData.weight
-                                  }
-                                  onChange={(e) =>
-                                    setCurrentSetData((prev) => ({
-                                      ...prev,
-                                      weight: parseFloat(e.target.value) || 0,
-                                    }))
-                                  }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                  step="0.5"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
-                                >
-                                  Reps
-                                </label>
-                                <input
-                                  type="number"
-                                  value={
-                                    currentSetData.reps === 0
-                                      ? ""
-                                      : currentSetData.reps
-                                  }
-                                  onChange={(e) =>
-                                    setCurrentSetData((prev) => ({
-                                      ...prev,
-                                      reps: parseInt(e.target.value) || 0,
-                                    }))
-                                  }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Mini-sets Logging */}
-                        {restPauseExtraReps.length > 0 && (
-                          <div className="space-y-3 mb-4">
-                            <div
-                              className={`text-sm font-semibold ${theme.text} mb-2`}
-                            >
-                              Mini-sets
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {restPauseExtraReps.map((r, idx) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      Mini-set {idx + 1}
-                                    </div>
-                                    <div
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      {currentSetData.weight || 0}kg
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label
-                                        className={`block text-xs font-medium ${theme.text} mb-1`}
-                                      >
-                                        Reps
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={r}
-                                        onChange={(e) =>
-                                          setRestPauseExtraReps((prev) =>
-                                            prev.map((x, i) =>
-                                              i === idx ? e.target.value : x,
-                                            ),
-                                          )
-                                        }
-                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                        placeholder="0"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label
-                                        className={`block text-xs font-medium ${theme.text} mb-1`}
-                                      >
-                                        Rest (s)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={
-                                          Number(
-                                            currentExercise?.meta
-                                              ?.rest_pause_duration,
-                                          ) ||
-                                          Number(
-                                            currentExercise?.rest_pause_duration,
-                                          ) ||
-                                          0
-                                        }
-                                        readOnly
-                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Previous Performance Card */}
-                        <div className="mt-4">
-                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-                        </div>
-
-                        {/* Log Button */}
-                        <div className="mt-4">
-                          <Button
-                            onClick={() => {
-                              // TODO: Implement rest pause completion logic
-                              console.log("Logging rest pause set:", {
-                                mainSet: currentSetData,
-                                miniSets: restPauseExtraReps,
-                              });
-                            }}
-                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                            disabled={
-                              currentSetData.weight <= 0 ||
-                              currentSetData.reps <= 0
-                            }
-                          >
-                            <Check className="w-5 h-5 mr-2" /> Log Rest Pause
-                            Set
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* For Time Flow */}
-                  {currentType === "for_time" && (
-                    <div className="fc-card-shell fc-card-shell--warning p-6">
-                      <div>
-                        {!forTimeActive && forTimeCompletionSecs == null ? (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "16px",
-                            }}
-                          >
-                            {/* Exercise Details Header */}
-                            <div
-                              className="flex items-center"
-                              style={{ gap: "12px" }}
-                            >
-                              <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-warning)] flex items-center justify-center">
-                                <Trophy className="w-8 h-8 text-white" />
-                              </div>
-                              <div>
-                                <div className="text-xl font-bold fc-text-primary">
-                                  For Time Details
-                                </div>
-                                <div
-                                  className="text-sm fc-text-dim"
-                                >
-                                  Complete target reps as fast as possible
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Summary Info */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Time Cap
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {Number(
-                                    currentExercise?.meta?.time_cap ??
-                                      currentExercise?.time_cap ??
-                                      10
-                                  )}{" "}
-                                  min
-                                </div>
-                              </div>
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  Target Reps
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {String(
-                                    currentExercise?.meta?.target_reps ??
-                                      currentExercise?.target_reps ??
-                                      currentExercise?.reps ??
-                                      "-"
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Start Button */}
-                            <Button
-                              onClick={() => {
-                                const capMin =
-                                  Number(currentExercise?.meta?.time_cap) ||
-                                  Number(currentExercise?.time_cap) ||
-                                  10;
-                                setForTimeTimeLeft(capMin * 60);
-                                setForTimeCompletionSecs(null);
-                                setForTimeActive(true);
-                                setForTimeStopped(false);
-                              }}
-                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
-                            >
-                              <Clock className="w-5 h-5 mr-2" /> Start For Time
-                            </Button>
-                          </div>
-                        ) : forTimeActive ? (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-5xl font-bold text-amber-700 dark:text-amber-300">
-                              {Math.floor(forTimeTimeLeft / 60)
-                                .toString()
-                                .padStart(2, "0")}
-                              :
-                              {(forTimeTimeLeft % 60)
-                                .toString()
-                                .padStart(2, "0")}
-                            </div>
-                            <div className="mt-2 fc-text-dim">
-                              Time Remaining
-                            </div>
-                            <Button
-                              onClick={() => {
-                                const capMin =
-                                  Number(currentExercise?.meta?.time_cap) ||
-                                  Number(currentExercise?.time_cap) ||
-                                  10;
-                                const elapsed = capMin * 60 - forTimeTimeLeft;
-                                setForTimeCompletionSecs(elapsed);
-                                setForTimeActive(false);
-                                setForTimeStopped(true);
-                              }}
-                              variant="outline"
-                              className="mt-4"
-                            >
-                              Stop
-                            </Button>
-                          </div>
-                        ) : forTimeStopped && forTimeCompletionSecs != null ? (
-                          <div className="space-y-6">
-                            {/* Completion Time Display */}
-                            <div className="flex flex-col items-center justify-center py-4">
-                              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-2">
-                                {Math.floor(forTimeCompletionSecs / 60)
-                                  .toString()
-                                  .padStart(2, "0")}
-                                :
-                                {(forTimeCompletionSecs % 60)
-                                  .toString()
-                                  .padStart(2, "0")}
-                              </div>
-                              <div className="text-sm fc-text-dim">
-                                Completion Time
-                              </div>
-                            </div>
-
-                            {/* Weight and Reps Inputs */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-semibold fc-text-dim mb-2">
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={
-                                    currentSetData.weight === 0
-                                      ? ""
-                                      : currentSetData.weight
-                                  }
-                                  onChange={(e) =>
-                                    setCurrentSetData((prev) => ({
-                                      ...prev,
-                                      weight: parseFloat(e.target.value) || 0,
-                                    }))
-                                  }
-                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
-                                  step="0.5"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-semibold fc-text-dim mb-2">
-                                  Reps
-                                </label>
-                                <input
-                                  type="number"
-                                  value={
-                                    currentSetData.reps === 0
-                                      ? ""
-                                      : currentSetData.reps
-                                  }
-                                  onChange={(e) =>
-                                    setCurrentSetData((prev) => ({
-                                      ...prev,
-                                      reps: parseInt(e.target.value) || 0,
-                                    }))
-                                  }
-                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Complete Set Button */}
-                            <Button
-                              onClick={completeSet}
-                              disabled={
-                                currentSetData.weight <= 0 ||
-                                currentSetData.reps <= 0 ||
-                                isLoggingSet
-                              }
-                              className="w-full bg-[var(--fc-status-success)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <Check className="w-5 h-5 mr-2" /> Complete Set
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-[color:var(--fc-glass-highlight)] rounded-xl border border-[color:var(--fc-glass-border)]">
-                            <div className="text-sm fc-text-dim">
-                              Completion time recorded: {forTimeCompletionSecs}s
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Superset / Pre-Exhaustion Flow */}
-                  {(currentType === "superset" ||
-                    currentType === "pre_exhaustion") && (
-                    <div className="fc-card-shell fc-card-shell--error p-6">
-                      <div>
-                        {/* Header */}
-                        <div
-                          className="flex items-center justify-between"
-                          style={{ marginBottom: "16px" }}
-                        >
+                          {/* Exercise Details Header */}
                           <div
                             className="flex items-center"
                             style={{ gap: "12px" }}
                           >
-                            <div className="text-xl font-bold fc-text-primary">
-                              {currentType === "superset"
-                                ? "Superset"
-                                : "Pre-Exhaustion"}
+                            <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-cyan)] flex items-center justify-center">
+                              <Target className="w-8 h-8 text-white" />
                             </div>
-                            {(currentExercise?.rest_seconds != null ||
-                              currentExercise?.meta?.rest_seconds != null) && (
-                              <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  Rest:{" "}
-                                  {Number(
-                                    currentExercise?.rest_seconds ??
-                                      currentExercise?.meta?.rest_seconds ??
-                                      0
+                            <div>
+                              <div className="text-xl font-bold fc-text-primary">
+                                AMRAP Details
+                              </div>
+                              <div className="text-sm fc-text-dim">
+                                Complete as many reps as possible
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Summary Info */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700">
+                              <div
+                                className={`text-sm ${theme.textSecondary} mb-1`}
+                              >
+                                Duration
+                              </div>
+                              <div
+                                className={`text-2xl font-bold ${theme.text}`}
+                              >
+                                {Number(
+                                  currentExercise?.meta?.amrap_duration ??
+                                    currentExercise?.amrap_duration ??
+                                    10,
+                                )}{" "}
+                                min
+                              </div>
+                            </div>
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                              <div
+                                className={`text-sm ${theme.textSecondary} mb-1`}
+                              >
+                                Sets
+                              </div>
+                              <div
+                                className={`text-2xl font-bold ${theme.text}`}
+                              >
+                                {currentExercise?.sets || 1}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Exercise Details */}
+                          <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
+                            <div className="flex items-start gap-3 mb-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
+                                <Dumbbell className="w-4 h-4 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div
+                                    className={`font-bold ${theme.text} text-base`}
+                                  >
+                                    {currentExercise.exercise?.name ||
+                                      "Exercise"}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2 text-sm">
+                                  {currentExercise?.reps != null && (
+                                    <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                      <span
+                                        className={`text-sm font-bold ${theme.text}`}
+                                      >
+                                        {String(currentExercise.reps)} reps
+                                      </span>
+                                    </div>
                                   )}
-                                  s
+                                  {(currentExercise?.rir ||
+                                    currentExercise?.rir === 0) && (
+                                    <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                      <span
+                                        className={`text-xs font-semibold ${theme.text}`}
+                                      >
+                                        RPE: {Number(currentExercise.rir)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {currentExercise.exercise?.video_url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openVideoModal(
+                                      currentExercise.exercise?.video_url || "",
+                                    )
+                                  }
+                                  className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Youtube className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Start Button */}
+                          <Button
+                            onClick={() => {
+                              setShowTimerModal(true);
+                              setTimerExerciseIndex(0);
+                              setTimerSetIndex(0);
+                              setIntervalMode("tabata");
+                              setIntervalRound(0);
+                              setIntervalPhase("work");
+                              setIntervalActive(true);
+
+                              // Initialize timer with first exercise
+                              const rawSets =
+                                currentType === "tabata"
+                                  ? (currentExercise?.meta?.tabata_sets ??
+                                    currentExercise?.tabata_sets)
+                                  : currentExercise?.meta?.tabata_sets;
+                              const sets = Array.isArray(rawSets)
+                                ? (rawSets as Array<{
+                                    exercises?: Array<{
+                                      work_seconds?: number;
+                                    }>;
+                                  }>)
+                                : undefined;
+                              const firstSet = sets?.[0];
+                              const firstExercise = firstSet?.exercises?.[0];
+                              const workTime = Number(
+                                firstExercise?.work_seconds ?? 20,
+                              );
+                              setIntervalPhaseLeft(workTime);
+
+                              // Set total rounds
+                              const rounds = currentExercise?.sets || 1;
+                              setIntervalTotalRounds(rounds);
+                            }}
+                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
+                          >
+                            <Clock className="w-5 h-5 mr-2" /> Start Tabata
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8">
+                          <div className="text-sm fc-text-dim mb-1">
+                            Round{" "}
+                            {Math.min(
+                              intervalRound +
+                                (intervalPhase === "rest" ? 1 : 1),
+                              intervalTotalRounds,
+                            )}{" "}
+                            / {intervalTotalRounds}
+                          </div>
+                          <div
+                            className={`text-5xl font-extrabold ${
+                              intervalPhase === "work"
+                                ? "text-purple-700"
+                                : "text-indigo-700"
+                            } dark:${
+                              intervalPhase === "work"
+                                ? "text-purple-300"
+                                : "text-indigo-300"
+                            }`}
+                          >
+                            {Math.floor(intervalPhaseLeft / 60)
+                              .toString()
+                              .padStart(2, "0")}
+                            :
+                            {(intervalPhaseLeft % 60)
+                              .toString()
+                              .padStart(2, "0")}
+                          </div>
+                          <div className="mt-2 fc-text-dim">
+                            {intervalPhase === "work" ? "Work" : "Rest"} phase
+                          </div>
+                          <Button
+                            onClick={() => setIntervalActive(false)}
+                            variant="outline"
+                            className="mt-4"
+                          >
+                            Stop
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cluster Set Flow */}
+                {currentType === "cluster_set" && (
+                  <div className="fc-card-shell p-6">
+                    <div>
+                      {/* Header */}
+                      <div
+                        className="flex items-center"
+                        style={{ gap: "12px", marginBottom: "16px" }}
+                      >
+                        <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-domain-workouts)] flex items-center justify-center">
+                          <Dumbbell className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold fc-text-primary">
+                            Cluster Set
+                          </div>
+                          <div className="text-sm fc-text-dim">
+                            Multiple mini-sets with short rest
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary Info */}
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                          <div
+                            className={`text-xs ${theme.textSecondary} mb-1`}
+                          >
+                            Clusters
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            {Number(currentExercise?.meta?.clusters_per_set) ||
+                              Number(currentExercise?.clusters_per_set) ||
+                              1}
+                          </div>
+                        </div>
+                        <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
+                          <div
+                            className={`text-xs ${theme.textSecondary} mb-1`}
+                          >
+                            Reps per Cluster
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            {Number(currentExercise?.meta?.cluster_reps) ||
+                              Number(currentExercise?.cluster_reps) ||
+                              1}
+                          </div>
+                        </div>
+                        <div className="fc-card-shell fc-card-shell--success p-3 relative">
+                          <div
+                            className={`text-xs ${theme.textSecondary} mb-1`}
+                          >
+                            Rest (s)
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            {Number(
+                              currentExercise?.meta?.intra_cluster_rest,
+                            ) ||
+                              Number(currentExercise?.intra_cluster_rest) ||
+                              0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Exercise Info */}
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-pink-500">
+                          <Dumbbell className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`font-bold ${theme.text} text-lg`}>
+                              {currentExercise.exercise?.name || "Exercise"}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2.5">
+                            {(currentExercise?.reps != null ||
+                              currentExercise?.meta?.cluster_reps != null) && (
+                              <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                <span
+                                  className={`text-sm font-bold ${theme.text}`}
+                                >
+                                  {String(
+                                    currentExercise?.reps ??
+                                      currentExercise?.meta?.cluster_reps ??
+                                      "",
+                                  )}{" "}
+                                  reps
                                 </span>
                               </div>
                             )}
-                          </div>
-                          <div className={`text-xs ${theme.textSecondary}`}>
-                            Set {currentSet} of {currentExercise?.sets || 1}
-                          </div>
-                        </div>
-
-                        {/* Exercise Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Exercise A */}
-                          <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
-                            <div
-                              className="fc-card-shell p-4 space-y-3"
-                            >
-                              {/* Exercise Header */}
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
-                                  <span className="text-white font-bold text-sm">
-                                    1
-                                  </span>
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className={`font-bold ${theme.text} text-base`}
-                                    >
-                                      {currentExercise?.exercise?.name ||
-                                        "First Exercise"}
-                                    </div>
-                                    {/* Utility Icon Buttons */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowPlateCalculator(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                {currentExercise?.exercise?.video_url && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      openVideoModal(
-                                        currentExercise.exercise?.video_url ||
-                                          "",
-                                      )
-                                    }
-                                    className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Youtube className="w-4 h-4" />
-                                  </Button>
-                                )}
+                            {(currentExercise?.rir ||
+                              currentExercise?.rir === 0) && (
+                              <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                <span
+                                  className={`text-xs font-semibold ${theme.text}`}
+                                >
+                                  RPE: {Number(currentExercise.rir)}
+                                </span>
                               </div>
-
-                              {/* Exercise Details */}
-                              <div className="flex flex-wrap gap-2">
-                                {(currentExercise?.meta?.superset_reps_a ||
-                                  currentExercise?.reps) && (
-                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                    <span
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      {String(
-                                        currentExercise?.meta?.superset_reps_a ??
-                                          currentExercise?.reps ??
-                                        ""
-                                      )}{" "}
-                                      reps
-                                    </span>
-                                  </div>
-                                )}
-                                {(currentExercise?.rir ||
-                                  currentExercise?.rir === 0) && (
-                                  <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                    <span
-                                      className={`text-xs font-semibold ${theme.text}`}
-                                    >
-                                      RPE: {Number(currentExercise.rir)}
-                                    </span>
-                                  </div>
-                                )}
-                                {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
-                                  <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                    <span
-                                      className={`text-xs font-semibold ${theme.text}`}
-                                    >
-                                      Tempo: {String(currentExercise.tempo)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Logging Fields */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Weight (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={supersetAWeight}
-                                    onChange={(e) =>
-                                      setSupersetAWeight(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    step="0.5"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Reps
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={supersetAReps}
-                                    onChange={(e) =>
-                                      setSupersetAReps(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Exercise B */}
-                          <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
-                            <div
-                              className="fc-card-shell p-4 space-y-3"
-                            >
-                              {/* Exercise Header */}
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
-                                  <span className="text-white font-bold text-sm">
-                                    2
-                                  </span>
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className={`font-bold ${theme.text} text-base`}
-                                    >
-                                      {(() => {
-                                        const exerciseId =
-                                          currentExercise?.meta
-                                            ?.superset_exercise_id ??
-                                          currentExercise?.superset_exercise_id;
-                                        const exerciseInfo =
-                                          exerciseId != null && exerciseId !== ""
-                                            ? exerciseLookup[String(exerciseId)]
-                                            : undefined;
-                                        return (
-                                          exerciseInfo?.name ||
-                                          "Second Exercise"
-                                        );
-                                      })()}
-                                    </div>
-                                    {/* Utility Icon Buttons */}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setShowPlateCalculator(true)
-                                      }
-                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                    >
-                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                    </Button>
-                                  </div>
-                                </div>
-                                {(() => {
-                                  const exerciseId =
-                                    currentExercise?.meta
-                                      ?.superset_exercise_id ??
-                                    currentExercise?.superset_exercise_id;
-                                  const exerciseInfo =
-                                    exerciseId != null && exerciseId !== ""
-                                      ? exerciseLookup[String(exerciseId)]
-                                      : undefined;
-                                  const video = exerciseInfo?.video_url;
-                                  return (
-                                    video && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => openVideoModal(video)}
-                                        className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                      >
-                                        <Youtube className="w-4 h-4" />
-                                      </Button>
-                                    )
-                                  );
-                                })()}
-                              </div>
-
-                              {/* Exercise Details */}
-                              <div className="flex flex-wrap gap-2">
-                                {(currentExercise?.meta?.superset_reps_b ||
-                                  currentExercise?.meta?.superset_reps ||
-                                  currentExercise?.superset_reps ||
-                                  currentExercise?.reps) && (
-                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                    <span
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      {String(
-                                        currentExercise?.meta?.superset_reps_b ??
-                                          currentExercise?.meta?.superset_reps ??
-                                          currentExercise?.superset_reps ??
-                                          currentExercise?.reps ??
-                                          ""
-                                      )}{" "}
-                                      reps
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Logging Fields */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Weight (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={supersetBWeight}
-                                    onChange={(e) =>
-                                      setSupersetBWeight(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    step="0.5"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    className={`block text-sm font-medium ${theme.text} mb-1`}
-                                  >
-                                    Reps
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={supersetBReps}
-                                    onChange={(e) =>
-                                      setSupersetBReps(e.target.value)
-                                    }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Previous Performance Card */}
-                        <div style={{ marginTop: "24px" }}>
-                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-                        </div>
-
-                        {/* Log Button */}
-                        <Button
-                          onClick={completeSuperset}
-                          className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
-                            style={{
-                              cursor: isLoggingSet ? "not-allowed" : "pointer",
-                              opacity: isLoggingSet ? 0.5 : 1,
-                            }}
-                          disabled={isLoggingSet}
-                        >
-                          <Check className="w-5 h-5 mr-2" /> Log{" "}
-                          {currentType === "superset"
-                            ? "Superset"
-                            : "Pre-Exhaustion"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Giant Set Flow */}
-                  {currentType === "giant_set" && (
-                    <div className="fc-card-shell p-6 relative z-20">
-                      <div>
-                        <div
-                          className="flex items-center justify-between"
-                          style={{ marginBottom: "16px" }}
-                        >
-                          <div
-                            className={`text-base sm:text-xl font-bold ${theme.text}`}
-                          >
-                            Giant Set
-                          </div>
-                          <div className={`text-xs ${theme.textSecondary}`}>
-                            Set {currentSet} of {currentExercise?.sets || 1}
-                          </div>
-                        </div>
-                        {(
-                          (currentExercise?.meta?.giant_set_exercises ||
-                            currentExercise?.giant_set_exercises ||
-                            []) as any[]
-                        ).map((item: any, idx: number) => {
-                          const resolved = item.exercise_id
-                            ? exerciseLookup[item.exercise_id]
-                            : undefined;
-                          const displayName =
-                            resolved?.name ||
-                            item.name ||
-                            `Exercise ${idx + 1}`;
-                          const video = resolved?.video_url || item.video_url;
-                          return (
-                            <div
-                              key={idx}
-                              className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
-                            >
-                              <div
-                                className="fc-card-shell p-4 space-y-3"
-                              >
-                                {/* Header: name + video + number badge */}
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-400 to-red-500">
-                                    <span className="text-white font-bold text-sm">
-                                      {idx + 1}
-                                    </span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <div className="text-base sm:text-lg font-bold fc-text-primary">
-                                        {displayName}
-                                      </div>
-                                      {/* Utility Icon Buttons */}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          setShowPlateCalculator(true)
-                                        }
-                                        className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
-                                      >
-                                        <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  {video && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openVideoModal(video)}
-                                      className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    >
-                                      <Youtube className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                </div>
-
-                                {/* Exercise Details - Reps */}
-                                {item.reps && (
-                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                    <span
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      {item.reps} reps
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Input Fields */}
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label
-                                      className={`block text-sm font-medium fc-text-primary mb-1`}
-                                    >
-                                      Weight (kg)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={giantWeights[idx] || ""}
-                                      onChange={(e) =>
-                                        setGiantWeights((prev) =>
-                                          prev.map((w, i) =>
-                                            i === idx ? e.target.value : w,
-                                          ),
-                                        )
-                                      }
-                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500`}
-                                      step="0.5"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label
-                                      className={`block text-sm font-medium fc-text-primary mb-1`}
-                                    >
-                                      Reps
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={giantReps[idx] || ""}
-                                      readOnly
-                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold`}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* Previous Performance Card */}
-                        <div style={{ marginTop: "24px" }}>
-                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-                        </div>
-
-                        <Button
-                          onClick={completeGiantSet}
-                          className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
-                            style={{
-                              cursor: isLoggingSet ? "not-allowed" : "pointer",
-                              opacity: isLoggingSet ? 0.5 : 1,
-                            }}
-                          disabled={isLoggingSet}
-                        >
-                          Log Giant Set
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {/* Standard Exercise Types - Modern Style */}
-                  {currentType !== "giant_set" &&
-                    currentType !== "tabata" &&
-                    currentType !== "amrap" &&
-                    currentType !== "emom" &&
-                    currentType !== "for_time" &&
-                    currentType !== "superset" &&
-                    currentType !== "pre_exhaustion" &&
-                    currentType !== "cluster_set" &&
-                    currentType !== "rest_pause" && (
-                      <div className="fc-card-shell p-6">
-                        <div>
-                          {/* Header */}
-                          <div
-                            className="flex items-center justify-between"
-                            style={{ marginBottom: "16px" }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`text-base sm:text-xl font-bold ${theme.text}`}
-                              >
-                                {currentType === "straight_set"
-                                  ? "Straight Set"
-                                  : currentType === "drop_set"
-                                    ? "Drop Set"
-                                    : currentType === "cluster_set"
-                                      ? "Cluster Set"
-                                      : currentType === "rest_pause"
-                                        ? "Rest Pause"
-                                        : "Exercise"}
-                              </div>
-                              {currentExercise?.rest_seconds && (
-                                <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
+                            )}
+                            {currentExercise?.tempo != null &&
+                              currentExercise.tempo !== "" && (
+                                <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    Rest: {currentExercise.rest_seconds}s
+                                    Tempo: {String(currentExercise.tempo)}
                                   </span>
                                 </div>
                               )}
-                            </div>
-                            <div className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                              <span
+                          </div>
+                        </div>
+                        {currentExercise.exercise?.video_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openVideoModal(
+                                currentExercise.exercise?.video_url || "",
+                              )
+                            }
+                            className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Youtube className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Cluster Logging Fields */}
+                      <div className="space-y-3">
+                        <div
+                          className={`text-sm font-semibold ${theme.text} mb-2`}
+                        >
+                          Log Performance
+                        </div>
+                        {clusterWeights.map((w, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div
                                 className={`text-sm font-bold ${theme.text}`}
                               >
-                                Set {currentSet} of {currentExercise?.sets || 1}
-                              </span>
+                                Cluster {idx + 1}
+                              </div>
+                              <div className={`text-xs ${theme.textSecondary}`}>
+                                Reps:{" "}
+                                {Number(currentExercise?.meta?.cluster_reps) ||
+                                  Number(currentExercise?.cluster_reps) ||
+                                  1}
+                              </div>
                             </div>
-                          </div>
-
-                          {/* Exercise Name and Actions */}
-                          <div
-                            className="flex items-start"
-                            style={{ gap: "12px", marginBottom: "16px" }}
-                          >
-                            <div
-                              style={{
-                                width: "56px",
-                                height: "56px",
-                                borderRadius: "18px",
-                                background: "var(--fc-accent-primary)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Dumbbell
-                                className="w-8 h-8 text-white"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="text-xl font-bold fc-text-primary">
-                                  {currentExercise.exercise?.name || "Exercise"}
-                                </div>
-                                {/* Utility Icon Buttons */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowPlateCalculator(true)}
-                                  className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label
+                                  className={`block text-xs font-medium ${theme.text} mb-1`}
                                 >
-                                  <Calculator className="w-3.5 h-3.5 fc-text-dim" />
-                                </Button>
+                                  Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={w}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setClusterWeights((prev) => {
+                                      const copy = [...prev];
+                                      copy[idx] = val;
+                                      // autofill subsequent clusters if editing first cluster
+                                      if (idx === 0 && val) {
+                                        for (let i = 1; i < copy.length; i++) {
+                                          copy[i] = val;
+                                        }
+                                      }
+                                      // clear subsequent clusters if first cluster is cleared
+                                      else if (idx === 0 && !val) {
+                                        for (let i = 1; i < copy.length; i++) {
+                                          copy[i] = "";
+                                        }
+                                      }
+                                      return copy;
+                                    });
+                                  }}
+                                  className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                  step="0.5"
+                                  placeholder={
+                                    idx === 0 ? "Enter weight" : "Auto-filled"
+                                  }
+                                  readOnly={idx > 0}
+                                />
                               </div>
-                              <div
-                                className="flex flex-wrap"
-                                style={{ gap: "8px" }}
-                              >
-                                {targetReps && (
-                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-primary)]/20">
-                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-primary)]">
-                                      {targetReps} reps
-                                    </span>
-                                  </div>
-                                )}
-                                {(currentExercise?.rir ||
-                                  currentExercise?.rir === 0) && (
-                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-warning)]/20">
-                                    <span className="text-sm font-semibold text-[color:var(--fc-status-warning)]">
-                                      RPE: {Number(currentExercise.rir)}
-                                    </span>
-                                  </div>
-                                )}
-                                {currentExercise?.exercise_id != null &&
-                                  currentExercise?.load_percentage != null &&
-                                  (() => {
-                                    const text = getSuggestedWeightText(
-                                      currentExercise.exercise_id,
-                                      Number(currentExercise.load_percentage ?? 0),
-                                    );
-                                    return text ? (
-                                      <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-success)]/20">
-                                        <span className="text-sm font-semibold text-[color:var(--fc-status-success)]">
-                                          {String(text)}
-                                        </span>
-                                      </div>
-                                    ) : null;
-                                  })()}
-                                {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
-                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
-                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
-                                      Tempo: {String(currentExercise.tempo)}
-                                    </span>
-                                  </div>
-                                )}
+                              <div>
+                                <label
+                                  className={`block text-xs font-medium ${theme.text} mb-1`}
+                                >
+                                  Reps
+                                </label>
+                                <input
+                                  type="number"
+                                  value={
+                                    Number(
+                                      currentExercise?.meta?.cluster_reps,
+                                    ) ||
+                                    Number(currentExercise?.cluster_reps) ||
+                                    1
+                                  }
+                                  readOnly
+                                  className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
+                                />
                               </div>
                             </div>
-                            {currentExercise.exercise?.video_url && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  openVideoModal(
-                                    currentExercise.exercise?.video_url || "",
-                                  )
-                                }
-                                className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                <Youtube className="w-4 h-4" />
-                              </Button>
-                            )}
                           </div>
+                        ))}
+                      </div>
 
-                          {/* Logging Fields */}
+                      {/* Timer Button */}
+                      <div className="flex justify-center mt-6 mb-4">
+                        <Button
+                          onClick={() => setShowClusterTimer(true)}
+                          className="w-full fc-btn fc-btn-primary px-6 py-3 rounded-xl font-semibold"
+                        >
+                          <Clock className="w-4 h-4 mr-2" />
+                          Start Rest Timer
+                        </Button>
+                      </div>
+
+                      {/* Previous Performance Card */}
+                      <div className="mt-4">
+                        <PreviousPerformanceCard
+                          previousPerformance={previousPerformance}
+                          theme={theme}
+                        />
+                      </div>
+
+                      {/* Log Button */}
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => {
+                            // TODO: Implement cluster set completion logic
+                            console.log("Logging cluster set:", clusterWeights);
+                          }}
+                          className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
+                          disabled={clusterWeights.some((w) => !w || w === "0")}
+                        >
+                          <Check className="w-5 h-5 mr-2" /> Log Cluster Set
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rest-Pause Flow */}
+                {currentType === "rest_pause" && (
+                  <div className="fc-card-shell fc-card-shell--success p-6">
+                    <div>
+                      {/* Header */}
+                      <div
+                        className="flex items-center"
+                        style={{ gap: "12px", marginBottom: "16px" }}
+                      >
+                        <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-success)] flex items-center justify-center">
+                          <Dumbbell className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold fc-text-primary">
+                            Rest Pause Set
+                          </div>
+                          <div className="text-sm fc-text-dim">
+                            Main set + mini-sets with rest periods
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary Info */}
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
                           <div
-                            className="grid grid-cols-2 gap-4 pt-4 border-t border-[color:var(--fc-glass-border)]"
+                            className={`text-xs ${theme.textSecondary} mb-1`}
                           >
+                            Main Set
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            1
+                          </div>
+                        </div>
+                        <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                          <div
+                            className={`text-xs ${theme.textSecondary} mb-1`}
+                          >
+                            Mini-sets
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            {restPauseExtraReps.length}
+                          </div>
+                        </div>
+                        <div className="fc-card-shell fc-card-shell--success p-3">
+                          <div
+                            className={`text-xs ${theme.textSecondary} mb-1`}
+                          >
+                            Rest (s)
+                          </div>
+                          <div className={`text-lg font-bold ${theme.text}`}>
+                            {Number(
+                              currentExercise?.meta?.rest_pause_duration,
+                            ) ||
+                              Number(currentExercise?.rest_pause_duration) ||
+                              0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Exercise Info */}
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-cyan-500">
+                          <Dumbbell className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`font-bold ${theme.text} text-lg`}>
+                              {currentExercise.exercise?.name || "Exercise"}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2.5">
+                            {(currentExercise?.reps != null ||
+                              currentExercise?.meta?.rest_pause_reps !=
+                                null) && (
+                              <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                <span
+                                  className={`text-sm font-bold ${theme.text}`}
+                                >
+                                  {String(
+                                    currentExercise?.reps ??
+                                      currentExercise?.meta?.rest_pause_reps ??
+                                      "",
+                                  )}{" "}
+                                  reps
+                                </span>
+                              </div>
+                            )}
+                            {(currentExercise?.rir ||
+                              currentExercise?.rir === 0) && (
+                              <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                <span
+                                  className={`text-xs font-semibold ${theme.text}`}
+                                >
+                                  RPE: {Number(currentExercise.rir)}
+                                </span>
+                              </div>
+                            )}
+                            {currentExercise?.tempo != null &&
+                              currentExercise.tempo !== "" && (
+                                <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
+                                  <span
+                                    className={`text-xs font-semibold ${theme.text}`}
+                                  >
+                                    Tempo: {String(currentExercise.tempo)}
+                                  </span>
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                        {currentExercise.exercise?.video_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openVideoModal(
+                                currentExercise.exercise?.video_url || "",
+                              )
+                            }
+                            className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Youtube className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Main Set Logging */}
+                      <div className="space-y-3 mb-4">
+                        <div
+                          className={`text-sm font-semibold ${theme.text} mb-2`}
+                        >
+                          Main Set
+                        </div>
+                        <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-semibold fc-text-dim mb-2">
-                                {currentType === "drop_set"
-                                  ? "Working Weight (kg)"
-                                  : "Weight (kg)"}
+                              <label
+                                className={`block text-sm font-medium ${theme.text} mb-1`}
+                              >
+                                Weight (kg)
                               </label>
                               <input
                                 type="number"
@@ -6639,8 +5186,295 @@ export default function LiveWorkout() {
                                     weight: parseFloat(e.target.value) || 0,
                                   }))
                                 }
-                                className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
-                                style={{ width: "100%", height: "56px", textAlign: "center" as const }}
+                                className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                step="0.5"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label
+                                className={`block text-sm font-medium ${theme.text} mb-1`}
+                              >
+                                Reps
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  currentSetData.reps === 0
+                                    ? ""
+                                    : currentSetData.reps
+                                }
+                                onChange={(e) =>
+                                  setCurrentSetData((prev) => ({
+                                    ...prev,
+                                    reps: parseInt(e.target.value) || 0,
+                                  }))
+                                }
+                                className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mini-sets Logging */}
+                      {restPauseExtraReps.length > 0 && (
+                        <div className="space-y-3 mb-4">
+                          <div
+                            className={`text-sm font-semibold ${theme.text} mb-2`}
+                          >
+                            Mini-sets
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {restPauseExtraReps.map((r, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div
+                                    className={`text-sm font-bold ${theme.text}`}
+                                  >
+                                    Mini-set {idx + 1}
+                                  </div>
+                                  <div
+                                    className={`text-sm font-bold ${theme.text}`}
+                                  >
+                                    {currentSetData.weight || 0}kg
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label
+                                      className={`block text-xs font-medium ${theme.text} mb-1`}
+                                    >
+                                      Reps
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={r}
+                                      onChange={(e) =>
+                                        setRestPauseExtraReps((prev) =>
+                                          prev.map((x, i) =>
+                                            i === idx ? e.target.value : x,
+                                          ),
+                                        )
+                                      }
+                                      className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label
+                                      className={`block text-xs font-medium ${theme.text} mb-1`}
+                                    >
+                                      Rest (s)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={
+                                        Number(
+                                          currentExercise?.meta
+                                            ?.rest_pause_duration,
+                                        ) ||
+                                        Number(
+                                          currentExercise?.rest_pause_duration,
+                                        ) ||
+                                        0
+                                      }
+                                      readOnly
+                                      className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Previous Performance Card */}
+                      <div className="mt-4">
+                        <PreviousPerformanceCard
+                          previousPerformance={previousPerformance}
+                          theme={theme}
+                        />
+                      </div>
+
+                      {/* Log Button */}
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => {
+                            // TODO: Implement rest pause completion logic
+                            console.log("Logging rest pause set:", {
+                              mainSet: currentSetData,
+                              miniSets: restPauseExtraReps,
+                            });
+                          }}
+                          className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
+                          disabled={
+                            currentSetData.weight <= 0 ||
+                            currentSetData.reps <= 0
+                          }
+                        >
+                          <Check className="w-5 h-5 mr-2" /> Log Rest Pause Set
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* For Time Flow */}
+                {currentType === "for_time" && (
+                  <div className="fc-card-shell fc-card-shell--warning p-6">
+                    <div>
+                      {!forTimeActive && forTimeCompletionSecs == null ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "16px",
+                          }}
+                        >
+                          {/* Exercise Details Header */}
+                          <div
+                            className="flex items-center"
+                            style={{ gap: "12px" }}
+                          >
+                            <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-warning)] flex items-center justify-center">
+                              <Trophy className="w-8 h-8 text-white" />
+                            </div>
+                            <div>
+                              <div className="text-xl font-bold fc-text-primary">
+                                For Time Details
+                              </div>
+                              <div className="text-sm fc-text-dim">
+                                Complete target reps as fast as possible
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Summary Info */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-700">
+                              <div
+                                className={`text-sm ${theme.textSecondary} mb-1`}
+                              >
+                                Time Cap
+                              </div>
+                              <div
+                                className={`text-2xl font-bold ${theme.text}`}
+                              >
+                                {Number(
+                                  currentExercise?.meta?.time_cap ??
+                                    currentExercise?.time_cap ??
+                                    10,
+                                )}{" "}
+                                min
+                              </div>
+                            </div>
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                              <div
+                                className={`text-sm ${theme.textSecondary} mb-1`}
+                              >
+                                Target Reps
+                              </div>
+                              <div
+                                className={`text-2xl font-bold ${theme.text}`}
+                              >
+                                {String(
+                                  currentExercise?.meta?.target_reps ??
+                                    currentExercise?.target_reps ??
+                                    currentExercise?.reps ??
+                                    "-",
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Start Button */}
+                          <Button
+                            onClick={() => {
+                              const capMin =
+                                Number(currentExercise?.meta?.time_cap) ||
+                                Number(currentExercise?.time_cap) ||
+                                10;
+                              setForTimeTimeLeft(capMin * 60);
+                              setForTimeCompletionSecs(null);
+                              setForTimeActive(true);
+                              setForTimeStopped(false);
+                            }}
+                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
+                          >
+                            <Clock className="w-5 h-5 mr-2" /> Start For Time
+                          </Button>
+                        </div>
+                      ) : forTimeActive ? (
+                        <div className="flex flex-col items-center justify-center py-8">
+                          <div className="text-5xl font-bold text-amber-700 dark:text-amber-300">
+                            {Math.floor(forTimeTimeLeft / 60)
+                              .toString()
+                              .padStart(2, "0")}
+                            :
+                            {(forTimeTimeLeft % 60).toString().padStart(2, "0")}
+                          </div>
+                          <div className="mt-2 fc-text-dim">Time Remaining</div>
+                          <Button
+                            onClick={() => {
+                              const capMin =
+                                Number(currentExercise?.meta?.time_cap) ||
+                                Number(currentExercise?.time_cap) ||
+                                10;
+                              const elapsed = capMin * 60 - forTimeTimeLeft;
+                              setForTimeCompletionSecs(elapsed);
+                              setForTimeActive(false);
+                              setForTimeStopped(true);
+                            }}
+                            variant="outline"
+                            className="mt-4"
+                          >
+                            Stop
+                          </Button>
+                        </div>
+                      ) : forTimeStopped && forTimeCompletionSecs != null ? (
+                        <div className="space-y-6">
+                          {/* Completion Time Display */}
+                          <div className="flex flex-col items-center justify-center py-4">
+                            <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-2">
+                              {Math.floor(forTimeCompletionSecs / 60)
+                                .toString()
+                                .padStart(2, "0")}
+                              :
+                              {(forTimeCompletionSecs % 60)
+                                .toString()
+                                .padStart(2, "0")}
+                            </div>
+                            <div className="text-sm fc-text-dim">
+                              Completion Time
+                            </div>
+                          </div>
+
+                          {/* Weight and Reps Inputs */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-semibold fc-text-dim mb-2">
+                                Weight (kg)
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  currentSetData.weight === 0
+                                    ? ""
+                                    : currentSetData.weight
+                                }
+                                onChange={(e) =>
+                                  setCurrentSetData((prev) => ({
+                                    ...prev,
+                                    weight: parseFloat(e.target.value) || 0,
+                                  }))
+                                }
+                                className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
                                 step="0.5"
                                 placeholder="0"
                               />
@@ -6662,1413 +5496,1670 @@ export default function LiveWorkout() {
                                     reps: parseInt(e.target.value) || 0,
                                   }))
                                 }
-                                className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
-                                style={{ width: "100%", height: "56px", textAlign: "center" as const }}
+                                className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
                                 placeholder="0"
                               />
                             </div>
                           </div>
 
-                          {/* Drop Set - Second Set Fields */}
-                          {currentType === "drop_set" && (
-                            <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Calculator className="w-3 h-3 text-orange-500" />
-                                <span className="text-xs font-medium fc-text-dim">
-                                  Drop Set (Second Set)
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-xs fc-text-dim mb-1">
-                                    Drop Weight (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={dropWeight === "" ? "" : dropWeight}
-                                    onChange={(e) =>
-                                      setDropWeight(e.target.value)
-                                    }
-                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
-                                    step="0.5"
-                                    placeholder={
-                                      currentSetData.weight > 0
-                                        ? (
-                                            currentSetData.weight *
-                                            (1 -
-                                              (Number(
-                                                currentExercise?.meta
-                                                  ?.drop_percentage,
-                                              ) ||
-                                                Number(
-                                                  currentExercise?.drop_percentage,
-                                                ) ||
-                                                0) /
-                                                100)
-                                          ).toFixed(1)
-                                        : "Auto"
-                                    }
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs fc-text-dim mb-1">
-                                    Reps
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={dropReps === 0 ? "" : dropReps}
-                                    onChange={(e) =>
-                                      setDropReps(parseInt(e.target.value) || 0)
-                                    }
-                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Previous Performance Card */}
-                          <div style={{ marginTop: "24px" }}>
-                            <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
-                          </div>
-
-                          {/* Log Button */}
+                          {/* Complete Set Button */}
                           <Button
                             onClick={completeSet}
-                            className="w-full min-h-[44px] py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none"
-                            style={{
-                              width: "100%",
-                              cursor:
-                                currentSetData.weight <= 0 ||
-                                currentSetData.reps <= 0 ||
-                                isLoggingSet
-                                  ? "not-allowed"
-                                  : "pointer",
-                              opacity:
-                                currentSetData.weight <= 0 ||
-                                currentSetData.reps <= 0 ||
-                                isLoggingSet
-                                  ? 0.5
-                                  : 1,
-                              marginTop: "24px",
-                            }}
                             disabled={
                               currentSetData.weight <= 0 ||
                               currentSetData.reps <= 0 ||
                               isLoggingSet
                             }
+                            className="w-full bg-[var(--fc-status-success)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Check className="w-5 h-5 mr-2" /> Log Set
+                            <Check className="w-5 h-5 mr-2" /> Complete Set
                           </Button>
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="p-3 bg-[color:var(--fc-glass-highlight)] rounded-xl border border-[color:var(--fc-glass-border)]">
+                          <div className="text-sm fc-text-dim">
+                            Completion time recorded: {forTimeCompletionSecs}s
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                  {/* Simple Navigation */}
-                  {exercises.length > 1 && (
-                    <div className="flex items-center justify-between">
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          setCurrentExerciseIndex(
-                            Math.max(0, currentExerciseIndex - 1),
-                          )
-                        }
-                        disabled={currentExerciseIndex === 0}
-                        className="flex-1 mr-2"
+                {/* Superset / Pre-Exhaustion Flow */}
+                {(currentType === "superset" ||
+                  currentType === "pre_exhaustion") && (
+                  <div className="fc-card-shell fc-card-shell--error p-6">
+                    <div>
+                      {/* Header */}
+                      <div
+                        className="flex items-center justify-between"
+                        style={{ marginBottom: "16px" }}
                       >
-                        <ChevronLeft className="w-4 h-4 mr-1" />
-                        Previous
-                      </Button>
-
-                      <div className="text-center px-4">
-                        <div className="text-sm fc-text-dim">Exercise</div>
-                        <div className="text-lg font-bold">
-                          {currentExerciseIndex + 1} / {exercises.length}
+                        <div
+                          className="flex items-center"
+                          style={{ gap: "12px" }}
+                        >
+                          <div className="text-xl font-bold fc-text-primary">
+                            {currentType === "superset"
+                              ? "Superset"
+                              : "Pre-Exhaustion"}
+                          </div>
+                          {(currentExercise?.rest_seconds != null ||
+                            currentExercise?.meta?.rest_seconds != null) && (
+                            <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
+                              <span
+                                className={`text-xs font-semibold ${theme.text}`}
+                              >
+                                Rest:{" "}
+                                {Number(
+                                  currentExercise?.rest_seconds ??
+                                    currentExercise?.meta?.rest_seconds ??
+                                    0,
+                                )}
+                                s
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className={`text-xs ${theme.textSecondary}`}>
+                          Set {currentSet} of {currentExercise?.sets || 1}
                         </div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          setCurrentExerciseIndex(
-                            Math.min(
-                              exercises.length - 1,
-                              currentExerciseIndex + 1,
-                            ),
-                          )
-                        }
-                        disabled={currentExerciseIndex === exercises.length - 1}
-                        className="flex-1 ml-2"
-                      >
-                        Next
-                        <ChevronRight className="w-4 h-4 ml-1" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <ClientGlassCard className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <AlertTriangle className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold fc-text-primary mb-3">
-                    No exercises found
-                  </h3>
-                  <p className="fc-text-dim mb-6">
-                    This workout doesn&apos;t have any exercises assigned.
-                  </p>
-                  <SecondaryButton
-                    className="w-auto"
-                    onClick={() => { window.location.href = "/client/train"; }}
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Workouts
-                  </SecondaryButton>
-                </ClientGlassCard>
-              )}
-
-        {/* Full-Screen Timer Modal for Tabata */}
-        {showTimerModal && currentType === "tabata" && (
-            <div
-              className={`fixed inset-0 z-[9999] transition-colors duration-500 ${
-                intervalPhase === "work"
-                  ? "bg-red-900/95"
-                  : intervalPhase === "rest_after_set"
-                    ? "bg-purple-900/95"
-                    : "bg-blue-900/95"
-              }`}
-            >
-              <div className="h-full flex flex-col items-center justify-center p-4">
-                {/* Segment Counter */}
-                <div className="absolute top-8 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-2">
-                    <span className="text-white font-semibold text-lg">
-                      {(() => {
-                        const raw =
-                          currentExercise?.meta?.tabata_sets ?? [];
-                        const intervalSets = Array.isArray(raw)
-                          ? raw
-                          : [];
-
-                        // Calculate segments per round
-                        let segmentsPerRound = 0;
-                        intervalSets.forEach((set: any) => {
-                          const exercisesInSet = set?.exercises?.length || 0;
-                          // Each exercise has: work + rest
-                          segmentsPerRound += exercisesInSet * 2;
-                          // Each set (except the last one) has: rest_after_set
-                          // Actually, every set except the last set of the last round has rest_after_set
-                          // For counting purposes, we'll add it for all sets and subtract later if needed
-                        });
-                        // Add rest_after_set for each set
-                        segmentsPerRound += intervalSets.length;
-
-                        const totalSegments =
-                          segmentsPerRound * intervalTotalRounds - 1; // -1 because last set of last round has no rest_after_set
-
-                        // Calculate current segment
-                        let currentSegment = intervalRound * segmentsPerRound;
-
-                        // Add segments from completed sets in current round
-                        for (let s = 0; s < timerSetIndex; s++) {
-                          const exercisesInSet =
-                            intervalSets[s]?.exercises?.length || 0;
-                          currentSegment += exercisesInSet * 2 + 1; // work + rest per exercise + rest_after_set
-                        }
-
-                        // Add segments from current set
-                        const currentSet = intervalSets[timerSetIndex];
-                        const exercisesBeforeCurrent = timerExerciseIndex;
-                        currentSegment += exercisesBeforeCurrent * 2; // work + rest for each completed exercise
-
-                        // Add current phase
-                        if (intervalPhase === "work") {
-                          currentSegment += 1;
-                        } else if (intervalPhase === "rest") {
-                          currentSegment += 2;
-                        } else if (intervalPhase === "rest_after_set") {
-                          const exercisesInCurrentSet =
-                            currentSet?.exercises?.length || 0;
-                          currentSegment += exercisesInCurrentSet * 2 + 1;
-                        }
-
-                        return `${currentSegment} / ${totalSegments}`;
-                      })()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Main Timer Display */}
-                <div className="text-center flex-1 flex flex-col justify-center items-center">
-                  {/* Current Exercise Info */}
-                  {((() => {
-                    const sets = currentExercise?.meta?.tabata_sets;
-                    if (!Array.isArray(sets)) return null;
-                    const set = (sets as unknown[])[timerSetIndex] as
-                      | { exercises?: unknown[] }
-                      | undefined;
-                    if (!set?.exercises?.length) return null;
-                    return (
-                      <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-8 py-6 max-w-md mb-12">
-                        <div className="text-2xl font-bold text-white mb-2">
-                          {(() => {
-                            const setsArr = sets as unknown[];
-                            const currentExerciseInSet = (
-                              setsArr[timerSetIndex] as {
-                                exercises?: Array<{ exercise_id?: string }>;
-                              }
-                            )?.exercises?.[timerExerciseIndex];
-                            return (
-                              exerciseLookup[
-                                currentExerciseInSet?.exercise_id ?? ""
-                              ]?.name || "Exercise"
-                            );
-                          })()}
-                        </div>
-                        {intervalPhase === "work" && (
-                          <div className="text-lg text-gray-200">
-                            {(
-                              (sets as unknown[])[timerSetIndex] as {
-                                exercises?: Array<{ work_seconds?: number }>;
-                              }
-                            )?.exercises?.[timerExerciseIndex]?.work_seconds
-                              ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ work_seconds?: number }> }).exercises[timerExerciseIndex].work_seconds}s work`
-                              : (sets as unknown[])[timerSetIndex] != null &&
-                                  ((sets as unknown[])[timerSetIndex] as { exercises?: Array<{ target_reps?: number }> })?.exercises?.[timerExerciseIndex]?.target_reps != null
-                                ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ target_reps?: number }> }).exercises[timerExerciseIndex].target_reps} reps`
-                                : "Work phase"}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })() as React.ReactNode)}
-
-                  {/* Phase Indicator */}
-                  <div
-                    className={`mb-8 px-8 py-4 rounded-2xl ${
-                      intervalPhase === "work"
-                        ? "bg-red-600/30 border-2 border-red-400"
-                        : intervalPhase === "rest_after_set"
-                          ? "bg-purple-600/30 border-2 border-purple-400"
-                          : "bg-blue-600/30 border-2 border-blue-400"
-                    }`}
-                  >
-                    <div className="text-4xl sm:text-5xl font-black text-white">
-                      {intervalPhase === "work"
-                        ? "WORK"
-                        : intervalPhase === "rest_after_set"
-                          ? "REST AFTER SET"
-                          : "REST"}
-                    </div>
-                  </div>
-
-                  {/* Large Timer */}
-                  <div
-                    className={`text-9xl sm:text-[12rem] font-black mb-8 ${
-                      intervalPhase === "work"
-                        ? "text-red-100"
-                        : "text-blue-100"
-                    }`}
-                  >
-                    {Math.floor(intervalPhaseLeft / 60)
-                      .toString()
-                      .padStart(2, "0")}
-                    :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
-                  </div>
-
-                  {/* Next Exercise Preview */}
-                  {currentExercise?.meta?.tabata_sets &&
-                    (((currentExercise.meta.tabata_sets) as unknown[])[
-                      timerSetIndex
-                    ] as { exercises?: Array<{ exercise_id?: string }> } | undefined)
-                      ?.exercises && (
-                      <div className="mb-4">
-                        <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
-                          <div className="text-sm text-gray-300 mb-1">
-                            Next:
-                          </div>
-                          <div className="text-lg font-semibold text-white">
-                            {timerExerciseIndex + 1 <
-                            (
-                              ((currentExercise.meta.tabata_sets) as unknown[])[
-                                timerSetIndex
-                              ] as { exercises: Array<{ exercise_id?: string }> }
-                            ).exercises.length
-                              ? exerciseLookup[
-                                  (
-                                    ((currentExercise.meta.tabata_sets) as unknown[])[
-                                      timerSetIndex
-                                    ] as {
-                                      exercises: Array<{ exercise_id?: string }>;
-                                    }
-                                  ).exercises[timerExerciseIndex + 1]
-                                    ?.exercise_id ?? ""
-                                ]?.name || "Next Exercise"
-                              : timerSetIndex + 1 <
-                                  ((currentExercise.meta.tabata_sets) as unknown[]).length
-                                ? "Next Set"
-                                : "Break"}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                </div>
-
-                {/* Control Buttons */}
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 items-center">
-                  {/* Previous Button */}
-                  <Button
-                    onClick={() => {
-                      const intervalSets = currentExercise?.meta?.tabata_sets;
-
-                      if (intervalPhase === "work") {
-                        // Work -> Previous Rest (or Previous Rest After Set)
-                        if (timerExerciseIndex > 0) {
-                          // Go to rest of previous exercise in same set
-                          setTimerExerciseIndex((prev) => prev - 1);
-                          const currentSet = intervalSets?.[timerSetIndex];
-                          const prevExercise =
-                            currentSet?.exercises?.[timerExerciseIndex - 1];
-                          const restTime = prevExercise?.rest_after || 10;
-                          setIntervalPhase("rest");
-                          setIntervalPhaseLeft(restTime);
-                        } else if (timerSetIndex > 0) {
-                          // First exercise in set - go to rest_after_set of previous set
-                          setTimerSetIndex((prev) => prev - 1);
-                          const prevSet = intervalSets?.[timerSetIndex - 1];
-                          const restAfterSetTime =
-                            Number(prevSet?.rest_between_sets) || 30;
-                          setIntervalPhase("rest_after_set");
-                          setIntervalPhaseLeft(restAfterSetTime);
-                        } else if (intervalRound > 0) {
-                          // First exercise of first set - go to rest_after_set of last set of previous round
-                          setIntervalRound((prev) => prev - 1);
-                          const lastSetIndex = intervalSets.length - 1;
-                          const lastSet = intervalSets?.[lastSetIndex];
-                          const restAfterSetTime =
-                            Number(lastSet?.rest_between_sets) || 30;
-                          setTimerSetIndex(lastSetIndex);
-                          setTimerExerciseIndex(0);
-                          setIntervalPhase("rest_after_set");
-                          setIntervalPhaseLeft(restAfterSetTime);
-                        }
-                      } else if (intervalPhase === "rest") {
-                        // Rest -> Work (same exercise)
-                        const currentSet = intervalSets?.[timerSetIndex];
-                        const currentExerciseInSet =
-                          currentSet?.exercises?.[timerExerciseIndex];
-                        const workTime =
-                          currentExerciseInSet?.work_seconds || 20;
-                        setIntervalPhase("work");
-                        setIntervalPhaseLeft(workTime);
-                      } else if (intervalPhase === "rest_after_set") {
-                        // Rest After Set -> Rest (last exercise of current set)
-                        const currentSet = intervalSets?.[timerSetIndex];
-                        const lastExerciseIndex =
-                          (currentSet?.exercises?.length || 1) - 1;
-                        const lastExercise =
-                          currentSet?.exercises?.[lastExerciseIndex];
-                        const restTime = lastExercise?.rest_after || 10;
-                        setTimerExerciseIndex(lastExerciseIndex);
-                        setIntervalPhase("rest");
-                        setIntervalPhaseLeft(restTime);
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm"
-                    disabled={
-                      timerExerciseIndex === 0 &&
-                      timerSetIndex === 0 &&
-                      intervalRound === 0 &&
-                      intervalPhase === "work"
-                    }
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
-
-                  {/* Play/Pause Button */}
-                  <Button
-                    onClick={() => setIsTimerPaused(!isTimerPaused)}
-                    variant="outline"
-                    size="lg"
-                    className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm px-8 py-3 text-lg"
-                  >
-                    {isTimerPaused ? (
-                      <Play className="w-6 h-6" />
-                    ) : (
-                      <div className="flex gap-1">
-                        <div className="w-2 h-6 bg-white"></div>
-                        <div className="w-2 h-6 bg-white"></div>
-                      </div>
-                    )}
-                  </Button>
-
-                  {/* Next Button */}
-                  <Button
-                    onClick={() => {
-                      const intervalSets = currentExercise?.meta?.tabata_sets;
-
-                      if (intervalPhase === "work") {
-                        // Work -> Rest (same exercise)
-                        const currentSet = intervalSets?.[timerSetIndex];
-                        const currentExerciseInSet =
-                          currentSet?.exercises?.[timerExerciseIndex];
-                        const restTime = currentExerciseInSet?.rest_after || 10;
-                        setIntervalPhase("rest");
-                        setIntervalPhaseLeft(restTime);
-                      } else if (intervalPhase === "rest") {
-                        // Rest -> Next Work (or Rest After Set)
-                        const currentSet = intervalSets?.[timerSetIndex];
-                        const isLastExerciseInSet =
-                          timerExerciseIndex ===
-                          (currentSet?.exercises?.length || 1) - 1;
-
-                        if (!isLastExerciseInSet) {
-                          // More exercises in set - go to next exercise work
-                          setTimerExerciseIndex((prev) => prev + 1);
-                          const nextExercise =
-                            currentSet?.exercises?.[timerExerciseIndex + 1];
-                          const workTime = nextExercise?.work_seconds || 20;
-                          setIntervalPhase("work");
-                          setIntervalPhaseLeft(workTime);
-                        } else {
-                          // Last exercise in set - check if we should show rest_after_set
-                          const isLastSetInRound =
-                            timerSetIndex === intervalSets.length - 1;
-                          const nextRound = intervalRound + 1;
-                          const isLastRound = nextRound >= intervalTotalRounds;
-
-                          if (!isLastSetInRound || !isLastRound) {
-                            // Show rest after set
-                            const restAfterSetTime =
-                              Number(currentSet?.rest_between_sets) || 30;
-                            setIntervalPhase("rest_after_set");
-                            setIntervalPhaseLeft(restAfterSetTime);
-                          } else {
-                            // Last set of last round - workout complete
-                            setIntervalActive(false);
-                            setShowTimerModal(false);
-                          }
-                        }
-                      } else if (intervalPhase === "rest_after_set") {
-                        // Rest After Set -> Work (first exercise of next set or next round)
-                        const isLastSetInRound =
-                          timerSetIndex === intervalSets.length - 1;
-
-                        if (isLastSetInRound) {
-                          // Start next round
-                          setIntervalRound((prev) => prev + 1);
-                          setTimerSetIndex(0);
-                          setTimerExerciseIndex(0);
-                          const firstSet = intervalSets?.[0];
-                          const firstExercise = firstSet?.exercises?.[0];
-                          const workTime = firstExercise?.work_seconds || 20;
-                          setIntervalPhase("work");
-                          setIntervalPhaseLeft(workTime);
-                        } else {
-                          // Move to next set
-                          setTimerSetIndex((prev) => prev + 1);
-                          setTimerExerciseIndex(0);
-                          const nextSet = intervalSets?.[timerSetIndex + 1];
-                          const firstExercise = nextSet?.exercises?.[0];
-                          const workTime = firstExercise?.work_seconds || 20;
-                          setIntervalPhase("work");
-                          setIntervalPhaseLeft(workTime);
-                        }
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm"
-                  >
-                    <ArrowLeft className="w-4 h-4 rotate-180" />
-                  </Button>
-
-                  {/* Stop Button */}
-                  <Button
-                    onClick={() => {
-                      setShowTimerModal(false);
-                      setIntervalActive(false);
-                      setIsTimerPaused(false);
-                    }}
-                    variant="outline"
-                    className="px-6 py-3 text-lg border-red-400 text-red-100 hover:bg-red-600 hover:text-white bg-red-600/20 backdrop-blur-sm"
-                  >
-                    Stop
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-        {/* Enhanced Video Modal */}
-        {showVideoModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-white/20">
-              {/* Enhanced Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center">
-                    <Youtube className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">
-                    Exercise Video
-                  </h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeVideoModal}
-                  className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
-                  aria-label="Close video"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Enhanced Video Content */}
-              <div className="p-6">
-                <div
-                  className="relative w-full"
-                  style={{ paddingBottom: "56.25%" }}
-                >
-                  <iframe
-                    src={getEmbedUrl(currentVideoUrl)}
-                    title="Exercise Video"
-                    className="absolute top-0 left-0 w-full h-full rounded-2xl"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {prCelebrationData && (
-          <PRCelebrationModal
-            visible={!!prCelebrationData}
-            onClose={() => {
-              setPrCelebrationData(null);
-              showAchievementsAfterPR();
-            }}
-            pr={prCelebrationData}
-            bodyWeightKg={clientBodyWeightKg}
-          />
-        )}
-
-        {newAchievementsQueue.length > 0 && (
-          <AchievementUnlockModal
-            achievement={newAchievementsQueue[achievementModalIndex] ?? null}
-            visible={achievementModalIndex < newAchievementsQueue.length}
-            onClose={() => {
-              if (achievementModalIndex < newAchievementsQueue.length - 1) {
-                setAchievementModalIndex((i) => i + 1);
-              } else {
-                setNewAchievementsQueue([]);
-                setAchievementModalIndex(0);
-              }
-            }}
-          />
-        )}
-
-        {/* Exercise Image Modal */}
-        {showExerciseImage && currentExercise.exercise?.image_url && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-white/20">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                    <Image className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">
-                    {currentExercise.exercise?.name}
-                  </h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowExerciseImage(false)}
-                  className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
-                  aria-label="Close image"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Image Content */}
-              <div className="p-6">
-                <div className="relative w-full">
-                  <img
-                    src={currentExercise.exercise.image_url}
-                    alt={currentExercise.exercise?.name}
-                    className="w-full h-auto rounded-2xl"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Plate Calculator Modal */}
-        {false && showPlateCalculator && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
-              <div className="p-6">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                      <Calculator className="w-4 h-4 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold fc-text-primary">
-                      Barbell Plate Calculator
-                    </h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowPlateCalculator(false);
-                      setShowPlateResults(false);
-                      setTargetWeight("");
-                      setSelectedBarbell(20);
-                    }}
-                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
-                </div>
-
-                {!showPlateResults ? (
-                  // Input Screen
-                  <div className="space-y-6">
-                    {/* Barbell Selection */}
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium fc-text-dim">
-                        Select Barbell:
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {barbellOptions.map((barbell) => (
-                          <button
-                            key={barbell.weight}
-                            onClick={() => setSelectedBarbell(barbell.weight)}
-                            className={`p-3 rounded-xl border-2 transition-all ${
-                              selectedBarbell === barbell.weight
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                : "border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-soft)]"
-                            }`}
-                          >
-                            <div className="text-center">
-                              <div className="text-lg font-bold fc-text-primary">
-                                {barbell.weight}kg
+                      {/* Exercise Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Exercise A */}
+                        <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
+                          <div className="fc-card-shell p-4 space-y-3">
+                            {/* Exercise Header */}
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
+                                <span className="text-white font-bold text-sm">
+                                  1
+                                </span>
                               </div>
-                              <div className="text-xs fc-text-dim">
-                                {barbell.name}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`font-bold ${theme.text} text-base`}
+                                  >
+                                    {currentExercise?.exercise?.name ||
+                                      "First Exercise"}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-xs mt-1">
-                                {barbell.type === "straight" ? "📏" : "🌀"}
+                              {currentExercise?.exercise?.video_url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openVideoModal(
+                                      currentExercise.exercise?.video_url || "",
+                                    )
+                                  }
+                                  className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Youtube className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+
+                            {/* Exercise Details */}
+                            <div className="flex flex-wrap gap-2">
+                              {(currentExercise?.meta?.superset_reps_a ||
+                                currentExercise?.reps) && (
+                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                  <span
+                                    className={`text-sm font-bold ${theme.text}`}
+                                  >
+                                    {String(
+                                      currentExercise?.meta?.superset_reps_a ??
+                                        currentExercise?.reps ??
+                                        "",
+                                    )}{" "}
+                                    reps
+                                  </span>
+                                </div>
+                              )}
+                              {(currentExercise?.rir ||
+                                currentExercise?.rir === 0) && (
+                                <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                  <span
+                                    className={`text-xs font-semibold ${theme.text}`}
+                                  >
+                                    RPE: {Number(currentExercise.rir)}
+                                  </span>
+                                </div>
+                              )}
+                              {currentExercise?.tempo != null &&
+                                currentExercise.tempo !== "" && (
+                                  <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
+                                    <span
+                                      className={`text-xs font-semibold ${theme.text}`}
+                                    >
+                                      Tempo: {String(currentExercise.tempo)}
+                                    </span>
+                                  </div>
+                                )}
+                            </div>
+
+                            {/* Logging Fields */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label
+                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                                >
+                                  Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={supersetAWeight}
+                                  onChange={(e) =>
+                                    setSupersetAWeight(e.target.value)
+                                  }
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                  step="0.5"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                                >
+                                  Reps
+                                </label>
+                                <input
+                                  type="number"
+                                  value={supersetAReps}
+                                  onChange={(e) =>
+                                    setSupersetAReps(e.target.value)
+                                  }
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                  placeholder="0"
+                                />
                               </div>
                             </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                          </div>
+                        </div>
 
-                    {/* Weight Input */}
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium fc-text-dim">
-                        Target Weight:
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={targetWeight}
-                          onChange={(e) => setTargetWeight(e.target.value)}
-                          className="w-full p-4 text-2xl font-bold text-center border-2 border-[color:var(--fc-glass-border)] rounded-xl fc-surface fc-text-primary focus:border-[color:var(--fc-domain-workouts)] focus:outline-none"
-                          placeholder="142.5"
+                        {/* Exercise B */}
+                        <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
+                          <div className="fc-card-shell p-4 space-y-3">
+                            {/* Exercise Header */}
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
+                                <span className="text-white font-bold text-sm">
+                                  2
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`font-bold ${theme.text} text-base`}
+                                  >
+                                    {(() => {
+                                      const exerciseId =
+                                        currentExercise?.meta
+                                          ?.superset_exercise_id ??
+                                        currentExercise?.superset_exercise_id;
+                                      const exerciseInfo =
+                                        exerciseId != null && exerciseId !== ""
+                                          ? exerciseLookup[String(exerciseId)]
+                                          : undefined;
+                                      return (
+                                        exerciseInfo?.name || "Second Exercise"
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              </div>
+                              {(() => {
+                                const exerciseId =
+                                  currentExercise?.meta?.superset_exercise_id ??
+                                  currentExercise?.superset_exercise_id;
+                                const exerciseInfo =
+                                  exerciseId != null && exerciseId !== ""
+                                    ? exerciseLookup[String(exerciseId)]
+                                    : undefined;
+                                const video = exerciseInfo?.video_url;
+                                return (
+                                  video && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVideoModal(video)}
+                                      className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    >
+                                      <Youtube className="w-4 h-4" />
+                                    </Button>
+                                  )
+                                );
+                              })()}
+                            </div>
+
+                            {/* Exercise Details */}
+                            <div className="flex flex-wrap gap-2">
+                              {(currentExercise?.meta?.superset_reps_b ||
+                                currentExercise?.meta?.superset_reps ||
+                                currentExercise?.superset_reps ||
+                                currentExercise?.reps) && (
+                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                  <span
+                                    className={`text-sm font-bold ${theme.text}`}
+                                  >
+                                    {String(
+                                      currentExercise?.meta?.superset_reps_b ??
+                                        currentExercise?.meta?.superset_reps ??
+                                        currentExercise?.superset_reps ??
+                                        currentExercise?.reps ??
+                                        "",
+                                    )}{" "}
+                                    reps
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Logging Fields */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label
+                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                                >
+                                  Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={supersetBWeight}
+                                  onChange={(e) =>
+                                    setSupersetBWeight(e.target.value)
+                                  }
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                  step="0.5"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                                >
+                                  Reps
+                                </label>
+                                <input
+                                  type="number"
+                                  value={supersetBReps}
+                                  onChange={(e) =>
+                                    setSupersetBReps(e.target.value)
+                                  }
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Previous Performance Card */}
+                      <div style={{ marginTop: "24px" }}>
+                        <PreviousPerformanceCard
+                          previousPerformance={previousPerformance}
+                          theme={theme}
                         />
-                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 fc-text-dim font-medium">
-                          kg
+                      </div>
+
+                      {/* Log Button */}
+                      <Button
+                        onClick={completeSuperset}
+                        className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
+                        style={{
+                          cursor: isLoggingSet ? "not-allowed" : "pointer",
+                          opacity: isLoggingSet ? 0.5 : 1,
+                        }}
+                        disabled={isLoggingSet}
+                      >
+                        <Check className="w-5 h-5 mr-2" /> Log{" "}
+                        {currentType === "superset"
+                          ? "Superset"
+                          : "Pre-Exhaustion"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Giant Set Flow */}
+                {currentType === "giant_set" && (
+                  <div className="fc-card-shell p-6 relative z-20">
+                    <div>
+                      <div
+                        className="flex items-center justify-between"
+                        style={{ marginBottom: "16px" }}
+                      >
+                        <div
+                          className={`text-base sm:text-xl font-bold ${theme.text}`}
+                        >
+                          Giant Set
+                        </div>
+                        <div className={`text-xs ${theme.textSecondary}`}>
+                          Set {currentSet} of {currentExercise?.sets || 1}
                         </div>
                       </div>
-                    </div>
-
-                    {/* Calculate Button */}
-                    <button
-                      onClick={() => {
-                        const weight = Number(targetWeight);
-                        if (weight > 0) {
-                          setShowPlateResults(true);
-                        }
-                      }}
-                      disabled={!targetWeight || Number(targetWeight) <= 0}
-                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Calculate
-                    </button>
-                  </div>
-                ) : (
-                  // Results Screen
-                  <div className="space-y-6">
-                    {(() => {
-                      const result = calculatePlateLoading(
-                        Number(targetWeight),
-                        selectedBarbell,
-                      );
-                      const selectedBarbellInfo = barbellOptions.find(
-                        (b) => b.weight === selectedBarbell,
-                      );
-
-                      if (
-                        result.option1.remainder > 0 ||
-                        result.option2.remainder > 0
-                      ) {
-                        // Impossible weight - show closest options
+                      {(
+                        (currentExercise?.meta?.giant_set_exercises ||
+                          currentExercise?.giant_set_exercises ||
+                          []) as any[]
+                      ).map((item: any, idx: number) => {
+                        const resolved = item.exercise_id
+                          ? exerciseLookup[item.exercise_id]
+                          : undefined;
+                        const displayName =
+                          resolved?.name || item.name || `Exercise ${idx + 1}`;
+                        const video = resolved?.video_url || item.video_url;
                         return (
-                          <div className="space-y-4">
-                            <div className="fc-card-shell fc-card-shell--error p-4 text-center">
-                              <div className="text-red-800 dark:text-red-200 font-semibold">
-                                Unable to load {targetWeight}kg exactly
+                          <div
+                            key={idx}
+                            className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
+                          >
+                            <div className="fc-card-shell p-4 space-y-3">
+                              {/* Header: name + video + number badge */}
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-400 to-red-500">
+                                  <span className="text-white font-bold text-sm">
+                                    {idx + 1}
+                                  </span>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-base sm:text-lg font-bold fc-text-primary">
+                                      {displayName}
+                                    </div>
+                                  </div>
+                                </div>
+                                {video && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openVideoModal(video)}
+                                    className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Youtube className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </div>
-                              <div className="text-red-600 dark:text-red-400 text-sm mt-1">
-                                Here are the closest options:
-                              </div>
-                            </div>
 
-                            {/* Lighter option */}
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
-                              <div className="text-center space-y-3">
-                                <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
-                                  Option 1:{" "}
-                                  {Number(targetWeight) -
-                                    result.option1.remainder * 2}
-                                  kg (
-                                  {(result.option1.remainder * 2).toFixed(2)}kg
-                                  lighter)
+                              {/* Exercise Details - Reps */}
+                              {item.reps && (
+                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                  <span
+                                    className={`text-sm font-bold ${theme.text}`}
+                                  >
+                                    {item.reps} reps
+                                  </span>
                                 </div>
-                                <div className="text-sm text-blue-700 dark:text-blue-200">
-                                  Load on each side:
-                                </div>
-                                <div className="flex flex-wrap items-center justify-center gap-2">
-                                  {result.option1.plates.map((plate, index) => (
-                                    <div
-                                      key={index}
-                                      className="flex items-center gap-1"
-                                    >
-                                      <div
-                                        className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
-                                      >
-                                        {/* Inner grey circle - smaller */}
-                                        <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                                          {/* Tiny black center */}
-                                          <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                        </div>
-                                      </div>
-                                      <span className="text-sm">
-                                        {plate.count} x {plate.weight}kg
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
+                              )}
 
-                            {/* Heavier option */}
-                            <div className="fc-card-shell fc-card-shell--success p-4">
-                              <div className="text-center space-y-3">
-                                <div className="text-lg font-bold text-green-800 dark:text-green-200">
-                                  Option 2:{" "}
-                                  {targetWeight + result.option1.remainder * 2}
-                                  kg (
-                                  {(result.option1.remainder * 2).toFixed(2)}kg
-                                  heavier)
+                              {/* Input Fields */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium fc-text-primary mb-1`}
+                                  >
+                                    Weight (kg)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={giantWeights[idx] || ""}
+                                    onChange={(e) =>
+                                      setGiantWeights((prev) =>
+                                        prev.map((w, i) =>
+                                          i === idx ? e.target.value : w,
+                                        ),
+                                      )
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500`}
+                                    step="0.5"
+                                  />
                                 </div>
-                                <div className="text-sm text-green-700 dark:text-green-200">
-                                  Load on each side:
-                                </div>
-                                <div className="flex flex-wrap items-center justify-center gap-2">
-                                  {result.option1.plates.map((plate, index) => (
-                                    <div
-                                      key={index}
-                                      className="flex items-center gap-1"
-                                    >
-                                      <div
-                                        className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
-                                      >
-                                        {/* Inner grey circle - smaller */}
-                                        <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                                          {/* Tiny black center */}
-                                          <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                        </div>
-                                      </div>
-                                      <span className="text-sm">
-                                        {plate.count} x {plate.weight}kg
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {result.option1.remainder > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <div className="w-3 h-3 bg-gray-400 rounded-full border border-gray-600 relative flex items-center justify-center">
-                                        {/* Inner grey circle */}
-                                        <div className="w-1.5 h-1.5 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                                          {/* Tiny black center */}
-                                          <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                        </div>
-                                      </div>
-                                      <span className="text-sm">
-                                        1 x 1.25kg
-                                      </span>
-                                    </div>
-                                  )}
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium fc-text-primary mb-1`}
+                                  >
+                                    Reps
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={giantReps[idx] || ""}
+                                    readOnly
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold`}
+                                  />
                                 </div>
                               </div>
                             </div>
                           </div>
                         );
-                      }
+                      })}
 
-                      // Exact match - show 2 best loading options
-                      return (
-                        <div className="space-y-6">
-                          {/* Total Weight Display */}
-                          <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
-                            <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                              Total: {targetWeight}kg
+                      {/* Previous Performance Card */}
+                      <div style={{ marginTop: "24px" }}>
+                        <PreviousPerformanceCard
+                          previousPerformance={previousPerformance}
+                          theme={theme}
+                        />
+                      </div>
+
+                      <Button
+                        onClick={completeGiantSet}
+                        className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
+                        style={{
+                          cursor: isLoggingSet ? "not-allowed" : "pointer",
+                          opacity: isLoggingSet ? 0.5 : 1,
+                        }}
+                        disabled={isLoggingSet}
+                      >
+                        Log Giant Set
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {/* Standard Exercise Types - Modern Style */}
+                {currentType !== "giant_set" &&
+                  currentType !== "tabata" &&
+                  currentType !== "amrap" &&
+                  currentType !== "emom" &&
+                  currentType !== "for_time" &&
+                  currentType !== "superset" &&
+                  currentType !== "pre_exhaustion" &&
+                  currentType !== "cluster_set" &&
+                  currentType !== "rest_pause" && (
+                    <div className="fc-card-shell p-6">
+                      <div>
+                        {/* Header */}
+                        <div
+                          className="flex items-center justify-between"
+                          style={{ marginBottom: "16px" }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`text-base sm:text-xl font-bold ${theme.text}`}
+                            >
+                              {currentType === "straight_set"
+                                ? "Straight Set"
+                                : currentType === "drop_set"
+                                  ? "Drop Set"
+                                  : currentType === "cluster_set"
+                                    ? "Cluster Set"
+                                    : currentType === "rest_pause"
+                                      ? "Rest Pause"
+                                      : "Exercise"}
                             </div>
-                            <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                              Using {selectedBarbell}kg{" "}
-                              {selectedBarbellInfo?.name} (
-                              {selectedBarbellInfo?.type === "straight"
-                                ? "📏"
-                                : "🌀"}
-                              )
-                            </div>
-                          </div>
-
-                          {/* Option 1 - Recommended */}
-                          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
-                            <div className="text-center space-y-4">
-                              <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
-                                Option 1 (Recommended):
-                              </div>
-
-                              {/* Visual Barbell Display */}
-                              <div className="p-3 bg-[color:var(--fc-glass-highlight)] rounded-lg">
-                                <div className="text-center text-xs font-medium fc-text-dim mb-2">
-                                  Load on each side:
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  {/* Left side plates */}
-                                  <div className="flex items-center space-x-1">
-                                    {result.option1.plates
-                                      .map((plate, index) => {
-                                        const size =
-                                          plate.weight >= 20
-                                            ? "w-6 h-6"
-                                            : plate.weight >= 10
-                                              ? "w-5 h-5"
-                                              : "w-4 h-4";
-                                        const innerSize =
-                                          plate.weight >= 20
-                                            ? "w-3 h-3"
-                                            : plate.weight >= 10
-                                              ? "w-2.5 h-2.5"
-                                              : "w-1.5 h-1.5";
-                                        return Array.from(
-                                          { length: plate.count },
-                                          (_, i) => (
-                                            <div
-                                              key={`left-${index}-${i}`}
-                                              className="flex flex-col items-center"
-                                            >
-                                              <div
-                                                className={`${size} ${plate.color} rounded-full border-2 ${plate.border} relative flex items-center justify-center`}
-                                              >
-                                                {/* Inner grey circle - smaller */}
-                                                <div
-                                                  className={`${innerSize} bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center`}
-                                                >
-                                                  {/* Tiny black center */}
-                                                  <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                                </div>
-                                              </div>
-                                              <div className="text-xs font-medium fc-text-dim mt-1">
-                                                {plate.weight}
-                                              </div>
-                                            </div>
-                                          ),
-                                        );
-                                      })
-                                      .flat()}
-                                  </div>
-
-                                  {/* Barbell shaft - aligned with black dots */}
-                                  <div className="flex-1 h-0.5 bg-[color:var(--fc-glass-border)] mx-3 rounded relative">
-                                    {/* Align barbell with the center of plates (black dots) */}
-                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[color:var(--fc-glass-border)] rounded"></div>
-                                  </div>
-
-                                  {/* Right side plates */}
-                                  <div className="flex items-center space-x-1">
-                                    {result.option1.plates
-                                      .map((plate, index) => {
-                                        const size =
-                                          plate.weight >= 20
-                                            ? "w-6 h-6"
-                                            : plate.weight >= 10
-                                              ? "w-5 h-5"
-                                              : "w-4 h-4";
-                                        const innerSize =
-                                          plate.weight >= 20
-                                            ? "w-3 h-3"
-                                            : plate.weight >= 10
-                                              ? "w-2.5 h-2.5"
-                                              : "w-1.5 h-1.5";
-                                        return Array.from(
-                                          { length: plate.count },
-                                          (_, i) => (
-                                            <div
-                                              key={`right-${index}-${i}`}
-                                              className="flex flex-col items-center"
-                                            >
-                                              <div
-                                                className={`${size} ${plate.color} rounded-full border-2 ${plate.border} relative flex items-center justify-center`}
-                                              >
-                                                {/* Inner grey circle - smaller */}
-                                                <div
-                                                  className={`${innerSize} bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center`}
-                                                >
-                                                  {/* Tiny black center */}
-                                                  <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                                </div>
-                                              </div>
-                                              <div className="text-xs font-medium fc-text-dim mt-1">
-                                                {plate.weight}
-                                              </div>
-                                            </div>
-                                          ),
-                                        );
-                                      })
-                                      .flat()}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Simple Text Breakdown */}
-                              <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-                                {result.option1.plates.map((plate, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center gap-1"
-                                  >
-                                    <div
-                                      className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
-                                    >
-                                      {/* Inner grey circle - smaller */}
-                                      <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                                        {/* Tiny black center */}
-                                        <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                      </div>
-                                    </div>
-                                    <span className="text-blue-700 dark:text-blue-200">
-                                      {plate.count} x {plate.weight}kg
-                                    </span>
-                                    {index <
-                                      result.option1.plates.length - 1 && (
-                                      <span className="text-blue-600 dark:text-blue-300 mx-1">
-                                        +
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                                <span className="text-blue-600 dark:text-blue-300 mx-1">
-                                  = {targetWeight}kg
+                            {currentExercise?.rest_seconds && (
+                              <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
+                                <span
+                                  className={`text-xs font-semibold ${theme.text}`}
+                                >
+                                  Rest: {currentExercise.rest_seconds}s
                                 </span>
                               </div>
-                            </div>
+                            )}
                           </div>
-
-                          {/* Option 2 - Alternative */}
-                          <div className="fc-card-shell fc-card-shell--success p-4">
-                            <div className="text-center space-y-3">
-                              <div className="text-lg font-bold text-green-800 dark:text-green-200">
-                                Option 2 (Alternative):
-                              </div>
-
-                              {/* Simple Text Breakdown */}
-                              <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-                                {result.option2.plates.map((plate, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center gap-1"
-                                  >
-                                    <div
-                                      className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
-                                    >
-                                      {/* Inner grey circle - smaller */}
-                                      <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
-                                        {/* Tiny black center */}
-                                        <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
-                                      </div>
-                                    </div>
-                                    <span className="text-green-700 dark:text-green-200">
-                                      {plate.count} x {plate.weight}kg
-                                    </span>
-                                    {index <
-                                      result.option2.plates.length - 1 && (
-                                      <span className="text-green-600 dark:text-green-300 mx-1">
-                                        +
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                                <span className="text-green-600 dark:text-green-300 mx-1">
-                                  = {targetWeight}kg
-                                </span>
-                              </div>
-                            </div>
+                          <div className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
+                            <span className={`text-sm font-bold ${theme.text}`}>
+                              Set {currentSet} of {currentExercise?.sets || 1}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })()}
 
-                    {/* Back Button */}
-                    <button
-                      onClick={() => setShowPlateResults(false)}
-                      className="w-full py-3 bg-[color:var(--fc-glass-highlight)] fc-text-primary font-medium rounded-xl hover:bg-[color:var(--fc-glass-soft)] transition-all"
+                        {/* Exercise Name and Actions */}
+                        <div
+                          className="flex items-start"
+                          style={{ gap: "12px", marginBottom: "16px" }}
+                        >
+                          <div
+                            style={{
+                              width: "56px",
+                              height: "56px",
+                              borderRadius: "18px",
+                              background: "var(--fc-domain-workouts)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Dumbbell className="w-8 h-8 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="text-xl font-bold fc-text-primary">
+                                {currentExercise.exercise?.name || "Exercise"}
+                              </div>
+                            </div>
+                            <div
+                              className="flex flex-wrap"
+                              style={{ gap: "8px" }}
+                            >
+                              {targetReps && (
+                                <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
+                                  <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
+                                    {targetReps} reps
+                                  </span>
+                                </div>
+                              )}
+                              {(currentExercise?.rir ||
+                                currentExercise?.rir === 0) && (
+                                <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-warning)]/20">
+                                  <span className="text-sm font-semibold text-[color:var(--fc-status-warning)]">
+                                    RPE: {Number(currentExercise.rir)}
+                                  </span>
+                                </div>
+                              )}
+                              {currentExercise?.exercise_id != null &&
+                                currentExercise?.load_percentage != null &&
+                                (() => {
+                                  const text = getSuggestedWeightText(
+                                    currentExercise.exercise_id,
+                                    Number(
+                                      currentExercise.load_percentage ?? 0,
+                                    ),
+                                  );
+                                  return text ? (
+                                    <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-success)]/20">
+                                      <span className="text-sm font-semibold text-[color:var(--fc-status-success)]">
+                                        {String(text)}
+                                      </span>
+                                    </div>
+                                  ) : null;
+                                })()}
+                              {currentExercise?.tempo != null &&
+                                currentExercise.tempo !== "" && (
+                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
+                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
+                                      Tempo: {String(currentExercise.tempo)}
+                                    </span>
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                          {currentExercise.exercise?.video_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                openVideoModal(
+                                  currentExercise.exercise?.video_url || "",
+                                )
+                              }
+                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              <Youtube className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Logging Fields */}
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[color:var(--fc-glass-border)]">
+                          <div>
+                            <label className="block text-sm font-semibold fc-text-dim mb-2">
+                              {currentType === "drop_set"
+                                ? "Working Weight (kg)"
+                                : "Weight (kg)"}
+                            </label>
+                            <input
+                              type="number"
+                              value={
+                                currentSetData.weight === 0
+                                  ? ""
+                                  : currentSetData.weight
+                              }
+                              onChange={(e) =>
+                                setCurrentSetData((prev) => ({
+                                  ...prev,
+                                  weight: parseFloat(e.target.value) || 0,
+                                }))
+                              }
+                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                              style={{
+                                width: "100%",
+                                height: "56px",
+                                textAlign: "center" as const,
+                              }}
+                              step="0.5"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold fc-text-dim mb-2">
+                              Reps
+                            </label>
+                            <input
+                              type="number"
+                              value={
+                                currentSetData.reps === 0
+                                  ? ""
+                                  : currentSetData.reps
+                              }
+                              onChange={(e) =>
+                                setCurrentSetData((prev) => ({
+                                  ...prev,
+                                  reps: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                              style={{
+                                width: "100%",
+                                height: "56px",
+                                textAlign: "center" as const,
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Drop Set - Second Set Fields */}
+                        {currentType === "drop_set" && (
+                          <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calculator className="w-3 h-3 text-orange-500" />
+                              <span className="text-xs font-medium fc-text-dim">
+                                Drop Set (Second Set)
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-xs fc-text-dim mb-1">
+                                  Drop Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={dropWeight === "" ? "" : dropWeight}
+                                  onChange={(e) =>
+                                    setDropWeight(e.target.value)
+                                  }
+                                  className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
+                                  step="0.5"
+                                  placeholder={
+                                    currentSetData.weight > 0
+                                      ? (
+                                          currentSetData.weight *
+                                          (1 -
+                                            (Number(
+                                              currentExercise?.meta
+                                                ?.drop_percentage,
+                                            ) ||
+                                              Number(
+                                                currentExercise?.drop_percentage,
+                                              ) ||
+                                              0) /
+                                              100)
+                                        ).toFixed(1)
+                                      : "Auto"
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs fc-text-dim mb-1">
+                                  Reps
+                                </label>
+                                <input
+                                  type="number"
+                                  value={dropReps === 0 ? "" : dropReps}
+                                  onChange={(e) =>
+                                    setDropReps(parseInt(e.target.value) || 0)
+                                  }
+                                  className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Previous Performance Card */}
+                        <div style={{ marginTop: "24px" }}>
+                          <PreviousPerformanceCard
+                            previousPerformance={previousPerformance}
+                            theme={theme}
+                          />
+                        </div>
+
+                        {/* Log Button */}
+                        <Button
+                          onClick={completeSet}
+                          className="w-full min-h-[44px] py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none"
+                          style={{
+                            width: "100%",
+                            cursor:
+                              currentSetData.weight <= 0 ||
+                              currentSetData.reps <= 0 ||
+                              isLoggingSet
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity:
+                              currentSetData.weight <= 0 ||
+                              currentSetData.reps <= 0 ||
+                              isLoggingSet
+                                ? 0.5
+                                : 1,
+                            marginTop: "24px",
+                          }}
+                          disabled={
+                            currentSetData.weight <= 0 ||
+                            currentSetData.reps <= 0 ||
+                            isLoggingSet
+                          }
+                        >
+                          <Check className="w-5 h-5 mr-2" /> Log Set
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Simple Navigation */}
+                {exercises.length > 1 && (
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setCurrentExerciseIndex(
+                          Math.max(0, currentExerciseIndex - 1),
+                        )
+                      }
+                      disabled={currentExerciseIndex === 0}
+                      className="flex-1 mr-2"
                     >
-                      Calculate New Weight
-                    </button>
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Previous
+                    </Button>
+
+                    <div className="text-center px-4">
+                      <div className="text-sm fc-text-dim">Exercise</div>
+                      <div className="text-lg font-bold">
+                        {currentExerciseIndex + 1} / {exercises.length}
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setCurrentExerciseIndex(
+                          Math.min(
+                            exercises.length - 1,
+                            currentExerciseIndex + 1,
+                          ),
+                        )
+                      }
+                      disabled={currentExerciseIndex === exercises.length - 1}
+                      className="flex-1 ml-2"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Workout Completion Modal */}
-        {showWorkoutCompletion && (
-          <div
-            style={{
-              position: "fixed",
-              inset: "0",
-              backgroundColor: "rgba(0, 0, 0, 0.8)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 50,
-              padding: "16px",
-            }}
-          >
-            <div className="fc-surface rounded-3xl w-full max-w-[448px] max-h-[90vh] overflow-hidden border-0 shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
-              <div style={{ padding: "32px", textAlign: "center" }}>
-                {/* Celebration Header */}
-                <div style={{ marginBottom: "24px" }}>
-                  <div className="w-20 h-20 rounded-full bg-[color:var(--fc-status-success)] flex items-center justify-center mx-auto mb-4 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
-                    <Trophy className="w-10 h-10 text-white" />
-                  </div>
-                  <h2 className="text-3xl font-extrabold fc-text-primary leading-tight mb-2">
-                    Workout Complete! 🎉
-                  </h2>
-                  <p className="text-base font-normal fc-text-dim">
-                    Amazing work! You crushed this workout!
-                  </p>
+            ) : (
+              <ClientGlassCard className="p-12 text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <AlertTriangle className="w-10 h-10 text-white" />
                 </div>
-
-                {/* Weight Lifted Highlight */}
-                <div className="p-6 rounded-3xl border-2 border-[color:var(--fc-status-error)] mb-6 text-center bg-[color:var(--fc-status-warning)]/30">
-                  <div className="text-4xl font-extrabold fc-text-primary leading-tight mb-2">
-                    {workoutStats.totalWeightLifted.toLocaleString()} kg
-                  </div>
-                  <div className="text-lg font-semibold fc-text-primary">
-                    Total Weight Lifted
-                  </div>
-                </div>
-
-                {/* Performance Stats */}
-                <div style={{ marginBottom: "32px" }}>
-                  <div className="grid grid-cols-3" style={{ gap: "12px" }}>
-                    <div className="fc-card-shell p-4 text-center">
-                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
-                        {(() => {
-                          console.log(
-                            "🕐 [Duration Debug] Modal displaying totalTime:",
-                            {
-                              totalTime: workoutStats.totalTime,
-                              unit: "minutes",
-                            },
-                          );
-                          return workoutStats.totalTime;
-                        })()}
-                      </div>
-                      <div className="text-xs font-normal fc-text-dim">
-                        Minutes
-                      </div>
-                    </div>
-                    <div className="fc-card-shell p-4 text-center">
-                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
-                        {workoutStats.exercisesCompleted}
-                      </div>
-                      <div className="text-xs font-normal fc-text-dim">
-                        Exercises
-                      </div>
-                    </div>
-                    <div className="fc-card-shell fc-card-shell--error p-4 text-center">
-                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
-                        {workoutStats.totalSets}
-                      </div>
-                      <div className="text-xs font-normal fc-text-dim">
-                        Total Sets
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
+                <h3 className="text-2xl font-bold fc-text-primary mb-3">
+                  No exercises found
+                </h3>
+                <p className="fc-text-dim mb-6">
+                  This workout doesn&apos;t have any exercises assigned.
+                </p>
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  className="h-10 w-auto"
+                  onClick={() => {
+                    window.location.href = "/client/train";
                   }}
                 >
-                  <Button
-                    disabled={isCompletingWorkout}
-                    onClick={async () => {
-                      console.log(
-                        "🔘 Completion modal button clicked - View Progress",
-                      );
-                      setShowWorkoutCompletion(false);
-                      await completeWorkout();
-                      // completeWorkout() already navigates to complete page
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-4 px-8 rounded-[20px] border-none bg-[color:var(--fc-status-success)] text-white text-base font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-70"
-                    style={{
-                      cursor: isCompletingWorkout ? "not-allowed" : "pointer",
-                      opacity: isCompletingWorkout ? 0.7 : 1,
-                    }}
-                  >
-                    {isCompletingWorkout ? (
-                      <>
-                        <Loader2
-                          style={{ width: "20px", height: "20px" }}
-                          className="animate-spin"
-                        />
-                        Completing…
-                      </>
-                    ) : (
-                      <>
-                        <Trophy style={{ width: "20px", height: "20px" }} />
-                        View Progress
-                      </>
-                    )}
-                  </Button>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Workouts
+                </Button>
+              </ClientGlassCard>
+            )}
 
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowWorkoutCompletion(false);
-                      window.location.href = "/client/train";
-                    }}
-                    className="fc-card-shell w-full py-4 px-8 text-[color:var(--fc-accent-primary)] font-semibold flex items-center justify-center"
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
+            {/* Full-Screen Timer Modal for Tabata */}
+            {showTimerModal && currentType === "tabata" && (
+              <div
+                className={`fixed inset-0 z-[9999] transition-colors duration-500 ${
+                  intervalPhase === "work"
+                    ? "bg-red-900/95"
+                    : intervalPhase === "rest_after_set"
+                      ? "bg-purple-900/95"
+                      : "bg-blue-900/95"
+                }`}
+              >
+                <div className="h-full flex flex-col items-center justify-center p-4">
+                  {/* Segment Counter */}
+                  <div className="absolute top-8 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-2">
+                      <span className="text-white font-semibold text-lg">
+                        {(() => {
+                          const raw = currentExercise?.meta?.tabata_sets ?? [];
+                          const intervalSets = Array.isArray(raw) ? raw : [];
 
-                {/* Motivational Message */}
-                <div className="mt-6 p-4 rounded-3xl border-2 border-[color:var(--fc-status-error)] bg-[color:var(--fc-status-warning)]/20">
-                  <p className="text-sm font-semibold fc-text-primary text-center">
-                    💪 Keep pushing! Every workout makes you stronger!
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                          // Calculate segments per round
+                          let segmentsPerRound = 0;
+                          intervalSets.forEach((set: any) => {
+                            const exercisesInSet = set?.exercises?.length || 0;
+                            // Each exercise has: work + rest
+                            segmentsPerRound += exercisesInSet * 2;
+                            // Each set (except the last one) has: rest_after_set
+                            // Actually, every set except the last set of the last round has rest_after_set
+                            // For counting purposes, we'll add it for all sets and subtract later if needed
+                          });
+                          // Add rest_after_set for each set
+                          segmentsPerRound += intervalSets.length;
 
-        {/* Drop Set Calculator Modal */}
-        {showDropSetCalculator && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
-              <div className="p-6">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
-                      <Calculator className="w-4 h-4 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold fc-text-primary">
-                      Drop Set Calculator
-                    </h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowDropSetCalculator(false)}
-                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
-                </div>
+                          const totalSegments =
+                            segmentsPerRound * intervalTotalRounds - 1; // -1 because last set of last round has no rest_after_set
 
-                <div className="space-y-6">
-                  {/* Working Weight Input */}
-                  <div>
-                    <label className="text-sm font-medium fc-text-dim mb-2 block">
-                      Working Weight (kg):
-                    </label>
-                    <input
-                      type="number"
-                      value={
-                        currentSetData.weight === 0 ? "" : currentSetData.weight
-                      }
-                      onChange={(e) =>
-                        setCurrentSetData((prev) => ({
-                          ...prev,
-                          weight: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]"
-                      step="0.5"
-                      placeholder="Enter weight"
-                    />
-                  </div>
+                          // Calculate current segment
+                          let currentSegment = intervalRound * segmentsPerRound;
 
-                  {/* Calculator Result */}
-                  <div className="rounded-xl p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Calculator className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <span className="text-sm font-semibold fc-text-primary">
-                        Auto-calculated drop weight:
+                          // Add segments from completed sets in current round
+                          for (let s = 0; s < timerSetIndex; s++) {
+                            const exercisesInSet =
+                              intervalSets[s]?.exercises?.length || 0;
+                            currentSegment += exercisesInSet * 2 + 1; // work + rest per exercise + rest_after_set
+                          }
+
+                          // Add segments from current set
+                          const currentSet = intervalSets[timerSetIndex];
+                          const exercisesBeforeCurrent = timerExerciseIndex;
+                          currentSegment += exercisesBeforeCurrent * 2; // work + rest for each completed exercise
+
+                          // Add current phase
+                          if (intervalPhase === "work") {
+                            currentSegment += 1;
+                          } else if (intervalPhase === "rest") {
+                            currentSegment += 2;
+                          } else if (intervalPhase === "rest_after_set") {
+                            const exercisesInCurrentSet =
+                              currentSet?.exercises?.length || 0;
+                            currentSegment += exercisesInCurrentSet * 2 + 1;
+                          }
+
+                          return `${currentSegment} / ${totalSegments}`;
+                        })()}
                       </span>
                     </div>
-                    {currentSetData.weight > 0 ? (
-                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                        {(
-                          currentSetData.weight *
-                          (1 -
-                            (Number(currentExercise?.meta?.drop_percentage) ||
-                              Number(currentExercise?.drop_percentage) ||
-                              0) /
-                              100)
-                        ).toFixed(1)}
-                        kg
+                  </div>
+
+                  {/* Main Timer Display */}
+                  <div className="text-center flex-1 flex flex-col justify-center items-center">
+                    {/* Current Exercise Info */}
+                    {
+                      (() => {
+                        const sets = currentExercise?.meta?.tabata_sets;
+                        if (!Array.isArray(sets)) return null;
+                        const set = (sets as unknown[])[timerSetIndex] as
+                          | { exercises?: unknown[] }
+                          | undefined;
+                        if (!set?.exercises?.length) return null;
+                        return (
+                          <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-8 py-6 max-w-md mb-12">
+                            <div className="text-2xl font-bold text-white mb-2">
+                              {(() => {
+                                const setsArr = sets as unknown[];
+                                const currentExerciseInSet = (
+                                  setsArr[timerSetIndex] as {
+                                    exercises?: Array<{ exercise_id?: string }>;
+                                  }
+                                )?.exercises?.[timerExerciseIndex];
+                                return (
+                                  exerciseLookup[
+                                    currentExerciseInSet?.exercise_id ?? ""
+                                  ]?.name || "Exercise"
+                                );
+                              })()}
+                            </div>
+                            {intervalPhase === "work" && (
+                              <div className="text-lg text-gray-200">
+                                {(
+                                  (sets as unknown[])[timerSetIndex] as {
+                                    exercises?: Array<{
+                                      work_seconds?: number;
+                                    }>;
+                                  }
+                                )?.exercises?.[timerExerciseIndex]?.work_seconds
+                                  ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ work_seconds?: number }> }).exercises[timerExerciseIndex].work_seconds}s work`
+                                  : (sets as unknown[])[timerSetIndex] !=
+                                        null &&
+                                      (
+                                        (sets as unknown[])[timerSetIndex] as {
+                                          exercises?: Array<{
+                                            target_reps?: number;
+                                          }>;
+                                        }
+                                      )?.exercises?.[timerExerciseIndex]
+                                        ?.target_reps != null
+                                    ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ target_reps?: number }> }).exercises[timerExerciseIndex].target_reps} reps`
+                                    : "Work phase"}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })() as React.ReactNode
+                    }
+
+                    {/* Phase Indicator */}
+                    <div
+                      className={`mb-8 px-8 py-4 rounded-2xl ${
+                        intervalPhase === "work"
+                          ? "bg-red-600/30 border-2 border-red-400"
+                          : intervalPhase === "rest_after_set"
+                            ? "bg-purple-600/30 border-2 border-purple-400"
+                            : "bg-blue-600/30 border-2 border-blue-400"
+                      }`}
+                    >
+                      <div className="text-4xl sm:text-5xl font-black text-white">
+                        {intervalPhase === "work"
+                          ? "WORK"
+                          : intervalPhase === "rest_after_set"
+                            ? "REST AFTER SET"
+                            : "REST"}
                       </div>
-                    ) : (
-                      <div className="fc-text-dim">
-                        Enter working weight to see calculation
-                      </div>
-                    )}
-                    <div className="text-xs fc-text-dim mt-1">
-                      Drop percentage:{" "}
-                      {Number(currentExercise?.meta?.drop_percentage) ||
-                        Number(currentExercise?.drop_percentage) ||
-                        0}
-                      %
                     </div>
-                  </div>
 
-                  {/* Manual Override */}
-                  <div>
-                    <label className="text-sm font-medium fc-text-dim mb-2 block">
-                      Manual Drop Weight (kg):
-                    </label>
-                    <input
-                      type="number"
-                      value={dropWeight === "" ? "" : dropWeight}
-                      onChange={(e) => setDropWeight(e.target.value)}
-                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-glass-border)] fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-accent-primary)]"
-                      step="0.5"
-                      placeholder="Override calculated weight"
-                    />
-                    <p className="text-xs fc-text-dim mt-1">
-                      Leave empty to use auto-calculated weight
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cluster Timer Modal */}
-        {showClusterTimer && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
-              <div className="p-6">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center">
-                      <Clock className="w-4 h-4 text-white" />
+                    {/* Large Timer */}
+                    <div
+                      className={`text-9xl sm:text-[12rem] font-black mb-8 ${
+                        intervalPhase === "work"
+                          ? "text-red-100"
+                          : "text-blue-100"
+                      }`}
+                    >
+                      {Math.floor(intervalPhaseLeft / 60)
+                        .toString()
+                        .padStart(2, "0")}
+                      :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
                     </div>
-                    <h3 className="text-xl font-bold fc-text-primary">
-                      Cluster Rest Timer
-                    </h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowClusterTimer(false)}
-                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
-                </div>
 
-                <div className="text-center space-y-6">
-                  {/* Timer Display */}
-                  <div className="fc-card-shell fc-card-shell--success p-8">
-                    <div className="text-6xl font-extrabold text-green-600 dark:text-green-400 mb-2">
-                      {Number(currentExercise?.meta?.intra_cluster_rest) ||
-                        Number(currentExercise?.intra_cluster_rest) ||
-                        0}
-                    </div>
-                    <div className="text-lg font-semibold fc-text-dim">
-                      seconds rest
-                    </div>
+                    {/* Next Exercise Preview */}
+                    {currentExercise?.meta?.tabata_sets &&
+                      (
+                        (currentExercise.meta.tabata_sets as unknown[])[
+                          timerSetIndex
+                        ] as
+                          | { exercises?: Array<{ exercise_id?: string }> }
+                          | undefined
+                      )?.exercises && (
+                        <div className="mb-4">
+                          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
+                            <div className="text-sm text-gray-300 mb-1">
+                              Next:
+                            </div>
+                            <div className="text-lg font-semibold text-white">
+                              {timerExerciseIndex + 1 <
+                              (
+                                (currentExercise.meta.tabata_sets as unknown[])[
+                                  timerSetIndex
+                                ] as {
+                                  exercises: Array<{ exercise_id?: string }>;
+                                }
+                              ).exercises.length
+                                ? exerciseLookup[
+                                    (
+                                      (
+                                        currentExercise.meta
+                                          .tabata_sets as unknown[]
+                                      )[timerSetIndex] as {
+                                        exercises: Array<{
+                                          exercise_id?: string;
+                                        }>;
+                                      }
+                                    ).exercises[timerExerciseIndex + 1]
+                                      ?.exercise_id ?? ""
+                                  ]?.name || "Next Exercise"
+                                : timerSetIndex + 1 <
+                                    (
+                                      currentExercise.meta
+                                        .tabata_sets as unknown[]
+                                    ).length
+                                  ? "Next Set"
+                                  : "Break"}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                   </div>
 
-                  {/* Instructions */}
-                  <div className="text-sm fc-text-dim">
-                    Use this timer between each cluster set. Tap start to begin
-                    the countdown.
-                  </div>
-
-                  {/* Timer Controls */}
-                  <div className="flex gap-3 justify-center">
-                    <PrimaryButton
+                  {/* Control Buttons */}
+                  <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 items-center">
+                    {/* Previous Button */}
+                    <Button
                       onClick={() => {
-                        // TODO: Implement timer start logic
-                        console.log("Starting cluster rest timer");
+                        const intervalSets = currentExercise?.meta?.tabata_sets;
+
+                        if (intervalPhase === "work") {
+                          // Work -> Previous Rest (or Previous Rest After Set)
+                          if (timerExerciseIndex > 0) {
+                            // Go to rest of previous exercise in same set
+                            setTimerExerciseIndex((prev) => prev - 1);
+                            const currentSet = intervalSets?.[timerSetIndex];
+                            const prevExercise =
+                              currentSet?.exercises?.[timerExerciseIndex - 1];
+                            const restTime = prevExercise?.rest_after || 10;
+                            setIntervalPhase("rest");
+                            setIntervalPhaseLeft(restTime);
+                          } else if (timerSetIndex > 0) {
+                            // First exercise in set - go to rest_after_set of previous set
+                            setTimerSetIndex((prev) => prev - 1);
+                            const prevSet = intervalSets?.[timerSetIndex - 1];
+                            const restAfterSetTime =
+                              Number(prevSet?.rest_between_sets) || 30;
+                            setIntervalPhase("rest_after_set");
+                            setIntervalPhaseLeft(restAfterSetTime);
+                          } else if (intervalRound > 0) {
+                            // First exercise of first set - go to rest_after_set of last set of previous round
+                            setIntervalRound((prev) => prev - 1);
+                            const lastSetIndex = intervalSets.length - 1;
+                            const lastSet = intervalSets?.[lastSetIndex];
+                            const restAfterSetTime =
+                              Number(lastSet?.rest_between_sets) || 30;
+                            setTimerSetIndex(lastSetIndex);
+                            setTimerExerciseIndex(0);
+                            setIntervalPhase("rest_after_set");
+                            setIntervalPhaseLeft(restAfterSetTime);
+                          }
+                        } else if (intervalPhase === "rest") {
+                          // Rest -> Work (same exercise)
+                          const currentSet = intervalSets?.[timerSetIndex];
+                          const currentExerciseInSet =
+                            currentSet?.exercises?.[timerExerciseIndex];
+                          const workTime =
+                            currentExerciseInSet?.work_seconds || 20;
+                          setIntervalPhase("work");
+                          setIntervalPhaseLeft(workTime);
+                        } else if (intervalPhase === "rest_after_set") {
+                          // Rest After Set -> Rest (last exercise of current set)
+                          const currentSet = intervalSets?.[timerSetIndex];
+                          const lastExerciseIndex =
+                            (currentSet?.exercises?.length || 1) - 1;
+                          const lastExercise =
+                            currentSet?.exercises?.[lastExerciseIndex];
+                          const restTime = lastExercise?.rest_after || 10;
+                          setTimerExerciseIndex(lastExerciseIndex);
+                          setIntervalPhase("rest");
+                          setIntervalPhaseLeft(restTime);
+                        }
                       }}
-                      className="w-auto px-8 py-3"
+                      variant="outline"
+                      size="sm"
+                      className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm"
+                      disabled={
+                        timerExerciseIndex === 0 &&
+                        timerSetIndex === 0 &&
+                        intervalRound === 0 &&
+                        intervalPhase === "work"
+                      }
                     >
-                      <Play className="w-4 h-4 mr-2" />
-                      Start Timer
-                    </PrimaryButton>
-                    <SecondaryButton
-                      onClick={() => setShowClusterTimer(false)}
-                      className="w-auto px-8 py-3"
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+
+                    {/* Play/Pause Button */}
+                    <Button
+                      onClick={() => setIsTimerPaused(!isTimerPaused)}
+                      variant="outline"
+                      size="lg"
+                      className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm px-8 py-3 text-lg"
                     >
-                      Close
-                    </SecondaryButton>
+                      {isTimerPaused ? (
+                        <Play className="w-6 h-6" />
+                      ) : (
+                        <div className="flex gap-1">
+                          <div className="w-2 h-6 bg-white"></div>
+                          <div className="w-2 h-6 bg-white"></div>
+                        </div>
+                      )}
+                    </Button>
+
+                    {/* Next Button */}
+                    <Button
+                      onClick={() => {
+                        const intervalSets = currentExercise?.meta?.tabata_sets;
+
+                        if (intervalPhase === "work") {
+                          // Work -> Rest (same exercise)
+                          const currentSet = intervalSets?.[timerSetIndex];
+                          const currentExerciseInSet =
+                            currentSet?.exercises?.[timerExerciseIndex];
+                          const restTime =
+                            currentExerciseInSet?.rest_after || 10;
+                          setIntervalPhase("rest");
+                          setIntervalPhaseLeft(restTime);
+                        } else if (intervalPhase === "rest") {
+                          // Rest -> Next Work (or Rest After Set)
+                          const currentSet = intervalSets?.[timerSetIndex];
+                          const isLastExerciseInSet =
+                            timerExerciseIndex ===
+                            (currentSet?.exercises?.length || 1) - 1;
+
+                          if (!isLastExerciseInSet) {
+                            // More exercises in set - go to next exercise work
+                            setTimerExerciseIndex((prev) => prev + 1);
+                            const nextExercise =
+                              currentSet?.exercises?.[timerExerciseIndex + 1];
+                            const workTime = nextExercise?.work_seconds || 20;
+                            setIntervalPhase("work");
+                            setIntervalPhaseLeft(workTime);
+                          } else {
+                            // Last exercise in set - check if we should show rest_after_set
+                            const isLastSetInRound =
+                              timerSetIndex === intervalSets.length - 1;
+                            const nextRound = intervalRound + 1;
+                            const isLastRound =
+                              nextRound >= intervalTotalRounds;
+
+                            if (!isLastSetInRound || !isLastRound) {
+                              // Show rest after set
+                              const restAfterSetTime =
+                                Number(currentSet?.rest_between_sets) || 30;
+                              setIntervalPhase("rest_after_set");
+                              setIntervalPhaseLeft(restAfterSetTime);
+                            } else {
+                              // Last set of last round - workout complete
+                              setIntervalActive(false);
+                              setShowTimerModal(false);
+                            }
+                          }
+                        } else if (intervalPhase === "rest_after_set") {
+                          // Rest After Set -> Work (first exercise of next set or next round)
+                          const isLastSetInRound =
+                            timerSetIndex === intervalSets.length - 1;
+
+                          if (isLastSetInRound) {
+                            // Start next round
+                            setIntervalRound((prev) => prev + 1);
+                            setTimerSetIndex(0);
+                            setTimerExerciseIndex(0);
+                            const firstSet = intervalSets?.[0];
+                            const firstExercise = firstSet?.exercises?.[0];
+                            const workTime = firstExercise?.work_seconds || 20;
+                            setIntervalPhase("work");
+                            setIntervalPhaseLeft(workTime);
+                          } else {
+                            // Move to next set
+                            setTimerSetIndex((prev) => prev + 1);
+                            setTimerExerciseIndex(0);
+                            const nextSet = intervalSets?.[timerSetIndex + 1];
+                            const firstExercise = nextSet?.exercises?.[0];
+                            const workTime = firstExercise?.work_seconds || 20;
+                            setIntervalPhase("work");
+                            setIntervalPhaseLeft(workTime);
+                          }
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="border-white/50 text-white hover:bg-white hover:text-black bg-white/10 backdrop-blur-sm"
+                    >
+                      <ArrowLeft className="w-4 h-4 rotate-180" />
+                    </Button>
+
+                    {/* Stop Button */}
+                    <Button
+                      onClick={() => {
+                        setShowTimerModal(false);
+                        setIntervalActive(false);
+                        setIsTimerPaused(false);
+                      }}
+                      variant="outline"
+                      className="px-6 py-3 text-lg border-red-400 text-red-100 hover:bg-red-600 hover:text-white bg-red-600/20 backdrop-blur-sm"
+                    >
+                      Stop
+                    </Button>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
+
+            {/* Enhanced Video Modal */}
+            {showVideoModal && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white/10 backdrop-blur-md rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-white/20">
+                  {/* Enhanced Modal Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-white/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center">
+                        <Youtube className="w-4 h-4 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        Exercise Video
+                      </h3>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={closeVideoModal}
+                      className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
+                      aria-label="Close video"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+
+                  {/* Enhanced Video Content */}
+                  <div className="p-6">
+                    <div
+                      className="relative w-full"
+                      style={{ paddingBottom: "56.25%" }}
+                    >
+                      <iframe
+                        src={getEmbedUrl(currentVideoUrl)}
+                        title="Exercise Video"
+                        className="absolute top-0 left-0 w-full h-full rounded-2xl"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {prCelebrationData && (
+              <PRCelebrationModal
+                visible={!!prCelebrationData}
+                onClose={() => {
+                  setPrCelebrationData(null);
+                  showAchievementsAfterPR();
+                }}
+                pr={prCelebrationData}
+                bodyWeightKg={clientBodyWeightKg}
+              />
+            )}
+
+            {newAchievementsQueue.length > 0 && (
+              <AchievementUnlockModal
+                achievement={
+                  newAchievementsQueue[achievementModalIndex] ?? null
+                }
+                visible={achievementModalIndex < newAchievementsQueue.length}
+                onClose={() => {
+                  if (achievementModalIndex < newAchievementsQueue.length - 1) {
+                    setAchievementModalIndex((i) => i + 1);
+                  } else {
+                    setNewAchievementsQueue([]);
+                    setAchievementModalIndex(0);
+                  }
+                }}
+              />
+            )}
+
+            {/* Exercise Image Modal */}
+            {showExerciseImage && currentExercise.exercise?.image_url && (
+              <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white/10 backdrop-blur-md rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-white/20">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-white/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <Image className="w-4 h-4 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        {currentExercise.exercise?.name}
+                      </h3>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowExerciseImage(false)}
+                      className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
+                      aria-label="Close image"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+
+                  {/* Image Content */}
+                  <div className="p-6">
+                    <div className="relative w-full">
+                      <img
+                        src={currentExercise.exercise.image_url}
+                        alt={currentExercise.exercise?.name}
+                        className="w-full h-auto rounded-2xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Workout Completion Modal */}
+            {showWorkoutCompletion && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: "0",
+                  backgroundColor: "rgba(0, 0, 0, 0.8)",
+                  backdropFilter: "blur(8px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 50,
+                  padding: "16px",
+                }}
+              >
+                <div className="fc-surface rounded-3xl w-full max-w-[448px] max-h-[90vh] overflow-hidden border-0 shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
+                  <div style={{ padding: "32px", textAlign: "center" }}>
+                    {/* Celebration Header */}
+                    <div style={{ marginBottom: "24px" }}>
+                      <div className="w-20 h-20 rounded-full bg-[color:var(--fc-status-success)] flex items-center justify-center mx-auto mb-4 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                        <Trophy className="w-10 h-10 text-white" />
+                      </div>
+                      <h2 className="text-3xl font-extrabold fc-text-primary leading-tight mb-2">
+                        Workout Complete! 🎉
+                      </h2>
+                      <p className="text-base font-normal fc-text-dim">
+                        Amazing work! You crushed this workout!
+                      </p>
+                    </div>
+
+                    {/* Weight Lifted Highlight */}
+                    <div className="p-6 rounded-3xl border-2 border-[color:var(--fc-status-error)] mb-6 text-center bg-[color:var(--fc-status-warning)]/30">
+                      <div className="text-4xl font-extrabold fc-text-primary leading-tight mb-2">
+                        {workoutStats.totalWeightLifted.toLocaleString()} kg
+                      </div>
+                      <div className="text-lg font-semibold fc-text-primary">
+                        Total Weight Lifted
+                      </div>
+                    </div>
+
+                    {/* Performance Stats */}
+                    <div style={{ marginBottom: "32px" }}>
+                      <div className="grid grid-cols-3" style={{ gap: "12px" }}>
+                        <div className="fc-card-shell p-4 text-center">
+                          <div className="text-3xl font-extrabold fc-text-primary leading-tight">
+                            {(() => {
+                              console.log(
+                                "🕐 [Duration Debug] Modal displaying totalTime:",
+                                {
+                                  totalTime: workoutStats.totalTime,
+                                  unit: "minutes",
+                                },
+                              );
+                              return workoutStats.totalTime;
+                            })()}
+                          </div>
+                          <div className="text-xs font-normal fc-text-dim">
+                            Minutes
+                          </div>
+                        </div>
+                        <div className="fc-card-shell p-4 text-center">
+                          <div className="text-3xl font-extrabold fc-text-primary leading-tight">
+                            {workoutStats.exercisesCompleted}
+                          </div>
+                          <div className="text-xs font-normal fc-text-dim">
+                            Exercises
+                          </div>
+                        </div>
+                        <div className="fc-card-shell fc-card-shell--error p-4 text-center">
+                          <div className="text-3xl font-extrabold fc-text-primary leading-tight">
+                            {workoutStats.totalSets}
+                          </div>
+                          <div className="text-xs font-normal fc-text-dim">
+                            Total Sets
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}
+                    >
+                      <Button
+                        disabled={isCompletingWorkout}
+                        onClick={async () => {
+                          console.log(
+                            "🔘 Completion modal button clicked - View Progress",
+                          );
+                          setShowWorkoutCompletion(false);
+                          await completeWorkout();
+                          // completeWorkout() already navigates to complete page
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-4 px-8 rounded-[20px] border-none bg-[color:var(--fc-status-success)] text-white text-base font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-70"
+                        style={{
+                          cursor: isCompletingWorkout
+                            ? "not-allowed"
+                            : "pointer",
+                          opacity: isCompletingWorkout ? 0.7 : 1,
+                        }}
+                      >
+                        {isCompletingWorkout ? (
+                          <>
+                            <Loader2
+                              style={{ width: "20px", height: "20px" }}
+                              className="animate-spin"
+                            />
+                            Completing…
+                          </>
+                        ) : (
+                          <>
+                            <Trophy style={{ width: "20px", height: "20px" }} />
+                            View Progress
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowWorkoutCompletion(false);
+                          window.location.href = "/client/train";
+                        }}
+                        className="fc-card-shell w-full py-4 px-8 text-[color:var(--fc-text-primary)] font-semibold flex items-center justify-center"
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </div>
+
+                    {/* Motivational Message */}
+                    <div className="mt-6 p-4 rounded-3xl border-2 border-[color:var(--fc-status-error)] bg-[color:var(--fc-status-warning)]/20">
+                      <p className="text-sm font-semibold fc-text-primary text-center">
+                        💪 Keep pushing! Every workout makes you stronger!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Drop Set Calculator Modal */}
+            {showDropSetCalculator && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
+                  <div className="p-6">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                          <Calculator className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold fc-text-primary">
+                          Drop Set Calculator
+                        </h3>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowDropSetCalculator(false)}
+                        className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
+                      >
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Working Weight Input */}
+                      <div>
+                        <label className="text-sm font-medium fc-text-dim mb-2 block">
+                          Working Weight (kg):
+                        </label>
+                        <input
+                          type="number"
+                          value={
+                            currentSetData.weight === 0
+                              ? ""
+                              : currentSetData.weight
+                          }
+                          onChange={(e) =>
+                            setCurrentSetData((prev) => ({
+                              ...prev,
+                              weight: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]"
+                          step="0.5"
+                          placeholder="Enter weight"
+                        />
+                      </div>
+
+                      {/* Calculator Result */}
+                      <div className="rounded-xl p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calculator className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          <span className="text-sm font-semibold fc-text-primary">
+                            Auto-calculated drop weight:
+                          </span>
+                        </div>
+                        {currentSetData.weight > 0 ? (
+                          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                            {(
+                              currentSetData.weight *
+                              (1 -
+                                (Number(
+                                  currentExercise?.meta?.drop_percentage,
+                                ) ||
+                                  Number(currentExercise?.drop_percentage) ||
+                                  0) /
+                                  100)
+                            ).toFixed(1)}
+                            kg
+                          </div>
+                        ) : (
+                          <div className="fc-text-dim">
+                            Enter working weight to see calculation
+                          </div>
+                        )}
+                        <div className="text-xs fc-text-dim mt-1">
+                          Drop percentage:{" "}
+                          {Number(currentExercise?.meta?.drop_percentage) ||
+                            Number(currentExercise?.drop_percentage) ||
+                            0}
+                          %
+                        </div>
+                      </div>
+
+                      {/* Manual Override */}
+                      <div>
+                        <label className="text-sm font-medium fc-text-dim mb-2 block">
+                          Manual Drop Weight (kg):
+                        </label>
+                        <input
+                          type="number"
+                          value={dropWeight === "" ? "" : dropWeight}
+                          onChange={(e) => setDropWeight(e.target.value)}
+                          className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-glass-border)] fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]"
+                          step="0.5"
+                          placeholder="Override calculated weight"
+                        />
+                        <p className="text-xs fc-text-dim mt-1">
+                          Leave empty to use auto-calculated weight
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cluster Timer Modal */}
+            {showClusterTimer && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
+                  <div className="p-6">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center">
+                          <Clock className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold fc-text-primary">
+                          Cluster Rest Timer
+                        </h3>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowClusterTimer(false)}
+                        className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
+                      >
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    <div className="text-center space-y-6">
+                      {/* Timer Display */}
+                      <div className="fc-card-shell fc-card-shell--success p-8">
+                        <div className="text-6xl font-extrabold text-green-600 dark:text-green-400 mb-2">
+                          {Number(currentExercise?.meta?.intra_cluster_rest) ||
+                            Number(currentExercise?.intra_cluster_rest) ||
+                            0}
+                        </div>
+                        <div className="text-lg font-semibold fc-text-dim">
+                          seconds rest
+                        </div>
+                      </div>
+
+                      {/* Instructions */}
+                      <div className="text-sm fc-text-dim">
+                        Use this timer between each cluster set. Tap start to
+                        begin the countdown.
+                      </div>
+
+                      {/* Timer Controls */}
+                      <div className="flex gap-3 justify-center">
+                        <Button
+                          type="button"
+                          variant="btn-action"
+                          onClick={() => {
+                            // TODO: Implement timer start logic
+                            console.log("Starting cluster rest timer");
+                          }}
+                          className="h-10 w-auto px-8"
+                        >
+                          <Play className="mr-2 h-4 w-4" />
+                          Start Timer
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="fc-secondary"
+                          onClick={() => setShowClusterTimer(false)}
+                          className="h-10 w-auto px-8"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </ClientPageShell>
-      </div>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   );

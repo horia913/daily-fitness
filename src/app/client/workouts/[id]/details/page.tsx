@@ -2,24 +2,28 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  ChevronLeft,
-  MoreHorizontal,
-  Play,
-  ChevronDown,
-  History,
-  TrendingUp,
-} from "lucide-react";
+import { ChevronLeft, MoreHorizontal, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
+import { ClientPageShell, IconButton, Eyebrow } from "@/components/client-ui";
+import { cn } from "@/lib/utils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { withTimeout } from "@/lib/withTimeout";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
+import { clientEffortLabelFromStoredRpe } from "@/lib/workoutEffortLabels";
+import {
+  WorkoutDetailsBlockSection,
+  type DropSubRow,
+} from "./WorkoutDetailsBlockSection";
+import type {
+  ClientBlockRecord,
+  ClientExerciseDisplay,
+  StructuredBlock,
+} from "./workoutDetailsTypes";
+import styles from "./WorkoutDetailsPage.module.css";
 
 function formatClientSpeedPrescription(row: Record<string, unknown> | null | undefined): string | null {
   if (!row || typeof row !== "object") return null;
@@ -153,76 +157,6 @@ interface PersonalRecord {
   reps: number;
   isRecent: boolean;
 }
-
-interface ExerciseWithPR extends ClientExerciseDisplay {
-  previousBest?: {
-    weight: number;
-    reps: number;
-    record: string;
-  } | null;
-}
-
-interface ClientExerciseDisplay {
-  id: string;
-  name: string;
-  description: string;
-  sets: number | null;
-  reps: string | null;
-  restSeconds: number | null;
-  weightGuidance: string | null;
-  loadPercentage: number | null;
-  weight: number | null;
-  orderIndex: number;
-  blockName: string | null;
-  blockType: string | null;
-  exerciseLetter: string | null;
-  notes: string | null;
-  tempo: string | null;
-  rir: number | null;
-  raw?: ClientBlockExerciseRecord | null;
-  meta?: Record<string, any> | null;
-}
-
-interface StructuredBlock {
-  id: string;
-  blockName: string | null;
-  blockType: string | null;
-  blockOrder: number;
-  notes: string | null;
-  exercises: ClientExerciseDisplay[];
-  rawBlock: ClientBlockRecord;
-  parameters?: Record<string, any> | null;
-  displayType?: string;
-}
-
-type ClientBlockExerciseRecord = {
-  id: string;
-  exercise_id: string | null;
-  exercise_order: number | null;
-  exercise_letter: string | null;
-  sets: number | null;
-  reps: string | null;
-  weight_kg: number | null;
-  rir: number | null;
-  tempo: string | null;
-  rest_seconds: number | null;
-  notes: string | null;
-  [key: string]: any;
-};
-
-type ClientBlockRecord = {
-  id: string;
-  set_order: number | null;
-  set_type: string | null;
-  set_name: string | null;
-  set_notes: string | null;
-  total_sets: number | null;
-  reps_per_set: string | null;
-  rest_seconds: number | null;
-  duration_seconds: number | null;
-  exercises?: ClientBlockExerciseRecord[] | null;
-  [key: string]: any;
-};
 
 const safeParse = (value: unknown) => {
   if (!value) return {};
@@ -804,56 +738,6 @@ export default function WorkoutDetailsPage() {
     return reps;
   };
 
-  // Get block type badge color (design system tokens)
-  const getBlockTypeBadgeColor = (blockType: string | null) => {
-    const vars = {
-      workouts: {
-        bg: "color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)",
-        text: "var(--fc-domain-workouts)",
-        border: "color-mix(in srgb, var(--fc-domain-workouts) 30%, transparent)",
-      },
-      warning: {
-        bg: "color-mix(in srgb, var(--fc-status-warning) 20%, transparent)",
-        text: "var(--fc-status-warning)",
-        border: "color-mix(in srgb, var(--fc-status-warning) 30%, transparent)",
-      },
-      purple: {
-        bg: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)",
-        text: "var(--fc-accent-purple)",
-        border: "color-mix(in srgb, var(--fc-accent-purple) 30%, transparent)",
-      },
-      error: {
-        bg: "color-mix(in srgb, var(--fc-status-error) 20%, transparent)",
-        text: "var(--fc-status-error)",
-        border: "color-mix(in srgb, var(--fc-status-error) 30%, transparent)",
-      },
-      indigo: {
-        bg: "color-mix(in srgb, var(--fc-accent-indigo) 20%, transparent)",
-        text: "var(--fc-accent-indigo)",
-        border: "color-mix(in srgb, var(--fc-accent-indigo) 30%, transparent)",
-      },
-      success: {
-        bg: "color-mix(in srgb, var(--fc-status-success) 20%, transparent)",
-        text: "var(--fc-status-success)",
-        border: "color-mix(in srgb, var(--fc-status-success) 30%, transparent)",
-      },
-      cyan: {
-        bg: "color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent)",
-        text: "var(--fc-accent-cyan)",
-        border: "color-mix(in srgb, var(--fc-accent-cyan) 30%, transparent)",
-      },
-    };
-    if (!blockType) return vars.workouts;
-    const type = blockType.toLowerCase();
-    if (type.includes("superset")) return vars.warning;
-    if (type.includes("drop")) return vars.purple;
-    if (type.includes("giant")) return vars.error;
-    if (type.includes("cluster")) return vars.indigo;
-    if (type.includes("rest_pause")) return vars.cyan;
-    if (type.includes("amrap") || type.includes("emom") || type.includes("for_time") || type.includes("tabata")) return vars.warning;
-    return vars.workouts;
-  };
-
   // Format block type label
   const formatBlockTypeLabel = (
     blockType: string | null,
@@ -923,8 +807,9 @@ export default function WorkoutDetailsPage() {
       // For SUPERSET: Show second exercise reps and load % (NOT the main load_percentage/weight_kg)
       if (blockType === "superset" && exercise.orderIndex === 1) {
         // Second exercise in superset
-        if (exerciseRaw?.superset_reps) {
-          result.push({ label: "Reps", value: formatReps(exerciseRaw.superset_reps) });
+        const supersetReps = exerciseRaw?.superset_reps;
+        if (typeof supersetReps === "string" && supersetReps) {
+          result.push({ label: "Reps", value: formatReps(supersetReps) });
         }
         if (exerciseRaw?.superset_load_percentage !== null && exerciseRaw?.superset_load_percentage !== undefined) {
           result.push({ label: "Load %", value: `${exerciseRaw.superset_load_percentage}%` });
@@ -950,8 +835,9 @@ export default function WorkoutDetailsPage() {
       // For PRE_EXHAUSTION: Show compound exercise reps and load % (NOT the main load_percentage/weight_kg)
       if (blockType === "pre_exhaustion" && exercise.orderIndex === 1) {
         // Compound exercise (second exercise)
-        if (exerciseRaw?.compound_reps) {
-          result.push({ label: "Reps", value: formatReps(exerciseRaw.compound_reps) });
+        const compoundReps = exerciseRaw?.compound_reps;
+        if (typeof compoundReps === "string" && compoundReps) {
+          result.push({ label: "Reps", value: formatReps(compoundReps) });
         }
         if (exerciseRaw?.compound_load_percentage !== null && exerciseRaw?.compound_load_percentage !== undefined) {
           result.push({ label: "Load %", value: `${exerciseRaw.compound_load_percentage}%` });
@@ -999,12 +885,19 @@ export default function WorkoutDetailsPage() {
       }
       
       // Check if drop_sets data exists (must be array with at least one item)
-      const dropSets = exerciseRaw?.drop_sets;
-      if (Array.isArray(dropSets) && dropSets.length > 0) {
-        const dropSet = dropSets[0];
+      const dropSetsRaw = exerciseRaw?.drop_sets;
+      const dropSets = Array.isArray(dropSetsRaw) ? dropSetsRaw : [];
+      if (dropSets.length > 0) {
+        const dropSet = dropSets[0] as {
+          weight_kg?: number;
+          reps?: string | null;
+          rest_seconds?: number | null;
+          drop_order?: number;
+          load_percentage?: number | null;
+        };
         // Calculate drop percentage from initial weight vs drop weight
-        const initialWeight = exerciseRaw?.weight_kg || 0;
-        const dropWeight = dropSet.weight_kg || 0;
+        const initialWeight = Number(exerciseRaw?.weight_kg) || 0;
+        const dropWeight = Number(dropSet.weight_kg) || 0;
         if (initialWeight > 0 && dropWeight > 0) {
           const dropPercentage = Math.round(((initialWeight - dropWeight) / initialWeight) * 100);
           result.push({ label: "Drop %", value: `${dropPercentage}%` });
@@ -1017,14 +910,20 @@ export default function WorkoutDetailsPage() {
           result.push({ label: "Rest", value: `${dropSet.rest_seconds}s` });
         }
       }
-      
+
       // Show load_percentage or weight_kg from workout_drop_sets (initial weight in drop_order=1)
-      const firstDropSet = dropSets && dropSets.length > 0 
-        ? dropSets.find((ds: any) => ds.drop_order === 1) || dropSets[0]
-        : null;
+      const firstDropSet =
+        dropSets.length > 0
+          ? dropSets.find(
+              (ds) => (ds as { drop_order?: number }).drop_order === 1,
+            ) || dropSets[0]
+          : null;
       if (firstDropSet) {
-        if (firstDropSet.load_percentage !== null && firstDropSet.load_percentage !== undefined) {
-          result.push({ label: "Load %", value: `${firstDropSet.load_percentage}%` });
+        const fd = firstDropSet as {
+          load_percentage?: number | null;
+        };
+        if (fd.load_percentage !== null && fd.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${fd.load_percentage}%` });
         } else if (exerciseRaw?.weight_kg !== null && exerciseRaw?.weight_kg !== undefined) {
           result.push({ label: "Weight", value: `${exerciseRaw.weight_kg} kg` });
         }
@@ -1350,423 +1249,253 @@ export default function WorkoutDetailsPage() {
     return result;
   };
 
+  const needsBlockConfigPanel = (block: StructuredBlock) => {
+    const t = (block.blockType || "").toLowerCase();
+    if (t === "drop_set") return true;
+    return block.exercises.length > 1;
+  };
+
+  const isValidBlockExerciseName = (name: string | null | undefined) => {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return false;
+    const lower = trimmed.toLowerCase();
+    return lower !== "test" && lower !== "teest";
+  };
+
+  const getBlockHeadTitle = (block: StructuredBlock) => {
+    if (isValidBlockExerciseName(block.blockName)) {
+      return block.blockName!.trim();
+    }
+    if (block.exercises?.length > 0) {
+      const exerciseNames = block.exercises
+        .map((ex) => ex.name)
+        .filter(isValidBlockExerciseName);
+      if (exerciseNames.length > 0) {
+        if (exerciseNames.length > 2) {
+          const firstTwo = exerciseNames.slice(0, 2).join(" + ");
+          const remaining = exerciseNames.length - 2;
+          return `${firstTwo} + ${remaining} ${
+            remaining === 1 ? "exercise" : "exercises"
+          }`;
+        }
+        return exerciseNames.join(" + ");
+      }
+    }
+    return formatBlockTypeLabel(block.blockType, null);
+  };
+
+  const mapFieldRowsToPrescription = (
+    rows: { label: string; value: string }[],
+    exercise: ClientExerciseDisplay,
+  ): { label: string; value: string }[] =>
+    rows.map((r) =>
+      r.label === "RPE"
+        ? {
+            label: "Effort",
+            value:
+              clientEffortLabelFromStoredRpe(exercise.rir) ??
+              String(exercise.rir ?? ""),
+          }
+        : r,
+    );
+
+  const computeExercisePrescriptionRows = (
+    block: StructuredBlock,
+    exercise: ClientExerciseDisplay,
+    opts: { mode: "single" | "multi" },
+  ): { label: string; value: string }[] => {
+    const blockType = (block.blockType || "").toLowerCase();
+    if (opts.mode === "single") {
+      if (["amrap", "emom", "for_time", "tabata"].includes(blockType)) {
+        return getTimeBasedParameters(block, exercise);
+      }
+      if (blockType === "speed_work" || blockType === "endurance") {
+        return getSpeedEnduranceDisplayFields(block, exercise);
+      }
+      return mapFieldRowsToPrescription(
+        getExerciseCardFields(block, exercise),
+        exercise,
+      );
+    }
+    let rows = getExerciseCardFields(block, exercise);
+    if (blockType === "drop_set") {
+      const ds = exercise.raw?.drop_sets;
+      if (Array.isArray(ds) && ds.length > 0) {
+        rows = rows.filter(
+          (x) => x.label !== "Drop %" && x.label !== "Drop reps",
+        );
+      }
+    }
+    return mapFieldRowsToPrescription(rows, exercise);
+  };
+
+  const getDropSubrows = (exercise: ClientExerciseDisplay): DropSubRow[] => {
+    const raw = exercise.raw as Record<string, unknown> | null | undefined;
+    const drops = raw?.drop_sets;
+    if (!Array.isArray(drops) || drops.length === 0) return [];
+    const sorted = [...drops].sort(
+      (a, b) =>
+        (Number((a as { drop_order?: unknown }).drop_order) || 0) -
+        (Number((b as { drop_order?: unknown }).drop_order) || 0),
+    );
+    return sorted.map((d, i) => {
+      const row = d as {
+        id?: string;
+        drop_order?: number;
+        reps?: string | null;
+        drop_percentage?: number | null;
+      };
+      const n = Number(row.drop_order) || i + 1;
+      const pct = row.drop_percentage;
+      const pctStr =
+        pct != null && Number.isFinite(Number(pct))
+          ? `−${Math.round(Number(pct))}%`
+          : null;
+      const parts = (
+        <>
+          {row.reps != null && row.reps !== "" ? (
+            <>
+              <span className={styles.dropValNum}>{String(row.reps)}</span>
+              <span> reps</span>
+            </>
+          ) : null}
+          {pctStr ? (
+            <>
+              {row.reps != null && row.reps !== "" ? (
+                <span className="text-[var(--fc-text-dim)]"> · </span>
+              ) : null}
+              <span className={styles.dropValNum}>{pctStr}</span>
+            </>
+          ) : null}
+        </>
+      );
+      return {
+        key: String(row.id ?? `drop-${n}`),
+        label: `Drop ${n}`,
+        parts,
+      };
+    });
+  };
+
   return (
     <AnimatedBackground>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .exercise-item {
-          max-height: 120px;
-          overflow: hidden;
-          transition: max-height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .exercise-item.active {
-          max-height: 5000px;
-        }
-        .rotate-icon {
-          transition: transform 0.3s ease;
-        }
-        .exercise-item.active .rotate-icon {
-          transform: rotate(180deg);
-        }
-      `,
-        }}
-      />
-      <div className="relative fc-app-bg isolate">
+      <div className={cn("relative fc-app-bg isolate", styles.pageRoot)}>
         <ClientPageShell className="min-h-screen pb-32">
-          {/* Navigation */}
-          <nav className="flex justify-between items-center mb-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-            <button
-              onClick={() => router.push("/client/train")}
+          <nav className={styles.topbar}>
+            <IconButton
+              variant="filled"
+              size="md"
+              className="active:scale-95"
               aria-label="Back to train"
-              className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95"
+              onClick={() => router.push("/client/train")}
             >
-              <ChevronLeft className="w-5 h-5 fc-text-primary" />
-            </button>
-            <div className="text-center">
-              <span className="text-[10px] uppercase tracking-[0.3em] fc-text-dim font-bold">Workout Details</span>
+              <ChevronLeft className="h-5 w-5 fc-text-primary" />
+            </IconButton>
+            <div className={styles.topbarTitle}>
+              <Eyebrow
+                tone="dim"
+                density="default"
+                className="!mb-0 !justify-center !w-full text-[color:var(--fc-text-quaternary,rgba(255,255,255,0.42))]"
+              >
+                Workout Details
+              </Eyebrow>
             </div>
-            <button className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95" aria-label="More options">
-              <MoreHorizontal className="w-5 h-5 fc-text-primary" />
-            </button>
+            <IconButton
+              variant="filled"
+              size="md"
+              className="active:scale-95"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="h-5 w-5 fc-text-primary" />
+            </IconButton>
           </nav>
 
-          <main className="max-w-3xl mx-auto pb-40" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-            {/* Header Section */}
-            <header className="mb-10">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                {assignment.category && (
-                  <Badge
-                    variant="fc-outline"
-                    className="px-3 py-1 text-xs font-bold uppercase tracking-wider"
-                  >
-                    {assignment.category}
-                  </Badge>
-                )}
-                {assignment.currentWeek != null && (
-                  <span className="text-xs font-mono fc-text-dim">
-                    PHASE • WEEK {assignment.currentWeek}
+          <main
+            className={cn("max-w-3xl mx-auto", styles.mainScroll)}
+            style={{
+              paddingLeft: "var(--fc-page-px)",
+              paddingRight: "var(--fc-page-px)",
+            }}
+          >
+            <header className={styles.header}>
+              <div className={styles.headerEyebrow}>
+                {assignment.category ? (
+                  <span className={styles.pillPhase}>{assignment.category}</span>
+                ) : null}
+                {assignment.currentWeek != null ? (
+                  <span className={styles.pillWeek}>
+                    Phase · Week {assignment.currentWeek}
                   </span>
-                )}
+                ) : null}
               </div>
-              <h1 className="text-2xl font-bold tracking-tight mb-6 fc-text-primary">
-                {assignment.name}
-              </h1>
-              {assignment.description && (
-                <div className="fc-surface p-4 rounded-2xl border-l-4 border-l-[color:var(--fc-domain-workouts)]">
-                  <p className="text-sm fc-text-dim italic leading-relaxed">{assignment.description}</p>
+              <h1 className={styles.title}>{assignment.name}</h1>
+              {assignment.description ? (
+                <div className="fc-surface mb-6 rounded-2xl border-l-4 border-l-[color:var(--fc-domain-workouts)] p-4">
+                  <p className="m-0 text-sm italic leading-relaxed fc-text-dim">
+                    {assignment.description}
+                  </p>
                 </div>
-              )}
+              ) : null}
             </header>
 
-            {/* Stats Strip */}
-            <section className="mb-8">
-              <div className="fc-stats-strip">
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">~{assignment.estimatedDuration ?? 0}</span>
-                  <span className="fc-stats-strip-label">Minutes</span>
+            <section className="mb-6">
+              <div className={styles.statStrip}>
+                <div className={styles.statCol}>
+                  <span className={styles.statValue}>
+                    ~{assignment.estimatedDuration ?? 0}
+                  </span>
+                  <span className={styles.statLabel}>Minutes</span>
                 </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">{totalSets}</span>
-                  <span className="fc-stats-strip-label">Sets</span>
+                <div className={styles.statCol}>
+                  <span className={styles.statValue}>{totalSets}</span>
+                  <span className={styles.statLabel}>Sets</span>
                 </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">{totalExercises}</span>
-                  <span className="fc-stats-strip-label">Exercises</span>
-                </div>
-                <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">{blocks.length}</span>
-                  <span className="fc-stats-strip-label">Sets</span>
+                <div className={styles.statCol}>
+                  <span className={styles.statValue}>{totalExercises}</span>
+                  <span className={styles.statLabel}>Exercises</span>
                 </div>
               </div>
             </section>
 
-          {/* Exercise List */}
-          <section style={{ marginBottom: "var(--fc-page-pb)" }}>
-            <h2 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim mb-6">
-              Workout Content
-            </h2>
-            <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-              {blocks.map((block, blockIndex) => {
-                const isExpanded = expandedExercises.has(block.id);
-                const badgeColor = getBlockTypeBadgeColor(block.blockType);
-                const blockParams = getBlockParameters(block);
+            <WorkoutDetailsBlockSection
+              blocks={blocks}
+              expandedIds={expandedExercises}
+              onToggleBlock={toggleExercise}
+              getBlockHeadTitle={getBlockHeadTitle}
+              formatBlockTypeLabel={formatBlockTypeLabel}
+              needsBlockConfigPanel={needsBlockConfigPanel}
+              getBlockParameters={getBlockParameters}
+              getExercisePrescriptionRows={(block, exercise) =>
+                computeExercisePrescriptionRows(block, exercise, {
+                  mode: needsBlockConfigPanel(block) ? "multi" : "single",
+                })
+              }
+              getDropSubrows={getDropSubrows}
+              getPreviousBest={getPreviousBest}
+            />
+          </main>
 
-                return (
-                  <div
-                    key={block.id}
-                    className={`exercise-item border-b border-[color:var(--fc-glass-border)] last:border-b-0 ${isExpanded ? "active" : ""}`}
-                    onClick={() => toggleExercise(block.id)}
-                  >
-                    <div className="cursor-pointer overflow-hidden transition-colors hover:bg-[color:var(--fc-glass-highlight)]">
-                    <div
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-mono text-sm fc-text-primary" style={{ background: badgeColor.bg, color: badgeColor.text }}>
-                          {String(blockIndex + 1).padStart(2, "0")}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span
-                              className="fc-badge fc-pill"
-                              style={{
-                                background: badgeColor.bg,
-                                color: badgeColor.text,
-                                border: `1px solid ${badgeColor.border}`,
-                              }}
-                            >
-                              {formatBlockTypeLabel(block.blockType, null)}
-                            </span>
-                          </div>
-                          <h4 className="text-lg font-bold fc-text-primary m-0">
-                            {(() => {
-                              // Helper to filter out "test" values
-                              const isValidName = (
-                                name: string | null | undefined
-                              ): boolean => {
-                                if (!name) return false;
-                                const trimmed = name.trim();
-                                if (trimmed.length === 0) return false;
-                                const lower = trimmed.toLowerCase();
-                                return lower !== "test" && lower !== "teest";
-                              };
-
-                              // Use block name if available and not empty
-                              if (isValidName(block.blockName)) {
-                                return block.blockName!.trim();
-                              }
-                              // If block has exercises, try to construct a meaningful title
-                              if (
-                                block.exercises &&
-                                block.exercises.length > 0
-                              ) {
-                                // Get all unique exercise names (excluding "test")
-                                const exerciseNames = block.exercises
-                                  .map((ex) => ex.name)
-                                  .filter(isValidName);
-
-                                if (exerciseNames.length > 0) {
-                                  // If more than 2 exercises, show first 2 + count
-                                  if (exerciseNames.length > 2) {
-                                    const firstTwo = exerciseNames
-                                      .slice(0, 2)
-                                      .join(" + ");
-                                    const remaining = exerciseNames.length - 2;
-                                    return `${firstTwo} + ${remaining} ${
-                                      remaining === 1 ? "exercise" : "exercises"
-                                    }`;
-                                  }
-                                  // For 2 or fewer exercises, show all names
-                                  return exerciseNames.join(" + ");
-                                }
-                              }
-                              // Final fallback: use block type
-                              return formatBlockTypeLabel(
-                                block.blockType,
-                                null
-                              );
-                            })()}
-                          </h4>
-                          {!isExpanded && block.exercises.length > 0 && (
-                            <p className="text-xs fc-text-dim mt-1 m-0">
-                              {block.exercises.length} exercise{block.exercises.length !== 1 ? "s" : ""}
-                              {(() => {
-                                const sets = block.rawBlock?.total_sets;
-                                const reps = block.exercises[0]?.reps || block.rawBlock?.reps_per_set;
-                                if (sets != null && reps) return ` — ${sets}×${reps}`;
-                                if (sets != null) return ` — ${sets} sets`;
-                                if (reps) return ` — ${reps} reps`;
-                                return "";
-                              })()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronDown className="rotate-icon w-5 h-5 fc-text-dim" />
-                    </div>
-                    {isExpanded && (
-                      <div className="border-t border-[color:var(--fc-glass-border)] px-4 pb-3 pt-3">
-                        {/* Block Notes */}
-                        {block.notes && (
-                          <div
-                            className="p-3 rounded-xl mb-4"
-                            style={{
-                              background: "color-mix(in srgb, var(--fc-domain-workouts) 8%, var(--fc-surface-card))",
-                              borderLeft: "3px solid var(--fc-domain-workouts)",
-                            }}
-                          >
-                            <p className="text-sm fc-text-primary leading-relaxed m-0">
-                              {block.notes}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Block Parameters */}
-                        {blockParams.length > 0 && (
-                          <div
-                            data-block-type={block.blockType}
-                            data-block-id={block.id}
-                            className="flex flex-wrap gap-3 mb-4 relative z-[1]"
-                          >
-                            {blockParams.map((param, idx) => (
-                              <div
-                                key={`${block.id}-param-${idx}`}
-                                data-param-label={param.label}
-                                data-param-value={param.value}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                                style={{ background: "var(--fc-surface-sunken)" }}
-                              >
-                                <span className="text-[10px] uppercase tracking-wider fc-text-dim font-semibold">
-                                  {param.label}
-                                </span>
-                                <span className="font-mono font-bold text-sm fc-text-primary">
-                                  {param.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Exercises in Block */}
-                        <div className="flex flex-col border-t border-[color:var(--fc-glass-border)]">
-                          {block.exercises.map((exercise, exerciseIndex) => {
-                            const previousBest = getPreviousBest(exercise.name);
-                            const exerciseBadgeColor = getBlockTypeBadgeColor(
-                              block.blockType
-                            );
-
-                            return (
-                              <div
-                                key={exercise.id}
-                                className="flex flex-col gap-3 border-b border-[color:var(--fc-glass-border)] py-3 transition-all duration-200 last:border-b-0"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold font-mono text-xs fc-text-dim flex-shrink-0" style={{ background: "var(--fc-surface-card)" }}>
-                                    {exercise.exerciseLetter || String(exerciseIndex + 1).padStart(2, "0")}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    {exercise.exerciseLetter && (
-                                      <span className="fc-badge fc-pill fc-text-warning border border-[color:var(--fc-status-warning)] bg-[color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] mb-1 inline-block">
-                                        {formatBlockTypeLabel(
-                                          block.blockType,
-                                          exercise.exerciseLetter
-                                        )}
-                                      </span>
-                                    )}
-                                    <h3 className="text-base font-semibold fc-text-primary mt-1">
-                                      {exercise.name}
-                                    </h3>
-                                    {exercise.notes && (
-                                      <p className="text-xs fc-text-dim mt-1 leading-relaxed">
-                                        {exercise.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Exercise Card Fields — primary (Sets/Reps/Rest) > secondary (Weight/Load) > tertiary (RPE/Tempo/Notes) */}
-                                {(() => {
-                                  const blockType = (block.blockType || "").toLowerCase();
-                                  const isTimeBased = ["amrap", "emom", "for_time", "tabata"].includes(blockType);
-                                  const primaryLabels = ["Sets", "Reps", "Rest"];
-                                  const secondaryLabels = ["Weight", "Load %"];
-                                  const tertiaryLabels = ["RPE", "Tempo", "Notes"];
-
-                                  if (isTimeBased) {
-                                    const timeParams = getTimeBasedParameters(block, exercise);
-                                    if (timeParams.length > 0) {
-                                      const primary = timeParams.filter((p) => ["Duration", "Work time", "Rest time", "Time cap", "Rounds"].includes(p.label));
-                                      const rest = timeParams.filter((p) => !primary.some((x) => x.label === p.label));
-                                      return (
-                                        <div className="space-y-3 mt-3">
-                                          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-                                            {timeParams.map((param, idx) => (
-                                              <div key={idx} className="flex items-baseline gap-2">
-                                                <span className="text-xs uppercase tracking-wider fc-text-dim">{param.label}</span>
-                                                <span className="font-mono font-bold text-xl fc-text-primary">{param.value}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  }
-
-                                  if (blockType === "speed_work" || blockType === "endurance") {
-                                    const seParams = getSpeedEnduranceDisplayFields(block, exercise);
-                                    if (seParams.length > 0) {
-                                      return (
-                                        <div className="space-y-3 mt-3">
-                                          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-                                            {seParams.map((param, idx) => (
-                                              <div key={idx} className="flex items-baseline gap-2">
-                                                <span className="text-xs uppercase tracking-wider fc-text-dim">{param.label}</span>
-                                                <span className="font-mono font-bold text-xl fc-text-primary">{param.value}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-                                  }
-
-                                  const exerciseFields = getExerciseCardFields(block, exercise);
-                                  if (exerciseFields.length === 0) return null;
-
-                                  const primary = exerciseFields.filter((f) => primaryLabels.includes(f.label));
-                                  const secondary = exerciseFields.filter((f) => secondaryLabels.includes(f.label));
-                                  const tertiary = exerciseFields.filter((f) => tertiaryLabels.includes(f.label));
-                                  const other = exerciseFields.filter((f) => !primaryLabels.includes(f.label) && !secondaryLabels.includes(f.label) && !tertiaryLabels.includes(f.label));
-
-                                  return (
-                                    <div className="space-y-3 mt-3">
-                                      {/* Primary: Sets, Reps, Rest — gym-floor essentials, largest */}
-                                      {primary.length > 0 && (
-                                        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-                                          {primary.map((field, idx) => (
-                                            <div key={idx} className="flex items-baseline gap-2">
-                                              <span className="text-xs uppercase tracking-wider fc-text-dim">{field.label}</span>
-                                              <span className={`font-mono font-bold text-xl ${field.label === "Rest" ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-primary"}`}>
-                                                {field.value || "—"}
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {/* Secondary: Weight, Load % */}
-                                      {(secondary.length > 0 || other.length > 0) && (
-                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-                                          {[...secondary, ...other].map((field, idx) => (
-                                            <div key={idx} className="flex items-baseline gap-1.5">
-                                              <span className="text-[10px] uppercase fc-text-dim">{field.label}</span>
-                                              <span className="font-mono font-medium fc-text-primary">{field.value || "—"}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {/* Tertiary: RPE, Tempo, Notes — small, muted */}
-                                      {tertiary.length > 0 && (
-                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs fc-text-dim">
-                                          {tertiary.map((field, idx) => (
-                                            <div key={idx} className="flex items-baseline gap-1.5">
-                                              <span className="uppercase">{field.label}</span>
-                                              <span className="font-mono">{field.value || "—"}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-
-                                {/* Previous Best */}
-                                {previousBest && (
-                                  <div className="flex items-center justify-between border-l-2 border-l-[color:var(--fc-status-success)] py-2 pl-3">
-                                    <div className="flex items-center gap-2">
-                                      <History className="w-3 h-3 fc-text-dim" />
-                                      <span className="text-xs fc-text-dim">
-                                        PR:{" "}
-                                        <span className="fc-text-primary font-bold font-mono">
-                                          {previousBest.record}
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <TrendingUp className="w-3 h-3 fc-text-success" />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Spacer for bottom action bar */}
-          <div className="h-20" />
-        </main>
-
-        {/* Fixed Bottom Action Bar */}
-        <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
-          <div className="max-w-3xl mx-auto">
-            <PrimaryButton
-              className="h-14 rounded-2xl gap-3 text-base uppercase tracking-wider"
-              onClick={() => router.push(`/client/workouts/${assignment.id}/start`)}
+          <div className={styles.stickyCta}>
+            <Button
+              type="button"
+              variant="btn-action"
+              className={cn(
+                styles.beginBtn,
+                "h-auto min-h-[52px] w-full text-sm font-bold uppercase tracking-[0.06em]",
+              )}
+              onClick={() =>
+                router.push(`/client/workouts/${assignment.id}/start`)
+              }
             >
-              <Play className="w-5 h-5 fill-current" />
-              Begin Workout
-            </PrimaryButton>
+              <span className={styles.beginBtnInner}>
+                <Play className="h-5 w-5 shrink-0 fill-current" />
+                Begin Workout
+              </span>
+            </Button>
           </div>
-        </div>
-      </ClientPageShell>
-    </div>
+        </ClientPageShell>
+      </div>
     </AnimatedBackground>
   );
 }

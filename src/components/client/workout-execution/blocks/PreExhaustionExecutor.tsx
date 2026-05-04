@@ -6,18 +6,15 @@ import {
   Target,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   Pencil,
   Repeat2,
   Timer,
-  Weight,
   Gauge,
   Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
-  formatLoadPercentage,
   formatTime,
   formatRestSeconds,
 } from "../BaseBlockExecutor";
@@ -25,11 +22,13 @@ import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
-import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 import { LargeInput } from "../ui/LargeInput";
+import logPairStyles from "../ui/logWeightRepsPair.module.css";
 import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { InlineRPERow } from "../ui/InlineRPERow";
+import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
+import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
+import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { ProgressionNudge } from "../ui/ProgressionNudge";
@@ -60,7 +59,6 @@ export function PreExhaustionExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
-  onPlateCalculatorClick,
   onRestTimerClick,
   onWorkoutBack,
   onSetComplete,
@@ -99,10 +97,7 @@ export function PreExhaustionExecutor({
   const [timerSeconds, setTimerSeconds] = useState(restBetween);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
-  /** Collapsible set history: show all sets or only last 2 */
-  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     isolationWeight: string;
@@ -345,48 +340,20 @@ export function PreExhaustionExecutor({
       value: compoundExercise.reps,
     });
   }
-  if (
-    isolationExercise?.load_percentage != null &&
-    isolationExercise.load_percentage !== undefined &&
-    isolationExercise.exercise_id
-  ) {
-    const suggestedForIso =
-      resultIso.source === "percent_e1rm"
-        ? resultIso.suggested_weight
-        : null;
-    const loadIso = formatLoadPercentage(
-      isolationExercise.load_percentage,
-      suggestedForIso,
-    );
-    if (loadIso) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load (isolation)",
-        value: loadIso,
-      });
-    }
-  }
-  if (
-    compoundExercise?.load_percentage != null &&
-    compoundExercise.load_percentage !== undefined &&
-    compoundExercise.exercise_id
-  ) {
-    const suggestedForComp =
-      resultComp.source === "percent_e1rm"
-        ? resultComp.suggested_weight
-        : null;
-    const loadComp = formatLoadPercentage(
-      compoundExercise.load_percentage,
-      suggestedForComp,
-    );
-    if (loadComp) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load (compound)",
-        value: loadComp,
-      });
-    }
-  }
+  appendTargetEffortItem(
+    prescriptionItems,
+    isolationExercise
+      ? (isolationExercise as { rir?: unknown }).rir
+      : undefined,
+    Flame,
+    "Target effort (isolation)",
+  );
+  appendTargetEffortItem(
+    prescriptionItems,
+    compoundExercise ? (compoundExercise as { rir?: unknown }).rir : undefined,
+    Flame,
+    "Target effort (compound)",
+  );
   if (isolationExercise?.tempo) {
     prescriptionItems.push({
       icon: Gauge,
@@ -399,27 +366,6 @@ export function PreExhaustionExecutor({
       icon: Gauge,
       label: "Tempo (compound)",
       value: compoundExercise.tempo,
-    });
-  }
-  if (
-    isolationExercise?.rir != null &&
-    isolationExercise?.rir !== undefined
-  ) {
-    prescriptionItems.push({
-      icon: Flame,
-      label: "RPE (isolation)",
-      value:
-        formatPrescribedRpeLabel(isolationExercise.rir) ??
-        String(isolationExercise.rir).trim(),
-    });
-  }
-  if (compoundExercise?.rir != null && compoundExercise?.rir !== undefined) {
-    prescriptionItems.push({
-      icon: Flame,
-      label: "RPE (compound)",
-      value:
-        formatPrescribedRpeLabel(compoundExercise.rir) ??
-        String(compoundExercise.rir).trim(),
     });
   }
 
@@ -449,7 +395,6 @@ export function PreExhaustionExecutor({
       compoundReps: String(comp?.reps_completed ?? ""),
       set_number: setEntry.set_number ?? 1,
     });
-    setMenuOpenSetId(null);
   };
 
   const handleSaveEdit = async () => {
@@ -683,140 +628,47 @@ export function PreExhaustionExecutor({
     ...new Set(loggedSetsList.map((s) => s.set_number)),
   ].sort((a, b) => a - b);
 
+  const updateSetRpe = useUpdateSetRpe({
+    blockId: block.block.id,
+    onSetLogUpsert,
+  });
+  const loggedSetRows: LoggedSetRow[] = setNumbersLogged.map((setNum) => {
+    const forSet = loggedSetsList.filter((s) => s.set_number === setNum);
+    const iso =
+      forSet.find(
+        (s) => s.exercise_id === isolationExercise?.exercise_id,
+      ) || forSet[0];
+    const comp =
+      forSet.find(
+        (s) => s.exercise_id === compoundExercise?.exercise_id,
+      ) || forSet[1];
+    const label = `Set ${setNum}: Iso ${iso?.weight_kg ?? "—"}×${iso?.reps_completed ?? "—"}${comp ? `, Comp ${comp.weight_kg ?? "—"}×${comp.reps_completed ?? "—"}` : ""}`;
+    const representative = iso ?? forSet[0];
+    return {
+      id: `set-${setNum}`,
+      title: label,
+      rpe: representative?.rpe ?? null,
+      onEffortChange: (rpe) => {
+        if (representative) updateSetRpe(representative, rpe);
+      },
+      disabled: !representative || representative.id.startsWith("temp-"),
+      menu: allowSetEditDelete && forSet[0] ? (
+        <button
+          type="button"
+          onClick={() => handleEditSet(forSet[0])}
+          className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--fc-text-dim)] hover:bg-white/5 hover:text-[color:var(--fc-text-primary)]"
+          aria-label="Edit"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      ) : null,
+    };
+  });
+  const aboveStickyContent =
+    loggedSetRows.length > 0 ? <LoggedSetsList rows={loggedSetRows} /> : null;
+
   const loggingInputs = (
     <div className="space-y-4">
-      {allowSetEditDelete && setNumbersLogged.length > 0 && (
-        <div className="border-t border-white/10 pt-3">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
-              Logged sets
-            </div>
-            {setNumbersLogged.length > 2 && (
-              <button
-                type="button"
-                onClick={() => setShowAllSets(!showAllSets)}
-                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
-              >
-                {showAllSets ? (
-                  <>Show less ▲</>
-                ) : (
-                  <>Show all {setNumbersLogged.length} sets ▼</>
-                )}
-              </button>
-            )}
-          </div>
-          <ul className="flex flex-col border-y border-white/5">
-            {(showAllSets ? setNumbersLogged : setNumbersLogged.slice(-2)).map((setNum) => {
-              // Calculate the actual index in the full list for isLatestSet
-              const actualIndex = showAllSets 
-                ? setNumbersLogged.indexOf(setNum)
-                : setNumbersLogged.length - 2 + setNumbersLogged.slice(-2).indexOf(setNum);
-              const isLatestSet = actualIndex === setNumbersLogged.length - 1;
-              const forSet = loggedSetsList.filter(
-                (s) => s.set_number === setNum,
-              );
-              const iso =
-                forSet.find(
-                  (s) => s.exercise_id === isolationExercise?.exercise_id,
-                ) || forSet[0];
-              const comp =
-                forSet.find(
-                  (s) => s.exercise_id === compoundExercise?.exercise_id,
-                ) || forSet[1];
-              const label = `Set ${setNum}: Iso ${iso?.weight_kg ?? "—"}×${iso?.reps_completed ?? "—"}${comp ? `, Comp ${comp.weight_kg ?? "—"}×${comp.reps_completed ?? "—"}` : ""}`;
-              const firstId = forSet[0]?.id ?? "";
-              const rpeForSet = iso?.rpe ?? comp?.rpe ?? null;
-              return (
-                <li
-                  key={`set-${setNum}`}
-                  className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm fc-text-primary">{label}</span>
-                    <div className="relative flex items-center">
-                      <button
-                        type="button"
-                        className="p-1.5 rounded-md hover:bg-black/10"
-                        onClick={() =>
-                          setMenuOpenSetId(
-                            menuOpenSetId === firstId ? null : firstId,
-                          )
-                        }
-                        aria-label="Options"
-                      >
-                        <MoreVertical className="w-4 h-4 fc-text-dim" />
-                      </button>
-                      {menuOpenSetId === firstId && (
-                        <div
-                          className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                          style={{
-                            background: "var(--fc-surface-elevated)",
-                            border: "1px solid var(--fc-surface-card-border)",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                            onClick={() => handleEditSet(forSet[0])}
-                          >
-                            <Pencil className="w-4 h-4" /> Edit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <InlineRPERow
-                    setLogId={firstId.startsWith("temp-") ? null : firstId}
-                    currentRPE={rpeForSet}
-                    onRPESelect={async (rpe) => {
-                      // Update RPE for the isolation exercise entry (represents the set)
-                      const updatedEntry: LoggedSet = {
-                        ...iso!,
-                        rpe,
-                      };
-                      onSetLogUpsert?.(block.block.id, updatedEntry, {
-                        replaceId: iso!.id,
-                      });
-
-                      // If set is synced, update via API
-                      if (!firstId.startsWith("temp-")) {
-                        try {
-                          const res = await fetch(`/api/sets/${firstId}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ rpe }),
-                            credentials: "include",
-                          });
-                          if (!res.ok) {
-                            console.error("Failed to update RPE:", await res.text());
-                            const revertedEntry: LoggedSet = {
-                              ...iso!,
-                              rpe: iso!.rpe ?? undefined,
-                            };
-                            onSetLogUpsert?.(block.block.id, revertedEntry, {
-                              replaceId: iso!.id,
-                            });
-                          }
-                        } catch (err) {
-                          console.error("Error updating RPE:", err);
-                          const revertedEntry: LoggedSet = {
-                            ...iso!,
-                            rpe: iso!.rpe ?? undefined,
-                          };
-                          onSetLogUpsert?.(block.block.id, revertedEntry, {
-                            replaceId: iso!.id,
-                          });
-                        }
-                      }
-                    }}
-                    isLatestSet={isLatestSet}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
       {allowSetEditDelete && totalSets > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
@@ -874,7 +726,7 @@ export function PreExhaustionExecutor({
             }}
           />
         )}
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
           <div className="space-y-2">
             <LargeInput
               label="Weight"
@@ -896,8 +748,7 @@ export function PreExhaustionExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
-              plateCalculatorEnabled
-            />
+              />
             {!editDraft &&
               coachSuggestedIso != null &&
               coachSuggestedIso > 0 && (
@@ -975,7 +826,7 @@ export function PreExhaustionExecutor({
             }}
           />
         )}
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
           <div className="space-y-2">
             <LargeInput
               label="Weight"
@@ -995,8 +846,7 @@ export function PreExhaustionExecutor({
               unit="kg"
               showStepper
               stepAmount={2.5}
-              plateCalculatorEnabled
-            />
+              />
             {!editDraft &&
               coachSuggestedComp != null &&
               coachSuggestedComp > 0 && (
@@ -1127,8 +977,7 @@ export function PreExhaustionExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
-        onPlateCalculatorClick,
-        onRestTimerClick,
+              onRestTimerClick,
         onWorkoutBack,
         previousPerformanceMap,
       }}
@@ -1140,7 +989,7 @@ export function PreExhaustionExecutor({
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
-      logSectionTitle={`LOG ROUND ${displaySetNumber}`}
+      aboveStickyContent={aboveStickyContent}
       showNavigation={true}
       currentExercise={titleExercisePre}
       showRestTimer={!!block.block.rest_seconds}

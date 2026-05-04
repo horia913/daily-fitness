@@ -4,6 +4,10 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { useRouter } from "next/navigation";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import {
+  resetTimezoneSyncGuard,
+  syncProfileTimezoneOnce,
+} from "@/lib/timezoneSync";
 
 export type ClientType = "online" | "in_gym";
 
@@ -36,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const profileLoadedForRef = useRef<string | null>(null);
+  /** One timezone sync attempt per signed-in user per session (avoids loops on profile re-fetches). */
+  const timezoneSyncAttemptedForUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
@@ -59,50 +65,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, fetchProfile]);
 
   useEffect(() => {
+    if (!user?.id || !profile) return;
+    const uid = user.id;
+    if (timezoneSyncAttemptedForUserIdRef.current === uid) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const updated = await syncProfileTimezoneOnce(uid, profile.timezone);
+        if (cancelled) return;
+        timezoneSyncAttemptedForUserIdRef.current = uid;
+        if (updated) {
+          const p = await fetchProfile(uid);
+          if (!cancelled && p) setProfile(p);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("[AuthContext] timezone sync failed", e);
+          timezoneSyncAttemptedForUserIdRef.current = uid;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, profile, fetchProfile]);
+
+  useEffect(() => {
     let mounted = true;
 
-    // Listen for auth state changes — this is the PRIMARY auth mechanism
+    // IMPORTANT: This callback must NOT be async and must NOT call any supabase methods directly.
+    // The auth lock is held during this callback. Calling supabase.from() or supabase.auth.* inside
+    // will deadlock. Defer all Supabase operations via setTimeout(..., 0).
+    // See: https://supabase.com/docs/reference/javascript/auth-onauthstatechange
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      (_event, newSession) => {
         if (!mounted) return;
-        
+
         const newUser = newSession?.user ?? null;
         setSession(newSession);
         setUser(newUser);
-        
-        if (newUser && profileLoadedForRef.current !== newUser.id) {
-          profileLoadedForRef.current = newUser.id;
-          const p = await fetchProfile(newUser.id);
-          if (mounted) setProfile(p);
-        } else if (!newUser) {
-          profileLoadedForRef.current = null;
-          setProfile(null);
-        }
-        
         setLoading(false);
+
+        setTimeout(() => {
+          if (!mounted) return;
+
+          if (newUser && profileLoadedForRef.current !== newUser.id) {
+            profileLoadedForRef.current = newUser.id;
+            void fetchProfile(newUser.id).then((p) => {
+              if (mounted) setProfile(p);
+            });
+          } else if (!newUser) {
+            profileLoadedForRef.current = null;
+            setProfile(null);
+          }
+        }, 0);
       }
     );
 
-    // Also do an initial getSession check
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    // Watchdog fallback: in rare cases INITIAL_SESSION may not arrive promptly.
+    // If loading is still unresolved after 5s, settle loading and reconcile session once.
+    const watchdog = setTimeout(() => {
       if (!mounted) return;
-      if (s?.user) {
-        setSession(s);
-        setUser(s.user);
-        if (profileLoadedForRef.current !== s.user.id) {
-          profileLoadedForRef.current = s.user.id;
-          fetchProfile(s.user.id).then(p => {
-            if (mounted) setProfile(p);
+
+      setLoading((currentLoading) => {
+        if (!currentLoading) return currentLoading;
+
+        void supabase.auth
+          .getSession()
+          .then(({ data: { session: recoveredSession } }) => {
+            if (!mounted) return;
+            setSession(recoveredSession ?? null);
+            setUser(recoveredSession?.user ?? null);
+
+            if (recoveredSession?.user && profileLoadedForRef.current !== recoveredSession.user.id) {
+              profileLoadedForRef.current = recoveredSession.user.id;
+              void fetchProfile(recoveredSession.user.id).then((p) => {
+                if (mounted) setProfile(p);
+              });
+            } else if (!recoveredSession?.user) {
+              profileLoadedForRef.current = null;
+              setProfile(null);
+            }
+          })
+          .catch((err) => {
+            console.error("[AuthContext] watchdog getSession failed", err);
           });
-        }
-      }
-      setLoading(false);
-    }).catch(() => {
-      if (mounted) setLoading(false);
-    });
+
+        return false;
+      });
+    }, 5000);
+
+    // Use onAuthStateChange as the single source of truth.
+    // Supabase emits INITIAL_SESSION on mount, so we avoid a parallel getSession()
+    // path that can double-fetch profile and create auth timing races.
 
     return () => {
       mounted = false;
+      clearTimeout(watchdog);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
@@ -113,6 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     profileLoadedForRef.current = null;
+    timezoneSyncAttemptedForUserIdRef.current = null;
+    resetTimezoneSyncGuard();
     router.push("/");
   }, [router]);
 

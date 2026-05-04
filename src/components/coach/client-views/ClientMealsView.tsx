@@ -28,8 +28,60 @@ import { DatabaseService, type Client } from '@/lib/database'
 import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/toast-provider'
-import { NutritionComplianceChart } from '@/components/progress/NutritionComplianceChart'
+import ClientDetailHero from '@/components/coach/client-detail/ClientDetailHero'
+import ComplianceCard from '@/components/coach/client-detail/ComplianceCard'
+import HeatStrip, { type HeatStripRange } from '@/components/coach/client-detail/HeatStrip'
+import EmptyStateBlock from '@/components/coach/client-detail/EmptyStateBlock'
+import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
 import ClientMealEditor from '@/components/coach/client-views/ClientMealEditor'
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+} from '@/lib/clientZonedCalendar'
+
+type MacroAdherenceStatus = 'idle' | 'loading' | 'unavailable' | 'ready'
+
+/** Last `days` calendar days ending on client-local `today` (YYYY-MM-DD). Used for macro trend / rolling KPIs. */
+function rollingWindowYmds(tz: string, days: number): string[] {
+  const today = zonedCalendarDateString(new Date(), tz)
+  const out: string[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    out.push(addCalendarDaysYmd(today, -i))
+  }
+  return out
+}
+
+/** Mon..Sun YYYY-MM-DD for the calendar week containing `now` in `tz` (same window as `computeNutritionWeek` in adherence API). */
+function currentWeekMonSunYmds(tz: string): string[] {
+  const mon = mondayYmdOfZonedWeekContaining(new Date(), tz)
+  return Array.from({ length: 7 }, (_, dow) => addCalendarDaysYmd(mon, dow))
+}
+
+type ActiveAssignmentRow = {
+  id: string
+  meal_plan_id: string
+  start_date: string
+  end_date: string | null
+  created_at: string
+}
+
+/**
+ * Same resolution as `pickActiveMealPlanAssignment` in `src/app/api/coach/analytics/adherence/route.ts`
+ * (active rows already scoped to this client and `is_active`).
+ */
+function pickActiveMealPlanAssignmentForDay(
+  activeRows: ActiveAssignmentRow[],
+  dayYmd: string
+): ActiveAssignmentRow | null {
+  const matches = activeRows.filter(
+    (a) => a.start_date <= dayYmd && (a.end_date == null || a.end_date >= dayYmd)
+  )
+  if (matches.length === 0) return null
+  matches.sort((a, b) => b.start_date.localeCompare(a.start_date))
+  return matches[0] ?? null
+}
 
 interface ClientMealsViewProps {
   clientId: string
@@ -88,6 +140,8 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   const [mealPlanCompliance, setMealPlanCompliance] = useState<MealPlanCompliance | null>(null)
   const [macroAdherence, setMacroAdherence] = useState<MacroAdherence | null>(null)
   const [complianceTrend, setComplianceTrend] = useState<Array<{ date: string; compliance: number }>>([])
+  const [clientTz, setClientTz] = useState('UTC')
+  const [heatRange, setHeatRange] = useState<HeatStripRange>('2W')
   // Phase N4/N5: today's plan selection + 7-day history; assign-another flow; Today's Plan block
   const [todaySelectionAssignmentId, setTodaySelectionAssignmentId] = useState<string | null>(null)
   const [selectionHistory, setSelectionHistory] = useState<Array<{ date: string; label: string; assignmentId: string }>>([])
@@ -102,7 +156,9 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     avg: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
     targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
   } | null>(null)
-  const [assignmentCompliance, setAssignmentCompliance] = useState<Record<string, number>>({})
+  const [assignmentCompliance, setAssignmentCompliance] = useState<Record<string, number | null>>({})
+  const [macroAdherenceStatus, setMacroAdherenceStatus] =
+    useState<MacroAdherenceStatus>('idle')
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedPlanForAssign, setSelectedPlanForAssign] = useState<MealPlan | null>(null)
   const [coachMealPlans, setCoachMealPlans] = useState<MealPlan[]>([])
@@ -118,36 +174,46 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   const loadAllData = async () => {
     try {
       setLoading(true)
-      
+      setMacroAdherenceStatus('idle')
+
+      const { data: profTz } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', clientId)
+        .maybeSingle()
+      const tz = normalizeClientTimezone(profTz?.timezone)
+      setClientTz(tz)
+
       // 1. Detect mode
       const mode = await getClientNutritionMode(clientId)
       setNutritionMode(mode)
-      
+
       // 2. Load meal plans (for all modes - needed for compliance)
       await loadMealPlans()
-      await loadPlanSelectionHistory()
+      await loadPlanSelectionHistory(tz)
 
       // 3. Load compliance data based on mode
       if (mode === 'meal_plan' || mode === 'hybrid') {
-        await loadMealPlanCompliance()
-        await loadWeeklyCompliance()
-        await loadWeeklyMacroAdherence()
-        await loadAssignmentCompliance()
+        await loadMealPlanCompliance(tz)
+        await loadWeeklyCompliance(tz)
+        await loadWeeklyMacroAdherence(tz)
+        await loadAssignmentCompliance(tz)
       }
 
       if (mode === 'goal_based' || mode === 'hybrid') {
-        await loadMacroAdherence()
+        setMacroAdherence(null)
+        setMacroAdherenceStatus('loading')
+        await loadMacroAdherence(tz)
+      } else {
+        setMacroAdherenceStatus('idle')
       }
 
-      // 4. Load compliance trend for chart (last 90 days)
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 90)
-      getNutritionComplianceTrend(
-        clientId,
-        start.toISOString().split('T')[0],
-        end.toISOString().split('T')[0]
-      ).then(setComplianceTrend).catch(() => setComplianceTrend([]))
+      // 4. Load compliance trend for chart (last 90 days, client-local bounds)
+      const todayYmd = zonedCalendarDateString(new Date(), tz)
+      const chartStart = addCalendarDaysYmd(todayYmd, -90)
+      getNutritionComplianceTrend(clientId, chartStart, todayYmd)
+        .then(setComplianceTrend)
+        .catch(() => setComplianceTrend([]))
     } catch (error) {
       console.error('Error loading nutrition data:', error)
     } finally {
@@ -181,12 +247,11 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadPlanSelectionHistory = async () => {
+  const loadPlanSelectionHistory = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-      const start = sevenDaysAgo.toISOString().split('T')[0]
+      const dates = rollingWindowYmds(tz, 7)
+      const start = dates[0]!
+      const today = dates[dates.length - 1]!
 
       const { data: selections, error } = await supabase
         .from('client_daily_plan_selection')
@@ -231,9 +296,9 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadMealPlanCompliance = async () => {
+  const loadMealPlanCompliance = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = zonedCalendarDateString(new Date(), tz)
 
       // Phase N4: Use today's plan selection if set, else first active assignment
       const { data: todaySelection } = await supabase
@@ -404,38 +469,35 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadWeeklyCompliance = async () => {
+  const loadWeeklyCompliance = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const dates: string[] = []
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date()
-        d.setDate(d.getDate() - i)
-        dates.push(d.toISOString().split('T')[0])
-      }
-      const start = dates[0]
-      const end = dates[dates.length - 1]
+      const todayYmd = zonedCalendarDateString(new Date(), tz)
+      const dates = currentWeekMonSunYmds(tz)
+      const start = dates[0]!
+      const end = dates[6]!
 
-      const { data: selections, error: selErr } = await supabase
-        .from('client_daily_plan_selection')
-        .select('date, meal_plan_assignment_id')
+      const { data: activeRowsRaw, error: actErr } = await supabase
+        .from('meal_plan_assignments')
+        .select('id, meal_plan_id, start_date, end_date, created_at')
         .eq('client_id', clientId)
-        .gte('date', start)
-        .lte('date', end)
+        .eq('is_active', true)
 
-      if (selErr) throw selErr
-      const selectionByDate = new Map<string, string>()
-      ;(selections || []).forEach((s: { date: string; meal_plan_assignment_id: string }) => {
-        selectionByDate.set(s.date, s.meal_plan_assignment_id)
-      })
+      if (actErr) throw actErr
+      const activeRows = (activeRowsRaw ?? []) as ActiveAssignmentRow[]
 
-      const assignmentIds = [...new Set((selections || []).map((s: { meal_plan_assignment_id: string }) => s.meal_plan_assignment_id))]
-      let assignmentPlanInfo = new Map<string, { planName: string; mealPlanId: string }>([])
-      if (assignmentIds.length > 0) {
+      const effectiveIds = new Set<string>()
+      for (const date of dates) {
+        if (date > todayYmd) continue
+        const picked = pickActiveMealPlanAssignmentForDay(activeRows, date)
+        if (picked) effectiveIds.add(picked.id)
+      }
+
+      let assignmentPlanInfo = new Map<string, { planName: string; mealPlanId: string }>()
+      if (effectiveIds.size > 0) {
         const { data: assignments } = await supabase
           .from('meal_plan_assignments')
           .select('id, meal_plan_id, meal_plans(name)')
-          .in('id', assignmentIds)
+          .in('id', [...effectiveIds])
         ;(assignments || []).forEach((a: { id: string; meal_plan_id: string; meal_plans: { name: string } | { name: string }[] | null }) => {
           const plan = Array.isArray(a.meal_plans) ? a.meal_plans[0] ?? null : a.meal_plans
           assignmentPlanInfo.set(a.id, {
@@ -467,11 +529,12 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         .lte('date', end)
 
       if (compErr) throw compErr
-      const completionsByDate = new Map<string, Set<string>>()
+      /** Rows per calendar day (same meal can log multiple rows; matches computeNutritionWeek capping). */
+      const completionsByDate = new Map<string, string[]>()
       ;(completions || []).forEach((c: { date: string; meal_id: string }) => {
-        const set = completionsByDate.get(c.date) ?? new Set()
-        set.add(c.meal_id)
-        completionsByDate.set(c.date, set)
+        const list = completionsByDate.get(c.date) ?? []
+        list.push(c.meal_id)
+        completionsByDate.set(c.date, list)
       })
 
       const planNameCounts = new Map<string, number>()
@@ -480,8 +543,16 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
       let daysWithPlan = 0
 
       for (const date of dates) {
-        const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })
-        const assignmentId = selectionByDate.get(date)
+        const dayLabel = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          weekday: 'short',
+        }).format(new Date(`${date}T12:00:00`))
+        if (date > todayYmd) {
+          dayRows.push({ date, dayLabel, planName: '—', totalMeals: 0, completed: 0, compliancePct: 0 })
+          continue
+        }
+        const picked = pickActiveMealPlanAssignmentForDay(activeRows, date)
+        const assignmentId = picked?.id ?? null
         if (!assignmentId) {
           dayRows.push({ date, dayLabel, planName: '—', totalMeals: 0, completed: 0, compliancePct: 0 })
           continue
@@ -493,8 +564,10 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         const mealIdsRaw = (mealPlanId && mealIdsByPlan.get(mealPlanId)) ?? []
         const mealIds = Array.isArray(mealIdsRaw) ? mealIdsRaw : []
         const totalMeals = mealIds.length
-        const completedSet = completionsByDate.get(date) ?? new Set()
-        const completed = mealIds.filter((id) => completedSet.has(id)).length
+        const mealIdSet = new Set(mealIds)
+        const rowsForDay = completionsByDate.get(date) ?? []
+        const inPlanRowCount = rowsForDay.filter((mid) => mealIdSet.has(mid)).length
+        const completed = Math.min(totalMeals, inPlanRowCount)
         const compliancePct = totalMeals > 0 ? Math.round((completed / totalMeals) * 100) : 0
         complianceSum += compliancePct
         daysWithPlan++
@@ -523,12 +596,11 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadWeeklyMacroAdherence = async () => {
+  const loadWeeklyMacroAdherence = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-      const start = sevenDaysAgo.toISOString().split('T')[0]
+      const dates = rollingWindowYmds(tz, 7)
+      const start = dates[0]!
+      const today = dates[dates.length - 1]!
 
       const { data: comps } = await supabase
         .from('meal_completions')
@@ -561,7 +633,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
             .eq('client_id', clientId)
             .eq('is_active', true)
             .lte('start_date', today)
-            .or('end_date.is.null,end_date.gte.' + today)
+            .or(`end_date.is.null,end_date.gte.${today}`)
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle()
@@ -666,7 +738,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
           .eq('client_id', clientId)
           .eq('is_active', true)
           .lte('start_date', today)
-          .or('end_date.is.null,end_date.gte.' + today)
+          .or(`end_date.is.null,end_date.gte.${today}`)
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle()
@@ -694,27 +766,28 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadAssignmentCompliance = async () => {
+  /** Per-assignment % = round(100 * sum(completed_capped) / sum(expected)) Mon–Sun client week; same assignment rule + window as `computeNutritionWeek` (adherence API). */
+  const loadAssignmentCompliance = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-      const start = sevenDaysAgo.toISOString().split('T')[0]
+      const dates = currentWeekMonSunYmds(tz)
+      const start = dates[0]!
+      const end = dates[6]!
 
-      const { data: assignments, error: aErr } = await supabase
+      const { data: activeRowsRaw, error: actErr } = await supabase
         .from('meal_plan_assignments')
-        .select('id, meal_plan_id')
+        .select('id, meal_plan_id, start_date, end_date, created_at')
         .eq('client_id', clientId)
         .eq('is_active', true)
-        .lte('start_date', today)
-        .or('end_date.is.null,end_date.gte.' + today)
 
-      if (aErr || !assignments?.length) {
+      if (actErr) throw actErr
+      const activeRows = (activeRowsRaw ?? []) as ActiveAssignmentRow[]
+
+      if (activeRows.length === 0) {
         setAssignmentCompliance({})
         return
       }
 
-      const planIds = [...new Set(assignments.map((a: { meal_plan_id: string }) => a.meal_plan_id))]
+      const planIds = [...new Set(activeRows.map((a) => a.meal_plan_id))]
       const { data: meals } = await supabase
         .from('meals')
         .select('id, meal_plan_id')
@@ -731,23 +804,35 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         .select('meal_id, date')
         .eq('client_id', clientId)
         .gte('date', start)
-        .lte('date', today)
+        .lte('date', end)
 
-      if (cErr) {
-        setAssignmentCompliance({})
-        return
-      }
+      if (cErr) throw cErr
 
-      const result: Record<string, number> = {}
-      for (const a of assignments as { id: string; meal_plan_id: string }[]) {
+      const completionsByDate = new Map<string, string[]>()
+      ;(completions || []).forEach((c: { meal_id: string; date: string | null }) => {
+        if (!c.date) return
+        const list = completionsByDate.get(c.date) ?? []
+        list.push(c.meal_id)
+        completionsByDate.set(c.date, list)
+      })
+
+      const result: Record<string, number | null> = {}
+      for (const a of activeRows) {
         const mealIds = mealIdsByPlan.get(a.meal_plan_id) ?? []
-        const totalExpected = 7 * mealIds.length
-        const planMealSet = new Set(mealIds)
-        const completed = (completions || []).filter(
-          (c: { meal_id: string }) => planMealSet.has(c.meal_id)
-        ).length
-        const pct = totalExpected > 0 ? Math.round((completed / totalExpected) * 100) : 0
-        result[a.id] = pct
+        const expectedIfDay = mealIds.length
+        const mealIdSet = new Set(mealIds)
+        let sumExpected = 0
+        let sumCompleted = 0
+        for (const date of dates) {
+          const picked = pickActiveMealPlanAssignmentForDay(activeRows, date)
+          const eff = picked?.id ?? null
+          if (eff !== a.id) continue
+          sumExpected += expectedIfDay
+          const rows = completionsByDate.get(date) ?? []
+          const inPlanRowCount = rows.filter((mid) => mealIdSet.has(mid)).length
+          sumCompleted += Math.min(expectedIfDay, inPlanRowCount)
+        }
+        result[a.id] = sumExpected > 0 ? Math.round((100 * sumCompleted) / sumExpected) : null
       }
       setAssignmentCompliance(result)
     } catch (error) {
@@ -756,17 +841,16 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     }
   }
 
-  const loadMacroAdherence = async () => {
+  const loadMacroAdherence = async (tz: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      const startDate = sevenDaysAgo.toISOString().split('T')[0]
+      const today = zonedCalendarDateString(new Date(), tz)
+      const startDate = addCalendarDaysYmd(today, -6)
 
       // Get goals
       const goals = await getClientNutritionGoals(clientId)
       if (!goals || !goals.calories) {
         setMacroAdherence(null)
+        setMacroAdherenceStatus('unavailable')
         return
       }
 
@@ -819,9 +903,11 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         trend,
         todayEntries,
       })
+      setMacroAdherenceStatus('ready')
     } catch (error) {
       console.error('Error loading macro adherence:', error)
       setMacroAdherence(null)
+      setMacroAdherenceStatus('unavailable')
     }
   }
 
@@ -927,16 +1013,6 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     loadAllData()
   }
 
-  const getModeBadge = (mode: NutritionMode) => {
-    const badges = {
-      meal_plan: { label: 'MEAL PLAN', color: 'fc-text-workouts' },
-      goal_based: { label: 'MACRO GOALS', color: 'fc-text-success' },
-      hybrid: { label: 'HYBRID', color: 'fc-text-warning' },
-      none: { label: 'NONE', color: 'fc-text-dim' },
-    }
-    return badges[mode] || badges.none
-  }
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -949,53 +1025,93 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
     )
   }
 
-  const modeBadge = nutritionMode ? getModeBadge(nutritionMode) : null
+  const mealPlanCount = mealPlans.filter((a) => a.is_active).length
+  const macroModeLabel =
+    !nutritionMode || nutritionMode === 'none'
+      ? 'None'
+      : nutritionMode === 'goal_based'
+        ? 'Targets'
+        : nutritionMode === 'meal_plan'
+          ? 'Plan'
+          : 'Plan'
+  const complianceHeroTone =
+    unifiedCompliance <= 0 ? 'critical' : unifiedCompliance < 50 ? 'warning' : 'good'
+  const complianceCardAccent =
+    unifiedCompliance <= 0 ? 'crit' : unifiedCompliance < 50 ? 'warn' : 'good'
 
   return (
-    <div className="space-y-4">
-      {/* Mode Badge & Unified Compliance Score */}
-      <div className="fc-card-shell px-3 py-2">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="fc-icon-tile fc-icon-workouts">
-              <Apple className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                Nutrition
-              </span>
-              <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                Client Nutrition Overview
-              </h3>
-            </div>
+    <div className="space-y-3">
+      <ClientDetailHero
+        accent="good"
+        eyebrow="Assigned meal plans"
+        title="Nutrition"
+        subtitle="Macro targets, compliance, and assigned meal plans"
+        stats={[
+          { num: `${unifiedCompliance}`, numSuffix: '%', label: 'Compliance', tone: complianceHeroTone },
+          { num: mealPlanCount, label: 'Plans', tone: 'default' },
+          {
+            num: macroModeLabel,
+            label: 'Mode',
+            tone: macroModeLabel === 'None' ? 'warning' : 'good',
+          },
+        ]}
+      />
+
+      <ComplianceCard pct={unifiedCompliance} accent={complianceCardAccent} />
+
+      <SetNutritionGoals clientId={clientId} layoutVariant="coach" />
+
+      <section className={sec.section}>
+        <div className={sec.sectionHead}>
+          <div>
+            <h2 className={sec.sectionTitle}>Compliance trend</h2>
+            <p className={sec.sectionMeta}>Daily adherence to targets</p>
           </div>
-          <div className="flex items-center gap-3">
-            {modeBadge && (
-              <span className={`fc-pill fc-pill-glass ${modeBadge.color} text-xs font-semibold`}>
-                {modeBadge.label}
-              </span>
-            )}
-            <div className="text-right">
-              <div className="text-2xl font-bold fc-text-primary">{unifiedCompliance}%</div>
-              <div className="text-xs fc-text-dim">Compliance</div>
-            </div>
+          <div className={sec.rangeRow}>
+            {(['1W', '2W', '1M', '3M'] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`${sec.rangeTab} ${heatRange === r ? sec.rangeTabActive : ''}`}
+                onClick={() => setHeatRange(r)}
+              >
+                {r}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
-
-      {/* Nutrition Targets (macro goals) */}
-      <SetNutritionGoals clientId={clientId} />
-
-      {/* Compliance trend chart — coaches see trend before meal logs */}
-      <NutritionComplianceChart
-        data={complianceTrend}
-        defaultTimeRange="2W"
-        className="w-full"
-      />
+        <HeatStrip
+          range={heatRange}
+          onRangeChange={setHeatRange}
+          trend={complianceTrend}
+          timeZone={clientTz}
+          showRangeTabs={false}
+        />
+      </section>
 
       {/* Mode-Specific Views */}
       {nutritionMode === 'none' ? (
-        <NoPlanState onAssignMealPlan={handleOpenAssignAnother} />
+        <EmptyStateBlock
+          icon={UtensilsCrossed}
+          title="No meal plan assigned"
+          description="Assign a meal plan to track nutrition compliance, or set macro targets above."
+          actions={[
+            {
+              label: 'Assign plan',
+              variant: 'primary',
+              onClick: () => {
+                void handleOpenAssignAnother()
+              },
+            },
+            {
+              label: 'Set targets',
+              variant: 'outline',
+              onClick: () => {
+                document.querySelector('[data-nutrition-goals]')?.scrollIntoView({ behavior: 'smooth' })
+              },
+            },
+          ]}
+        />
       ) : nutritionMode === 'meal_plan' ? (
         <MealPlanModeView
           mealPlans={mealPlans}
@@ -1016,12 +1132,13 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
           onCancelEditLabel={() => { setEditingLabelId(null); setEditingLabelValue(''); }}
         />
       ) : nutritionMode === 'goal_based' ? (
-        <GoalBasedModeView adherence={macroAdherence} />
+        <GoalBasedModeView adherence={macroAdherence} macroAdherenceStatus={macroAdherenceStatus} />
       ) : nutritionMode === 'hybrid' ? (
         <HybridModeView
           mealPlans={mealPlans}
           mealPlanCompliance={mealPlanCompliance}
           macroAdherence={macroAdherence}
+          macroAdherenceStatus={macroAdherenceStatus}
           todayPlanSummary={todayPlanSummary}
           weeklyCompliance={weeklyCompliance}
           weeklyMacroAdherence={weeklyMacroAdherence}
@@ -1103,38 +1220,6 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
   )
 }
 
-// No Plan/Goals State
-function NoPlanState({ onAssignMealPlan }: { onAssignMealPlan: () => void }) {
-  return (
-    <div className="fc-card-shell p-8 text-center">
-      <EmptyState
-        variant="compact"
-        icon={UtensilsCrossed}
-        title="No meal plan assigned"
-        description="Assign a meal plan to track nutrition."
-        className="mb-6"
-      />
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <Button
-          variant="fc-primary"
-          type="button"
-          onClick={() => onAssignMealPlan()}
-        >
-          Assign meal plan
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            document.querySelector('[data-nutrition-goals]')?.scrollIntoView({ behavior: 'smooth' })
-          }}
-        >
-          Set macro targets
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 // Meal Plan Mode View (Phase N4/N5: multi-plan, selection history, Today's Plan block, deactivate, edit label, assign another)
 function MealPlanModeView({
   mealPlans,
@@ -1167,7 +1252,7 @@ function MealPlanModeView({
     avg: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
     targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
   } | null
-  assignmentCompliance: Record<string, number>
+  assignmentCompliance: Record<string, number | null>
   todaySelectionAssignmentId: string | null
   selectionHistory: Array<{ date: string; label: string; assignmentId: string }>
   onDeactivate: (id: string) => void
@@ -1204,7 +1289,7 @@ function MealPlanModeView({
         </div>
       )}
 
-      {/* This Week — 7-day compliance grid (Phase N5) */}
+      {/* This Week — Mon–Sun calendar week (client tz), matches adherence cockpit */}
       {weeklyCompliance && weeklyCompliance.days.length > 0 && (
         <div className="rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2 mb-4">
           <h4 className="text-sm font-semibold fc-text-primary mb-3">This Week</h4>
@@ -1342,10 +1427,10 @@ function MealPlanModeView({
         </div>
       )}
 
-      {/* Macro Adherence — This Week Avg (Phase N5) */}
+      {/* Macro from meal completions — rolling last 7 days (not calendar week) */}
       {weeklyMacroAdherence && (
         <div className="fc-card-shell p-4 sm:p-6 mb-6">
-          <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (This Week Avg)</h4>
+          <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (last 7 days avg)</h4>
           <p className="text-xs fc-text-dim mb-3">Based on completed meals&apos; option macros.</p>
           <div className="space-y-2 text-sm">
             {weeklyMacroAdherence.targets.calories > 0 && (
@@ -1411,18 +1496,37 @@ function MealPlanModeView({
 }
 
 // Goal-Based Mode View
-function GoalBasedModeView({ adherence }: { adherence: MacroAdherence | null }) {
-  if (!adherence) {
+function GoalBasedModeView({
+  adherence,
+  macroAdherenceStatus,
+}: {
+  adherence: MacroAdherence | null
+  macroAdherenceStatus: MacroAdherenceStatus
+}) {
+  if (macroAdherenceStatus === 'loading' || macroAdherenceStatus === 'idle') {
     return (
-      <div className="fc-card-shell p-8 text-center">
-        <p className="fc-text-dim">Loading macro adherence data...</p>
+      <div className="fc-card-shell p-8 space-y-4 animate-pulse" aria-busy="true">
+        <div className="h-6 fc-glass-soft rounded-md w-1/3 max-w-[12rem]" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="h-24 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
+            />
+          ))}
+        </div>
+        <div className="h-8 fc-glass-soft rounded-md w-full max-w-md mx-auto" />
       </div>
     )
   }
 
-  const caloriePercentage = adherence.todayTarget.calories > 0
-    ? Math.round((adherence.todayTotal.calories / adherence.todayTarget.calories) * 100)
-    : 0
+  if (macroAdherenceStatus === 'unavailable' || !adherence) {
+    return (
+      <div className="fc-card-shell p-8 text-center">
+        <p className="fc-text-dim text-sm">Set calorie targets above to see macro adherence.</p>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -1479,14 +1583,15 @@ function GoalBasedModeView({ adherence }: { adherence: MacroAdherence | null }) 
             </div>
           </div>
 
-          {/* 7-Day Adherence */}
+          {/* Last 7 days (rolling); log range matches `loadMacroAdherence` */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold fc-text-primary">7-Day Adherence</h4>
+              <h4 className="text-sm font-semibold fc-text-primary">Last 7 days adherence</h4>
               <span className="text-lg font-bold text-cyan-400 tabular-nums">{adherence.sevenDayAdherence}%</span>
             </div>
             <p className="text-xs fc-text-dim mb-3">
-              Days within 10% of calorie target: {adherence.trend.filter(t => t.withinTarget).length} / {adherence.trend.length}
+              Days within 10% of calorie target (last 7 days):{' '}
+              {adherence.trend.filter((t) => t.withinTarget).length} / {adherence.trend.length}
             </p>
             <div className="flex gap-1">
               {adherence.trend.map((day, idx) => (
@@ -1540,6 +1645,7 @@ function HybridModeView({
   mealPlans,
   mealPlanCompliance,
   macroAdherence,
+  macroAdherenceStatus,
   todayPlanSummary,
   weeklyCompliance,
   weeklyMacroAdherence,
@@ -1558,6 +1664,7 @@ function HybridModeView({
   mealPlans: MealPlanAssignment[]
   mealPlanCompliance: MealPlanCompliance | null
   macroAdherence: MacroAdherence | null
+  macroAdherenceStatus: MacroAdherenceStatus
   todayPlanSummary: { planName: string; label?: string; targetCalories?: number } | null
   weeklyCompliance: {
     days: Array<{ date: string; dayLabel: string; planName: string; totalMeals: number; completed: number; compliancePct: number }>
@@ -1569,7 +1676,7 @@ function HybridModeView({
     avg: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
     targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number }
   } | null
-  assignmentCompliance: Record<string, number>
+  assignmentCompliance: Record<string, number | null>
   todaySelectionAssignmentId: string | null
   selectionHistory: Array<{ date: string; label: string; assignmentId: string }>
   onDeactivate: (id: string) => void
@@ -1581,30 +1688,40 @@ function HybridModeView({
   onStartEditLabel: (id: string, current: string | null) => void
   onCancelEditLabel: () => void
 }) {
-  if (!mealPlanCompliance || !macroAdherence) {
+  if (!mealPlanCompliance) {
     return (
-      <div className="fc-card-shell p-8 text-center">
-        <p className="fc-text-dim">Loading hybrid data...</p>
+      <div className="fc-card-shell p-8 text-center" aria-busy="true">
+        <p className="fc-text-dim">Loading meal plan data...</p>
       </div>
     )
   }
 
-  const fromPlan = {
-    calories: macroAdherence.todayTotal.calories - macroAdherence.todayEntries.reduce((sum, e) => sum + e.calories, 0),
-    protein: macroAdherence.todayTotal.protein - macroAdherence.todayEntries.reduce((sum, e) => sum + e.protein_g, 0),
-    carbs: macroAdherence.todayTotal.carbs - macroAdherence.todayEntries.reduce((sum, e) => sum + e.carbs_g, 0),
-    fat: macroAdherence.todayTotal.fat - macroAdherence.todayEntries.reduce((sum, e) => sum + e.fat_g, 0),
-  }
-  const fromAdditional = {
-    calories: macroAdherence.todayEntries.reduce((sum, e) => sum + e.calories, 0),
-    protein: macroAdherence.todayEntries.reduce((sum, e) => sum + e.protein_g, 0),
-    carbs: macroAdherence.todayEntries.reduce((sum, e) => sum + e.carbs_g, 0),
-    fat: macroAdherence.todayEntries.reduce((sum, e) => sum + e.fat_g, 0),
-  }
-  const total = macroAdherence.todayTotal
-  const target = macroAdherence.todayTarget
+  const ma = macroAdherenceStatus === 'ready' && macroAdherence != null ? macroAdherence : null
+  const macroLoading = macroAdherenceStatus === 'loading' || macroAdherenceStatus === 'idle'
+  const macroUnavailable =
+    macroAdherenceStatus === 'unavailable' ||
+    (macroAdherenceStatus === 'ready' && macroAdherence == null)
 
-  const isOverTarget = target.calories > 0 && total.calories > target.calories * 1.2
+  const fromPlan = ma
+    ? {
+        calories: ma.todayTotal.calories - ma.todayEntries.reduce((sum, e) => sum + e.calories, 0),
+        protein: ma.todayTotal.protein - ma.todayEntries.reduce((sum, e) => sum + e.protein_g, 0),
+        carbs: ma.todayTotal.carbs - ma.todayEntries.reduce((sum, e) => sum + e.carbs_g, 0),
+        fat: ma.todayTotal.fat - ma.todayEntries.reduce((sum, e) => sum + e.fat_g, 0),
+      }
+    : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const fromAdditional = ma
+    ? {
+        calories: ma.todayEntries.reduce((sum, e) => sum + e.calories, 0),
+        protein: ma.todayEntries.reduce((sum, e) => sum + e.protein_g, 0),
+        carbs: ma.todayEntries.reduce((sum, e) => sum + e.carbs_g, 0),
+        fat: ma.todayEntries.reduce((sum, e) => sum + e.fat_g, 0),
+      }
+    : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const total = ma ? ma.todayTotal : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const target = ma ? ma.todayTarget : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+
+  const isOverTarget = ma != null && target.calories > 0 && total.calories > target.calories * 1.2
 
   return (
     <>
@@ -1668,10 +1785,10 @@ function HybridModeView({
         </div>
       )}
 
-      {/* Macro Adherence — This Week Avg (Phase N5) — Hybrid */}
+      {/* Macro from meal completions — rolling last 7 days (not calendar week) — Hybrid */}
       {weeklyMacroAdherence && (
         <div className="fc-card-shell p-4 sm:p-6 mb-6">
-          <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (This Week Avg)</h4>
+          <h4 className="text-sm font-semibold fc-text-primary mb-2">Macro Adherence (last 7 days avg)</h4>
           <p className="text-xs fc-text-dim mb-3">Based on completed meals&apos; option macros.</p>
           <div className="space-y-2 text-sm">
             {weeklyMacroAdherence.targets.calories > 0 && (
@@ -1815,119 +1932,137 @@ function HybridModeView({
           </div>
         </div>
         <div className="px-3 py-2 space-y-3">
-          {/* Breakdown */}
-          <div>
-            <h4 className="text-sm font-semibold fc-text-primary mb-3">Today&apos;s Breakdown</h4>
-            <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="fc-text-dim">From meal plan:</span>
-                <span className="font-semibold fc-text-primary">
-                  {Math.round(fromPlan.calories)} cal ({mealPlanCompliance.loggedMeals} meals logged)
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="fc-text-dim">Additional food:</span>
-                <span className="font-semibold fc-text-primary">
-                  {Math.round(fromAdditional.calories)} cal ({macroAdherence.todayEntries.length} items)
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-[color:var(--fc-glass-border)]">
-                <span className="fc-text-primary font-semibold">Total:</span>
-                <span className="font-bold fc-text-primary">
-                  {Math.round(total.calories)} / {target.calories.toLocaleString()} cal target
-                </span>
-              </div>
-              {isOverTarget && (
-                <div className="flex items-center gap-2 text-xs fc-text-error mt-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Client is significantly over calorie target (additional food may be pushing over)</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Macro Cards */}
-          <div>
-            <h4 className="text-sm font-semibold fc-text-primary mb-3">Macro Totals</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <MacroCard
-                label="Calories"
-                consumed={total.calories}
-                target={target.calories}
-                unit="kcal"
-                icon={Flame}
-              />
-              <MacroCard
-                label="Protein"
-                consumed={total.protein}
-                target={target.protein}
-                unit="g"
-                icon={TrendingUp}
-              />
-              <MacroCard
-                label="Carbs"
-                consumed={total.carbs}
-                target={target.carbs}
-                unit="g"
-                icon={TrendingUp}
-              />
-              <MacroCard
-                label="Fat"
-                consumed={total.fat}
-                target={target.fat}
-                unit="g"
-                icon={TrendingUp}
-              />
-            </div>
-          </div>
-
-          {/* 7-Day Adherence */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold fc-text-primary">7-Day Adherence</h4>
-              <span className="text-lg font-bold fc-text-primary">{macroAdherence.sevenDayAdherence}%</span>
-            </div>
-            <div className="flex gap-1">
-              {macroAdherence.trend.map((day, idx) => (
-                <div
-                  key={idx}
-                  className={`flex-1 h-8 rounded ${
-                    day.withinTarget ? 'bg-[color:var(--fc-status-success)]' : 'bg-[color:var(--fc-glass-highlight)]'
-                  }`}
-                  title={`${day.date}: ${day.calories} / ${day.target} cal`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Additional Food List */}
-          {macroAdherence.todayEntries.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold fc-text-primary mb-3">Additional Food Logged</h4>
-              <div className="space-y-2">
-                {macroAdherence.todayEntries.map(entry => (
-                  <div
-                    key={entry.id}
-                    className="border-b border-[color:var(--fc-glass-border)] px-2 py-2 last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold fc-text-primary">
-                          {entry.food?.name || 'Unknown Food'}
-                        </div>
-                        <div className="text-xs fc-text-dim">
-                          {entry.quantity} {entry.unit} • {Math.round(entry.calories)} cal
-                        </div>
-                      </div>
-                      <div className="text-xs fc-text-dim text-right">
-                        {Math.round(entry.protein_g)}P / {Math.round(entry.carbs_g)}C / {Math.round(entry.fat_g)}F
-                      </div>
-                    </div>
-                  </div>
+          {macroLoading ? (
+            <div className="space-y-4 animate-pulse py-4" aria-busy="true">
+              <div className="h-24 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-20 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]" />
                 ))}
               </div>
+              <div className="h-8 fc-glass-soft rounded-md w-full max-w-md" />
             </div>
-          )}
+          ) : macroUnavailable ? (
+            <p className="fc-text-dim text-sm text-center py-6">
+              Set calorie targets above to see macro adherence.
+            </p>
+          ) : ma ? (
+            <>
+              {/* Breakdown */}
+              <div>
+                <h4 className="text-sm font-semibold fc-text-primary mb-3">Today&apos;s Breakdown</h4>
+                <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="fc-text-dim">From meal plan:</span>
+                    <span className="font-semibold fc-text-primary">
+                      {Math.round(fromPlan.calories)} cal ({mealPlanCompliance.loggedMeals} meals logged)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="fc-text-dim">Additional food:</span>
+                    <span className="font-semibold fc-text-primary">
+                      {Math.round(fromAdditional.calories)} cal ({ma.todayEntries.length} items)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm pt-2 border-t border-[color:var(--fc-glass-border)]">
+                    <span className="fc-text-primary font-semibold">Total:</span>
+                    <span className="font-bold fc-text-primary">
+                      {Math.round(total.calories)} / {target.calories.toLocaleString()} cal target
+                    </span>
+                  </div>
+                  {isOverTarget && (
+                    <div className="flex items-center gap-2 text-xs fc-text-error mt-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Client is significantly over calorie target (additional food may be pushing over)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Macro Cards */}
+              <div>
+                <h4 className="text-sm font-semibold fc-text-primary mb-3">Macro Totals</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <MacroCard
+                    label="Calories"
+                    consumed={total.calories}
+                    target={target.calories}
+                    unit="kcal"
+                    icon={Flame}
+                  />
+                  <MacroCard
+                    label="Protein"
+                    consumed={total.protein}
+                    target={target.protein}
+                    unit="g"
+                    icon={TrendingUp}
+                  />
+                  <MacroCard
+                    label="Carbs"
+                    consumed={total.carbs}
+                    target={target.carbs}
+                    unit="g"
+                    icon={TrendingUp}
+                  />
+                  <MacroCard
+                    label="Fat"
+                    consumed={total.fat}
+                    target={target.fat}
+                    unit="g"
+                    icon={TrendingUp}
+                  />
+                </div>
+              </div>
+
+              {/* Last 7 days (rolling); log range matches `loadMacroAdherence` */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold fc-text-primary">Last 7 days adherence</h4>
+                  <span className="text-lg font-bold fc-text-primary">{ma.sevenDayAdherence}%</span>
+                </div>
+                <div className="flex gap-1">
+                  {ma.trend.map((day, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex-1 h-8 rounded ${
+                        day.withinTarget ? 'bg-[color:var(--fc-status-success)]' : 'bg-[color:var(--fc-glass-highlight)]'
+                      }`}
+                      title={`${day.date}: ${day.calories} / ${day.target} cal`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Food List */}
+              {ma.todayEntries.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold fc-text-primary mb-3">Additional Food Logged</h4>
+                  <div className="space-y-2">
+                    {ma.todayEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="border-b border-[color:var(--fc-glass-border)] px-2 py-2 last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-semibold fc-text-primary">
+                              {entry.food?.name || 'Unknown Food'}
+                            </div>
+                            <div className="text-xs fc-text-dim">
+                              {entry.quantity} {entry.unit} • {Math.round(entry.calories)} cal
+                            </div>
+                          </div>
+                          <div className="text-xs fc-text-dim text-right">
+                            {Math.round(entry.protein_g)}P / {Math.round(entry.carbs_g)}C / {Math.round(entry.fat_g)}F
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -1964,7 +2099,7 @@ function MealPlansList({
   onCancelEditLabel,
 }: {
   mealPlans: MealPlanAssignment[]
-  assignmentCompliance?: Record<string, number>
+  assignmentCompliance?: Record<string, number | null>
   todaySelectionAssignmentId?: string | null
   onDeactivate: (id: string) => void
   onEditLabel: (id: string, label: string | null) => void
@@ -2037,7 +2172,11 @@ function MealPlansList({
                         </span>
                         {assignmentCompliance[plan.id] !== undefined && (
                           <span className="fc-pill fc-pill-glass fc-text-dim text-xs">
-                            Compliance: {assignmentCompliance[plan.id]}% (last 7 days)
+                            Compliance:{' '}
+                            {assignmentCompliance[plan.id] === null
+                              ? '—'
+                              : `${assignmentCompliance[plan.id]}%`}{' '}
+                            (this week)
                           </span>
                         )}
                       </div>

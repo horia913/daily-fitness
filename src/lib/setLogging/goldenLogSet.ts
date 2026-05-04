@@ -16,6 +16,7 @@ import {
   GLF_STORAGE_PREFIX,
   buildIdempotencyKey,
 } from "./types";
+import { fetchApi } from "@/lib/apiClient";
 
 // Re-export for convenience
 export { buildIdempotencyKey };
@@ -128,7 +129,7 @@ export async function syncEntry(
   const timeoutId = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
 
   try {
-    const response = await fetch("/api/log-set", {
+    const response = await fetchApi("/api/log-set", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildSyncPayload(entry)),

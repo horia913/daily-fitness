@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import ExerciseCategoryForm from "@/components/ExerciseCategoryForm";
+import { fetchApi } from "@/lib/apiClient";
 
 interface ExerciseCategory {
   id: string;
@@ -57,7 +58,7 @@ export function CoachExerciseCategoriesPanel() {
     loadingRef.current = true;
     try {
       setLoading(true);
-      const res = await fetch("/api/coach/exercise-categories", { signal: signal ?? null });
+      const res = await fetchApi("/api/coach/exercise-categories", { signal: signal ?? null });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -230,7 +231,7 @@ export function CoachExerciseCategoriesPanel() {
             <button
               type="button"
               onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-primary)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
+              className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-lime)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.05)";
               }}
@@ -260,13 +261,19 @@ export function CoachExerciseCategoriesPanel() {
         />
       </div>
 
+      {/*
+        Phase 0b 6-FAB extension — mobile-only category FAB (md:hidden preserved).
+        Spec ref: design-system-v4 §6.21. Was: fc-btn fc-btn-primary fixed bottom-6
+        right-6 w-14 h-14 rounded-2xl, Plus w-7 h-7. Desktop "New category" unchanged.
+        Now: fab-action + md:hidden.
+      */}
       <button
         type="button"
         onClick={() => setShowCreateForm(true)}
-        className="fc-btn fc-btn-primary fixed bottom-6 right-6 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg md:hidden z-50"
+        className="fab-action md:hidden"
         aria-label="Create category"
       >
-        <Plus className="w-7 h-7" />
+        <Plus />
       </button>
     </>
   );

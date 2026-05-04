@@ -1,0 +1,94 @@
+.wrap {
+  overflow-x: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 62px repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 280px;
+}
+
+.dayHead {
+  text-align: center;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+  padding: 4px 0;
+}
+
+.dayHeadToday {
+  color: var(--fc-set-type-straight);
+  background: var(--fc-set-type-straight-soft);
+  border-radius: 6px;
+  border: 1px solid var(--fc-set-type-straight-border);
+}
+
+.rowLabel {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding-right: 4px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-secondary);
+}
+
+.rowIcon {
+  width: 10px;
+  height: 10px;
+  color: var(--fc-text-subtle);
+  flex-shrink: 0;
+}
+
+.cell {
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  box-sizing: border-box;
+}
+
+.cellTodayCol {
+  outline: 1.5px solid var(--fc-set-type-straight);
+  outline-offset: 1px;
+}
+
+.cellMet {
+  background: color-mix(in srgb, var(--fc-effort-easy) 14%, transparent);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: var(--fc-effort-easy);
+}
+
+.cellMiss {
+  background: rgba(255, 90, 95, 0.06);
+  border: 1px solid rgba(255, 90, 95, 0.18);
+  color: rgba(255, 90, 95, 0.55);
+}
+
+.cellNa {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--fc-divider);
+  color: var(--fc-text-quaternary);
+}
+
+.cellIcon {
+  width: 11px;
+  height: 11px;
+}
+
+.missX {
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.naText {
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 8px;
+}

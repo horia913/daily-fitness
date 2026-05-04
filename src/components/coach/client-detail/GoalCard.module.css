@@ -1,0 +1,101 @@
+.card {
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 11px;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-left: 3px solid var(--goal-accent, var(--fc-set-type-straight));
+}
+
+.title {
+  font-family: var(--f-headline, var(--font-geist-sans));
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--fc-text-primary);
+  margin: 0;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid var(--fc-glass-border);
+  color: var(--fc-text-subtle);
+  background: var(--fc-surface-card);
+}
+
+.pillStatusActive {
+  border-color: color-mix(in srgb, var(--fc-effort-easy) 45%, var(--fc-glass-border));
+  color: var(--fc-effort-easy);
+  background: color-mix(in srgb, var(--fc-effort-easy) 12%, transparent);
+}
+
+.pillStatusPaused {
+  border-color: color-mix(in srgb, var(--fc-effort-medium) 45%, var(--fc-glass-border));
+  color: var(--fc-effort-medium);
+  background: color-mix(in srgb, var(--fc-effort-medium) 10%, transparent);
+}
+
+.pillStatusDone {
+  border-color: color-mix(in srgb, var(--fc-text-subtle) 35%, var(--fc-glass-border));
+  color: var(--fc-text-subtle);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--fc-text-primary);
+}
+
+.current {
+  font-family: var(--f-display, var(--font-geist-sans));
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.barTrack {
+  flex: 1;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+}
+
+.target {
+  font-size: 10px;
+  color: var(--fc-text-subtle);
+  flex-shrink: 0;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+}

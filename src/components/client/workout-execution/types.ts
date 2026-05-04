@@ -34,7 +34,6 @@ export interface BaseBlockExecutorProps {
   ) => number | null;
   onVideoClick?: (videoUrl: string, title?: string) => void;
   onAlternativesClick?: (exerciseId: string) => void;
-  onPlateCalculatorClick?: () => void;
   onToolsClick?: () => void;
   onRestTimerClick?: () => void;
   /** Exit workout (e.g. confirm + navigate away). Wired from start page only. */

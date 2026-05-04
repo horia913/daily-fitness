@@ -10,11 +10,26 @@ import { Textarea } from '@/components/ui/textarea'
 import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { CheckCircle2, CreditCard, Plus } from 'lucide-react'
+import {
+  CheckCircle2,
+  CreditCard,
+  Plus,
+  RefreshCw,
+  Pencil,
+  XCircle,
+  Calendar,
+  Clock,
+  CircleDollarSign,
+  RectangleHorizontal,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import DetailGrid from '@/components/coach/client-detail/DetailGrid'
+import EmptyStateBlock from '@/components/coach/client-detail/EmptyStateBlock'
+import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
 
 export type CoachClientSubscriptionSectionProps = {
   clientId: string
+  layoutVariant?: 'default' | 'coachV6'
 }
 
 type SubscriptionRow = {
@@ -59,6 +74,7 @@ const PRESET_MONTHS = [1, 3, 6, 12] as const
 
 export default function CoachClientSubscriptionSection({
   clientId,
+  layoutVariant = 'default',
 }: CoachClientSubscriptionSectionProps) {
   const { addToast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -390,7 +406,7 @@ export default function CoachClientSubscriptionSection({
                 'w-full text-left rounded-xl border px-4 py-3 text-sm font-medium transition-colors',
                 'min-h-[48px] flex items-center gap-3',
                 selected
-                  ? 'border-[color:var(--fc-accent)] bg-[color:var(--fc-accent)]/12 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-accent)]/40'
+                  ? 'border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-accent-cyan)]/12 text-[color:var(--fc-text-primary)] ring-1 ring-[color:var(--fc-accent-cyan)]/40'
                   : 'border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-text-dim)]'
               )}
             >
@@ -398,7 +414,7 @@ export default function CoachClientSubscriptionSection({
                 className={cn(
                   'flex h-5 w-5 shrink-0 rounded-full border-2 items-center justify-center',
                   selected
-                    ? 'border-[color:var(--fc-accent)] bg-[color:var(--fc-accent)]'
+                    ? 'border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-accent-cyan)]'
                     : 'border-[color:var(--fc-glass-border)] bg-transparent'
                 )}
                 aria-hidden
@@ -415,7 +431,7 @@ export default function CoachClientSubscriptionSection({
           className={cn(
             'rounded-xl border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap',
             value === 'custom'
-              ? 'border-[color:var(--fc-accent)] bg-[color:var(--fc-accent)]/12 ring-1 ring-[color:var(--fc-accent)]/40'
+              ? 'border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-accent-cyan)]/12 ring-1 ring-[color:var(--fc-accent-cyan)]/40'
               : 'border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]'
           )}
         >
@@ -430,7 +446,7 @@ export default function CoachClientSubscriptionSection({
               className={cn(
                 'flex h-5 w-5 shrink-0 rounded-full border-2 items-center justify-center',
                 value === 'custom'
-                  ? 'border-[color:var(--fc-accent)] bg-[color:var(--fc-accent)]'
+                  ? 'border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-accent-cyan)]'
                   : 'border-[color:var(--fc-glass-border)]'
               )}
               aria-hidden
@@ -460,135 +476,345 @@ export default function CoachClientSubscriptionSection({
   )
 
   if (loading) {
-    return (
+    return layoutVariant === 'coachV6' ? (
+      <div className={`${sec.section} animate-pulse h-28`} aria-hidden />
+    ) : (
       <GlassCard elevation={1} className="fc-card-shell p-6 animate-pulse">
         <div className="h-24 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
       </GlassCard>
     )
   }
 
+  const latestRow = rows[0] ?? null
+  const expiredCoachV6 =
+    layoutVariant === 'coachV6' &&
+    !active &&
+    latestRow &&
+    !isRowActiveSubscription(latestRow) &&
+    latestRow.end_date < todayYmd()
+
+  const openAssign = () => {
+    setPlanPreset(3)
+    setCustomMonths('3')
+    setStartDate(todayYmd())
+    setAmount('')
+    setNotes('')
+    setCreateOpen(true)
+  }
+
   return (
     <>
-      <GlassCard
-        elevation={2}
-        className={cn(
-          'p-3 sm:p-4 border border-[color:var(--fc-glass-border)] border-l-2 rounded-xl',
-          !active
-            ? ''
-            : active && daysRemainingFromEnd(active.end_date) <= 14
-              ? 'border-l-red-500'
-              : 'border-l-cyan-500'
-        )}
-      >
-        {!active ? (
-          <div className="space-y-3">
-            <EmptyState
-              icon={CreditCard}
-              title="No active subscription"
-              description="Add a coaching plan with a start date and duration."
-            />
-            <Button
+      {layoutVariant === 'coachV6' ? (
+        !active && !expiredCoachV6 ? (
+          <EmptyStateBlock
+            icon={CreditCard}
+            title="No active subscription"
+            description="Assign a plan to track renewal dates and payments."
+            actions={[{ label: 'Assign plan', onClick: openAssign, variant: 'primary' }]}
+          />
+        ) : !active && expiredCoachV6 && latestRow ? (
+          <section className={sec.section}>
+            <div className={sec.sectionHead}>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{
+                    background: 'var(--fc-effort-max)',
+                    boxShadow: '0 0 6px var(--fc-effort-max)',
+                  }}
+                  aria-hidden
+                />
+                <span className={sec.eyebrow} style={{ color: 'var(--fc-effort-max)' }}>
+                  Expired
+                </span>
+              </div>
+              <span
+                className={sec.pillActive}
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--fc-effort-max) 35%, transparent)',
+                  color: 'var(--fc-effort-max)',
+                  background: 'color-mix(in srgb, var(--fc-effort-max) 10%, transparent)',
+                }}
+              >
+                Expired {Math.max(1, Math.abs(daysRemainingFromEnd(latestRow.end_date)))}d ago
+              </span>
+            </div>
+            <button
               type="button"
-              className="fc-btn fc-btn-primary gap-2"
-              onClick={() => {
-                setPlanPreset(3)
-                setCustomMonths('3')
-                setStartDate(todayYmd())
-                setAmount('')
-                setNotes('')
-                setCreateOpen(true)
-              }}
+              className={sec.btnPrimary}
+              style={{ width: '100%' }}
+              disabled={saving}
+              onClick={() => openRenew(latestRow)}
             >
-              <Plus className="w-4 h-4" />
-              Add Subscription
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[color:var(--fc-text-success)]">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <span className="font-semibold">Active</span>
-            </div>
-            <div className="text-sm rounded-lg border border-[color:var(--fc-glass-border)]">
-              <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
-                <span className="text-[color:var(--fc-text-dim)]">Plan: </span>
-                <span className="font-medium">
-                  {planLabelFromMonths(active.plan_duration_months ?? 1)}
+              <RefreshCw className="w-4 h-4" aria-hidden />
+              Renew
+            </button>
+          </section>
+        ) : active ? (
+          <section className={sec.section}>
+            <div className={sec.sectionHead}>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{
+                    background: 'var(--fc-effort-easy)',
+                    boxShadow: '0 0 6px var(--fc-effort-easy)',
+                    marginRight: 2,
+                  }}
+                  aria-hidden
+                />
+                <span className={sec.eyebrow} style={{ color: 'var(--fc-effort-easy)' }}>
+                  Active
                 </span>
-              </p>
-              <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
-                Status:{' '}
-                <span className="fc-text-primary font-medium">
-                  {String(active.subscription_status || 'active').replace(/_/g, ' ')}
-                </span>
-              </p>
-              <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
-                Started:{' '}
-                {new Date(active.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </p>
-              <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
-                Expires:{' '}
-                {new Date(active.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-                {(() => {
-                  const dr = daysRemainingFromEnd(active.end_date)
-                  if (dr < 0) return ' (expired)'
-                  return ` (${dr} day${dr === 1 ? '' : 's'} remaining)`
-                })()}
-              </p>
-              {active.amount_paid != null && String(active.amount_paid).trim() !== '' && (
-                <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
-                  Amount: {Number(active.amount_paid).toLocaleString()}
-                </p>
-              )}
-              {active.subscription_notes && (
-                <p className="fc-text-dim text-xs px-2 py-2 whitespace-pre-wrap">
-                  {active.subscription_notes}
-                </p>
-              )}
+              </div>
+              {(() => {
+                const dr = daysRemainingFromEnd(active.end_date)
+                const tone =
+                  dr > 14 ? 'var(--fc-effort-easy)' : dr >= 4 ? 'var(--fc-effort-medium)' : 'var(--fc-effort-max)'
+                return (
+                  <span
+                    className={sec.pillActive}
+                    style={{
+                      borderColor: tone,
+                      color: tone,
+                      background: `color-mix(in srgb, ${tone} 12%, transparent)`,
+                    }}
+                  >
+                    {dr < 0 ? 'Expired' : `${dr} day${dr === 1 ? '' : 's'} left`}
+                  </span>
+                )
+              })()}
             </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button
+            <DetailGrid
+              rows={[
+                {
+                  icon: RectangleHorizontal,
+                  label: 'Plan',
+                  value: planLabelFromMonths(active.plan_duration_months ?? 1),
+                  iconTone: 'lime',
+                },
+                {
+                  icon: CheckCircle2,
+                  label: 'Status',
+                  value: (
+                    <span style={{ color: 'var(--fc-effort-easy)' }}>
+                      {String(active.subscription_status || 'active')
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                  ),
+                  iconTone: 'good',
+                },
+                {
+                  icon: Calendar,
+                  label: 'Started',
+                  value: new Date(active.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  }),
+                },
+                {
+                  icon: Clock,
+                  label: 'Expires',
+                  iconTone: daysRemainingFromEnd(active.end_date) <= 14 ? 'warn' : undefined,
+                  value: (
+                    <>
+                      {new Date(active.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}{' '}
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-geist-mono, monospace)',
+                          fontSize: 10,
+                          color:
+                            daysRemainingFromEnd(active.end_date) > 14
+                              ? 'var(--fc-text-subtle)'
+                              : 'var(--fc-effort-medium)',
+                        }}
+                      >
+                        {(() => {
+                          const dr = daysRemainingFromEnd(active.end_date)
+                          return dr >= 0 ? `${dr}d` : ''
+                        })()}
+                      </span>
+                    </>
+                  ),
+                },
+                ...(active.amount_paid != null && String(active.amount_paid).trim() !== ''
+                  ? [
+                      {
+                        icon: CircleDollarSign,
+                        label: 'Amount',
+                        value: (
+                          <span
+                            style={{
+                              fontFamily: 'var(--f-display, var(--font-geist-sans))',
+                              fontWeight: 700,
+                              fontSize: 18,
+                            }}
+                          >
+                            {Number(active.amount_paid).toLocaleString()}
+                          </span>
+                        ),
+                        iconTone: 'purple' as const,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+            {active.subscription_notes ? (
+              <p className={sec.sectionMeta} style={{ whiteSpace: 'pre-wrap' }}>
+                {active.subscription_notes}
+              </p>
+            ) : null}
+            <div className="grid grid-cols-3 gap-2">
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="fc-btn fc-btn-secondary"
+                className={sec.btnPrimary}
+                style={{ padding: '9px 6px', fontSize: 11 }}
                 disabled={saving}
                 onClick={() => openRenew(active)}
               >
+                <RefreshCw className="w-3.5 h-3.5" aria-hidden />
                 Renew
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="fc-btn fc-btn-ghost text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
+                className={sec.btnOutline}
+                style={{ padding: '9px 6px', fontSize: 11 }}
                 disabled={saving}
                 onClick={() => openEdit(active)}
               >
+                <Pencil className="w-3.5 h-3.5" aria-hidden />
                 Edit
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="fc-btn fc-btn-secondary"
+                className={sec.btnDanger}
+                style={{ padding: '9px 6px', fontSize: 11 }}
                 disabled={saving}
                 onClick={() => void handleCancelSubscription(active)}
               >
+                <XCircle className="w-3.5 h-3.5" aria-hidden />
                 Cancel
+              </button>
+            </div>
+          </section>
+        ) : null
+      ) : (
+        <GlassCard
+          elevation={2}
+          className={cn(
+            'p-3 sm:p-4 border border-[color:var(--fc-glass-border)] border-l-2 rounded-xl',
+            !active
+              ? ''
+              : active && daysRemainingFromEnd(active.end_date) <= 14
+                ? 'border-l-red-500'
+                : 'border-l-cyan-500'
+          )}
+        >
+          {!active ? (
+            <div className="space-y-3">
+              <EmptyState
+                icon={CreditCard}
+                title="No active subscription"
+                description="Add a coaching plan with a start date and duration."
+              />
+              <Button type="button" className="fc-btn fc-btn-primary gap-2" onClick={openAssign}>
+                <Plus className="w-4 h-4" />
+                Add Subscription
               </Button>
             </div>
-          </div>
-        )}
-      </GlassCard>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-[color:var(--fc-text-success)]">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span className="font-semibold">Active</span>
+              </div>
+              <div className="text-sm rounded-lg border border-[color:var(--fc-glass-border)]">
+                <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
+                  <span className="text-[color:var(--fc-text-dim)]">Plan: </span>
+                  <span className="font-medium">
+                    {planLabelFromMonths(active.plan_duration_months ?? 1)}
+                  </span>
+                </p>
+                <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
+                  Status:{' '}
+                  <span className="fc-text-primary font-medium">
+                    {String(active.subscription_status || 'active').replace(/_/g, ' ')}
+                  </span>
+                </p>
+                <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
+                  Started:{' '}
+                  {new Date(active.start_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="fc-text-primary px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
+                  Expires:{' '}
+                  {new Date(active.end_date + 'T12:00:00Z').toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                  {(() => {
+                    const dr = daysRemainingFromEnd(active.end_date)
+                    if (dr < 0) return ' (expired)'
+                    return ` (${dr} day${dr === 1 ? '' : 's'} remaining)`
+                  })()}
+                </p>
+                {active.amount_paid != null && String(active.amount_paid).trim() !== '' && (
+                  <p className="fc-text-dim px-2 py-2 border-b border-[color:var(--fc-glass-border)]">
+                    Amount: {Number(active.amount_paid).toLocaleString()}
+                  </p>
+                )}
+                {active.subscription_notes && (
+                  <p className="fc-text-dim text-xs px-2 py-2 whitespace-pre-wrap">
+                    {active.subscription_notes}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="fc-btn fc-btn-secondary"
+                  disabled={saving}
+                  onClick={() => openRenew(active)}
+                >
+                  Renew
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="fc-btn fc-btn-ghost text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
+                  disabled={saving}
+                  onClick={() => openEdit(active)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="fc-btn fc-btn-secondary"
+                  disabled={saving}
+                  onClick={() => void handleCancelSubscription(active)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </GlassCard>
+      )}
 
       <ResponsiveModal
         isOpen={createOpen}

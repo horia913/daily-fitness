@@ -24,6 +24,21 @@ import {
   normalizeClientTimezone,
 } from '@/lib/programWeekCalendar'
 
+/**
+ * MERGED SLOT `id` — consumer audit (Fix 9)
+ * ---------------------------------------------------------------------------
+ * `ProgramScheduleSlot.id` MUST be a `program_schedule` row UUID when present.
+ *
+ * Expect **program_schedule.id** (e.g. FK `workout_logs.program_schedule_id`, completions ledger):
+ * - getNextSlot / getProgramState (next slot vs completion keys)
+ * - getOverdueSlots (same ledger comparison)
+ * - trainPageDataMapper & programWeekStateBuilder → `scheduleId` → start-workout payloads
+ * - weekComplianceService (required slot ids)
+ *
+ * When **null**: no matching `program_schedule` row for this snapshot cell — callers must not send this
+ * value as `program_schedule_id` (previously `snap.id` incorrectly doubled as schedule id).
+ */
+
 // ============================================================================
 // INTERFACES
 // ============================================================================
@@ -62,7 +77,8 @@ export interface AssignmentScheduleSlot {
 }
 
 export interface ProgramScheduleSlot {
-  id: string               // program_schedule.id
+  /** program_schedule.id, or null if snapshot has no master row */
+  id: string | null
   program_id: string
   week_number: number      // 1-based week number
   day_number: number       // 1-based day number (1..7)
@@ -114,7 +130,7 @@ export async function getActiveProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -139,7 +155,7 @@ export async function getRecentlyCompletedProgramAssignment(
 ): Promise<ProgramAssignment | null> {
   const { data, error } = await supabase
     .from('program_assignments')
-    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at, progression_mode, coach_unlocked_week, pause_status, paused_at, pause_accumulated_days, timezone_snapshot, pause_reason')
     .eq('client_id', clientId)
     .eq('status', 'completed')
     .order('created_at', { ascending: false })
@@ -325,7 +341,7 @@ export async function getProgramScheduleSlotsForAssignment(
       )
     }
 
-    const id = ps?.id ?? snap.id
+    const id = ps?.id ?? null
     const dayOfWeek =
       typeof ps?.day_of_week === 'number' ? ps.day_of_week : Math.max(0, Math.min(6, snap.program_day - 1))
 
@@ -437,8 +453,9 @@ export async function getNextSlot(
 
   const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
 
-  // Find first uncompleted slot
-  return slots.find(slot => !completedScheduleIds.has(slot.id)) ?? null
+  return (
+    slots.find((slot) => slot.id != null && !completedScheduleIds.has(slot.id)) ?? null
+  )
 }
 
 /**
@@ -485,7 +502,8 @@ export async function getProgramState(
 
   // 3. Compute next slot
   const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
-  const nextSlot = slots.find(slot => !completedScheduleIds.has(slot.id)) ?? null
+  const nextSlot =
+    slots.find(slot => slot.id != null && !completedScheduleIds.has(slot.id)) ?? null
 
   const completedCount = completedSlots.length
   const totalSlots = slots.length
@@ -498,7 +516,10 @@ export async function getProgramState(
 
   // 5. Compute day position within the week for label
   const slotsInWeek = slots.filter(s => s.week_number === currentWeekNumber)
-  const dayPosition = slotsInWeek.findIndex(s => s.id === referenceSlot.id) + 1
+  const dayPosition =
+    referenceSlot.id != null
+      ? slotsInWeek.findIndex(s => s.id === referenceSlot.id) + 1
+      : 0
 
   const weekLabel = `Week ${currentWeekNumber}`
   const dayLabel = `Day ${dayPosition || currentDayNumber}`
@@ -568,8 +589,9 @@ export async function updateProgressCache(
 // ============================================================================
 
 /**
- * Get the slot in unlocked week that matches todayWeekday.
- * todayWeekday = (new Date().getDay() + 6) % 7  (0=Monday .. 6=Sunday)
+ * Get the slot in unlocked week that matches todayWeekday (0=Monday .. 6=Sunday).
+ * `todayWeekday` MUST come from the same timezone-aware chain as train/program-week callers
+ * (see trainPageDataMapper.resolveTrainPageTodayWeekday and GET /api/client/program-week), not from naive server Date.
  * If multiple slots match (should not happen in well-formed schedule), returns first by day_number order.
  */
 export function getTodaySlot(
@@ -602,7 +624,19 @@ export function getOverdueSlots(
 ): ProgramScheduleSlot[] {
   const unlockedSlots = slots.filter(s => s.week_number === unlockedWeekMax)
   const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
-  const uncompleted = unlockedSlots.filter(s => !completedScheduleIds.has(s.id))
+  const uncompleted = unlockedSlots.filter(
+    s =>
+      s.id != null &&
+      !completedScheduleIds.has(s.id)
+  )
+  const skippedNoMaster = unlockedSlots.filter(s => s.id == null).length
+  if (skippedNoMaster > 0) {
+    console.warn(
+      '[programStateService] getOverdueSlots: skipping',
+      skippedNoMaster,
+      'slot(s) without program_schedule id',
+    )
+  }
 
   let overdue: ProgramScheduleSlot[]
 
@@ -632,7 +666,10 @@ export function getOverdueSlots(
 export function computeUnlockedWeekMax(
   slots: ProgramScheduleSlot[],
   _completedSlots: CompletedSlot[],
-  assignment?: (AssignmentWeekFields & { progression_mode?: string; coach_unlocked_week?: number | null }),
+  assignment?: Partial<AssignmentWeekFields> & {
+    progression_mode?: string
+    coach_unlocked_week?: number | null
+  },
   clientTimezone?: string
 ): number {
   if (slots.length === 0) return 1
@@ -667,7 +704,10 @@ export function assertWeekUnlocked(
   targetWeekNumber: number,
   slots: ProgramScheduleSlot[],
   completedSlots: CompletedSlot[],
-  assignment?: (AssignmentWeekFields & { progression_mode?: string; coach_unlocked_week?: number | null }),
+  assignment?: Partial<AssignmentWeekFields> & {
+    progression_mode?: string
+    coach_unlocked_week?: number | null
+  },
   clientTimezone?: string
 ): void {
   const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots, assignment, clientTimezone)

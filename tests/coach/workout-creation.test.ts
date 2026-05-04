@@ -1,7 +1,7 @@
 /**
  * Workout Creation Tests
  * 
- * Tests for coach-side workout template creation, editing, and all 13 exercise types
+ * Tests for coach-side workout template creation, editing, and supported exercise types
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
@@ -235,30 +235,6 @@ describe('Workout Creation', () => {
     });
   });
 
-  describe('Exercise Type: Pyramid Set', () => {
-    it('should create pyramid set with pyramid order', async () => {
-      const blockData = {
-        template_id: 'test-workout-id',
-        block_type: 'pyramid',
-        block_order: 1,
-        pyramid_order: 1,
-        sets: 4,
-        reps: '12',
-        weight_kg: 50,
-        rest_seconds: 90,
-      };
-
-      const result = await mockSupabase
-        .from('workout_blocks')
-        .insert(blockData)
-        .select()
-        .single();
-
-      expect(result.data?.block_type).toBe('pyramid');
-      expect(result.data?.pyramid_order).toBe(1);
-    });
-  });
-
   describe('Exercise Type: Pre-Exhaustion', () => {
     it('should create pre-exhaustion with isolation and compound exercises', async () => {
       const blockData = {
@@ -373,30 +349,6 @@ describe('Workout Creation', () => {
       expect(result.data?.block_type).toBe('for_time');
       expect(result.data?.target_reps).toBe(100);
       expect(result.data?.time_cap_minutes).toBe(15);
-    });
-  });
-
-  describe('Exercise Type: Ladder', () => {
-    it('should create Ladder with ladder order, reps, and weight', async () => {
-      const blockData = {
-        template_id: 'test-workout-id',
-        block_type: 'ladder',
-        block_order: 1,
-        ladder_order: 1,
-        reps: '5',
-        weight_kg: 60,
-        rest_seconds: 60,
-      };
-
-      const result = await mockSupabase
-        .from('workout_blocks')
-        .insert(blockData)
-        .select()
-        .single();
-
-      expect(result.data?.block_type).toBe('ladder');
-      expect(result.data?.ladder_order).toBe(1);
-      expect(result.data?.reps).toBe('5');
     });
   });
 

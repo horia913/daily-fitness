@@ -42,6 +42,7 @@ import WorkoutTemplateCard from "@/components/features/workouts/WorkoutTemplateC
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { useToast } from "@/components/ui/toast-provider";
+import { fetchApi } from "@/lib/apiClient";
 
 export default function WorkoutTemplatesPage() {
   const { user } = useAuth();
@@ -81,7 +82,7 @@ export default function WorkoutTemplatesPage() {
     loadingRef.current = true;
     setLoading(true);
     try {
-      const res = await fetch("/api/coach/workouts/templates", { signal: signal ?? null });
+      const res = await fetchApi("/api/coach/workouts/templates", { signal: signal ?? null });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? `HTTP ${res.status}`);

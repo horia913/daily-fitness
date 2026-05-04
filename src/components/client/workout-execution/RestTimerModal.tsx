@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Minus, Plus, SkipForward, Trophy } from "lucide-react";
 import { preventBackgroundScroll, restoreBackgroundScroll } from "@/lib/mobile-compatibility";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Badge } from "@/components/ui/badge";
 
 const TICK_MS = 250;
 
@@ -162,7 +164,13 @@ export function RestTimerModal({
     <ModalPortal isOpen={isOpen}>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="w-full max-w-sm rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-6 shadow-[0_0_40px_rgba(6,182,212,0.15)] backdrop-blur-md">
-          <p className="mb-2 text-xs uppercase tracking-wider text-cyan-300">REST TIMER</p>
+          <Eyebrow
+            tone="cyan"
+            density="section"
+            className="mb-2 !text-cyan-300"
+          >
+            REST TIMER
+          </Eyebrow>
           <p className="mb-4 text-sm text-gray-400">
             Next: {nextLabel} — {contextLabel}
           </p>
@@ -174,10 +182,13 @@ export function RestTimerModal({
                   Last set: {lastSet.weight}kg × {lastSet.reps}
                 </p>
                 {lastSet.isPr ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                  <Badge
+                    variant="status-warning"
+                    className="inline-flex items-center gap-1 border-amber-500/30 bg-amber-500/15 text-[10px] font-semibold uppercase tracking-wide text-amber-400"
+                  >
                     <Trophy className="h-3 w-3" />
                     PR
-                  </span>
+                  </Badge>
                 ) : null}
               </div>
             </div>

@@ -43,6 +43,7 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
+import { fetchApi } from "@/lib/apiClient";
 
 interface ReportTemplate {
   id: string
@@ -112,7 +113,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
       loadingRef.current = true
       setLoading(true)
       try {
-        const res = await fetch('/api/coach/reports/clients', {
+        const res = await fetchApi('/api/coach/reports/clients', {
           signal: signal ?? null,
         })
         if (!res.ok) {

@@ -2,13 +2,25 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import type { LastSessionSetRow } from "@/lib/clientProgressionService";
-import { clientEffortLabelFromStoredRpe } from "@/lib/workoutEffortLabels";
+import {
+  clientEffortLabelFromStoredRpe,
+  rpeToEffortTier,
+  type EffortTier,
+} from "@/lib/workoutEffortLabels";
+import { cn } from "@/lib/utils";
 
 function formatWeightKg(kg: number | null): string {
   if (kg == null || Number.isNaN(Number(kg))) return "—";
   const n = Math.round(Number(kg) * 10) / 10;
   return String(n);
 }
+
+const TIER_COLOR_VAR: Record<EffortTier, string> = {
+  easy: "var(--fc-effort-easy)",
+  medium: "var(--fc-effort-medium)",
+  hard: "var(--fc-effort-hard)",
+  max: "var(--fc-effort-max)",
+};
 
 export interface LastSessionWorkoutSummary {
   weight: number | null;
@@ -21,17 +33,10 @@ interface LastSessionSetsSectionProps {
   lastWorkout: LastSessionWorkoutSummary | null | undefined;
 }
 
-const tableClass =
-  "w-full table-fixed border-separate border-spacing-0 text-sm text-gray-300";
-
-const thClass =
-  "pb-1.5 pr-1 text-left text-[10px] font-normal uppercase tracking-wider text-gray-500 sm:text-xs sm:tracking-wider";
-
-const tdClass = "py-1.5 pr-1 align-middle tabular-nums";
-
 /**
- * Below the sticky LOG SET area: last time this exercise was logged (any session),
- * or if none, the last time on this same workout assignment.
+ * Last-session card — workout-exec-v6 §History.
+ * Each row's effort label is color-coded with a dot (tier color + glow).
+ * Bands match SetEffortPicker / clientEffortLabelFromStoredRpe.
  */
 export function LastSessionSetsSection({ lastWorkout }: LastSessionSetsSectionProps) {
   const details = lastWorkout?.setDetails;
@@ -52,134 +57,106 @@ export function LastSessionSetsSection({ lastWorkout }: LastSessionSetsSectionPr
     !showAll && totalSets > 5 ? sortedSets.slice(0, 5) : sortedSets;
   const hasMore = totalSets > 5;
 
-  return (
-    <div className="px-4 pb-1">
-      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-        <p className="mb-2 text-xs uppercase tracking-wider text-gray-500">
-          LAST SESSION
-        </p>
+  const headerLeft = hasRows
+    ? `Last session · ${totalSets} sets`
+    : "Last session";
 
-        {!lastWorkout ? (
-          <p className="text-xs text-gray-500 italic">No previous data</p>
-        ) : hasRows ? (
-          <>
-            <div className="w-full min-w-0 overflow-x-auto">
-              <table className={tableClass}>
-                <colgroup>
-                  <col className="w-[2.25rem] sm:w-8" />
-                  <col className="min-w-0" />
-                  <col className="min-w-0" />
-                  <col className="w-[4.75rem] sm:w-[5.25rem]" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th scope="col" className={thClass}>
-                      #
-                    </th>
-                    <th scope="col" className={thClass}>
-                      Weight
-                    </th>
-                    <th scope="col" className={thClass}>
-                      Reps
-                    </th>
-                    <th scope="col" className={`${thClass} pr-0`}>
-                      Effort
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleSets.map((set, i) => (
-                    <tr
-                      key={`${set.set_number}-${i}`}
-                      className="border-b border-white/[0.06] last:border-b-0"
-                    >
-                      <td className={`${tdClass} text-gray-500`}>
-                        {set.set_number}
-                      </td>
-                      <td className={`${tdClass} text-gray-300`}>
-                        <span className="block min-w-0 break-words leading-tight">
-                          {formatWeightKg(set.weight_kg)} kg
-                        </span>
-                      </td>
-                      <td className={`${tdClass} text-gray-300`}>
-                        <span className="block min-w-0 break-words leading-tight">
-                          {set.reps_completed ?? "—"}
-                        </span>
-                      </td>
-                      <td className={`${tdClass} pr-0 text-gray-400`}>
-                        <span className="block text-[11px] leading-tight normal-case">
-                          {clientEffortLabelFromStoredRpe(set.rpe) ?? "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {hasMore && (
-              <button
-                type="button"
-                onClick={() => setShowAll((v) => !v)}
-                className="mt-2 text-left text-xs font-medium text-cyan-400/90 transition-opacity hover:opacity-90"
-              >
-                {showAll ? "Show less" : `Show all ${totalSets} sets`}
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="w-full min-w-0 overflow-x-auto">
-            <table className={tableClass}>
-              <colgroup>
-                <col className="w-[2.25rem] sm:w-8" />
-                <col className="min-w-0" />
-                <col className="min-w-0" />
-                <col className="w-[4.75rem] sm:w-[5.25rem]" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th scope="col" className={thClass}>
-                    #
-                  </th>
-                  <th scope="col" className={thClass}>
-                    Weight
-                  </th>
-                  <th scope="col" className={thClass}>
-                    Reps
-                  </th>
-                  <th scope="col" className={`${thClass} pr-0`}>
-                    Effort
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className={`${tdClass} text-gray-500`}>—</td>
-                  <td className={`${tdClass} text-gray-300`}>
-                    <span className="block min-w-0 break-words leading-tight">
-                      {formatWeightKg(lastWorkout.weight)} kg
-                    </span>
-                  </td>
-                  <td className={`${tdClass} text-gray-300`}>
-                    <span className="block min-w-0 break-words leading-tight">
-                      {lastWorkout.reps ?? "—"}
-                    </span>
-                  </td>
-                  <td className={`${tdClass} pr-0 text-gray-400`}>
-                    <span className="block text-[11px] leading-tight normal-case">
-                      {clientEffortLabelFromStoredRpe(
-                        lastWorkout.avgRpe != null && lastWorkout.avgRpe > 0
-                          ? Math.round(lastWorkout.avgRpe)
-                          : null,
-                      ) ?? "—"}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+  return (
+    <div className="mx-5 mb-6 rounded-[18px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-4 py-3.5">
+      <div className="mb-3 flex items-center justify-between gap-2 text-[9.5px] font-bold uppercase tracking-[0.16em] text-[color:var(--fc-text-dim)]">
+        <span>{headerLeft}</span>
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="font-semibold normal-case tracking-normal text-[color:var(--fc-accent-cyan)] hover:opacity-90"
+          >
+            {showAll ? "Show less" : `Show all ${totalSets} →`}
+          </button>
+        ) : null}
       </div>
-      <div className="h-44 shrink-0" aria-hidden />
+
+      {!lastWorkout ? (
+        <p className="text-xs italic text-zinc-500">No previous data</p>
+      ) : hasRows ? (
+        <div className="flex flex-col">
+          {visibleSets.map((set, i) => (
+            <HistRow
+              key={`${set.set_number}-${i}`}
+              setNumber={set.set_number}
+              weightKg={set.weight_kg}
+              reps={set.reps_completed}
+              rpe={set.rpe ?? null}
+            />
+          ))}
+        </div>
+      ) : (
+        <HistRow
+          setNumber={null}
+          weightKg={lastWorkout.weight}
+          reps={lastWorkout.reps}
+          rpe={
+            lastWorkout.avgRpe != null && lastWorkout.avgRpe > 0
+              ? Math.round(lastWorkout.avgRpe)
+              : null
+          }
+        />
+      )}
+      <div className="h-24 shrink-0" aria-hidden />
+    </div>
+  );
+}
+
+interface HistRowProps {
+  setNumber: number | null;
+  weightKg: number | null;
+  reps: number | null;
+  rpe: number | null;
+}
+
+function HistRow({ setNumber, weightKg, reps, rpe }: HistRowProps) {
+  const tier = rpeToEffortTier(rpe);
+  const label = clientEffortLabelFromStoredRpe(rpe);
+  const color = tier ? TIER_COLOR_VAR[tier] : null;
+
+  return (
+    <div className="grid grid-cols-[24px_1fr_60px_84px] items-center border-b border-white/[0.04] py-2 text-[12.5px] last:border-b-0">
+      <div className="font-mono text-[11px] text-[color:var(--fc-text-dim)]">
+        {setNumber ?? "—"}
+      </div>
+      <div
+        className="min-w-0 font-semibold text-white"
+        style={{
+          fontFamily:
+            "var(--font-bricolage-grotesque, var(--font-sans))",
+        }}
+      >
+        {formatWeightKg(weightKg)} kg
+      </div>
+      <div className="text-[color:var(--fc-text-dim)]">
+        {reps ?? "—"}
+      </div>
+      <div
+        className={cn(
+          "flex items-center justify-end gap-1.5 text-right text-[11px] font-semibold",
+          tier ? "" : "text-[color:var(--fc-text-quaternary)]",
+        )}
+        style={tier && color ? { color } : undefined}
+      >
+        <span
+          className="inline-block h-1.5 w-1.5 rounded-full"
+          style={
+            tier && color
+              ? {
+                  backgroundColor: color,
+                  boxShadow: `0 0 6px ${color}`,
+                }
+              : { background: "transparent", boxShadow: "none" }
+          }
+          aria-hidden
+        />
+        <span>{label ?? "—"}</span>
+      </div>
     </div>
   );
 }

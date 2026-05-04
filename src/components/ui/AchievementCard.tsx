@@ -6,6 +6,8 @@ import { GlassCard } from "./GlassCard";
 import { Lock } from "lucide-react";
 import { AchievementIconDisplay } from "./achievementIconDisplay";
 import { rarityColors } from "@/lib/colors";
+import { cn } from "@/lib/utils";
+import { TierBadge, type Tier } from "./TierBadge";
 
 export type AchievementRarity =
   | "common"
@@ -44,7 +46,9 @@ export interface Achievement {
   name: string;
   description: string;
   icon: string;
-  rarity: AchievementRarity;
+  tier: Exclude<Tier, "diamond"> | null;
+  /** @deprecated use `tier` */
+  rarity?: AchievementRarity;
   unlocked: boolean;
   unlockedAt?: Date;
   progress?: number;
@@ -97,7 +101,7 @@ function AchievementDenseRow({
   className = "",
 }: AchievementRowProps) {
   const { isDark } = useTheme();
-  const rarity = rarityColors[achievement.rarity];
+  const rarity = rarityColors[achievement.rarity ?? "common"];
   const earned =
     achievement.unlocked ||
     (achievement.unlockedTiers && achievement.unlockedTiers.length > 0);
@@ -152,11 +156,9 @@ function AchievementDenseRow({
           >
             {achievement.name}
           </h4>
-          <span
-            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold capitalize ${RARITY_BADGE_CLASS[achievement.rarity]} ${!earned ? "opacity-70" : ""}`}
-          >
-            {achievement.rarity}
-          </span>
+          {achievement.tier ? (
+            <TierBadge tier={achievement.tier} className={cn(!earned && "opacity-70")} />
+          ) : null}
           {achievement.isMastered && (
             <span className="rounded bg-gradient-to-r from-violet-500 to-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
               Mastered
@@ -231,8 +233,8 @@ export function AchievementCard({
   dense = false,
 }: AchievementCardProps) {
   const { isDark } = useTheme();
-  const rarity = rarityColors[achievement.rarity];
-  const hasTiers = achievement.unlockedTiers !== undefined && achievement.unlockedTiers.length >= 0;
+  const rarity = rarityColors[achievement.rarity ?? "common"];
+  const hasTiers = achievement.unlockedTiers !== undefined;
   const earnedTiers = achievement.unlockedTiers || [];
 
   if (dense) {
@@ -253,7 +255,7 @@ export function AchievementCard({
         onPress={onClick}
         elevation={2}
         borderColor={rarity.color}
-        className={`p-4 relative overflow-hidden ${RARITY_CARD_TINT[achievement.rarity]} ${className}`}
+        className={`p-4 relative overflow-hidden ${RARITY_CARD_TINT[achievement.rarity ?? "common"]} ${className}`}
       >
         {/* Glow effect */}
         <div
@@ -304,13 +306,9 @@ export function AchievementCard({
                   <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-gradient-to-r from-violet-500 to-amber-400 text-white">
                     Mastered
                   </span>
-                ) : (
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${RARITY_BADGE_CLASS[achievement.rarity]}`}
-                  >
-                    {achievement.rarity}
-                  </span>
-                )}
+                ) : achievement.tier ? (
+                  <TierBadge tier={achievement.tier} />
+                ) : null}
               </div>
 
               <p
@@ -365,7 +363,7 @@ export function AchievementCard({
             </div>
           </div>
 
-          {achievement.rarity === "legendary" && (
+          {achievement.tier === "platinum" && (
             <div className="absolute top-2 right-2 animate-pulse">
               <span className="text-2xl">✨</span>
             </div>
@@ -381,7 +379,7 @@ export function AchievementCard({
       <GlassCard
         pressable={false}
         elevation={1}
-        className={`p-4 relative opacity-80 ${RARITY_CARD_TINT[achievement.rarity]} ${className}`}
+        className={`p-4 relative opacity-80 ${RARITY_CARD_TINT[achievement.rarity ?? "common"]} ${className}`}
       >
         {achievement.nearMiss && (
           <div className="absolute top-2 right-2">
@@ -415,9 +413,7 @@ export function AchievementCard({
               >
                 {achievement.name}
               </h4>
-              <span className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${RARITY_BADGE_CLASS[achievement.rarity]} opacity-70`}>
-                {achievement.rarity}
-              </span>
+              {achievement.tier ? <TierBadge tier={achievement.tier} className="opacity-70" /> : null}
             </div>
 
             <p
@@ -491,9 +487,9 @@ export function AchievementCard({
             >
               {achievement.name}
             </h4>
-            <span className="px-2 py-0.5 rounded text-xs font-semibold capitalize bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-              {achievement.rarity}
-            </span>
+            {achievement.tier ? (
+              <TierBadge tier={achievement.tier} className="opacity-60" />
+            ) : null}
           </div>
 
           <p

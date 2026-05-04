@@ -1,0 +1,635 @@
+/* Fuel / nutrition daily view — nutrition-v1 */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 16px;
+}
+
+.avatarBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--fc-glass-border);
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: linear-gradient(
+    135deg,
+    var(--fc-surface-elevated),
+    var(--fc-surface-card)
+  );
+}
+
+.avatarBtn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 18px;
+}
+
+.headerLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.todayEyebrowWrap {
+  margin-bottom: 8px;
+}
+
+.fuelTitle {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  margin: 0;
+  background: linear-gradient(
+    135deg,
+    var(--fc-accent-cyan),
+    var(--fc-accent-lime)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.pillAddFood {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(79, 227, 232, 0.25);
+  background: rgba(79, 227, 232, 0.1);
+  color: var(--fc-accent-cyan);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pillAddFood:hover {
+  background: rgba(79, 227, 232, 0.16);
+}
+
+.pillHistory {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--fc-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fc-text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pillHistory:hover {
+  color: var(--fc-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.goalPrompt {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-surface-card);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.goalPrompt::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 45%;
+  height: 70%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 100% 0%,
+    rgba(245, 194, 66, 0.12),
+    transparent 65%
+  );
+}
+
+.goalPromptInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.goalPromptIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(245, 194, 66, 0.12);
+  color: var(--fc-accent-gold);
+}
+
+.goalPromptTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fc-text-primary);
+  margin: 0 0 2px;
+}
+
+.goalPromptSub {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.goalPromptCta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fc-accent-lime);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.goalPromptCta:hover {
+  text-decoration: underline;
+}
+
+.footerNote {
+  text-align: center;
+  color: var(--fc-text-quaternary, rgba(255, 255, 255, 0.26));
+  font-size: 10.5px;
+  margin: 14px 0;
+}
+
+.mealsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trendsCard {
+  border-radius: 18px;
+  border: 1px solid var(--fc-surface-card-border);
+  background: var(--fc-surface-card);
+  padding: 0;
+  overflow: hidden;
+}
+
+.trendsHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.trendsHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trendsTitle {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fc-text-primary);
+}
+
+.trendsBody {
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.trendsEmpty {
+  text-align: center;
+  padding: 20px 8px 8px;
+}
+
+.trendsEmptyPrimary {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fc-text-dim);
+  margin: 0 0 6px;
+}
+
+.trendsEmptySecondary {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0;
+}
+
+/* Day summary card */
+.daySummary {
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid var(--fc-surface-card-border);
+  background: var(--fc-surface-card);
+  padding: 18px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.daySummary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55%;
+  height: 55%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 0% 0%,
+    rgba(197, 255, 74, 0.08),
+    transparent 58%
+  );
+}
+
+.daySummary::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42%;
+  height: 48%;
+  pointer-events: none;
+  opacity: 0.12;
+  background: repeating-linear-gradient(
+    -28deg,
+    rgba(255, 255, 255, 0.05) 0 2px,
+    transparent 2px 5px
+  );
+  border-radius: 0 22px 0 0;
+}
+
+.daySummaryInner {
+  position: relative;
+  z-index: 1;
+}
+
+.dayHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dayHeadLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrowMealPlan {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  margin-bottom: 6px;
+}
+
+.planName {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--fc-text-primary);
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.planDate {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0;
+}
+
+.ringWrap {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.ringSvg {
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.ringBg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 4;
+}
+
+.ringFg {
+  fill: none;
+  stroke: var(--fc-accent-lime);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(197, 255, 74, 0.35));
+}
+
+.ringCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ringNums {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--fc-text-primary);
+}
+
+.ringNums span {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.26);
+}
+
+.ringMealsLabel {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  margin-top: 2px;
+}
+
+.calorieLine {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 16px;
+}
+
+.calCurrent {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--fc-accent-lime);
+  line-height: 1;
+}
+
+.calSep {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.26);
+}
+
+.calTarget {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fc-text-dim);
+}
+
+.calUnit {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  margin-left: 4px;
+}
+
+.macroGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.macroRow {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.macroLabel {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.macroTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.macroFillProtein {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--fc-macro-protein),
+    var(--fc-macro-protein-mid)
+  );
+}
+
+.macroFillCarbs {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--fc-macro-carbs),
+    var(--fc-macro-carbs-mid)
+  );
+}
+
+.macroFillFat {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--fc-macro-fat),
+    var(--fc-macro-fat-mid)
+  );
+}
+
+.macroValue {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+  white-space: nowrap;
+}
+
+.macroValueUnit {
+  font-family: var(--font-sans, ui-sans-serif);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* Water card v6 chrome */
+.waterCard {
+  border-radius: 18px;
+  border: 1px solid var(--fc-surface-card-border);
+  background: var(--fc-surface-card);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.waterHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.waterHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.waterLabel {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fc-text-primary);
+}
+
+.waterVal {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.waterCurrent {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fc-accent-cyan);
+}
+
+.waterSep {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14px;
+}
+
+.waterTarget {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.waterUnit {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.dropletRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropletBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.dropletBtnActive {
+  background: rgba(79, 227, 232, 0.1);
+  border-color: rgba(79, 227, 232, 0.2);
+  color: var(--fc-accent-cyan);
+}
+
+.dropletBtnInactive {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--fc-surface-card-border);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.dropletBtn:active {
+  transform: scale(0.96);
+}
+
+.waterAddBtn {
+  height: 38px;
+  min-width: 72px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.waterAddBtn:hover {
+  border-color: rgba(79, 227, 232, 0.35);
+  background: rgba(79, 227, 232, 0.06);
+  color: var(--fc-accent-cyan);
+}

@@ -17,6 +17,12 @@ import { getNutritionCompliance } from "./metrics/nutrition";
 import { getNutritionComplianceTrend } from "./nutritionLogService";
 import { dbToUiScale } from "./wellnessService";
 import { computeCurrentProgramWeekForAssignment } from "./programWeekCalendar";
+import {
+  resolveProgramTotalDisplayWeeks,
+  sumTrainingBlockWeeksFromRows,
+} from "./programDurationResolver";
+import { fetchClientHabits } from "./habitTemplateService";
+import { normalizeClientTimezone } from "@/lib/clientZonedCalendar";
 
 const TODAY = new Date().toISOString().split("T")[0];
 const THIRTY_DAYS_AGO = new Date();
@@ -45,11 +51,13 @@ export interface ClientAnalyticsData {
       id: string;
       title: string;
       pillar: string;
+      priority: string | null;
       target_value: number | null;
       current_value: number | null;
       progress_percentage: number | null;
       target_unit: string | null;
       created_at: string;
+      updated_at: string;
     }>;
     completedCount: number;
   };
@@ -82,13 +90,30 @@ export interface ClientAnalyticsData {
   };
 }
 
-export async function getClientAnalytics(clientId: string): Promise<ClientAnalyticsData> {
+/** Same priority chain as coach summary RPC helpers: snapshot → profile → UTC (+ warn). */
+export function resolveStatsTabTimezone(
+  timezoneSnapshot: string | null | undefined,
+  profileTimezone: string | null | undefined
+): string {
+  const s = timezoneSnapshot?.trim();
+  if (s) return normalizeClientTimezone(s);
+  const p = profileTimezone?.trim();
+  if (p) return normalizeClientTimezone(p);
+  console.warn(
+    "[clientAnalytics] No timezone_snapshot or profile.timezone; using UTC for weekly volume boundaries",
+  );
+  return "UTC";
+}
+
+export async function getClientAnalytics(
+  clientId: string,
+  clientTimezone: string
+): Promise<ClientAnalyticsData> {
   const [
     goalsRes,
     bodyMeasurements,
     firstMeasurement,
     wellnessLogs,
-    volumeStats,
     photoTimeline,
     checkinStreak,
     bestStreak,
@@ -97,34 +122,45 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
     profileRes,
     mealPlanRes,
     nutritionGoalsRes,
-    habitAssignmentsRes,
   ] = await Promise.all([
-    supabase.from("goals").select("id, title, pillar, target_value, current_value, progress_percentage, target_unit, status, created_at").eq("client_id", clientId).order("created_at", { ascending: false }),
+    supabase.from("goals").select("id, title, pillar, priority, target_value, current_value, progress_percentage, target_unit, status, created_at, updated_at").eq("client_id", clientId).order("created_at", { ascending: false }),
     getClientMeasurements(clientId, 90),
     getFirstMeasurement(clientId),
     getLogRange(clientId, NINETY_DAYS_AGO_STR, TODAY),
-    getWeeklyVolume(clientId, 12),
     getPhotoTimelineWithPreviews(clientId, 12),
     getCheckinStreak(clientId),
     getBestStreak(clientId),
     getClientCheckInConfig(clientId),
-    supabase.from("program_assignments").select("id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot").eq("client_id", clientId).eq("status", "active").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase
+      .from("program_assignments")
+      .select(
+        "id, program_id, start_date, duration_weeks, total_days, pause_accumulated_days, pause_status, paused_at, timezone_snapshot"
+      )
+      .eq("client_id", clientId)
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase.from("profiles").select("timezone").eq("id", clientId).maybeSingle(),
     supabase.from("meal_plan_assignments").select("id").eq("client_id", clientId).eq("is_active", true).limit(1),
     supabase.from("goals").select("id").eq("client_id", clientId).eq("pillar", "nutrition").eq("status", "active").limit(1),
-    supabase.from("habit_assignments").select("id, habit_id").eq("client_id", clientId).eq("is_active", true),
   ]);
+
+  const tzCanonical = normalizeClientTimezone(clientTimezone);
+  const volumeStats = await getWeeklyVolume(clientId, 12, tzCanonical);
 
   const goals = (goalsRes.data ?? []) as Array<{
     id: string;
     title: string;
     pillar: string;
+    priority: string | null;
     target_value: number | null;
     current_value: number | null;
     progress_percentage: number | null;
     target_unit: string | null;
     status: string;
     created_at: string;
+    updated_at: string;
   }>;
   const activeGoals = goals.filter((g) => g.status === "active");
   const completedCount = goals.filter((g) => g.status === "completed").length;
@@ -137,23 +173,54 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
   let programAdherencePriorWeek: number | null = null;
 
   if (assignment?.id) {
-    const [{ data: schedule }, { data: completions }] = await Promise.all([
-      supabase.from("program_schedule").select("id, week_number, is_optional").eq("program_id", assignment.program_id),
-      supabase.from("program_day_completions").select("program_schedule_id, program_schedule(week_number)").eq("program_assignment_id", assignment.id),
-    ]);
+    const [{ data: schedule }, { data: completions }, { data: trainingBlockRows }] =
+      await Promise.all([
+        supabase
+          .from("program_schedule")
+          .select("id, week_number, is_optional")
+          .eq("program_id", assignment.program_id),
+        supabase
+          .from("program_day_completions")
+          .select("program_schedule_id, program_schedule(week_number)")
+          .eq("program_assignment_id", assignment.id),
+        supabase
+          .from("training_blocks")
+          .select("duration_weeks")
+          .eq("program_id", assignment.program_id),
+      ]);
+
+    const sumBlockWeeks = sumTrainingBlockWeeksFromRows(
+      trainingBlockRows as { duration_weeks: number | null }[] | null
+    );
+
+    const assignmentRow = assignment as {
+      duration_weeks?: number | null;
+      total_days?: number | null;
+    };
+
+    const totalWeeks = resolveProgramTotalDisplayWeeks({
+      sumTrainingBlockWeeks: sumBlockWeeks,
+      assignmentDurationWeeks: assignmentRow.duration_weeks ?? null,
+      assignmentTotalDays: assignmentRow.total_days ?? null,
+    });
+
     const { week: weekNum } = computeCurrentProgramWeekForAssignment(
       {
         start_date: assignment.start_date ?? null,
-        duration_weeks: assignment.duration_weeks ?? null,
+        duration_weeks: totalWeeks,
         pause_accumulated_days: assignment.pause_accumulated_days ?? 0,
         pause_status: assignment.pause_status ?? null,
         paused_at: assignment.paused_at ?? null,
         timezone_snapshot: assignment.timezone_snapshot ?? null,
       },
-      (profileRes.data as { timezone?: string | null } | null)?.timezone ?? 'UTC'
+      tzCanonical
     );
-    const durationWeeks = assignment.duration_weeks ?? 12;
-    programProgress = { weekNum, totalWeeks: durationWeeks, pct: durationWeeks > 0 ? Math.round((weekNum / durationWeeks) * 100) : 0 };
+
+    programProgress = {
+      weekNum,
+      totalWeeks,
+      pct: totalWeeks > 0 ? Math.min(100, Math.round((weekNum / totalWeeks) * 100)) : 0,
+    };
     const slotsThisWeek = (schedule ?? []).filter((s: { week_number: number }) => s.week_number === weekNum);
     const requiredSlotsThisWeek = slotsThisWeek.filter((s: { is_optional?: boolean }) => !s.is_optional);
     scheduledThisWeek = requiredSlotsThisWeek.length;
@@ -265,37 +332,37 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
 
   const weightGoal = activeGoals.find((g) => g.target_unit === "kg" || g.title?.toLowerCase().includes("weight"))?.target_value ?? null;
 
-  // habit_assignments can 500 (e.g. RLS); treat as empty so analytics page still loads
-  const habitAssignmentsRaw = (habitAssignmentsRes.error ? [] : (habitAssignmentsRes.data ?? [])) as Array<{ id: string; habit_id: string }>;
-  const habitIds = [...new Set(habitAssignmentsRaw.map((a) => a.habit_id))];
-  let habitNames: Record<string, string> = {};
-  if (habitIds.length > 0) {
-    const { data: habitsData } = await supabase.from("habits").select("id, name").in("id", habitIds);
-    if (habitsData) {
-      habitNames = Object.fromEntries(habitsData.map((h) => [h.id, h.name ?? ""]));
-    }
+  /** Client-owned habits (habit_templates + habits rows); logs keyed by habit_id + client_id. */
+  let clientHabitsList: Awaited<ReturnType<typeof fetchClientHabits>> = [];
+  try {
+    clientHabitsList = await fetchClientHabits(clientId);
+  } catch {
+    clientHabitsList = [];
   }
-  const habitAssignments = habitAssignmentsRaw.map((a) => ({
-    id: a.id,
-    habit_id: a.habit_id,
-    name: habitNames[a.habit_id],
+  const habitAssignments = clientHabitsList.map((h) => ({
+    id: h.id,
+    habit_id: h.id,
+    name: h.template.name,
   }));
   let completionByHabit: Record<string, { completed: number; total: number; streak: number }> = {};
   if (habitAssignments.length > 0) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyStr = thirtyDaysAgo.toISOString().split("T")[0];
+    const habitRowIds = habitAssignments.map((a) => a.id);
     const { data: habitLogs } = await supabase
       .from("habit_logs")
-      .select("assignment_id, log_date")
-      .in("assignment_id", habitAssignments.map((a) => a.id))
-      .gte("log_date", thirtyDaysAgo.toISOString().split("T")[0]);
-    const byAssignment = new Map<string, string[]>();
-    (habitLogs ?? []).forEach((l: { assignment_id: string; log_date: string }) => {
-      if (!byAssignment.has(l.assignment_id)) byAssignment.set(l.assignment_id, []);
-      byAssignment.get(l.assignment_id)!.push(l.log_date);
+      .select("habit_id, log_date")
+      .eq("client_id", clientId)
+      .in("habit_id", habitRowIds)
+      .gte("log_date", thirtyStr);
+    const byHabit = new Map<string, string[]>();
+    (habitLogs ?? []).forEach((l: { habit_id: string; log_date: string }) => {
+      if (!byHabit.has(l.habit_id)) byHabit.set(l.habit_id, []);
+      byHabit.get(l.habit_id)!.push(l.log_date);
     });
     habitAssignments.forEach((a) => {
-      const dates = byAssignment.get(a.id) ?? [];
+      const dates = byHabit.get(a.id) ?? [];
       const unique = new Set(dates);
       const total = 30;
       let streak = 0;
@@ -343,11 +410,13 @@ export async function getClientAnalytics(clientId: string): Promise<ClientAnalyt
         id: g.id,
         title: g.title,
         pillar: g.pillar,
+        priority: g.priority ?? null,
         target_value: g.target_value,
         current_value: g.current_value,
         progress_percentage: g.progress_percentage,
         target_unit: g.target_unit,
         created_at: g.created_at,
+        updated_at: g.updated_at,
       })),
       completedCount,
     },

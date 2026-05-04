@@ -1,0 +1,11 @@
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pair > * {
+  min-width: 0;
+}

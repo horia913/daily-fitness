@@ -388,7 +388,7 @@ export function ChallengeDetailPageBody({
                     width: `${pct}%`,
                     background: isEndingSoon
                       ? "linear-gradient(90deg, var(--fc-status-error), var(--fc-status-warning))"
-                      : "linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent))",
+                      : "linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-accent-cyan))",
                   }}
                 />
                 <div className="absolute top-0 left-1/4 w-px h-full bg-[color:var(--fc-glass-border)]" />

@@ -1,6 +1,8 @@
 // Server-side notification sending
 // This should be called from API routes to keep REST API key secure
 
+import { isPushNotificationsEnabled } from "@/lib/pushNotificationsEnabled";
+
 interface NotificationPayload {
   userIds?: string[]
   segments?: string[]
@@ -35,6 +37,11 @@ export async function sendPushNotification({
   url,
   data
 }: NotificationPayload) {
+  if (!isPushNotificationsEnabled()) {
+    console.debug("[push] disabled, skipping notification");
+    return { success: true, data: null };
+  }
+
   const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
   const apiKey = process.env.ONESIGNAL_REST_API_KEY
 
@@ -83,6 +90,11 @@ export async function sendEmail({
   htmlContent,
   templateId
 }: EmailPayload) {
+  if (!isPushNotificationsEnabled()) {
+    console.debug("[push] disabled, skipping notification");
+    return { success: true, data: null };
+  }
+
   const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
   const apiKey = process.env.ONESIGNAL_REST_API_KEY
 

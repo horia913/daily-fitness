@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 import type { WeeklyCheckInBodyData } from "./WeeklyCheckInFlowTypes";
 import type { CheckInConfig } from "@/lib/checkInConfigService";
 import type { BodyMeasurement } from "@/lib/measurementService";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 
 const CIRCUMFERENCE_KEYS = [
   "waist",
@@ -137,9 +138,13 @@ export function StepBodyMetrics({
   const showCircumferenceSection = circumferencesEnabled.length > 0 || true;
 
   return (
-    <ClientGlassCard className="p-6 sm:p-8">
-      <p className="text-sm fc-text-subtle mb-4">Step 1 of 3</p>
-      <h2 className="text-xl font-bold fc-text-primary mb-1">Body metrics</h2>
+    <div className={cn(checkinSuiteStyles.wizardCard, checkinSuiteStyles.root)}>
+      <p className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")} style={{ color: "var(--cs-cyan)" }}>
+        Step 1 of 3
+      </p>
+      <h2 className={cn(checkinSuiteStyles.fontHeadline, "text-xl font-bold")} style={{ color: "var(--cs-t1)" }}>
+        Body metrics
+      </h2>
       {lastMeasurement?.weight_kg != null && (
         <p className="text-sm fc-text-dim mb-6">
           Last check-in: {lastMeasurement.weight_kg.toFixed(1)} kg
@@ -218,15 +223,20 @@ export function StepBodyMetrics({
 
       {error && <p className="text-sm fc-text-error mt-4">{error}</p>}
 
-      <div className="mt-8 flex justify-end">
+      <div className="mt-6 flex justify-end">
         <button
           type="button"
           onClick={handleNext}
-          className="fc-btn fc-btn-primary px-6 py-3 rounded-xl font-semibold"
+          className={cn(checkinSuiteStyles.fontBody, "inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold")}
+          style={{
+            color: "var(--cs-cyan-text)",
+            background: "linear-gradient(135deg, var(--cs-cyan), #34a8ad)",
+          }}
         >
-          Next →
+          Next
+          <ChevronRight className="h-4 w-4" aria-hidden />
         </button>
       </div>
-    </ClientGlassCard>
+    </div>
   );
 }

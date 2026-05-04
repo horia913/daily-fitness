@@ -77,6 +77,8 @@ const WHITELIST: Record<string, Set<string>> = {
     'fortime_target_reps',
     'rpe',
   ]),
+  endurance: new Set(['rpe', 'set_number']),
+  speed_work: new Set(['rpe', 'set_number']),
 }
 
 function parseNum(value: unknown): number | null {

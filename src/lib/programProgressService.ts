@@ -170,7 +170,7 @@ export async function getCurrentWorkoutFromProgress(
     position_label: state.positionLabel,
     
     template_id: nextSlot.template_id,
-    schedule_row_id: nextSlot.id,
+    schedule_row_id: nextSlot.id ?? undefined,
     
     total_weeks: uniqueWeeks.length,
     days_in_current_week: slotsInWeek.length,

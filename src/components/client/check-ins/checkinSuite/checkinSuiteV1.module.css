@@ -1,0 +1,548 @@
+/* Client check-in suite v1 — scoped tokens (canonical spec) */
+.root {
+  --cs-bg: #07101a;
+  --cs-card: #0e1f2e;
+  --cs-card-2: #0b1824;
+  --cs-card-3: #091420;
+  --cs-line: rgba(255, 255, 255, 0.08);
+  --cs-line-2: rgba(255, 255, 255, 0.05);
+  --cs-t1: #fff;
+  --cs-t2: rgba(255, 255, 255, 0.65);
+  --cs-t3: rgba(255, 255, 255, 0.42);
+  --cs-t4: rgba(255, 255, 255, 0.26);
+  --cs-cyan: #4fe3e8;
+  --cs-cyan-soft: rgba(79, 227, 232, 0.12);
+  --cs-cyan-dim: rgba(79, 227, 232, 0.18);
+  --cs-lime: #c5ff4a;
+  --cs-lime-2: #7fe89a;
+  --cs-lime-soft: rgba(197, 255, 74, 0.14);
+  --cs-critical: #ff5a5f;
+  --cs-critical-soft: rgba(255, 90, 95, 0.12);
+  --cs-critical-dim: rgba(255, 90, 95, 0.25);
+  --cs-warning: #f5c242;
+  --cs-warning-soft: rgba(245, 194, 66, 0.12);
+  --cs-warning-dim: rgba(245, 194, 66, 0.25);
+  --cs-warning-lite: #f8d67a;
+  --cs-warning-lite-soft: rgba(248, 214, 122, 0.12);
+  --cs-good: #34d399;
+  --cs-good-soft: rgba(52, 211, 153, 0.12);
+  --cs-good-dim: rgba(52, 211, 153, 0.25);
+  --cs-purple: #a78bfa;
+  --cs-purple-soft: rgba(167, 139, 250, 0.12);
+  --cs-purple-dim: rgba(167, 139, 250, 0.25);
+  --cs-orange: #fb923c;
+  --cs-orange-soft: rgba(251, 146, 60, 0.12);
+  --cs-lime-text: #0a1a18;
+  --cs-cyan-text: #0a1a26;
+}
+
+.fontHeadline {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+}
+.fontBody {
+  font-family: var(--font-geist-sans, "Geist", sans-serif);
+}
+.fontDisplay {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+}
+.fontMono {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+}
+
+/* --- Hero (UI-1) --- */
+.hero {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--cs-line);
+  background: linear-gradient(135deg, var(--cs-card), var(--cs-card-2));
+  padding: 14px 14px 16px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.heroGlowCyan::before {
+  content: "";
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  top: -48px;
+  right: -48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 227, 232, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+.heroTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.heroIconBtn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  border: 1px solid var(--cs-line);
+  background: var(--cs-card-2);
+  color: var(--cs-t2);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.heroIconBtn:hover {
+  color: var(--cs-t1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.heroMeta {
+  flex: 1;
+  min-width: 0;
+}
+.heroEyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.heroEyebrowDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.heroEyebrowText {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.heroTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--cs-t1);
+  margin: 0;
+}
+.heroTitleCompact {
+  font-size: 20px;
+}
+.heroSub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--cs-t3);
+}
+
+.limePrimaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cs-lime-text);
+  background: linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2));
+  position: relative;
+  transition: filter 0.15s, opacity 0.15s;
+}
+.limePrimaryBtn:hover {
+  filter: brightness(1.05);
+}
+.limePrimaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Section card + stripe (UI-2) --- */
+.sectionCard {
+  position: relative;
+  background: var(--cs-card);
+  border: 1px solid var(--cs-line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  overflow: hidden;
+}
+/* Accent flush to the left inside the card (full height), with content cleared to the right */
+.sectionCardStripe {
+  padding-left: 18px;
+}
+.sectionCardStripe::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 16px 0 0 16px;
+}
+.stripeCyan::before {
+  background: var(--cs-cyan);
+}
+.stripePurple::before {
+  background: var(--cs-purple);
+}
+.stripeWarning::before {
+  background: var(--cs-warning);
+}
+.stripeGood::before {
+  background: var(--cs-good);
+}
+.stripeLime::before {
+  background: var(--cs-lime);
+}
+.sectionTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 4px;
+}
+.sectionTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cs-t1);
+  margin: 0;
+}
+.optHelper {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-t4);
+  flex-shrink: 0;
+}
+
+/* --- Stepper (UI-3) --- */
+.stepperRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+.stepperBtn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  border: 1px solid var(--cs-line);
+  background: var(--cs-card-2);
+  color: var(--cs-t1);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+.stepperBtn:hover:not(:disabled) {
+  border-color: var(--cs-cyan-dim);
+  background: rgba(255, 255, 255, 0.05);
+}
+.stepperBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.stepperCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+}
+.stepperValue {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--cs-t1);
+  cursor: text;
+  text-align: center;
+}
+.stepperValueMuted {
+  color: var(--cs-t4);
+}
+.stepperUnit {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-t3);
+}
+
+/* --- Preset chips (UI-4) --- */
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.presetChip {
+  padding: 7px 0;
+  border-radius: 10px;
+  border: 1px solid var(--cs-line-2);
+  background: var(--cs-card-2);
+  color: var(--cs-t2);
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.presetChip:hover {
+  color: var(--cs-t1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.presetChipActive {
+  background: var(--cs-cyan-soft);
+  color: var(--cs-cyan);
+  border-color: var(--cs-cyan-dim);
+  box-shadow: inset 0 0 0 1px var(--cs-cyan-dim);
+}
+
+/* --- Scale pills (UI-5) --- */
+.scaleGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+.scalePill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border-radius: 11px;
+  border: 1px solid var(--cs-line-2);
+  background: var(--cs-card-2);
+  cursor: pointer;
+  transition: box-shadow 0.15s, background 0.15s, border-color 0.15s;
+}
+.scaleEmoji {
+  font-size: 14px;
+  line-height: 1;
+}
+.scaleLabel {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cs-t3);
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* Save CTA (UI-6) */
+.saveCta {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--cs-lime-text);
+  background: linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2));
+  transition: opacity 0.15s;
+}
+.saveCta:disabled {
+  opacity: 0.5;
+  background: var(--cs-card-2);
+  color: var(--cs-t3);
+  cursor: not-allowed;
+}
+.saveHelper {
+  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--cs-t3);
+  text-align: center;
+  padding: 0 6px;
+  margin-top: 6px;
+}
+
+/* Status pill (UI-7) */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.statusCompleted {
+  background: var(--cs-good-soft);
+  color: var(--cs-good);
+  border-color: var(--cs-good-dim);
+}
+.statusDue {
+  background: var(--cs-warning-soft);
+  color: var(--cs-warning);
+  border-color: var(--cs-warning-dim);
+}
+
+/* Delta pills (UI-24) */
+.deltaPill {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--cs-line-2);
+  background: var(--cs-card-2);
+  color: var(--cs-t3);
+}
+.deltaUp {
+  background: var(--cs-good-soft);
+  color: var(--cs-good);
+  border-color: var(--cs-good-dim);
+}
+.deltaDown {
+  background: var(--cs-critical-soft);
+  color: var(--cs-critical);
+  border-color: var(--cs-critical-dim);
+}
+
+/* Misc */
+.dailySectionHeader {
+  padding: 0 4px 12px;
+}
+.dailySectionTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--cs-t1);
+  margin: 0;
+}
+.dailySectionDate {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--cs-t3);
+  margin-top: 4px;
+}
+
+.weekTrackerCard {
+  background: var(--cs-card);
+  border: 1px solid var(--cs-line);
+  border-radius: 14px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.linkCyan {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-geist-sans, "Geist", sans-serif);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--cs-cyan);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  padding: 8px 4px;
+}
+.linkCyan:hover {
+  text-decoration: underline;
+}
+
+.wizardCard {
+  background: var(--cs-card);
+  border: 1px solid var(--cs-line);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.statsHero {
+  position: relative;
+  background: linear-gradient(135deg, var(--cs-card), var(--cs-card-2));
+  border: 1px solid var(--cs-line);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.statsHero::before {
+  content: "";
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  top: -40px;
+  right: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.sheetBackdrop {
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+/* Segmented tab pills (body metrics & similar) */
+.pillTab {
+  padding: 7px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--cs-line-2);
+  background: var(--cs-card-2);
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-t3);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.pillTab:hover {
+  color: var(--cs-t1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.pillTabActive {
+  background: var(--cs-cyan-soft);
+  color: var(--cs-cyan);
+  border-color: var(--cs-cyan-dim);
+  box-shadow: inset 0 0 0 1px var(--cs-cyan-dim);
+}

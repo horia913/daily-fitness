@@ -1,0 +1,109 @@
+.prEyebrow {
+  margin: 0;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--fc-set-type-straight);
+}
+
+.fieldLabel {
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+
+.selectWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select {
+  width: 100%;
+  appearance: none;
+  padding: 10px 36px 10px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--fc-glass-border);
+  background: var(--fc-glass-soft);
+  color: var(--fc-text-primary);
+  font-size: 12.5px;
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  cursor: pointer;
+}
+
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: var(--fc-text-subtle);
+}
+
+.prRow {
+  padding: 9px 0;
+}
+
+.prRowBorder {
+  border-top: 1px solid var(--fc-divider);
+}
+
+.prRowBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.prRowBtn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.prRowLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.prExercise {
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--fc-text-primary);
+}
+
+.prValue {
+  font-family: var(--f-display, var(--font-geist-sans));
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fc-set-type-straight);
+  margin-top: 1px;
+}
+
+.prDate {
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fc-text-quaternary);
+  flex-shrink: 0;
+}
+
+.viewAll {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fc-set-type-straight);
+}

@@ -1,0 +1,56 @@
+.chartShell {
+  position: relative;
+  height: 140px;
+  padding: 8px 4px 4px;
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-divider);
+  border-radius: 11px;
+  box-sizing: border-box;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 104px;
+}
+
+.gridLine {
+  stroke: rgba(255, 255, 255, 0.04);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.entryBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fc-effort-easy) 14%, transparent);
+  color: var(--fc-effort-easy);
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.dateAxis {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9px;
+  color: var(--fc-text-quaternary);
+  pointer-events: none;
+}
+
+.empty {
+  margin: 0;
+  padding: 36px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fc-text-subtle);
+}

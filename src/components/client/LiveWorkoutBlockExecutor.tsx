@@ -24,7 +24,6 @@ import {
   type RestTimerNextSetPreview,
 } from "./workout-execution/RestTimerModal";
 import { BaseBlockExecutorProps } from "./workout-execution/types";
-import { isBarbellExercise } from "@/lib/exerciseUtils";
 import {
   formatTime,
   calculateSuggestedWeightUtil,
@@ -102,7 +101,6 @@ interface LiveWorkoutBlockExecutorProps {
       } | null;
     }
   >;
-  onPlateCalculatorClick?: () => void;
   /** Called whenever the active exercise changes (by exercise_id). Used to trigger per-exercise data fetches in the parent. */
   onExerciseChanged?: (exerciseId: string) => void;
   /** Called when log-set returns pr_detected (new PR stored). Parent can show PRCelebrationModal. */
@@ -156,7 +154,6 @@ export default function LiveWorkoutBlockExecutor({
   onExerciseComplete,
   progressionSuggestions,
   previousPerformanceMap,
-  onPlateCalculatorClick,
   onExerciseChanged,
   onPRDetected,
   onAchievementsUnlocked,
@@ -535,7 +532,7 @@ export default function LiveWorkoutBlockExecutor({
           ...data,
         };
 
-        const sendLogSet = async (attempt: number) => {
+        const sendLogSet = async () => {
           const controller = new AbortController();
           inFlightLogRef.current = {
             startedAt: Date.now(),
@@ -554,7 +551,7 @@ export default function LiveWorkoutBlockExecutor({
           });
 
           const response = (await Promise.race([
-            fetch("/api/log-set", {
+            fetchApi("/api/log-set", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(requestBody),
@@ -583,29 +580,7 @@ export default function LiveWorkoutBlockExecutor({
           return { response, parsed };
         };
 
-        let attempt = 1;
-        let { response, parsed } = await sendLogSet(attempt);
-
-        if (
-          (response.status === 401 || response.status === 403) &&
-          attempt === 1
-        ) {
-          await supabase.auth.refreshSession();
-          const {
-            data: { session: refreshedSession },
-          } = await supabase.auth.getSession();
-          if (!refreshedSession?.access_token) {
-            addToast({
-              title: "Session expired",
-              description: "Please refresh and log in again.",
-              variant: "destructive",
-              duration: 5000,
-            });
-            return { success: false, error: "Session expired" };
-          }
-          attempt = 2;
-          ({ response, parsed } = await sendLogSet(attempt));
-        }
+        const { response, parsed } = await sendLogSet();
 
         if (response.ok) {
           const result = parsed;
@@ -772,22 +747,35 @@ export default function LiveWorkoutBlockExecutor({
         });
         return { success: false, error: "Server slow" };
       } catch (apiError: any) {
+        const isSessionExpired =
+          typeof apiError?.message === "string" &&
+          apiError.message.toLowerCase().includes("session expired");
         const isAbort =
           apiError?.name === "AbortError" ||
           apiError?.message?.toLowerCase().includes("abort") ||
           apiError?.name === "TimeoutError";
         addToast({
-          title: isAbort ? "Server slow" : "Error",
-          description: isAbort
-            ? "Server slow, try again."
-            : "Failed to log set. Please try again.",
+          title: isSessionExpired
+            ? "Session expired"
+            : isAbort
+              ? "Server slow"
+              : "Error",
+          description: isSessionExpired
+            ? "Please refresh and log in again."
+            : isAbort
+              ? "Server slow, try again."
+              : "Failed to log set. Please try again.",
           variant: "destructive",
           duration: 5000,
         });
         inFlightLogRef.current = null;
         return {
           success: false,
-          error: isAbort ? "Server slow" : apiError,
+          error: isSessionExpired
+            ? "Session expired"
+            : isAbort
+              ? "Server slow"
+              : apiError,
         };
       }
     } catch (error) {
@@ -1009,9 +997,6 @@ export default function LiveWorkoutBlockExecutor({
       setAlternativesExerciseId(exerciseId);
       setShowAlternativesModal(true);
     },
-    onPlateCalculatorClick: isBarbellExercise(currentExercise?.exercise ?? {})
-      ? onPlateCalculatorClick
-      : undefined,
     onRestTimerClick: handleRestTimerClick,
     onSetComplete: handleSetComplete,
     onLastSetLoggedForRest: handleLastSetLoggedForRest,
@@ -1116,8 +1101,7 @@ export default function LiveWorkoutBlockExecutor({
           );
         })()}
 
-      {/* RPE Modal - Deprecated: RPE is now collected inline via InlineRPERow component */}
-      {/* Keeping component import but never rendering it */}
+      {/* RPE Modal - Deprecated: RPE is now collected per logged set via LoggedSetsList / SetEffortPicker */}
 
       {/* Rest Timer Modal */}
       <RestTimerModal

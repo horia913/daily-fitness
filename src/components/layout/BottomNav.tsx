@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * BottomNav — client + coach floating bottom navigation
+ *
+ * Cluster 7 (Apr 2026): **Flat five-item bar** for client + coach — no elevated
+ * center hub. Active state = cyan **dot** below icon (mockup `client-screens-v5.html`
+ * Phone 1 `.nav-item.active::before`), not pill background. Replaces prior v4 §6.23
+ * elevated Train hub pattern for mockup alignment.
+ *
+ * Phase 0b (Task 4): inactive items use `fc-text-dim`; active accent from `var(--fc-accent-cyan)` (client + coach).
+ */
+
 import { usePathname } from "next/navigation";
 import {
   Home,
@@ -7,7 +18,6 @@ import {
   Apple,
   ClipboardCheck,
   User,
-  Grid,
   Users,
   BarChart3,
 } from "lucide-react";
@@ -16,18 +26,16 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string; fill?: string; stroke?: string }>;
   label: string;
-  isCenter?: boolean; // Special flag for the elevated center button
 }
 
 const clientNavItems: NavItem[] = [
   { href: "/client", icon: Home, label: "Home" },
   { href: "/client/check-ins", icon: ClipboardCheck, label: "Check-in" },
-  { href: "/client/train", icon: Dumbbell, label: "Train", isCenter: true },
+  { href: "/client/train", icon: Dumbbell, label: "Train" },
   { href: "/client/nutrition", icon: Apple, label: "Fuel" },
   { href: "/client/me", icon: User, label: "Me" },
 ];
 
-// Training opens a hub (programs, templates, exercises); sub-routes stay highlighted on this tab.
 const coachNavItems: NavItem[] = [
   { href: "/coach", icon: Home, label: "Home" },
   { href: "/coach/clients", icon: Users, label: "Clients" },
@@ -38,38 +46,37 @@ const coachNavItems: NavItem[] = [
 
 function isSegmentActive(pathname: string, item: NavItem): boolean {
   const { href } = item;
-  
-  // Home: exact match only
+
   if (href === "/client" || href === "/coach") {
     return pathname === href;
   }
-  
-  // Check-in: starts with /client/check-in
+
   if (href === "/client/check-ins") {
     return pathname.startsWith("/client/check-in");
   }
-  
-  // Train: matches both /client/train and /client/workouts
+
   if (href === "/client/train") {
-    return pathname.startsWith("/client/train") || pathname.startsWith("/client/workouts");
+    return (
+      pathname.startsWith("/client/train") ||
+      pathname.startsWith("/client/workouts")
+    );
   }
-  
-  // Fuel: starts with /client/nutrition
+
   if (href === "/client/nutrition") {
     return pathname.startsWith("/client/nutrition");
   }
-  
-  // Me: matches /client/me, /client/profile, /client/progress
+
   if (href === "/client/me") {
-    return pathname.startsWith("/client/me") || 
-           pathname.startsWith("/client/profile") || 
-           pathname.startsWith("/client/progress") ||
-           pathname.startsWith("/client/goals") ||
-           pathname.startsWith("/client/habits") ||
-           pathname.startsWith("/client/challenges");
+    return (
+      pathname.startsWith("/client/me") ||
+      pathname.startsWith("/client/profile") ||
+      pathname.startsWith("/client/progress") ||
+      pathname.startsWith("/client/goals") ||
+      pathname.startsWith("/client/habits") ||
+      pathname.startsWith("/client/challenges")
+    );
   }
 
-  // Coach Training: hub + programs, workout templates, exercises, categories, gym console
   if (href === "/coach/training") {
     return (
       pathname.startsWith("/coach/training") ||
@@ -81,102 +88,66 @@ function isSegmentActive(pathname: string, item: NavItem): boolean {
       pathname.startsWith("/coach/challenges")
     );
   }
-  
-  // Default: exact match or starts with href + "/"
+
   return pathname === href || pathname.startsWith(href + "/");
 }
 
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // Hide nav on workout execution pages
   if (pathname.includes("/workouts/") && pathname.includes("/start")) {
     return null;
   }
 
-  const navItems = pathname.startsWith("/coach")
-    ? coachNavItems
-    : clientNavItems;
+  const navItems = pathname.startsWith("/coach") ? coachNavItems : clientNavItems;
+  const isCoach = pathname.startsWith("/coach");
 
-  const navContent = (
+  return (
     <nav
       data-fc-bottom-nav
       className="fc-bottom-nav-float"
+      data-coach-context={isCoach ? "true" : undefined}
     >
       <div className="fc-bottom-nav-inner">
-        {navItems.map((item, index) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = isSegmentActive(pathname, item);
-          const isCenter = item.isCenter === true;
+          const activeColor = "text-[color:var(--fc-accent-cyan)]";
 
-          // Render center button (window.location.href bypasses dead router after tab switch)
-          if (isCenter) {
-            return (
-              <button
-                key={item.href}
-                type="button"
-                onClick={() => { window.location.href = item.href; }}
-                className="fc-bottom-nav-item-center bg-transparent border-none cursor-pointer"
-              >
-                <div className="fc-bottom-nav-center-button">
-                  <Icon
-                    className={`w-6 h-6 transition-all duration-200 ${
-                      isActive ? "text-white" : "text-white/90"
-                    }`}
-                  />
-                  {isActive && (
-                    <div className="fc-bottom-nav-center-ring" aria-hidden />
-                  )}
-                </div>
-                <span className="fc-bottom-nav-center-label">
-                  {item.label}
-                </span>
-              </button>
-            );
-          }
-
-          // Render regular nav items (window.location.href bypasses dead router after tab switch)
           return (
             <button
               key={item.href}
               type="button"
-              onClick={() => { window.location.href = item.href; }}
-              className={`fc-bottom-nav-item ${isActive ? "fc-bottom-nav-item--active" : ""} bg-transparent border-none cursor-pointer`}
+              onClick={() => {
+                window.location.href = item.href;
+              }}
+              className={`fc-bottom-nav-item fc-bottom-nav-item--flat relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 bg-transparent cursor-pointer border-none p-1.5 ${
+                isActive ? "fc-bottom-nav-item--active" : ""
+              }`}
             >
-              {/* Active pill background */}
-              {isActive && (
-                <div className="fc-bottom-nav-pill" aria-hidden />
-              )}
+              {isActive ? (
+                <span className="fc-bottom-nav-active-dot" aria-hidden />
+              ) : null}
 
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center gap-0.5">
                 <Icon
-                  className={`w-5 h-5 transition-colors duration-200 ${
-                    isActive
-                      ? "text-cyan-400"
-                      : pathname.startsWith("/coach")
-                        ? "text-gray-500"
-                        : "fc-text-dim"
+                  className={`h-[22px] w-[22px] transition-colors duration-200 ${
+                    isActive ? activeColor : "fc-text-dim"
                   }`}
                 />
+                <span
+                  className={`text-[10px] font-semibold leading-none transition-colors duration-200 ${
+                    isActive ? activeColor : "fc-text-dim"
+                  }`}
+                  style={{ letterSpacing: "0.04em" }}
+                >
+                  {item.label}
+                </span>
               </div>
-
-              <span
-                className={`text-[10px] font-semibold leading-none relative z-10 transition-colors duration-200 ${
-                  isActive
-                    ? "text-cyan-400"
-                    : pathname.startsWith("/coach")
-                      ? "text-gray-500"
-                      : "fc-text-dim"
-                }`}
-              >
-                {item.label}
-              </span>
             </button>
           );
         })}
       </div>
     </nav>
   );
-
-  return navContent;
 }

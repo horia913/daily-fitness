@@ -24,6 +24,7 @@ export function ClientTypeGuard({
   showMessage = true 
 }: ClientTypeGuardProps) {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { profile, loading } = useAuth();
   const router = useRouter();
 
@@ -31,6 +32,8 @@ export function ClientTypeGuard({
     if (loading) return;
 
     if (!profile) {
+      setIsAuthorized(false);
+      setIsLoading(false);
       router.push('/');
       return;
     }
@@ -40,18 +43,20 @@ export function ClientTypeGuard({
     const hasAccess = clientType === requiredType;
 
     if (!hasAccess) {
+      setIsAuthorized(false);
+      setIsLoading(false);
       if (!showMessage) {
         router.push(fallbackPath);
         return;
       }
-      setIsAuthorized(false);
     } else {
       setIsAuthorized(true);
+      setIsLoading(false);
     }
   }, [profile, loading, requiredType, fallbackPath, showMessage, router]);
 
   // Show loading state
-  if (loading || isAuthorized === null) {
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
         <div className="text-center">
@@ -89,7 +94,8 @@ export function ClientTypeGuard({
     );
   }
 
-  // Render children if authorized
-  return isAuthorized ? <>{children}</> : null;
+  if (!isAuthorized) return null;
+
+  return <>{children}</>;
 }
 

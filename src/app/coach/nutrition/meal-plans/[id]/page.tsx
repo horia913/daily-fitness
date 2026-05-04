@@ -358,7 +358,7 @@ export default function MealPlanDetailPage() {
             {dailyTotals && (
               <GlassCard elevation={2} className="fc-card-shell p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className="w-4 h-4 text-[color:var(--fc-accent)]" />
+                  <Zap className="w-4 h-4 text-[color:var(--fc-accent-cyan)]" />
                   <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
                     Daily Totals
                     <span className="text-xs font-normal text-[color:var(--fc-text-dim)] ml-2">(Option 1 of each meal)</span>
@@ -371,7 +371,7 @@ export default function MealPlanDetailPage() {
                 </div>
                 <div className="grid grid-cols-5 gap-2">
                   {[
-                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent)]",       unit: "" },
+                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent-cyan)]",       unit: "" },
                     { label: "Protein", value: dailyTotals.protein,  color: "text-[color:var(--fc-domain-meals)]", unit: "g" },
                     { label: "Carbs",   value: dailyTotals.carbs,    color: "text-[color:var(--fc-status-info)]",  unit: "g" },
                     { label: "Fat",     value: dailyTotals.fat,      color: "text-[color:var(--fc-status-warning)]", unit: "g" },

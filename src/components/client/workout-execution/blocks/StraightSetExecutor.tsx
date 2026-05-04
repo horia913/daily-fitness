@@ -2,24 +2,25 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/client-ui";
 import {
-  CheckCircle,
   MoreVertical,
   Pencil,
   Target,
   Repeat2,
   Timer,
-  Weight,
   Gauge,
   Flame,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
+import logPairStyles from "../ui/logWeightRepsPair.module.css";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { BaseBlockExecutorProps } from "../types";
 import {
   BaseBlockExecutorLayout,
-  formatLoadPercentage,
   calculateSuggestedWeightUtil,
   formatRestSeconds,
 } from "../BaseBlockExecutor";
@@ -34,8 +35,9 @@ import {
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
-import { InlineRPERow } from "../ui/InlineRPERow";
-import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
+import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
+import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
+import { appendTargetEffortItem } from "../appendTargetEffortItem";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -59,7 +61,6 @@ export function StraightSetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
-  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
@@ -89,14 +90,8 @@ export function StraightSetExecutor({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   /** 0 = current set (form for logging next), 1..n = viewing logged set 1..n (same form, edit) */
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
-  /** Collapsible set history: show all sets or only last 2 */
-  const [showAllSets, setShowAllSets] = useState(false);
-  /** Visual feedback: green flash on Log Set button */
+  /** Visual feedback: green flash on Log Set button (kept for future hook into LogSetButton). */
   const [showLogSuccessFlash, setShowLogSuccessFlash] = useState(false);
-  /** Track newly logged set IDs for slide-in animation */
-  const [newlyLoggedSetIds, setNewlyLoggedSetIds] = useState<Set<string>>(
-    new Set(),
-  );
   // Use exercise.sets if available, otherwise fall back to block.total_sets, then default to 1
   const totalSets =
     currentExercise?.sets !== null && currentExercise?.sets !== undefined
@@ -381,6 +376,8 @@ export function StraightSetExecutor({
   const repsDisplay =
     currentExercise?.reps ?? block.block.reps_per_set ?? "—";
 
+  // Mock workout-exec-v6 order: Sets / Reps / Rest / Target effort (when prescribed) / Tempo (full-width).
+  // "Load %" dropped — coach-prescribed weight is already encoded in the suggested weight.
   const prescriptionItems: PrescriptionItem[] = [
     { icon: Target, label: "Sets", value: totalSets },
     { icon: Repeat2, label: "Reps", value: repsDisplay },
@@ -392,42 +389,16 @@ export function StraightSetExecutor({
     },
   ];
 
-  const loadPercentageDisplay = currentExercise?.load_percentage;
-  if (
-    loadPercentageDisplay !== null &&
-    loadPercentageDisplay !== undefined &&
-    currentExercise?.exercise_id
-  ) {
-    const suggestedForDisplay =
-      source === "percent_e1rm" ? suggested_weight : null;
-    const loadDisplay = formatLoadPercentage(
-      loadPercentageDisplay,
-      suggestedForDisplay,
-    );
-    if (loadDisplay) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load",
-        value: loadDisplay,
-      });
-    }
-  }
+  const prescribedEffortRaw = currentExercise
+    ? (currentExercise as { rir?: unknown }).rir
+    : undefined;
+  appendTargetEffortItem(prescriptionItems, prescribedEffortRaw, Flame);
 
   if (currentExercise?.tempo) {
     prescriptionItems.push({
       icon: Gauge,
       label: "Tempo",
       value: currentExercise.tempo,
-    });
-  }
-
-  if (currentExercise?.rir !== null && currentExercise?.rir !== undefined) {
-    prescriptionItems.push({
-      icon: Flame,
-      label: "RPE",
-      value:
-        formatPrescribedRpeLabel(currentExercise.rir) ??
-        String(currentExercise.rir).trim(),
     });
   }
 
@@ -504,18 +475,6 @@ export function StraightSetExecutor({
         } as LoggedSet;
 
         onSetLogUpsert?.(block.block.id, loggedSet);
-
-        // Mark this set as newly logged for slide-in animation
-        const finalSetId = result.set_log_id || loggedSet.id;
-        setNewlyLoggedSetIds((prev) => new Set([...prev, finalSetId]));
-        // Remove from animation set after animation completes
-        setTimeout(() => {
-          setNewlyLoggedSetIds((prev) => {
-            const next = new Set(prev);
-            next.delete(finalSetId);
-            return next;
-          });
-        }, 300);
 
         console.log("[StraightSetExecutor] set logged", {
           currentSetNumber,
@@ -598,199 +557,123 @@ export function StraightSetExecutor({
     }
   };
 
-  const aboveStickyContent =
-    allowSetEditDelete && loggedSetsList.length > 0 ? (
-      <div className="border-t border-white/10 pt-2">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
-            Logged sets
-          </div>
-          {loggedSetsList.length > 2 && (
-            <button
-              type="button"
-              onClick={() => setShowAllSets(!showAllSets)}
-              className="text-xs font-medium fc-text-dim transition-colors hover:fc-text-primary"
-            >
-              {showAllSets ? (
-                <>Show less ▲</>
-              ) : (
-                <>Show all {loggedSetsList.length} sets ▼</>
-              )}
-            </button>
-          )}
-        </div>
-        <ul className="flex flex-col border-y border-white/5">
-          {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map(
-            (setEntry, index) => {
-              const actualIndex = showAllSets
-                ? index
-                : loggedSetsList.length - 2 + index;
-              const isLatestSet = actualIndex === loggedSetsList.length - 1;
-              const isNewlyLogged = newlyLoggedSetIds.has(setEntry.id);
-              return (
-                <li
-                  key={setEntry.id}
-                  className={`flex flex-col gap-1.5 border-b border-white/5 px-1 py-3 last:border-b-0 transition-all duration-300 ${
-                    isNewlyLogged ? "animate-slideInRight" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2 text-sm fc-text-primary">
-                      <CheckCircle
-                        className="h-4 w-4 shrink-0 text-cyan-400"
-                        aria-hidden
-                      />
-                      <span>
-                        Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"}{" "}
-                        kg × {setEntry.reps_completed ?? "—"} reps
-                      </span>
-                    </span>
-                    <div className="relative flex items-center">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMenuOpenSetId(
-                            menuOpenSetId === setEntry.id ? null : setEntry.id,
-                          )
-                        }
-                        className="rounded-lg p-1.5 fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                        aria-label="Options"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                      {menuOpenSetId === setEntry.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setMenuOpenSetId(null)}
-                            aria-hidden
-                          />
-                          <div
-                            className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg py-1 shadow-lg"
-                            style={{
-                              background: "var(--fc-surface-elevated)",
-                              border: "1px solid var(--fc-surface-card-border)",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => handleEditSet(setEntry)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:opacity-80"
-                            >
-                              <Pencil className="h-3.5 w-3.5" /> Edit
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <InlineRPERow
-                    setLogId={
-                      setEntry.id.startsWith("temp-") ? null : setEntry.id
-                    }
-                    currentRPE={setEntry.rpe ?? null}
-                    onRPESelect={async (rpe) => {
-                      const updatedEntry: LoggedSet = {
-                        ...setEntry,
-                        rpe,
-                      };
-                      onSetLogUpsert?.(block.block.id, updatedEntry, {
-                        replaceId: setEntry.id,
-                      });
+  const updateSetRpe = useUpdateSetRpe({
+    blockId: block.block.id,
+    onSetLogUpsert,
+  });
 
-                      if (!setEntry.id.startsWith("temp-")) {
-                        try {
-                          const res = await fetch(`/api/sets/${setEntry.id}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ rpe }),
-                            credentials: "include",
-                          });
-                          if (!res.ok) {
-                            console.error(
-                              "Failed to update RPE:",
-                              await res.text(),
-                            );
-                            const revertedEntry: LoggedSet = {
-                              ...setEntry,
-                              rpe: setEntry.rpe ?? undefined,
-                            };
-                            onSetLogUpsert?.(block.block.id, revertedEntry, {
-                              replaceId: setEntry.id,
-                            });
-                          }
-                        } catch (err) {
-                          console.error("Error updating RPE:", err);
-                          const revertedEntry: LoggedSet = {
-                            ...setEntry,
-                            rpe: setEntry.rpe ?? undefined,
-                          };
-                          onSetLogUpsert?.(block.block.id, revertedEntry, {
-                            replaceId: setEntry.id,
-                          });
-                        }
-                      }
-                    }}
-                    isLatestSet={isLatestSet}
-                  />
-                </li>
-              );
-            },
-          )}
-        </ul>
+  const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((setEntry) => ({
+    id: setEntry.id,
+    title: `Set ${setEntry.set_number}: ${setEntry.weight_kg ?? "—"} kg × ${setEntry.reps_completed ?? "—"} reps`,
+    rpe: setEntry.rpe ?? null,
+    onEffortChange: (rpe) => updateSetRpe(setEntry, rpe),
+    disabled: setEntry.id.startsWith("temp-"),
+    menu: allowSetEditDelete ? (
+      <div className="relative flex items-center">
+        <button
+          type="button"
+          onClick={() =>
+            setMenuOpenSetId(
+              menuOpenSetId === setEntry.id ? null : setEntry.id,
+            )
+          }
+          className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--fc-text-dim)] hover:bg-white/5 hover:text-[color:var(--fc-text-primary)]"
+          aria-label="Options"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        {menuOpenSetId === setEntry.id && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setMenuOpenSetId(null)}
+              aria-hidden
+            />
+            <div
+              className="absolute right-0 top-full z-20 mt-1 min-w-[120px] rounded-lg py-1 shadow-lg"
+              style={{
+                background: "var(--fc-surface-elevated)",
+                border: "1px solid var(--fc-surface-card-border)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleEditSet(setEntry)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:opacity-80"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </button>
+            </div>
+          </>
+        )}
       </div>
+    ) : null,
+  }));
+
+  const aboveStickyContent =
+    loggedSetRows.length > 0 ? (
+      <LoggedSetsList rows={loggedSetRows} />
     ) : null;
+
+  const logNavRight = (
+    <div className="flex items-center gap-1.5">
+      <IconButton
+        size="sm"
+        variant="filled"
+        className="!h-[26px] !w-[26px] min-h-0 border border-[color:var(--fc-glass-border)] bg-white/[0.06] text-zinc-300 hover:bg-white/10"
+        aria-label="Previous set"
+        disabled={viewingSetIndex === 0}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setViewingSetIndex((i) => Math.max(0, i - 1));
+        }}
+      >
+        <ChevronLeft className="h-3 w-3" aria-hidden />
+      </IconButton>
+      <span
+        className="min-w-[56px] px-1.5 text-center text-sm font-bold tabular-nums tracking-[0.04em] text-white"
+        style={{
+          fontFamily: "var(--font-big-shoulders-display, var(--font-sans))",
+        }}
+      >
+        {displaySetNumber}
+        <span className="font-medium text-zinc-500"> / {totalSets}</span>
+      </span>
+      <IconButton
+        size="sm"
+        variant="filled"
+        className="!h-[26px] !w-[26px] min-h-0 border border-[color:var(--fc-glass-border)] bg-white/[0.06] text-zinc-300 hover:bg-white/10"
+        aria-label={
+          loggedSetsList.length === 0
+            ? "Next set (log a set first to review)"
+            : "Next set"
+        }
+        title={
+          loggedSetsList.length === 0
+            ? "Log at least one set to review previous sets"
+            : undefined
+        }
+        disabled={viewingSetIndex >= loggedSetsList.length}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setViewingSetIndex((i) => Math.min(loggedSetsList.length, i + 1));
+        }}
+      >
+        <ChevronRight className="h-3 w-3" aria-hidden />
+      </IconButton>
+    </div>
+  );
 
   const loggingInputs = (
     <div className="space-y-3">
-      <div className="flex h-8 items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setViewingSetIndex((i) => Math.max(0, i - 1));
-          }}
-          disabled={viewingSetIndex === 0}
-          className="flex min-h-8 min-w-8 items-center justify-center rounded-md fc-text-primary transition-transform hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
-          aria-label="Previous set"
-        >
-          <span className="text-sm" aria-hidden>
-            ←
-          </span>
-        </button>
-        <span className="min-w-[7.5rem] text-center text-[11px] font-semibold uppercase tracking-wide fc-text-dim">
-          Set {displaySetNumber} of {totalSets}
-        </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setViewingSetIndex((i) => Math.min(loggedSetsList.length, i + 1));
-          }}
-          disabled={viewingSetIndex >= loggedSetsList.length}
-          title={
-            loggedSetsList.length === 0
-              ? "Log at least one set to review previous sets"
-              : undefined
-          }
-          className="flex min-h-8 min-w-8 items-center justify-center rounded-md fc-text-primary transition-transform hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
-          aria-label={
-            loggedSetsList.length === 0
-              ? "Next set (log a set first to review)"
-              : "Next set"
-          }
-        >
-          <span className="text-sm" aria-hidden>
-            →
-          </span>
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
+      <div className={`mb-3 w-full min-w-0 ${logPairStyles.pair}`}>
+        <div className="flex min-h-0 min-w-0 flex-col">
           <LargeInput
+            className="min-h-0 flex-1"
             label="Weight"
+            unit="kg"
             value={editDraft ? editDraft.weight : weight}
             onChange={(val) => {
               if (editDraft) {
@@ -802,40 +685,41 @@ export function StraightSetExecutor({
             }}
             placeholder="0"
             step="0.5"
-            unit="kg"
             showStepper
             stepAmount={2.5}
-            plateCalculatorEnabled
           />
-          {!editDraft &&
-            coachSuggestedWeight != null &&
-            coachSuggestedWeight > 0 && (
-              <ApplySuggestedWeightButton
-                suggestedKg={coachSuggestedWeight}
-                onApply={() => {
-                  setWeight(String(coachSuggestedWeight));
-                  setIsWeightPristine(false);
-                }}
-              />
-            )}
         </div>
-        <LargeInput
-          label="Reps"
-          hint={!editDraft ? repsRangeHint ?? undefined : undefined}
-          value={editDraft ? editDraft.reps : reps}
-          onChange={(val) => {
-            if (editDraft) {
-              setEditDraft((d) => (d ? { ...d, reps: val } : null));
-            } else {
-              setReps(val);
-            }
-          }}
-          placeholder="0"
-          step="1"
-          showStepper
-          stepAmount={1}
-        />
+        <div className="flex min-h-0 min-w-0 flex-col">
+          <LargeInput
+            className="min-h-0 flex-1"
+            label="Reps"
+            hint={!editDraft ? repsRangeHint ?? undefined : undefined}
+            value={editDraft ? editDraft.reps : reps}
+            onChange={(val) => {
+              if (editDraft) {
+                setEditDraft((d) => (d ? { ...d, reps: val } : null));
+              } else {
+                setReps(val);
+              }
+            }}
+            placeholder="0"
+            step="1"
+            showStepper
+            stepAmount={1}
+          />
+        </div>
       </div>
+      {!editDraft &&
+        coachSuggestedWeight != null &&
+        coachSuggestedWeight > 0 && (
+          <ApplySuggestedWeightButton
+            suggestedKg={coachSuggestedWeight}
+            onApply={() => {
+              setWeight(String(coachSuggestedWeight));
+              setIsWeightPristine(false);
+            }}
+          />
+        )}
     </div>
   );
 
@@ -921,12 +805,12 @@ export function StraightSetExecutor({
           calculateSuggestedWeight,
           onVideoClick,
           onAlternativesClick,
-          onPlateCalculatorClick,
-          onRestTimerClick,
+                  onRestTimerClick,
           progressionSuggestion,
           previousPerformanceMap,
         }}
         exerciseName={currentExercise?.exercise?.name || "Exercise"}
+        prescriptionGridMode="two-column-only"
         prescriptionItems={prescriptionItems}
         instructions={instructions}
         currentSet={displaySetNumber}
@@ -934,7 +818,7 @@ export function StraightSetExecutor({
         progressLabel="Set"
         loggingInputs={loggingInputs}
         logButton={logButton}
-        logSectionTitle={`LOG SET ${displaySetNumber}`}
+        logNavRight={logNavRight}
         showNavigation={true}
         currentExercise={currentExercise}
         showRestTimer={

@@ -4,7 +4,7 @@
 // that no external service or cron calls this endpoint.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAllClientGoals } from '@/lib/goalSyncService'
+import { syncGoalsForClient } from '@/lib/goalSyncService'
 import { createErrorResponse, handleApiError, createSuccessResponse } from '@/lib/apiErrorHandler'
 import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
@@ -33,15 +33,13 @@ export async function POST(req: NextRequest) {
       return createForbiddenResponse('Cannot sync goals for another user')
     }
 
-    const userId = user.id
-
-    // Sync all goals for this client
-    const results = await syncAllClientGoals(userId)
+    const summary = await syncGoalsForClient(clientId)
 
     return createSuccessResponse({
-      synced: results.filter(r => r.updated).length,
-      total: results.length,
-      results
+      ...summary,
+      /** @deprecated use summary fields */
+      synced: summary.syncedGoals,
+      total: summary.totalGoals,
     })
   } catch (error: any) {
     // Handle auth errors specifically

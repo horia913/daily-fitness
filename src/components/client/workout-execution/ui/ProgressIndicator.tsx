@@ -2,8 +2,9 @@
 
 import React from "react";
 import { Progress } from "@/components/ui/progress";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 
-interface ProgressIndicatorProps {
+interface SetProgressIndicatorProps {
   current: number;
   total: number;
   label?: string;
@@ -12,21 +13,21 @@ interface ProgressIndicatorProps {
   segmented?: boolean;
 }
 
-export function ProgressIndicator({
+export function SetProgressIndicator({
   current,
   total,
   label = "Set",
   showBar = true,
   segmented = true,
-}: ProgressIndicatorProps) {
+}: SetProgressIndicatorProps) {
   const percentage = total > 0 ? (current / total) * 100 : 0;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+        <Eyebrow as="span" tone="dim" density="section" className="!mb-0">
           {label} {current} of {total}
-        </span>
+        </Eyebrow>
         <span className="text-xs font-bold font-mono text-cyan-400 tabular-nums">
           {Math.round(percentage)}%
         </span>

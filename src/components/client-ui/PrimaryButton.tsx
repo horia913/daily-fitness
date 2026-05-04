@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface PrimaryButtonProps {
@@ -11,6 +12,9 @@ interface PrimaryButtonProps {
   className?: string;
 }
 
+/**
+ * @deprecated Prefer `<Button variant="btn-action" className="h-10 w-full" />` from `@/components/ui/button`.
+ */
 export function PrimaryButton({
   children,
   onClick,
@@ -19,17 +23,15 @@ export function PrimaryButton({
   className,
 }: PrimaryButtonProps) {
   return (
-    <button
+    <Button
       type={type}
+      variant="btn-action"
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "fc-btn fc-btn-primary fc-press w-full h-10 flex items-center justify-center gap-2 text-sm font-bold rounded-xl",
-        className
-      )}
+      className={cn("h-10 w-full", className)}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

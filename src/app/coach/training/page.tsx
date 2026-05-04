@@ -96,21 +96,21 @@ export default function CoachTrainingHubPage() {
                   href={item.href}
                   className={`flex w-full min-h-[52px] items-center gap-4 border-b border-[color:var(--fc-glass-border)] py-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] ${item.accent}`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-accent)]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-accent-cyan)]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="font-semibold fc-text-primary">{item.title}</h2>
                     <p className="mt-0.5 text-xs fc-text-dim">{item.description}</p>
                   </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-[color:var(--fc-accent)]/80" />
+                  <ChevronRight className="h-5 w-5 shrink-0 text-[color:var(--fc-accent-cyan)]/80" />
                 </Link>
               );
             })}
           </nav>
 
           <div className="mt-8">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-accent)]/60">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-[color:var(--fc-accent-cyan)]/60">
               Organization
             </p>
             <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
@@ -120,7 +120,7 @@ export default function CoachTrainingHubPage() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex w-full min-h-[48px] items-center justify-between border-b border-[color:var(--fc-glass-border)] py-3 text-left text-sm font-medium text-[color:var(--fc-accent)] transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
+                    className="flex w-full min-h-[48px] items-center justify-between border-b border-[color:var(--fc-glass-border)] py-3 text-left text-sm font-medium text-[color:var(--fc-accent-cyan)] transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
                   >
                     <span className="flex items-center gap-2">
                       <Icon className="h-4 w-4 opacity-80" />

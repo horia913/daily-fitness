@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface NavigationControlsProps {
   currentBlock: number;
@@ -12,6 +13,7 @@ interface NavigationControlsProps {
   canGoNext?: boolean;
 }
 
+/** Mock ex-nav-row: meta left, Prev / Next buttons right. */
 export function NavigationControls({
   currentBlock,
   totalBlocks,
@@ -25,32 +27,38 @@ export function NavigationControls({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 py-2">
-      <div className="text-xs font-medium tabular-nums fc-text-dim">
+    <div className="mx-5 mb-4 flex items-center justify-between gap-3">
+      <div className="text-[11.5px] font-medium text-zinc-500">
         Exercise {currentBlock} of {totalBlocks}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         {onPrevious && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            className="h-8 px-2.5 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
+            className={cn(
+              "flex items-center gap-1 rounded-[10px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 py-2 text-xs font-semibold text-white transition-colors",
+              !canGoPrevious && "cursor-not-allowed text-zinc-600 opacity-50",
+            )}
           >
-            ← Prev Exercise
-          </Button>
+            <ChevronLeft className="h-3 w-3" aria-hidden />
+            Prev
+          </button>
         )}
         {onNext && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={onNext}
             disabled={!canGoNext}
-            className="h-8 px-2.5 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
+            className={cn(
+              "flex items-center gap-1 rounded-[10px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-card)] px-3 py-2 text-xs font-semibold text-white transition-colors",
+              !canGoNext && "cursor-not-allowed text-zinc-600 opacity-50",
+            )}
           >
-            Next Exercise →
-          </Button>
+            Next
+            <ChevronRight className="h-3 w-3" aria-hidden />
+          </button>
         )}
       </div>
     </div>

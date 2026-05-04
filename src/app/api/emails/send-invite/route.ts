@@ -5,7 +5,28 @@ import { validateApiAuth, createUnauthorizedResponse } from '@/lib/apiAuth'
 export async function POST(request: NextRequest) {
   try {
     // Validate authentication - only authenticated users (coaches) can send invites
-    await validateApiAuth(request)
+    const { user, supabaseAuth } = await validateApiAuth(request)
+
+    const { data: profile, error: profileError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
+
+    const role = String(profile.role || '').toLowerCase()
+    if (!['coach', 'admin'].includes(role)) {
+      return NextResponse.json(
+        { error: 'Only coaches can send invite emails' },
+        { status: 403 }
+      )
+    }
     
     const body = await request.json()
     const { clientEmail, clientName, inviteCode, expiryDays, inviteLink } = body

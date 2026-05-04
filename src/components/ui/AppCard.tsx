@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 
 export type AppCardShellTone = "neutral" | "success" | "error" | "warning" | "info";
 
-const toneModifier: Record<Exclude<AppCardShellTone, "neutral">, string> = {
-  success: "fc-card-shell--success",
-  error: "fc-card-shell--error",
-  warning: "fc-card-shell--warning",
-  info: "fc-card-shell--info",
+const toneStripeColor: Record<Exclude<AppCardShellTone, "neutral">, string> = {
+  success: "var(--fc-status-success)",
+  error: "var(--fc-status-error)",
+  warning: "var(--fc-status-warning)",
+  info: "var(--fc-accent-cyan)",
 };
 
 export interface AppCardProps {
@@ -63,8 +63,9 @@ export function AppCard({
   status,
 }: AppCardProps) {
   const resolvedTone = shellTone ?? statusToShellTone(status) ?? "neutral";
-  const shellToneClass =
-    resolvedTone !== "neutral" ? toneModifier[resolvedTone] : undefined;
+  const stripeColor =
+    accentColor ??
+    (resolvedTone !== "neutral" ? toneStripeColor[resolvedTone] : undefined);
 
   const isInteractive = typeof onClick === "function";
 
@@ -84,13 +85,13 @@ export function AppCard({
           : undefined
       }
       className={cn(
-        "fc-card-shell overflow-hidden transition-all duration-200",
-        shellToneClass,
+        "overflow-hidden rounded-[22px] border border-[color:var(--fc-glass-border)] bg-[var(--fc-surface-card)] transition-all duration-200",
+        stripeColor && "fc-pillar-stripe",
         isInteractive && "cursor-pointer fc-hover-rise",
         "hover:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]",
         className
       )}
-      style={accentColor ? { borderLeftColor: accentColor } : undefined}
+      style={stripeColor ? ({ "--pillar-color": stripeColor } as React.CSSProperties) : undefined}
     >
       <div className="p-4 sm:p-5 space-y-3">
         {/* Eyebrow */}

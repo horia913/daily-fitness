@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { SectionHeader } from "@/components/client-ui";
 import { dbToUiScale } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
@@ -32,6 +33,10 @@ function avgSoreness(logs: DailyWellnessLog[]): number | null {
   const sum = withSoreness.reduce((s, l) => s + (dbToUiScale(l.soreness_level) ?? 0), 0);
   return sum / withSoreness.length;
 }
+
+/** Stat / trend numerals — matches dashboard stat strip (display → number → mono). */
+const trendNumClass =
+  "tabular-nums [font-family:var(--f-display,var(--font-display,var(--font-number,var(--font-mono,ui-monospace,monospace))))]";
 
 export function WellnessTrendsCard({
   logRange,
@@ -147,7 +152,11 @@ export function WellnessTrendsCard({
   if (!hasEnoughData) {
     return (
       <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
-        <h3 className="mb-2 text-base font-semibold fc-text-primary">Wellness Trends</h3>
+        <SectionHeader
+          title="Wellness Trends"
+          titleTone="plain"
+          className="!mb-2"
+        />
         <p className="text-sm fc-text-dim">Not enough data yet — keep checking in!</p>
       </div>
     );
@@ -164,7 +173,11 @@ export function WellnessTrendsCard({
   if (mode === "week_only") {
     return (
       <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
-        <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
+        <SectionHeader
+          title="Wellness Trends"
+          titleTone="plain"
+          className="!mb-3"
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[240px] border-collapse text-sm">
             <thead>
@@ -178,20 +191,20 @@ export function WellnessTrendsCard({
             <tbody className="fc-text-primary">
               <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                 <td className="py-2 pr-4 font-medium">Avg Sleep</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.lastWeek.sleep, "sleep_hours")}`}>{fmt(periods.lastWeek.sleep)} hrs</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.thisWeek.sleep, "sleep_hours")}`}>{fmt(periods.thisWeek.sleep)} hrs</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.lastWeek.sleep, "sleep_hours")}`}>{fmt(periods.lastWeek.sleep)} hrs</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.thisWeek.sleep, "sleep_hours")}`}>{fmt(periods.thisWeek.sleep)} hrs</td>
                 <td className={`text-right py-2 pl-2 text-xs ${trendClass(sleepTrendLabel)}`}>{sleepTrendLabel}</td>
               </tr>
               <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                 <td className="py-2 pr-4 font-medium">Avg Stress</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.lastWeek.stress, "stress")}`}>{fmt(periods.lastWeek.stress)}</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.thisWeek.stress, "stress")}`}>{fmt(periods.thisWeek.stress)}</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.lastWeek.stress, "stress")}`}>{fmt(periods.lastWeek.stress)}</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.thisWeek.stress, "stress")}`}>{fmt(periods.thisWeek.stress)}</td>
                 <td className={`text-right py-2 pl-2 text-xs ${trendClass(stressTrendLabel)}`}>{stressTrendLabel}</td>
               </tr>
               <tr className="border-b border-[color:var(--fc-glass-border)]/50">
                 <td className="py-2 pr-4 font-medium">Avg Soreness</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.lastWeek.soreness, "soreness")}`}>{fmt(periods.lastWeek.soreness)}</td>
-                <td className={`text-right py-2 px-2 font-mono ${valueColor(periods.thisWeek.soreness, "soreness")}`}>{fmt(periods.thisWeek.soreness)}</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.lastWeek.soreness, "soreness")}`}>{fmt(periods.lastWeek.soreness)}</td>
+                <td className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(periods.thisWeek.soreness, "soreness")}`}>{fmt(periods.thisWeek.soreness)}</td>
                 <td className={`text-right py-2 pl-2 text-xs ${trendClass(sorenessTrendLabel)}`}>{sorenessTrendLabel}</td>
               </tr>
             </tbody>
@@ -214,7 +227,11 @@ export function WellnessTrendsCard({
 
   return (
     <div className="border-y border-[color:var(--fc-glass-border)] px-4 py-3">
-      <h3 className="mb-3 text-base font-semibold fc-text-primary">Wellness Trends</h3>
+      <SectionHeader
+        title="Wellness Trends"
+        titleTone="plain"
+        className="!mb-3"
+      />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[320px] border-collapse text-sm">
           <thead>
@@ -230,21 +247,21 @@ export function WellnessTrendsCard({
             <tr className="border-b border-[color:var(--fc-glass-border)]/50">
               <td className="py-2 pr-4 font-medium">Avg Sleep</td>
               {cols.map((c) => (
-                <td key={c.label} className={`text-right py-2 px-2 font-mono ${valueColor(c.sleep, "sleep_hours")}`}>{fmt(c.sleep)} hrs</td>
+                <td key={c.label} className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(c.sleep, "sleep_hours")}`}>{fmt(c.sleep)} hrs</td>
               ))}
               <td className={`text-right py-2 pl-2 text-xs ${trendClass(sleepTrendLabel)}`}>{sleepTrendLabel}</td>
             </tr>
             <tr className="border-b border-[color:var(--fc-glass-border)]/50">
               <td className="py-2 pr-4 font-medium">Avg Stress</td>
               {cols.map((c) => (
-                <td key={c.label} className={`text-right py-2 px-2 font-mono ${valueColor(c.stress, "stress")}`}>{fmt(c.stress)}</td>
+                <td key={c.label} className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(c.stress, "stress")}`}>{fmt(c.stress)}</td>
               ))}
               <td className={`text-right py-2 pl-2 text-xs ${trendClass(stressTrendLabel)}`}>{stressTrendLabel}</td>
             </tr>
             <tr className="border-b border-[color:var(--fc-glass-border)]/50">
               <td className="py-2 pr-4 font-medium">Avg Soreness</td>
               {cols.map((c) => (
-                <td key={c.label} className={`text-right py-2 px-2 font-mono ${valueColor(c.soreness, "soreness")}`}>{fmt(c.soreness)}</td>
+                <td key={c.label} className={`text-right py-2 px-2 ${trendNumClass} ${valueColor(c.soreness, "soreness")}`}>{fmt(c.soreness)}</td>
               ))}
               <td className={`text-right py-2 pl-2 text-xs ${trendClass(sorenessTrendLabel)}`}>{sorenessTrendLabel}</td>
             </tr>

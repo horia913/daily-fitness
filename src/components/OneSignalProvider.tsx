@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { oneSignalService } from "@/lib/onesignal";
+import { isPushNotificationsEnabled } from "@/lib/pushNotificationsEnabled";
 
 interface OneSignalProviderProps {
   children: React.ReactNode;
@@ -11,12 +12,15 @@ interface OneSignalProviderProps {
 export default function OneSignalProvider({
   children,
 }: OneSignalProviderProps) {
+  const pushEnabled = isPushNotificationsEnabled();
   const { user } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [userSubscribed, setUserSubscribed] = useState(false);
 
   useEffect(() => {
+    if (!pushEnabled) return;
+
     // Fire and forget - OneSignal initialization should NEVER block rendering
     // If it fails or times out, the app continues normally (just without push notifications)
     const initializeOneSignal = async () => {
@@ -93,7 +97,11 @@ export default function OneSignalProvider({
 
     // Don't await - fire and forget
     setupUserContext();
-  }, [isInitialized, user?.id, userSubscribed]); // Only depend on user.id to prevent loops
+  }, [pushEnabled, isInitialized, user?.id, userSubscribed]); // Only depend on user.id to prevent loops
+
+  if (!pushEnabled) {
+    return <>{children}</>;
+  }
 
   return (
     <>

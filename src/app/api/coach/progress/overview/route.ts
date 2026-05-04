@@ -1,7 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import { dbToUiScale } from '@/lib/wellnessService'
 
-export async function GET(_req: NextRequest) {
+const DEFAULT_CLIENT_TZ = 'Europe/Bucharest'
+
+type ActiveProgramAssignment = {
+  id: string
+  client_id: string
+  program_id: string
+  start_date: string | null
+  duration_weeks: number | null
+  pause_accumulated_days: number | null
+  pause_status: string | null
+  paused_at: string | null
+  timezone_snapshot: string | null
+}
+
+type Period = 'week' | 'month'
+
+/**
+ * Returns ISO timestamp at the start of the given period (Mon 00:00 local for "week",
+ * 1st of current month at 00:00 local for "month") in coach-local time.
+ *
+ * Note: "local" here is the server's local time. We don't have the coach's tz reliably
+ * from the request, so we use the server tz. This matches existing behaviour.
+ */
+function periodStart(period: Period, now: Date): Date {
+  if (period === 'week') {
+    const d = new Date(now)
+    const dow = d.getDay() // 0 = Sun
+    const diffToMonday = (dow + 6) % 7 // Mon -> 0, Tue -> 1 ... Sun -> 6
+    d.setDate(d.getDate() - diffToMonday)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  const d = new Date(now.getFullYear(), now.getMonth(), 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/** Mon 00:00 local of current week. */
+function currentMondayStart(now: Date): Date {
+  return periodStart('week', now)
+}
+
+export async function GET(req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient()
     const {
@@ -16,6 +60,10 @@ export async function GET(_req: NextRequest) {
       )
     }
 
+    const url = new URL(req.url)
+    const periodParam = (url.searchParams.get('period') || 'month').toLowerCase()
+    const period: Period = periodParam === 'week' ? 'week' : 'month'
+
     // Load coach's clients
     const { data: clientsRows, error: clientsError } = await supabase
       .from('clients')
@@ -23,51 +71,49 @@ export async function GET(_req: NextRequest) {
       .eq('coach_id', user.id)
 
     if (clientsError || !clientsRows || clientsRows.length === 0) {
-      const emptyWorkoutStats = {
-        totalSessions: 0,
-        completedSessions: 0,
-        thisWeek: 0,
-        thisMonth: 0,
-        averageCompletionRate: 0,
-      }
-      const emptyWellness = {
-        checkedInToday: 0,
-        totalClients: 0,
-        averageEnergy: 0,
-        highStressCount: 0,
-        highStressClients: [] as any[],
-        inactiveClients: [] as any[],
-      }
       return NextResponse.json({
+        period,
+        totals: {
+          activeClients: 0,
+          completedWorkouts: 0,
+          avgAdherence: 0,
+          checkinsThisWeek: 0,
+        },
+        actionQueue: {
+          needAttention: [],
+          inactiveCheckIns: [],
+          flagged: [],
+        },
+        wellness: {
+          checkedInToday: 0,
+          totalClients: 0,
+          averageEnergy: null,
+        },
         clientProgress: [],
-        workoutStats: emptyWorkoutStats,
-        wellnessOverview: emptyWellness,
       })
     }
 
     const clientIds = clientsRows.map((c) => c.client_id)
 
-    const today = new Date().toISOString().split('T')[0]
     const now = new Date()
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - now.getDay())
-    weekStart.setHours(0, 0, 0, 0)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const today = now.toISOString().split('T')[0]
+    const periodStartDate = periodStart(period, now)
+    const mondayStartDate = currentMondayStart(now)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
     const [
       { data: profiles },
       { data: wellnessLogs },
       { data: workoutLogs },
-      { data: assignments },
-      { data: programs },
+      { data: programAssignmentsRows },
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, timezone, avatar_url')
         .in('id', clientIds),
       supabase
         .from('daily_wellness_logs')
-        .select('client_id, log_date, energy_level, stress_level')
+        .select('client_id, log_date, energy_level, stress_level, created_at')
         .in('client_id', clientIds),
       supabase
         .from('workout_logs')
@@ -75,245 +121,394 @@ export async function GET(_req: NextRequest) {
         .in('client_id', clientIds)
         .not('completed_at', 'is', null),
       supabase
-        .from('workout_assignments')
-        .select('client_id')
-        .in('client_id', clientIds),
-      supabase
         .from('program_assignments')
-        .select('client_id, total_days, duration_weeks, status')
+        .select(
+          'id, client_id, program_id, start_date, duration_weeks, pause_accumulated_days, pause_status, paused_at, timezone_snapshot, status, updated_at'
+        )
         .in('client_id', clientIds)
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false }),
     ])
 
-    const profileMap = new Map<
-      string,
-      { id: string; first_name?: string | null; last_name?: string | null }
-    >((profiles || []).map((p) => [p.id, p]))
-
-    const wellnessByClient: Record<string, any[]> = {}
-    ;(wellnessLogs || []).forEach((row: any) => {
-      if (!wellnessByClient[row.client_id]) wellnessByClient[row.client_id] = []
-      wellnessByClient[row.client_id].push(row)
-    })
-
-    const workoutsByClient: Record<string, any[]> = {}
-    ;(workoutLogs || []).forEach((row: any) => {
-      if (!workoutsByClient[row.client_id]) workoutsByClient[row.client_id] = []
-      workoutsByClient[row.client_id].push(row)
-    })
-
-    const assignmentsByClient: Record<string, number> = {}
-    ;(assignments || []).forEach((row: any) => {
-      const id = row.client_id
-      assignmentsByClient[id] = (assignmentsByClient[id] || 0) + 1
-    })
-
-    const programByClient: Record<
-      string,
-      { total_days: number | null; duration_weeks: number | null }
-    > = {}
-    ;(programs || []).forEach(
-      (row: { client_id: string; total_days: number | null; duration_weeks: number | null }) => {
-        if (!programByClient[row.client_id]) {
-          programByClient[row.client_id] = {
-            total_days: row.total_days,
-            duration_weeks: row.duration_weeks,
-          }
-        }
-      }
+    type ProfileRow = {
+      id: string
+      first_name?: string | null
+      last_name?: string | null
+      timezone?: string | null
+      avatar_url?: string | null
+    }
+    const profileMap = new Map<string, ProfileRow>(
+      (profiles || []).map((p) => [p.id, p as ProfileRow])
     )
 
-    const checkedInToday: string[] = []
-    const energyValues: number[] = []
-    const highStressClients: Array<{ id: string; name: string; stress: number }> = []
-    const inactiveClients: Array<{ id: string; name: string; daysSince: number }> = []
+    type WellnessRow = {
+      client_id: string
+      log_date: string
+      energy_level: number | null
+      stress_level: number | null
+      created_at: string | null
+    }
+    const wellnessByClient: Record<string, WellnessRow[]> = {}
+    ;(wellnessLogs || []).forEach((row) => {
+      const r = row as WellnessRow
+      if (!wellnessByClient[r.client_id]) wellnessByClient[r.client_id] = []
+      wellnessByClient[r.client_id].push(r)
+    })
 
-    const clientProgress: Array<{
+    type WorkoutRow = { client_id: string; completed_at: string }
+    const workoutsByClient: Record<string, WorkoutRow[]> = {}
+    ;(workoutLogs || []).forEach((row) => {
+      const r = row as WorkoutRow
+      if (!workoutsByClient[r.client_id]) workoutsByClient[r.client_id] = []
+      workoutsByClient[r.client_id].push(r)
+    })
+
+    /** One active assignment per client (most recently updated). */
+    const assignmentByClientId = new Map<string, ActiveProgramAssignment>()
+    for (const row of programAssignmentsRows || []) {
+      const cid = (row as ActiveProgramAssignment).client_id
+      if (!assignmentByClientId.has(cid)) {
+        assignmentByClientId.set(cid, row as ActiveProgramAssignment)
+      }
+    }
+
+    type WeekTarget = {
+      clientId: string
+      assignmentId: string
+      programId: string
+      weekNum: number
+    }
+    const weekTargets: WeekTarget[] = []
+    for (const [clientId, pa] of assignmentByClientId) {
+      const prof = profileMap.get(clientId)
+      const tzFallback =
+        prof?.timezone && String(prof.timezone).trim().length > 0
+          ? String(prof.timezone).trim()
+          : DEFAULT_CLIENT_TZ
+      const { week: weekNum } = computeCurrentProgramWeekForAssignment(
+        {
+          start_date: pa.start_date ?? null,
+          duration_weeks: pa.duration_weeks ?? null,
+          pause_accumulated_days: pa.pause_accumulated_days ?? 0,
+          pause_status: pa.pause_status ?? null,
+          paused_at: pa.paused_at ?? null,
+          timezone_snapshot: pa.timezone_snapshot ?? null,
+        },
+        tzFallback
+      )
+      weekTargets.push({
+        clientId,
+        assignmentId: pa.id,
+        programId: pa.program_id,
+        weekNum,
+      })
+    }
+
+    const uniqueProgramIds = [...new Set(weekTargets.map((t) => t.programId))]
+    const assignmentIds = weekTargets.map((t) => t.assignmentId)
+
+    let scheduleRows: Array<{
+      id: string
+      program_id: string
+      week_number: number
+      is_optional?: boolean | null
+    }> = []
+    let completionRows: Array<{
+      program_assignment_id: string
+      program_schedule_id: string
+      notes?: string | null
+    }> = []
+
+    if (uniqueProgramIds.length > 0 && assignmentIds.length > 0) {
+      const [schedRes, compRes] = await Promise.all([
+        supabase
+          .from('program_schedule')
+          .select('id, program_id, week_number, is_optional, day_of_week')
+          .in('program_id', uniqueProgramIds),
+        supabase
+          .from('program_day_completions')
+          .select('program_assignment_id, program_schedule_id, notes')
+          .in('program_assignment_id', assignmentIds),
+      ])
+      scheduleRows = (schedRes.data ?? []) as typeof scheduleRows
+      completionRows = (compRes.data ?? []) as typeof completionRows
+    }
+
+    /**
+     * CANONICAL adherence: program-week required slots vs program_day_completions.
+     * Mirrors /coach/clients/[id]/progress (OptimizedAdherenceTracking) and
+     * /api/coach/analytics/adherence.
+     *
+     * Clamp the effective week to the maximum authored week so an over-running
+     * assignment (e.g. duration_weeks = null) doesn't return 0 required slots.
+     */
+    const maxWeekByProgram = new Map<string, number>()
+    for (const s of scheduleRows) {
+      const cur = maxWeekByProgram.get(s.program_id) ?? 0
+      if (s.week_number > cur) maxWeekByProgram.set(s.program_id, s.week_number)
+    }
+
+    const adherenceByClientId = new Map<string, number>()
+    for (const t of weekTargets) {
+      const maxAuthored = maxWeekByProgram.get(t.programId) ?? t.weekNum
+      const effectiveWeek = Math.min(t.weekNum, maxAuthored)
+      const requiredScheduleIds = new Set(
+        scheduleRows
+          .filter(
+            (s) =>
+              s.program_id === t.programId &&
+              s.week_number === effectiveWeek &&
+              !s.is_optional
+          )
+          .map((s) => s.id)
+      )
+      const assigned = requiredScheduleIds.size
+      const completedForWeek = completionRows.filter(
+        (c) =>
+          c.program_assignment_id === t.assignmentId &&
+          requiredScheduleIds.has(c.program_schedule_id) &&
+          !String(c.notes ?? '').startsWith('Skipped by coach')
+      )
+      const completedRequired = completedForWeek.length
+      const completed = Math.min(assigned, completedRequired)
+      const pct = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
+      adherenceByClientId.set(t.clientId, pct)
+    }
+
+    type ClientRecord = {
       id: string
       name: string
-      totalWorkouts: number
-      thisWeek: number
-      thisMonth: number
-      streak: number
-      completionRate: number
-      lastWorkout: string
+      avatarUrl: string | null
       adherence: number
-    }> = []
+      lastActiveAt: string | null
+      lastWellnessDate: string | null // YYYY-MM-DD or null
+      mostRecentWellness: WellnessRow | null
+      hasActiveProgram: boolean
+    }
+    const clientRecords: ClientRecord[] = []
+
+    let checkedInTodayCount = 0
+    let checkinsThisWeekCount = 0
+    let completedWorkoutsInPeriod = 0
+    const energyValuesToday: number[] = []
 
     for (const client of clientsRows) {
       const clientId = client.client_id
       const profile = profileMap.get(clientId)
       if (!profile) continue
       const clientName =
-        `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown'
+        `${profile.first_name || ''} ${profile.last_name || ''}`.trim() ||
+        'Unknown'
 
-      const clientWellness = wellnessByClient[clientId] || []
-      const todaysLog = clientWellness.find((row) => row.log_date === today)
+      const wellness = wellnessByClient[clientId] || []
+      const sortedWellness = [...wellness].sort((a, b) =>
+        a.log_date < b.log_date ? 1 : a.log_date > b.log_date ? -1 : 0
+      )
+      const mostRecentWellness = sortedWellness[0] ?? null
+      const todaysLog = sortedWellness.find((w) => w.log_date === today) ?? null
+
       if (todaysLog) {
-        checkedInToday.push(clientId)
+        checkedInTodayCount++
         if (todaysLog.energy_level != null) {
-          energyValues.push(todaysLog.energy_level)
-        }
-        if (todaysLog.stress_level != null && todaysLog.stress_level > 7) {
-          highStressClients.push({
-            id: clientId,
-            name: clientName,
-            stress: todaysLog.stress_level,
-          })
+          energyValuesToday.push(todaysLog.energy_level)
         }
       }
 
-      if (clientWellness.length > 0) {
-        const latest = clientWellness
-          .map((row) => row.log_date as string)
-          .sort()
-          .pop()
-        if (latest) {
-          const lastDate = new Date(latest + 'T12:00:00')
-          const todayDate = new Date(today + 'T12:00:00')
-          const daysSince = Math.floor(
-            (todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
-          )
-          if (daysSince >= 3) {
-            inactiveClients.push({ id: clientId, name: clientName, daysSince })
-          }
-        }
-      } else {
-        inactiveClients.push({ id: clientId, name: clientName, daysSince: 999 })
+      // Weekly check-in count: log_date >= this Monday.
+      for (const w of sortedWellness) {
+        const d = new Date(w.log_date + 'T00:00:00')
+        if (d >= mondayStartDate) checkinsThisWeekCount++
       }
 
-      const completedWorkouts = (workoutsByClient[clientId] || []).filter(
-        (row) => row.completed_at
-      )
-      completedWorkouts.sort((a, b) =>
-        new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
-      )
+      // Period-bounded completed workouts
+      const wls = workoutsByClient[clientId] || []
+      const completedInPeriod = wls.filter((row) => {
+        const t = new Date(row.completed_at).getTime()
+        return Number.isFinite(t) && t >= periodStartDate.getTime()
+      })
+      completedWorkoutsInPeriod += completedInPeriod.length
 
-      const thisWeekWorkouts = completedWorkouts.filter(
-        (row) => new Date(row.completed_at) >= weekStart
-      )
-      const thisMonthWorkouts = completedWorkouts.filter(
-        (row) => new Date(row.completed_at) >= monthStart
-      )
+      const latestWorkoutAt = wls.reduce<string | null>((acc, row) => {
+        if (!row.completed_at) return acc
+        if (!acc) return row.completed_at
+        return new Date(row.completed_at) > new Date(acc) ? row.completed_at : acc
+      }, null)
 
-      const uniqueDates = Array.from(
-        new Set(
-          completedWorkouts.map((row) =>
-            new Date(row.completed_at).toISOString().split('T')[0]
-          )
-        )
-      ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-
-      let streak = 0
-      if (uniqueDates.length > 0) {
-        const todayStr = new Date().toISOString().split('T')[0]
-        const yesterdayStr = new Date(Date.now() - 86400000)
-          .toISOString()
-          .split('T')[0]
-        if (uniqueDates[0] === todayStr || uniqueDates[0] === yesterdayStr) {
-          streak = 1
-          let expected = new Date(uniqueDates[0])
-          for (let i = 1; i < uniqueDates.length; i++) {
-            expected.setDate(expected.getDate() - 1)
-            const expectedStr = expected.toISOString().split('T')[0]
-            if (uniqueDates[i] === expectedStr) {
-              streak++
-            } else {
-              break
-            }
-          }
+      const lastWellnessDate = mostRecentWellness?.log_date ?? null
+      // Use most recent of latest workout or most recent wellness log
+      let lastActiveAt: string | null = latestWorkoutAt
+      if (lastWellnessDate) {
+        const wellnessIso = new Date(lastWellnessDate + 'T12:00:00').toISOString()
+        if (!lastActiveAt || new Date(wellnessIso) > new Date(lastActiveAt)) {
+          lastActiveAt = wellnessIso
         }
       }
 
-      const assignedCount = assignmentsByClient[clientId] || 0
-      const completionRate =
-        assignedCount > 0
-          ? Math.round((completedWorkouts.length / assignedCount) * 100)
-          : 0
+      const adherence = adherenceByClientId.get(clientId) ?? 0
+      const hasActiveProgram = assignmentByClientId.has(clientId)
 
-      let adherence = 0
-      const program = programByClient[clientId]
-      if (
-        program &&
-        program.total_days != null &&
-        program.total_days > 0 &&
-        program.duration_weeks != null &&
-        program.duration_weeks > 0
-      ) {
-        const weeklyGoal = program.total_days / program.duration_weeks
-        const expectedThisMonth = weeklyGoal * 4
-        adherence =
-          expectedThisMonth > 0
-            ? Math.min(
-                100,
-                Math.round((thisMonthWorkouts.length / expectedThisMonth) * 100)
-              )
-            : 0
-      }
-
-      const lastWorkout = completedWorkouts[0]?.completed_at || ''
-
-      clientProgress.push({
+      clientRecords.push({
         id: clientId,
         name: clientName,
-        totalWorkouts: completedWorkouts.length,
-        thisWeek: thisWeekWorkouts.length,
-        thisMonth: thisMonthWorkouts.length,
-        streak,
-        completionRate,
-        lastWorkout,
+        avatarUrl: profile.avatar_url ?? null,
         adherence,
+        lastActiveAt,
+        lastWellnessDate,
+        mostRecentWellness,
+        hasActiveProgram,
       })
     }
 
-    const averageEnergy =
-      energyValues.length > 0
-        ? Math.round(
-            (energyValues.reduce((sum, val) => sum + val, 0) / energyValues.length) * 10
-          ) / 10
-        : null
+    // ---- Action Queue ------------------------------------------------------
+    const NEED_ATTENTION_THRESHOLD = 60
 
-    const wellnessOverview = {
-      checkedInToday: checkedInToday.length,
-      totalClients: clientsRows.length,
-      averageEnergy, // null when no data (do not show 0 for missing legacy energy_level)
-      highStressCount: highStressClients.length,
-      highStressClients,
-      inactiveClients: inactiveClients.slice(0, 10),
+    /** Need Attention: only clients with an active program; canonical adherence < 60%. */
+    const needAttention = clientRecords
+      .filter((c) => c.hasActiveProgram && c.adherence < NEED_ATTENTION_THRESHOLD)
+      .sort((a, b) => a.adherence - b.adherence)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        avatarUrl: c.avatarUrl,
+        adherence: c.adherence,
+        lastActiveAt: c.lastActiveAt,
+      }))
+
+    /** Inactive Check-ins: no daily_wellness_logs in last 7 days. */
+    const inactiveCheckIns = clientRecords
+      .filter((c) => {
+        if (!c.lastWellnessDate) return true
+        const d = new Date(c.lastWellnessDate + 'T12:00:00')
+        return d < sevenDaysAgo
+      })
+      .map((c) => {
+        let daysSince: number | null = null
+        if (c.lastWellnessDate) {
+          const d = new Date(c.lastWellnessDate + 'T12:00:00')
+          const todayDate = new Date(today + 'T12:00:00')
+          daysSince = Math.max(
+            0,
+            Math.floor(
+              (todayDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+            )
+          )
+        }
+        return {
+          id: c.id,
+          name: c.name,
+          avatarUrl: c.avatarUrl,
+          daysSince, // null = never
+          lastWellnessDate: c.lastWellnessDate,
+        }
+      })
+      .sort((a, b) => {
+        // Never first, then largest gap first
+        const av = a.daysSince ?? Number.POSITIVE_INFINITY
+        const bv = b.daysSince ?? Number.POSITIVE_INFINITY
+        return bv - av
+      })
+
+    /**
+     * Flagged: most recent daily_wellness_logs row shows stress_level
+     * (UI scale 1-5) >= 4 AND is recent (within the last 14 days).
+     * Stress is stored on a 1-10 DB scale and mapped to 1-5 via dbToUiScale.
+     */
+    type FlaggedEntry = {
+      id: string
+      name: string
+      avatarUrl: string | null
+      signal: string
+      logDate: string
+      daysSince: number
+      stressUi: number | null
     }
+    const flagged: FlaggedEntry[] = []
+    for (const c of clientRecords) {
+      const log = c.mostRecentWellness
+      if (!log) continue
+      const stressUi = log.stress_level != null ? dbToUiScale(log.stress_level) : null
+      const isHighStress = stressUi != null && stressUi >= 4
+      if (!isHighStress) continue
 
-    const totalSessions = clientProgress.reduce(
-      (sum, c) => sum + c.totalWorkouts,
-      0
-    )
-    const thisWeekTotal = clientProgress.reduce(
-      (sum, c) => sum + c.thisWeek,
-      0
-    )
-    const thisMonthTotal = clientProgress.reduce(
-      (sum, c) => sum + c.thisMonth,
-      0
-    )
-    const avgCompletionRate =
-      clientProgress.length > 0
+      const todayDate = new Date(today + 'T12:00:00')
+      const logDay = new Date(log.log_date + 'T12:00:00')
+      const daysSince = Math.max(
+        0,
+        Math.floor(
+          (todayDate.getTime() - logDay.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      )
+      // Recency cap: stale stress signals stay in "Inactive Check-ins", not here.
+      if (daysSince > 14) continue
+
+      const signals: string[] = []
+      if (isHighStress && stressUi != null) signals.push(`Stress ${stressUi}/5`)
+      const whenLabel =
+        daysSince === 0
+          ? 'today'
+          : daysSince === 1
+            ? '1 day ago'
+            : `${daysSince} days ago`
+
+      flagged.push({
+        id: c.id,
+        name: c.name,
+        avatarUrl: c.avatarUrl,
+        signal: `${signals.join(' · ')}, ${whenLabel}`,
+        logDate: log.log_date,
+        daysSince,
+        stressUi,
+      })
+    }
+    flagged.sort((a, b) => a.daysSince - b.daysSince)
+
+    // ---- Totals ------------------------------------------------------------
+    const activeClients = clientRecords.length
+    const adherenceVals = clientRecords
+      .filter((c) => c.hasActiveProgram)
+      .map((c) => c.adherence)
+    const avgAdherence =
+      adherenceVals.length > 0
         ? Math.round(
-            clientProgress.reduce((sum, c) => sum + c.completionRate, 0) /
-              clientProgress.length
+            adherenceVals.reduce((s, v) => s + v, 0) / adherenceVals.length
           )
         : 0
 
-    const workoutStats = {
-      totalSessions,
-      completedSessions: totalSessions,
-      thisWeek: thisWeekTotal,
-      thisMonth: thisMonthTotal,
-      averageCompletionRate: avgCompletionRate,
-    }
+    // ---- Wellness summary --------------------------------------------------
+    const averageEnergy =
+      energyValuesToday.length > 0
+        ? Math.round(
+            (energyValuesToday.reduce((s, v) => s + v, 0) /
+              energyValuesToday.length) *
+              10
+          ) / 10
+        : null
 
     return NextResponse.json({
-      clientProgress,
-      workoutStats,
-      wellnessOverview,
+      period,
+      totals: {
+        activeClients,
+        completedWorkouts: completedWorkoutsInPeriod,
+        avgAdherence,
+        checkinsThisWeek: checkinsThisWeekCount,
+      },
+      actionQueue: {
+        needAttention,
+        inactiveCheckIns,
+        flagged,
+      },
+      wellness: {
+        checkedInToday: checkedInTodayCount,
+        totalClients: clientsRows.length,
+        averageEnergy,
+      },
+      // Kept for any downstream readers; the page itself derives KPIs from `totals`.
+      clientProgress: clientRecords.map((c) => ({
+        id: c.id,
+        name: c.name,
+        adherence: c.adherence,
+        lastActiveAt: c.lastActiveAt,
+      })),
     })
   } catch (err: unknown) {
     console.error('[coach/progress/overview] Unexpected error:', err)
@@ -323,4 +518,3 @@ export async function GET(_req: NextRequest) {
     )
   }
 }
-

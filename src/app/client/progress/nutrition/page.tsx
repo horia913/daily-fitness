@@ -632,7 +632,7 @@ export default function NutritionPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">
@@ -644,7 +644,7 @@ export default function NutritionPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-4 overflow-x-hidden">

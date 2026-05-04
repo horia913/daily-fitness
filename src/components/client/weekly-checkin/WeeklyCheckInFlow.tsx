@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { CheckinHero } from "@/components/client/check-ins/checkinSuite";
 import { StepBodyMetrics } from "./StepBodyMetrics";
 import { StepPhotos } from "./StepPhotos";
 import { StepReview, type WellnessSummary } from "./StepReview";
@@ -171,14 +171,12 @@ export function WeeklyCheckInFlow({
         try {
           const weightNew = await AchievementService.checkAndUnlockAchievements(clientId, "weight_goal");
           if (weightNew.length > 0) {
-            const tierToRarity = (tier: string | null): Achievement["rarity"] =>
-              !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
             const mapped: Achievement[] = weightNew.map((a) => ({
               id: a.templateId,
               name: a.templateName,
               description: a.description ?? "",
               icon: a.templateIcon ?? "🏆",
-              rarity: tierToRarity(a.tier),
+              tier: (a.tier ?? null) as Achievement["tier"],
               unlocked: true,
             }));
             setNewAchievementsQueue(mapped);
@@ -233,24 +231,14 @@ export function WeeklyCheckInFlow({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => {
-            router.push("/client/check-ins");
-          }}
-          aria-label="Back to check-ins"
-          className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
-        >
-          <ArrowLeft className="w-5 h-5" aria-hidden />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold fc-text-primary">
-            Scheduled Check-In{config?.frequency_days ? ` · ${config.frequency_days === 7 ? "Weekly" : config.frequency_days === 14 ? "Every 2 weeks" : config.frequency_days === 30 ? "Monthly" : `Every ${config.frequency_days} days`}` : ""}
-          </h1>
-          <p className="text-sm fc-text-dim">Step {step} of 3</p>
-        </div>
-      </div>
+      <CheckinHero
+        onBack={onBack}
+        backAriaLabel="Back"
+        eyebrow="Scheduled check-in"
+        eyebrowColor="var(--cs-cyan)"
+        title="Weekly review"
+        subtitle="3 quick steps · ~2 minutes"
+      />
 
       {step === 1 && (
         <StepBodyMetrics

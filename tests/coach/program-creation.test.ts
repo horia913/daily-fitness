@@ -5,7 +5,7 @@
  * - Weekly schedule assignment
  * - Automatic copy to program_progression_rules
  * - Week-by-week progression rules editing
- * - All 13 exercise types in progression rules
+ * - All supported exercise types in progression rules
  * - Exercise/workout replacement
  * - Data independence between weeks
  */
@@ -389,7 +389,7 @@ describe('Program Creation - Progression Rules (CRITICAL)', () => {
     });
   });
 
-  describe('All 13 Exercise Types in Progression Rules', () => {
+  describe('All supported exercise types in Progression Rules', () => {
     const exerciseTypes = [
       { type: 'straight_set', fields: ['sets', 'reps', 'rest_seconds', 'tempo', 'rir'] },
       { type: 'superset', fields: ['first_exercise_reps', 'second_exercise_reps', 'rest_between_pairs'] },
@@ -397,13 +397,13 @@ describe('Program Creation - Progression Rules (CRITICAL)', () => {
       { type: 'drop_set', fields: ['exercise_reps', 'drop_set_reps', 'weight_reduction_percentage'] },
       { type: 'cluster_set', fields: ['reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest'] },
       { type: 'rest_pause', fields: ['rest_pause_duration', 'max_rest_pauses'] },
-      { type: 'pyramid', fields: ['pyramid_order', 'sets', 'reps', 'weight_kg'] },
       { type: 'pre_exhaustion', fields: ['isolation_reps', 'compound_reps', 'compound_exercise_id'] },
       { type: 'amrap', fields: ['duration_minutes', 'target_reps'] },
       { type: 'emom', fields: ['emom_mode', 'duration_minutes', 'target_reps', 'work_seconds'] },
       { type: 'tabata', fields: ['work_seconds', 'rest_seconds', 'rounds', 'rest_after_set'] },
       { type: 'for_time', fields: ['target_reps', 'time_cap_minutes'] },
-      { type: 'ladder', fields: ['ladder_order', 'reps', 'weight_kg', 'rest_seconds'] },
+      { type: 'speed_work', fields: ['rest_seconds', 'reps'] },
+      { type: 'endurance', fields: ['rest_seconds', 'reps'] },
     ];
 
     exerciseTypes.forEach(({ type, fields }) => {

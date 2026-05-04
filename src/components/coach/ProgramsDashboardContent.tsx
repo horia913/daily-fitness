@@ -19,6 +19,7 @@ import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast-provider";
+import { fetchApi } from "@/lib/apiClient";
 
 interface Program {
   id: string;
@@ -102,7 +103,7 @@ export default function ProgramsDashboardContent() {
 
     try {
       const filter = programFilter === 'all' ? 'all' : 'active';
-      const res = await fetch(`/api/coach/programs?filter=${filter}`, {
+      const res = await fetchApi(`/api/coach/programs?filter=${filter}`, {
         signal: signal ?? null,
         cache: 'no-store',
       });
@@ -171,10 +172,22 @@ export default function ProgramsDashboardContent() {
     [coachId]
   );
 
+  const clientLabel = useCallback(
+    (clientId: string) => {
+      const row = clients.find((c) => c.client_id === clientId);
+      const p = row?.profiles;
+      const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ").trim();
+      if (name) return name;
+      if (p?.email) return String(p.email);
+      return clientId.slice(0, 8) + "…";
+    },
+    [clients]
+  );
+
   const doAssignAndClose = useCallback(async () => {
     if (!assignProgramId || selectedClients.length === 0) return;
     try {
-      await WorkoutTemplateService.assignProgramToClients(
+      const { successful, failed } = await WorkoutTemplateService.assignProgramToClients(
         assignProgramId,
         selectedClients,
         coachId,
@@ -183,11 +196,44 @@ export default function ProgramsDashboardContent() {
         assignProgressionMode
       );
       await loadPrograms();
+
+      if (failed.length > 0) {
+        const failLines = failed.map(
+          (f) =>
+            `${clientLabel(f.clientId)}: ${f.stage} — ${f.error}${
+              f.orphanedAssignmentId ? ` (orphan id ${f.orphanedAssignmentId})` : ""
+            }`
+        );
+        if (successful.length > 0) {
+          const okNames = successful.map((s) => clientLabel(s.clientId)).join(", ");
+          addToast({
+            title: `Assigned ${successful.length} client(s); ${failed.length} failed`,
+            description: `Succeeded: ${okNames}.\nFailed:\n${failLines.join("\n")}`,
+            variant: "destructive",
+          });
+        } else {
+          addToast({
+            title: `Assignment failed for ${failed.length} client(s)`,
+            description: failLines.join("\n"),
+            variant: "destructive",
+          });
+        }
+        setShowReplaceConfirm(false);
+        setReplaceConfirmList([]);
+        return;
+      }
+
       setShowAssignModal(false);
       setShowReplaceConfirm(false);
       setReplaceConfirmList([]);
       setClientSearchQuery("");
       setSelectedClients([]);
+      addToast({
+        title:
+          successful.length === 1
+            ? "Program assigned."
+            : `Program assigned to ${successful.length} clients.`,
+      });
     } catch (error) {
       console.error("Error assigning program:", error);
       addToast({ title: "Error assigning program. Please try again.", variant: "destructive" });
@@ -200,6 +246,8 @@ export default function ProgramsDashboardContent() {
     assignNotes,
     assignProgressionMode,
     loadPrograms,
+    addToast,
+    clientLabel,
   ]);
 
   const submitAssign = useCallback(async () => {

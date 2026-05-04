@@ -9,7 +9,8 @@ export type AttentionLevel = 'urgent' | 'warning' | 'good' | 'inactive';
 
 export type ClientRosterStatus = 'active' | 'inactive' | 'pending' | 'at-risk';
 
-function daysSinceIsoDate(isoDate: string | null): number | null {
+/** Days since calendar date `isoDate` (YYYY-MM-DD), non-negative; null if invalid / missing. */
+export function daysSinceIsoDate(isoDate: string | null): number | null {
   if (!isoDate) return null;
   const d = new Date(isoDate + 'T12:00:00Z');
   if (isNaN(d.getTime())) return null;

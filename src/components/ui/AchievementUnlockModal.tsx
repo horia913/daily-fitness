@@ -13,6 +13,7 @@ import { rarityColors } from "@/lib/colors";
 import { fireCelebrationConfettiBurst } from "@/lib/celebrationConfetti";
 import type { Achievement } from "./AchievementCard";
 import { AchievementIconDisplay } from "./achievementIconDisplay";
+import { TierBadge } from "./TierBadge";
 
 const TIER_GRADIENT: Record<string, string[]> = {
   bronze: ["#CD7F32", "#8B4513"],
@@ -31,7 +32,7 @@ const CELEBRATION_CONFETTI_Z_INDEX = 100000;
 
 function milestoneConfettiColors(
   labCelebrationTier: AchievementLabCelebrationTier | undefined,
-  rarity: Achievement["rarity"],
+  tier: Achievement["tier"],
 ): string[] {
   if (labCelebrationTier === "bronze") {
     return ["#CD7F32", "#DAA520", "#8B4513", "#FFD700", "#FFFFFF"];
@@ -42,17 +43,17 @@ function milestoneConfettiColors(
   if (labCelebrationTier === "platinum") {
     return ["#06b6d4", "#22d3ee", "#a5f3fc", "#ffffff", "#EC4899"];
   }
-  switch (rarity) {
-    case "legendary":
+  switch (tier) {
+    case "platinum":
       return ["#9B59B6", "#E74C3C", "#FFD700", "#FF6B35", "#FFFFFF"];
-    case "epic":
-      return ["#9B59B6", "#8E44AD", "#FFD700", "#FFFFFF", "#22D3EE"];
-    case "rare":
+    case "gold":
       return ["#FFD700", "#FFA500", "#FFEC8B", "#FFFFFF", "#10B981"];
-    case "uncommon":
+    case "silver":
       return ["#C0C0C0", "#A0A0A0", "#E0E0E0", "#FFFFFF", "#94a3b8"];
-    default:
+    case "bronze":
       return ["#CD7F32", "#DAA520", "#8B4513", "#FFD700", "#FFFFFF"];
+    default:
+      return ["#22D3EE", "#06b6d4", "#a5f3fc", "#FFFFFF", "#10B981"];
   }
 }
 
@@ -80,7 +81,7 @@ function AchievementUnlockContent({
     if (!visible || !achievement) return;
     const colors = milestoneConfettiColors(
       labCelebrationTier,
-      achievement.rarity,
+      achievement.tier,
     );
     const timeouts = fireCelebrationConfettiBurst(colors, {
       zIndex: CELEBRATION_CONFETTI_Z_INDEX,
@@ -141,16 +142,15 @@ function AchievementUnlockContent({
             }
           : null;
 
-  const rarity = labVisual?.rarity ?? rarityColors[achievement.rarity];
+  const rarity = labVisual?.rarity ?? rarityColors.common;
 
   const tierName = labVisual
     ? labVisual.tierName
     : (() => {
-        const r = achievement.rarity;
-        if (r === "legendary") return "Platinum";
-        if (r === "epic") return "Gold";
-        if (r === "rare") return "Silver";
-        if (r === "uncommon") return "Bronze";
+        if (achievement.tier === "platinum") return "Platinum";
+        if (achievement.tier === "gold") return "Gold";
+        if (achievement.tier === "silver") return "Silver";
+        if (achievement.tier === "bronze") return "Bronze";
         return null;
       })();
   const tierGrad = labVisual
@@ -273,15 +273,7 @@ function AchievementUnlockContent({
               </span>
             )}
             {!labCelebrationTier && (
-              <span
-                className="px-3 py-1 rounded-full text-xs font-bold capitalize text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${rarity.gradient.join(", ")})`,
-                  boxShadow: `0 2px 8px ${rarity.glow}30`,
-                }}
-              >
-                {achievement.rarity}
-              </span>
+              achievement.tier ? <TierBadge tier={achievement.tier} /> : null
             )}
           </div>
 
@@ -312,11 +304,11 @@ function AchievementUnlockContent({
             {labCelebrationTier === "bronze" && "Nice job! Every step counts!"}
             {labCelebrationTier === "gold" && "Rare feat! You are on fire!"}
             {labCelebrationTier === "platinum" && "Incredible! You are unstoppable!"}
-            {!labCelebrationTier && achievement.rarity === "legendary" && "Incredible! You are a legend!"}
-            {!labCelebrationTier && achievement.rarity === "epic" && "Epic achievement! Keep crushing it!"}
-            {!labCelebrationTier && achievement.rarity === "rare" && "Rare feat! You are on fire!"}
-            {!labCelebrationTier && achievement.rarity === "uncommon" && "Great work! Keep it up!"}
-            {!labCelebrationTier && achievement.rarity === "common" && "Nice job! Every step counts!"}
+            {!labCelebrationTier && achievement.tier === "platinum" && "Incredible! You are a legend!"}
+            {!labCelebrationTier && achievement.tier === "gold" && "Epic achievement! Keep crushing it!"}
+            {!labCelebrationTier && achievement.tier === "silver" && "Rare feat! You are on fire!"}
+            {!labCelebrationTier && achievement.tier === "bronze" && "Great work! Keep it up!"}
+            {!labCelebrationTier && achievement.tier === null && "Nice job! Every step counts!"}
           </p>
 
           <div className="flex gap-3">

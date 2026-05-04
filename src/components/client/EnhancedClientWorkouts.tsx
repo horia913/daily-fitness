@@ -4,16 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
-import { GlassCard } from "@/components/ui/GlassCard";
 import {
   ClientPageShell,
   ClientGlassCard,
   SectionHeader,
-  PrimaryButton,
-  SecondaryButton,
   AssignedWorkoutRow,
+  Eyebrow,
 } from "@/components/client-ui";
-import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { GoalWizard } from "@/components/goals/GoalWizard";
 import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -1424,7 +1422,7 @@ export default function EnhancedClientWorkouts({
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen fc-page flex items-center justify-center">
           <div className="max-w-3xl w-full">
-            <GlassCard className="fc-card">
+            <ClientGlassCard className="fc-card">
               <div className="p-6 space-y-4 text-center">
                 <h2 className="text-lg font-semibold fc-text-primary">
                   Unable to load workouts
@@ -1434,7 +1432,7 @@ export default function EnhancedClientWorkouts({
                   Refresh
                 </Button>
               </div>
-            </GlassCard>
+            </ClientGlassCard>
           </div>
         </div>
       </AnimatedBackground>
@@ -1463,16 +1461,20 @@ export default function EnhancedClientWorkouts({
                     )}
                   </div>
                   {todaysWorkout?.hasWorkout && (
-                    <PrimaryButton
-                      className="mb-4"
+                    <Button
+                      type="button"
+                      variant="btn-action"
+                      className="mb-4 h-10 w-full"
                       onClick={() => startWorkout(todaysWorkout)}
                     >
-                      <Play className="w-4 h-4 mr-2" />
+                      <Play className="mr-2 h-4 w-4" />
                       Start Today&apos;s Workout
-                    </PrimaryButton>
+                    </Button>
                   )}
-                  <SecondaryButton
-                    className="w-full sm:w-auto"
+                  <Button
+                    type="button"
+                    variant="fc-secondary"
+                    className="h-10 w-full sm:w-auto"
                     onClick={() => {
                       const programAssignment = allAssignedWorkouts.find((a: any) => a.program_id);
                       const programId = programAssignment?.program_id ?? (currentProgram as any)?.program_id ?? currentProgram?.id;
@@ -1481,17 +1483,19 @@ export default function EnhancedClientWorkouts({
                     }}
                   >
                     View Full Program
-                  </SecondaryButton>
+                  </Button>
                 </>
               ) : (
                 <div className="text-center py-4">
                   <p className="fc-text-dim mb-4">No active program assigned.</p>
-                  <SecondaryButton
-                    className="w-auto"
+                  <Button
+                    type="button"
+                    variant="fc-secondary"
+                    className="h-10 w-auto"
                     onClick={() => router.push("/client/workouts")}
                   >
                     Browse Workouts
-                  </SecondaryButton>
+                  </Button>
                 </div>
               )}
             </ClientGlassCard>
@@ -1598,12 +1602,14 @@ export default function EnhancedClientWorkouts({
                 ) : (
                   <p className="fc-text-dim text-sm py-4 text-center">No recent workouts yet.</p>
                 )}
-                <SecondaryButton
-                  className="w-full mt-4"
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  className="mt-4 h-10 w-full"
                   onClick={() => router.push("/client/progress/workout-logs")}
                 >
                   View All Logs
-                </SecondaryButton>
+                </Button>
               </ClientGlassCard>
             </section>
 
@@ -1613,17 +1619,26 @@ export default function EnhancedClientWorkouts({
               <ClientGlassCard className="p-5">
                 <div className="flex flex-wrap gap-6 mb-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wider fc-text-dim mb-1">Weekly Volume</p>
+                    <Eyebrow tone="dim" density="section" className="!mb-1">
+                      Weekly Volume
+                    </Eyebrow>
                     <p className="text-xl font-bold fc-text-primary">{weeklyStats.totalVolume.toLocaleString()} kg</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wider fc-text-dim mb-1">Active Time</p>
+                    <Eyebrow tone="dim" density="section" className="!mb-1">
+                      Active Time
+                    </Eyebrow>
                     <p className="text-xl font-bold fc-text-primary">{weeklyStats.activeTime} min</p>
                   </div>
                 </div>
-                <PrimaryButton onClick={() => router.push("/client/progress/personal-records")}>
+                <Button
+                  type="button"
+                  variant="btn-action"
+                  className="h-10 w-full"
+                  onClick={() => router.push("/client/progress/personal-records")}
+                >
                   View Performance
-                </PrimaryButton>
+                </Button>
               </ClientGlassCard>
             </section>
 
@@ -1683,20 +1698,30 @@ export default function EnhancedClientWorkouts({
                   <p className="fc-text-dim text-sm mb-4">No active training goals.</p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>
+                  <Button
+                    type="button"
+                    variant="btn-action"
+                    className="h-10 w-full sm:w-auto"
+                    onClick={() => setShowAddGoalModal(true)}
+                  >
                     + Add Training Goal
-                  </PrimaryButton>
-                  <SecondaryButton className="w-full sm:w-auto" onClick={() => router.push("/client/goals")}>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="fc-secondary"
+                    className="h-10 w-full sm:w-auto"
+                    onClick={() => router.push("/client/goals")}
+                  >
                     Manage all goals
-                  </SecondaryButton>
+                  </Button>
                 </div>
               </ClientGlassCard>
             </section>
 
-            <AddGoalModal
+            <GoalWizard
               open={showAddGoalModal}
               onClose={() => setShowAddGoalModal(false)}
-              defaultPillar="training"
+              initialCategory={null}
               onSuccess={fetchPillarGoals}
             />
           </ClientPageShell>

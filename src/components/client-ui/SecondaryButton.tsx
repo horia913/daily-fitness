@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface SecondaryButtonProps {
@@ -11,6 +12,9 @@ interface SecondaryButtonProps {
   className?: string;
 }
 
+/**
+ * @deprecated Prefer `<Button variant="fc-secondary" className="h-10" />` from `@/components/ui/button`.
+ */
 export function SecondaryButton({
   children,
   onClick,
@@ -19,17 +23,15 @@ export function SecondaryButton({
   className,
 }: SecondaryButtonProps) {
   return (
-    <button
+    <Button
       type={type}
+      variant="fc-secondary"
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm flex items-center justify-center gap-2 rounded-xl",
-        className
-      )}
+      className={cn("h-10 px-6", className)}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

@@ -1,287 +1,495 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Activity,
-  Dumbbell,
-  Apple,
-  Zap,
-  Calendar,
-  BarChart3,
-  LineChart
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import chartStyles from '@/components/coach/AdherenceTrendChart.module.css'
 
-export interface TrendData {
-  date: string
+export interface HistoricalTrendDataPoint {
+  week_start: string
   workout: number
-  nutrition: number
-  habit: number
-  overall: number
+  checkins: number
+  nutrition: number | null
+  habits: number | null
 }
 
 interface AdherenceTrendChartProps {
   clientId: string
   clientName: string
-  trendData: TrendData[]
-  selectedMetric: 'overall' | 'workout' | 'nutrition' | 'habit'
+  trendData: HistoricalTrendDataPoint[]
+  variant?: 'default' | 'coachV6'
 }
 
-export default function AdherenceTrendChart({ 
-  clientId, 
-  clientName, 
-  trendData, 
-  selectedMetric 
-}: AdherenceTrendChartProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-  const [chartType, setChartType] = useState<'line' | 'bar'>('line')
+function buildLinePathWithGaps(
+  data: HistoricalTrendDataPoint[],
+  key: 'nutrition' | 'habits',
+  xForIndex: (index: number) => number,
+  yForPct: (pct: number) => number
+): string {
+  let d = ''
+  let penUp = true
+  for (let i = 0; i < data.length; i++) {
+    const raw = data[i][key]
+    if (raw == null) {
+      penUp = true
+      continue
+    }
+    const pct = raw
+    const x = xForIndex(i)
+    const y = yForPct(pct)
+    if (penUp) {
+      d += `${d ? ' ' : ''}M ${x} ${y}`
+      penUp = false
+    } else {
+      d += ` L ${x} ${y}`
+    }
+  }
+  return d
+}
 
+function AdherenceTrendChartCoachV6({ data }: { data: HistoricalTrendDataPoint[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+
+  const vbW = 360
+  const vbH = 110
+  const padL = 2
+  const padR = 2
+  const padT = 4
+  const padB = 2
+  const innerW = vbW - padL - padR
+  const innerH = vbH - padT - padB
+
+  const xForIndex = (index: number) =>
+    padL + (index * innerW) / Math.max(1, data.length - 1)
+  const yForPct = (pct: number) =>
+    padT + ((100 - Math.max(0, Math.min(100, pct))) / 100) * innerH
+
+  const linePath = (key: 'workout' | 'checkins') =>
+    data
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xForIndex(index)} ${yForPct(point[key] ?? 0)}`)
+      .join(' ')
+
+  const nutritionPath = buildLinePathWithGaps(data, 'nutrition', xForIndex, yForPct)
+  const habitsPath = buildLinePathWithGaps(data, 'habits', xForIndex, yForPct)
+
+  const formatWeek = (weekStart: string) =>
+    new Date(weekStart + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' })
+
+  const n = data.length
+  const axisIdx = useMemo(() => {
+    if (n <= 1) return [0]
+    return [0, Math.round((n - 1) * 0.33), Math.round((n - 1) * 0.66), n - 1].filter(
+      (v, i, a) => a.indexOf(v) === i
+    )
+  }, [n])
+
+  const hoverPoint = hoveredIndex == null ? null : data[hoveredIndex]
+
+  return (
+    <div className={chartStyles.v6Outer}>
+      <div className={chartStyles.v6Legend}>
+        <span className={chartStyles.v6LegendItem}>
+          <span className={chartStyles.v6LegendSwatch} style={{ background: '#60A5FA' }} />
+          Workouts
+        </span>
+        <span className={chartStyles.v6LegendItem}>
+          <span className={chartStyles.v6SwDash} />
+          Check-ins
+        </span>
+        <span className={chartStyles.v6LegendItem}>
+          <span
+            className={chartStyles.v6LegendSwatch}
+            style={{ background: 'var(--fc-effort-easy)' }}
+          />
+          Nutrition
+        </span>
+        <span className={chartStyles.v6LegendItem}>
+          <span
+            className={chartStyles.v6LegendSwatch}
+            style={{ background: 'var(--fc-accent-lime-2)' }}
+          />
+          Habits
+        </span>
+      </div>
+
+      <div className={chartStyles.v6Wrap}>
+        <svg
+          viewBox={`0 0 ${vbW} ${vbH}`}
+          width="100%"
+          height="100%"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Adherence trend last weeks"
+          onMouseLeave={() => setHoveredIndex(null)}
+        >
+          {[25, 50, 100].map((tick) => {
+            const y = yForPct(tick)
+            return (
+              <line
+                key={tick}
+                x1={padL}
+                y1={y}
+                x2={vbW - padR}
+                y2={y}
+                stroke="rgba(255,255,255,0.04)"
+                strokeWidth={1}
+                strokeDasharray="2 4"
+              />
+            )
+          })}
+
+          <path
+            d={linePath('workout')}
+            fill="none"
+            stroke="#60A5FA"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={linePath('checkins')}
+            fill="none"
+            stroke="var(--fc-set-type-straight)"
+            strokeWidth={2}
+            strokeDasharray="3 3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {nutritionPath ? (
+            <path
+              d={nutritionPath}
+              fill="none"
+              stroke="var(--fc-effort-easy)"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : null}
+          {habitsPath ? (
+            <path
+              d={habitsPath}
+              fill="none"
+              stroke="var(--fc-accent-lime-2)"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : null}
+
+          {data.map((point, index) => {
+            const x = xForIndex(index)
+            const yW = yForPct(point.workout)
+            const isHovered = hoveredIndex === index
+            const band = Math.max(14, innerW / Math.max(data.length, 6) / 2)
+            return (
+              <g key={`v6-${point.week_start}`}>
+                {isHovered ? (
+                  <line
+                    x1={x}
+                    y1={padT}
+                    x2={x}
+                    y2={vbH - padB}
+                    stroke="rgba(56,189,248,0.25)"
+                    strokeWidth={1}
+                  />
+                ) : null}
+                <circle cx={x} cy={yW} r={isHovered ? 3.2 : 2.5} fill="#60A5FA" />
+                <rect
+                  x={x - band}
+                  y={padT}
+                  width={band * 2}
+                  height={innerH}
+                  fill="transparent"
+                  onMouseEnter={() => setHoveredIndex(index)}
+                />
+              </g>
+            )
+          })}
+        </svg>
+
+        {hoverPoint && hoveredIndex != null ? (
+          <div className={chartStyles.v6Tooltip}>
+            <div style={{ marginBottom: 4, color: 'var(--fc-text-primary)' }}>
+              Week of {formatWeek(hoverPoint.week_start)}
+            </div>
+            <div style={{ color: '#60A5FA' }}>Workouts: {hoverPoint.workout}%</div>
+            <div style={{ color: 'var(--fc-set-type-straight)' }}>
+              Check-ins: {hoverPoint.checkins}%
+            </div>
+            {hoverPoint.nutrition != null ? (
+              <div style={{ color: 'var(--fc-effort-easy)' }}>Nutrition: {hoverPoint.nutrition}%</div>
+            ) : (
+              <div style={{ color: 'var(--fc-text-quaternary)' }}>Nutrition: —</div>
+            )}
+            {hoverPoint.habits != null ? (
+              <div style={{ color: 'var(--fc-accent-lime-2)' }}>Habits: {hoverPoint.habits}%</div>
+            ) : (
+              <div style={{ color: 'var(--fc-text-quaternary)' }}>Habits: —</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div className={chartStyles.v6Axis}>
+        {axisIdx.map((i) => (
+          <span key={i}>{formatWeek(data[i]!.week_start)}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AdherenceTrendChartDefault({
+  clientId: _clientId,
+  clientName: _clientName,
+  trendData,
+}: Omit<AdherenceTrendChartProps, 'variant'>) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const data = trendData ?? []
 
-  const getMetricColor = (metric: string) => {
-    switch (metric) {
-      case 'workout': return 'text-blue-600 dark:text-blue-400'
-      case 'nutrition': return 'text-green-600 dark:text-green-400'
-      case 'habit': return 'text-purple-600 dark:text-purple-400'
-      default: return 'text-slate-600 dark:text-slate-400'
+  const summary = useMemo(() => {
+    if (data.length === 0)
+      return {
+        workoutsAvg: 0,
+        checkinsAvg: 0,
+        nutritionAvg: null as number | null,
+        habitsAvg: null as number | null,
+      }
+    const workoutsAvg = Math.round(data.reduce((s, d) => s + (d.workout ?? 0), 0) / data.length)
+    const checkinsAvg = Math.round(data.reduce((s, d) => s + (d.checkins ?? 0), 0) / data.length)
+    const nutVals = data.map((d) => d.nutrition).filter((v): v is number => v != null)
+    const nutritionAvg =
+      nutVals.length > 0 ? Math.round(nutVals.reduce((s, v) => s + v, 0) / nutVals.length) : null
+    const habitVals = data.map((d) => d.habits).filter((v): v is number => v != null)
+    const habitsAvg =
+      habitVals.length > 0 ? Math.round(habitVals.reduce((s, v) => s + v, 0) / habitVals.length) : null
+    return { workoutsAvg, checkinsAvg, nutritionAvg, habitsAvg }
+  }, [data])
+
+  const summarySentence = useMemo(() => {
+    const parts: string[] = [
+      `workouts ${summary.workoutsAvg}% avg`,
+      `check-ins ${summary.checkinsAvg}% avg`,
+    ]
+    if (summary.nutritionAvg != null) {
+      parts.push(`nutrition ${summary.nutritionAvg}% avg (weeks on plan)`)
     }
-  }
-
-  const getMetricBgColor = (metric: string) => {
-    switch (metric) {
-      case 'workout': return 'bg-blue-100 dark:bg-blue-900/30'
-      case 'nutrition': return 'bg-green-100 dark:bg-green-900/30'
-      case 'habit': return 'bg-purple-100 dark:bg-purple-900/30'
-      default: return 'bg-slate-100 dark:bg-slate-900/30'
+    if (summary.habitsAvg != null) {
+      parts.push(`habits ${summary.habitsAvg}% avg (weeks tracked)`)
     }
-  }
+    return parts.join(', ')
+  }, [summary])
 
-  const getMetricIcon = (metric: string) => {
-    switch (metric) {
-      case 'workout': return Dumbbell
-      case 'nutrition': return Apple
-      case 'habit': return Zap
-      default: return Activity
-    }
-  }
+  const width = Math.max(640, data.length * 86)
+  const height = 260
+  const padLeft = 34
+  const padRight = 18
+  const padTop = 20
+  const padBottom = 42
+  const innerWidth = width - padLeft - padRight
+  const innerHeight = height - padTop - padBottom
 
-  const getCurrentValue = () => {
-    if (data.length === 0) return 0
-    const latest = data[data.length - 1]
-    return latest[selectedMetric] ?? 0
-  }
+  const xForIndex = (index: number) => padLeft + (index * innerWidth) / Math.max(1, data.length - 1)
+  const yForPct = (pct: number) => padTop + ((100 - Math.max(0, Math.min(100, pct))) / 100) * innerHeight
 
-  const getPreviousValue = () => {
-    if (data.length < 2) return 0
-    const previous = data[data.length - 2]
-    return previous[selectedMetric] ?? 0
-  }
+  const linePath = (key: 'workout' | 'checkins') =>
+    data
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xForIndex(index)} ${yForPct(point[key] ?? 0)}`)
+      .join(' ')
 
-  const getTrend = () => {
-    const current = getCurrentValue()
-    const previous = getPreviousValue()
-    const diff = current - previous
-    if (diff > 2) return 'up'
-    if (diff < -2) return 'down'
-    return 'stable'
-  }
+  const nutritionPath = buildLinePathWithGaps(data, 'nutrition', xForIndex, yForPct)
+  const habitsPath = buildLinePathWithGaps(data, 'habits', xForIndex, yForPct)
 
-  const getTrendPercentage = () => {
-    const current = getCurrentValue()
-    const previous = getPreviousValue()
-    if (previous == null || previous === 0) return '0.0'
-    return Math.abs(((current - previous) / previous) * 100).toFixed(1)
-  }
+  const formatWeek = (weekStart: string) =>
+    new Date(weekStart + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' })
 
-  const sevenDayAvg =
-    data.length > 0
-      ? (data.reduce((sum, day) => sum + (day[selectedMetric] ?? 0), 0) / data.length).toFixed(1)
-      : '0.0'
+  const hoverPoint = hoveredIndex == null ? null : data[hoveredIndex]
 
-  const MetricIcon = getMetricIcon(selectedMetric)
+  return (
+    <Card className="fc-card-shell rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <CardContent className="p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col gap-2">
+          <h4 className="font-semibold text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+            Adherence Trend (last {data.length} weeks)
+          </h4>
+          <p className="text-sm text-[color:var(--fc-text-dim)]">
+            Last {data.length} weeks: {summarySentence}
+          </p>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm">
+          <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
+            <span className="inline-block w-6 h-[3px] rounded bg-blue-500" />
+            Workouts
+          </div>
+          <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
+            <span className="inline-block w-6 h-[3px] rounded bg-teal-400 border border-teal-300" />
+            Check-ins
+          </div>
+          <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
+            <span className="inline-block w-6 h-[3px] rounded bg-lime-500" />
+            Nutrition
+          </div>
+          <div className="flex items-center gap-2 text-[color:var(--fc-text-primary)]">
+            <span className="inline-block w-6 h-[3px] rounded bg-violet-400" />
+            Habits
+          </div>
+        </div>
+
+        <div className="relative overflow-x-auto">
+          <svg width={width} height={height} className="min-w-full">
+            {[0, 25, 50, 75, 100].map((tick) => {
+              const y = yForPct(tick)
+              return (
+                <g key={tick}>
+                  <line
+                    x1={padLeft}
+                    y1={y}
+                    x2={width - padRight}
+                    y2={y}
+                    stroke="rgba(148,163,184,0.22)"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={padLeft - 8}
+                    y={y + 4}
+                    textAnchor="end"
+                    fontSize="10"
+                    fill="rgba(148,163,184,0.9)"
+                  >
+                    {tick}
+                  </text>
+                </g>
+              )
+            })}
+
+            <path d={linePath('workout')} fill="none" stroke="#3b82f6" strokeWidth={3} strokeLinecap="round" />
+            <path
+              d={linePath('checkins')}
+              fill="none"
+              stroke="#2dd4bf"
+              strokeDasharray="6 4"
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+            {nutritionPath ? (
+              <path
+                d={nutritionPath}
+                fill="none"
+                stroke="#84cc16"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+            {habitsPath ? (
+              <path
+                d={habitsPath}
+                fill="none"
+                stroke="#a78bfa"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+
+            {data.map((point, index) => {
+              const x = xForIndex(index)
+              const yW = yForPct(point.workout)
+              const yC = yForPct(point.checkins)
+              const yN = point.nutrition != null ? yForPct(point.nutrition) : null
+              const yH = point.habits != null ? yForPct(point.habits) : null
+              const isHovered = hoveredIndex === index
+              return (
+                <g key={`pt-${point.week_start}`}>
+                  {isHovered ? (
+                    <line
+                      x1={x}
+                      y1={padTop}
+                      x2={x}
+                      y2={height - padBottom}
+                      stroke="rgba(56,189,248,0.35)"
+                      strokeWidth={1}
+                    />
+                  ) : null}
+                  <circle cx={x} cy={yW} r={isHovered ? 5 : 4} fill="#3b82f6" />
+                  <circle cx={x} cy={yC} r={isHovered ? 5 : 4} fill="#2dd4bf" />
+                  {yN != null ? <circle cx={x} cy={yN} r={isHovered ? 5 : 4} fill="#84cc16" /> : null}
+                  {yH != null ? <circle cx={x} cy={yH} r={isHovered ? 5 : 4} fill="#a78bfa" /> : null}
+                  <rect
+                    x={x - Math.max(18, innerWidth / Math.max(data.length, 8) / 2)}
+                    y={padTop}
+                    width={Math.max(36, innerWidth / Math.max(data.length, 8))}
+                    height={innerHeight}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredIndex(index)}
+                  />
+                  <text
+                    x={x}
+                    y={height - 14}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill="rgba(148,163,184,0.9)"
+                  >
+                    {formatWeek(point.week_start)}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+
+          {hoverPoint && hoveredIndex != null ? (
+            <div className="absolute top-2 right-2 rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg)]/95 px-3 py-2 text-xs shadow-xl">
+              <div className="font-medium text-[color:var(--fc-text-primary)] mb-1">
+                Week of {formatWeek(hoverPoint.week_start)}
+              </div>
+              <div className="text-blue-400">Workouts: {hoverPoint.workout}%</div>
+              <div className="text-teal-300">Check-ins: {hoverPoint.checkins}%</div>
+              {hoverPoint.nutrition != null ? (
+                <div className="text-lime-400">Nutrition: {hoverPoint.nutrition}%</div>
+              ) : (
+                <div className="text-[color:var(--fc-text-dim)]">Nutrition: —</div>
+              )}
+              {hoverPoint.habits != null ? (
+                <div className="text-violet-300">Habits: {hoverPoint.habits}%</div>
+              ) : (
+                <div className="text-[color:var(--fc-text-dim)]">Habits: —</div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function AdherenceTrendChart({
+  variant = 'default',
+  ...rest
+}: AdherenceTrendChartProps) {
+  const data = rest.trendData ?? []
   if (data.length === 0) {
+    if (variant === 'coachV6') {
+      return (
+        <div className={chartStyles.v6Empty}>
+          No historical trend data yet — weekly adherence appears after logs.
+        </div>
+      )
+    }
     return (
-      <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className={`${theme.text} text-base sm:text-lg`}>
-            {clientName} — {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Trends
-          </CardTitle>
-        </CardHeader>
+      <Card className="fc-card-shell rounded-2xl border border-[color:var(--fc-glass-border)]">
         <CardContent className="p-4 sm:p-6">
           <EmptyState
             variant="compact"
-            title="No trend data yet"
-            description="Complete workouts and check-ins to see adherence trends."
+            title="No historical trend data"
+            description="Weekly adherence appears here after workouts and check-ins are logged."
           />
         </CardContent>
       </Card>
     )
   }
-
-  return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-      <CardHeader className="p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className={`flex items-center gap-2 sm:gap-3 ${theme.text} text-base sm:text-lg min-w-0 truncate`}>
-            <div className={`p-2 ${getMetricBgColor(selectedMetric)} rounded-lg`}>
-              <MetricIcon className={`w-5 h-5 ${getMetricColor(selectedMetric)}`} />
-            </div>
-            {clientName} - {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Trends
-          </CardTitle>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant={chartType === 'line' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartType('line')}
-            >
-              <LineChart className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={chartType === 'bar' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartType('bar')}
-            >
-              <BarChart3 className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="p-4 sm:p-6">
-        {/* Trend Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-4 h-4 fc-text-subtle flex-shrink-0" />
-              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>Current</span>
-            </div>
-            <p className={`text-xl sm:text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
-              {getCurrentValue()}%
-            </p>
-          </div>
-          
-          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
-            <div className="flex items-center gap-2 mb-2">
-              {getTrend() === 'up' ? (
-                <TrendingUp className="w-4 h-4 text-green-600 flex-shrink-0" />
-              ) : getTrend() === 'down' ? (
-                <TrendingDown className="w-4 h-4 text-red-600 flex-shrink-0" />
-              ) : (
-                <Activity className="w-4 h-4 fc-text-subtle flex-shrink-0" />
-              )}
-              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>Trend</span>
-            </div>
-            <p className={`text-xl sm:text-2xl font-bold ${
-              getTrend() === 'up' ? 'text-green-600 dark:text-green-400' :
-              getTrend() === 'down' ? 'text-red-600 dark:text-red-400' :
-              'text-slate-600 dark:text-slate-400'
-            }`}>
-              {getTrend() === 'up' ? '+' : getTrend() === 'down' ? '-' : '±'}{getTrendPercentage()}%
-            </p>
-          </div>
-          
-          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-4 h-4 fc-text-subtle flex-shrink-0" />
-              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>7-Day Avg</span>
-            </div>
-            <p className={`text-xl sm:text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
-              {sevenDayAvg}%
-            </p>
-          </div>
-        </div>
-
-        {/* Chart Visualization */}
-        <div className={`${theme.card} rounded-xl p-4 sm:p-6 border-2 overflow-x-auto`}>
-          <div className="space-y-3 sm:space-y-4 min-w-0">
-            {/* Chart Header */}
-            <div className="flex items-center justify-between gap-2">
-              <h4 className={`font-semibold text-sm sm:text-base ${theme.text}`}>Weekly Trend</h4>
-              <Badge className={`${getMetricBgColor(selectedMetric)} ${getMetricColor(selectedMetric)} border-0`}>
-                {chartType === 'line' ? 'Line Chart' : 'Bar Chart'}
-              </Badge>
-            </div>
-
-            {/* Simple Chart Visualization */}
-            <div className="h-64 flex items-end justify-between gap-1 sm:gap-2">
-              {data.map((day, index) => {
-                const value = day[selectedMetric]
-                const height = (value / 100) * 200 // Scale to chart height
-                
-                return (
-                  <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                    <div className="text-xs fc-text-subtle">
-                      {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
-                    </div>
-                    
-                    {chartType === 'line' ? (
-                      <div className="relative w-full">
-                        <div 
-                          className={`w-full rounded-t-sm ${getMetricBgColor(selectedMetric)}`}
-                          style={{ height: `${height}px` }}
-                        ></div>
-                        <div className={`absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-medium ${getMetricColor(selectedMetric)}`}>
-                          {value}%
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative w-full">
-                        <div 
-                          className={`w-full rounded-t-sm ${getMetricBgColor(selectedMetric)}`}
-                          style={{ height: `${height}px` }}
-                        ></div>
-                        <div className={`absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-medium ${getMetricColor(selectedMetric)}`}>
-                          {value}%
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Chart Legend */}
-            <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${getMetricBgColor(selectedMetric)}`}></div>
-                <span className={`text-sm ${theme.textSecondary}`}>
-                  {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Adherence
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Insights */}
-        <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 mt-3 sm:mt-4`}>
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-            <span className={`font-medium ${theme.text}`}>Insights</span>
-          </div>
-          <div className="space-y-2">
-            <p className={`text-sm ${theme.textSecondary}`}>
-              {getTrend() === 'up' 
-                ? `Great progress! ${selectedMetric} adherence has improved by ${getTrendPercentage()}% this week.`
-                : getTrend() === 'down'
-                ? `Attention needed: ${selectedMetric} adherence has decreased by ${getTrendPercentage()}% this week.`
-                : `${selectedMetric} adherence has remained stable this week.`
-              }
-            </p>
-            <p className={`text-sm ${theme.textSecondary}`}>
-              Current streak: {getCurrentValue() >= 90 ? 'Excellent' : getCurrentValue() >= 75 ? 'Good' : 'Needs improvement'}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  if (variant === 'coachV6') {
+    return <AdherenceTrendChartCoachV6 data={data} />
+  }
+  return <AdherenceTrendChartDefault {...rest} trendData={data} />
 }

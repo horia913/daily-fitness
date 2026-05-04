@@ -1,5 +1,7 @@
 'use client'
 
+import { isPushNotificationsEnabled } from '@/lib/pushNotificationsEnabled'
+
 // OneSignal REST API Sender for server-side push notifications
 export class OneSignalSender {
   private static readonly API_URL = 'https://onesignal.com/api/v1/notifications'
@@ -57,6 +59,11 @@ export class OneSignalSender {
    * Send push notification to specific user
    */
   static async sendToUser(userId: string, title: string, body: string, data?: any): Promise<boolean> {
+    if (!isPushNotificationsEnabled()) {
+      console.debug('[push] disabled, skipping notification')
+      return true
+    }
+
     if (!this.APP_ID) {
       console.error('OneSignal App ID not configured')
       return false

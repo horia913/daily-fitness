@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Trophy, Calendar, Users, Gift, Clock, Flame } from "lucide-react";
 import { Challenge } from "@/lib/challengeService";
 
@@ -157,16 +158,16 @@ export function ChallengeCard({
       {/* At-a-glance details */}
       <div className="space-y-2 mb-4">
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+          <Eyebrow tone="zinc" density="section" className="!mb-1 !text-gray-500">
             Challenge asks
-          </p>
+          </Eyebrow>
           <p className="text-sm text-gray-200 line-clamp-2">{challengeAsk}</p>
         </div>
         <div className="grid grid-cols-1 gap-2">
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+            <Eyebrow tone="zinc" density="section" className="!mb-1 !text-gray-500">
               Prize
-            </p>
+            </Eyebrow>
             <div className="flex items-center gap-1.5">
               <Gift className="w-3.5 h-3.5 text-amber-400" />
               <p className="text-xs text-gray-200 truncate">
@@ -175,9 +176,9 @@ export function ChallengeCard({
             </div>
           </div>
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
+            <Eyebrow tone="zinc" density="section" className="!mb-1 !text-gray-500">
               Start / End
-            </p>
+            </Eyebrow>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-gray-400" />
               <p className="text-xs text-gray-200">
@@ -203,7 +204,7 @@ export function ChallengeCard({
                 width: `${progress}%`,
                 background: isEnding
                   ? "linear-gradient(90deg, #ef4444, #f97316)"
-                  : "linear-gradient(90deg, #06b6d4, #3b82f6)",
+                  : "linear-gradient(90deg, var(--fc-accent-lime), var(--fc-accent-lime-2))",
               }}
             />
           </div>

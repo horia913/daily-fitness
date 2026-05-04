@@ -238,7 +238,7 @@ function MobilityMetricsPageContent() {
 
   if (loadError) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -254,7 +254,7 @@ function MobilityMetricsPageContent() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -266,7 +266,7 @@ function MobilityMetricsPageContent() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
@@ -614,7 +614,7 @@ export default function MobilityMetricsPage() {
   return (
     <Suspense
       fallback={
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="client">
           <AnimatedBackground>
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
               <PageSkeleton variant="dashboard" />

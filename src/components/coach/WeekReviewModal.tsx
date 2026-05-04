@@ -21,6 +21,7 @@ import {
   type ExerciseComparisonStatus,
 } from '@/lib/weekReviewService'
 import { useToast } from '@/components/ui/toast-provider'
+import { fetchApi } from "@/lib/apiClient";
 
 export interface WeekReviewModalProps {
   isOpen: boolean
@@ -82,7 +83,7 @@ export function WeekReviewModal({
   const handleSaveNote = async () => {
     setSubmitting(true)
     try {
-      const res = await fetch('/api/coach/week-review', {
+      const res = await fetchApi('/api/coach/week-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

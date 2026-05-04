@@ -1,0 +1,1083 @@
+/* Coach workout template edit v1 — scoped tokens (UI spec) */
+.wrap {
+  --bg: #07101a;
+  --card: #0e1f2e;
+  --card-2: #0b1824;
+  --card-3: #091420;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.05);
+  --t1: #fff;
+  --t2: rgba(255, 255, 255, 0.65);
+  --t3: rgba(255, 255, 255, 0.42);
+  --t4: rgba(255, 255, 255, 0.26);
+  --cyan: #4fe3e8;
+  --cyan-soft: rgba(79, 227, 232, 0.12);
+  --cyan-dim: rgba(79, 227, 232, 0.18);
+  --lime: #c5ff4a;
+  --lime-2: #7fe89a;
+  --lime-soft: rgba(197, 255, 74, 0.14);
+  --critical: #ff5a5f;
+  --critical-soft: rgba(255, 90, 95, 0.12);
+  --warning: #f5c242;
+  --warning-soft: rgba(245, 194, 66, 0.12);
+  --warning-dim: rgba(245, 194, 66, 0.25);
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.12);
+  --good-dim: rgba(52, 211, 153, 0.25);
+  --purple: #a78bfa;
+  --purple-soft: rgba(167, 139, 250, 0.12);
+  --purple-dim: rgba(167, 139, 250, 0.25);
+  --lime-text: #0a1a18;
+  color: var(--t1);
+  font-family: var(--font-geist-sans, Geist, sans-serif);
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, var(--card) 0%, var(--card-2) 100%);
+}
+
+.heroGlowCyan::before {
+  content: "";
+  position: absolute;
+  right: -20%;
+  top: -40%;
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(ellipse at center, rgba(79, 227, 232, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.heroGlowLime::before {
+  content: "";
+  position: absolute;
+  right: -20%;
+  top: -40%;
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(ellipse at center, rgba(197, 255, 74, 0.14) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.eyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.eyebrowLime {
+  color: var(--lime);
+}
+
+.statNum {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.statNumMuted {
+  color: var(--t4);
+}
+
+.statLbl {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.heroTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--t1);
+}
+
+.heroTitlePlaceholder {
+  font-style: italic;
+  color: var(--t3);
+  font-weight: 600;
+}
+
+.heroSub {
+  font-size: 12px;
+  color: var(--t3);
+  margin-top: 4px;
+}
+
+.statStrip {
+  display: flex;
+  align-items: stretch;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  gap: 0;
+}
+
+.statCell {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.statCell + .statCell {
+  border-left: 1px solid var(--line);
+}
+
+.statValLime {
+  color: var(--lime);
+}
+
+.statValCyan {
+  color: var(--cyan);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.statusUnsaved {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning-dim);
+}
+
+.statusSaved {
+  background: var(--good-soft);
+  color: var(--good);
+  border-color: var(--good-dim);
+}
+
+.statusDraft {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t3);
+  border-color: var(--line);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.backBtn:hover {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.formCard {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionEyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin-bottom: 10px;
+}
+
+.groupSep {
+  border-top: 1px solid var(--line-2);
+  padding-top: 12px;
+  margin-top: 2px;
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t1);
+  margin-bottom: 6px;
+}
+
+.optHelper {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--t4);
+}
+
+.reqStar {
+  color: var(--critical);
+}
+
+.inputLike {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 12.5px;
+  color: var(--t1);
+  width: 100%;
+}
+
+.inputLike:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+
+.inputLike::placeholder {
+  color: var(--t4);
+  font-style: italic;
+}
+
+.textareaMin {
+  min-height: 64px;
+}
+
+.selectTriggerLike {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 12.5px;
+  color: var(--t1);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.exercisesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+  margin-top: 8px;
+}
+
+.exercisesEyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+
+.exercisesCount {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lime);
+  margin-left: 6px;
+}
+
+.btnLimePrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lime-text);
+  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.btnLimePrimary:hover {
+  filter: brightness(1.05);
+}
+
+.btnLimePrimary:active {
+  transform: scale(0.98);
+}
+
+.dragStrip {
+  width: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  border-right: 1px solid var(--line-2);
+  cursor: grab;
+  align-self: stretch;
+  min-height: 48px;
+}
+
+.dragStrip:active {
+  cursor: grabbing;
+}
+
+.saveBar {
+  flex-shrink: 0;
+  padding: 14px 14px 6px;
+  background: linear-gradient(180deg, transparent 0%, var(--bg) 30%);
+}
+
+.saveBarInner {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btnGhostCancel {
+  background: transparent;
+  border: none;
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.btnGhostCancel:hover {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.btnLimeSave {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--lime-text);
+  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
+}
+
+.btnLimeSave:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.emptyExercises {
+  background: var(--card-2);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 24px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.emptyIconTile {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--cyan-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+}
+
+.emptyTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.emptyBody {
+  font-size: 11.5px;
+  color: var(--t3);
+  max-width: 240px;
+  line-height: 1.45;
+}
+
+/* Session balance */
+.balanceCard {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.balanceHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.balanceIconTile {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.balanceMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.balanceEyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.balanceTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.groupsPill {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  border: 1px solid var(--cyan-dim);
+  white-space: nowrap;
+}
+
+.balanceSummary {
+  font-size: 12px;
+  color: var(--t3);
+  line-height: 1.45;
+}
+
+.balanceSummary strong {
+  color: var(--t1);
+  font-weight: 600;
+}
+
+.balanceList {
+  border-top: 1px solid var(--line-2);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.balanceRow {
+  background: var(--card-2);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.balanceMuscleName {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.balanceRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.balanceBarTrack {
+  width: 46px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+
+.balanceBarFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan) 0%, #34a8ad 100%);
+}
+
+.balanceCount {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.balanceUnit {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9px;
+  color: var(--t3);
+}
+
+/* Exercise card v1 */
+.exCard {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  width: 100%;
+}
+
+.exBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--card-2);
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t2);
+  flex-shrink: 0;
+  margin: 0 8px;
+  align-self: center;
+}
+
+.exBody {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 8px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.exMeta {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  color: var(--t3);
+  line-height: 1.35;
+}
+
+.exActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  flex-shrink: 0;
+}
+
+.exIconBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.exIconBtn:hover {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.exIconBtnDanger:hover {
+  background: var(--critical-soft);
+  color: var(--critical);
+}
+
+.exExpandedWrap {
+  border-radius: 14px;
+  border-width: 1px;
+  border-style: solid;
+  overflow: hidden;
+  width: 100%;
+}
+
+.exExpandedWrapCyan {
+  border-color: var(--cyan-dim);
+  background: rgba(79, 227, 232, 0.02);
+}
+
+.exExpandedWrapPurple {
+  border-color: var(--purple-dim);
+  background: rgba(167, 139, 250, 0.02);
+}
+
+.exExpandedWrapWarning {
+  border-color: var(--warning-dim);
+  background: rgba(245, 194, 66, 0.02);
+}
+
+.exExpandedWrapGood {
+  border-color: var(--good-dim);
+  background: rgba(52, 211, 153, 0.02);
+}
+
+.exHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.subExList {
+  background: rgba(0, 0, 0, 0.18);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subExRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subExTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subLetter {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.subExName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.subExMeta {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9px;
+  color: var(--t3);
+  padding-left: 28px;
+}
+
+.exExpandedBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Config card UI-7 */
+.configCard {
+  position: relative;
+  background: var(--card-2);
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  padding: 14px;
+  padding-left: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.configStripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 14px 0 0 14px;
+}
+
+.stripeCyan {
+  background: var(--cyan);
+}
+.stripePurple {
+  background: var(--purple);
+}
+.stripeWarning {
+  background: var(--warning);
+}
+.stripeGood {
+  background: var(--good);
+}
+
+.configHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.configIconTile {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tileCyan {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+.tilePurple {
+  background: var(--purple-soft);
+  color: var(--purple);
+}
+.tileWarning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.tileGood {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.configEyebrow {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.textAccentCyan {
+  color: var(--cyan);
+}
+.textAccentPurple {
+  color: var(--purple);
+}
+.textAccentWarning {
+  color: var(--warning);
+}
+.textAccentGood {
+  color: var(--good);
+}
+
+.configTitle {
+  font-family: var(--f-headline, "Bricolage Grotesque", sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.configDesc {
+  font-size: 11px;
+  color: var(--t3);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* Nested exercise row UI-9 */
+.nestedExRow {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.nestedBadge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nestedClose {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--critical);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nestedClose:hover {
+  background: var(--critical-soft);
+}
+
+.nestedSearch {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card-2);
+  margin-right: 28px;
+}
+
+/* Load toggle pill UI-10 */
+.loadRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loadRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.loadToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--card-3);
+  border: 1px solid var(--line-2);
+}
+
+.loadToggleLabel {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.loadToggleLabelActive {
+  color: var(--cyan);
+}
+
+.loadToggleLabelIdle {
+  color: var(--t3);
+}
+
+.loadSwitchTrack {
+  width: 22px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.loadSwitchTrackOn {
+  background: rgba(79, 227, 232, 0.35);
+}
+
+.loadSwitchThumb {
+  position: absolute;
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #0a1a26;
+  transition: left 0.15s ease;
+}
+
+/* Coach form scope — numeric + tempo */
+.wtCoachForm :global(.wt-num-input) {
+  font-family: var(--f-display, "Big Shoulders Display", sans-serif) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  padding: 8px 11px !important;
+}
+
+.wtCoachForm :global(.wt-tempo-input) {
+  font-family: var(--f-mono, "Geist Mono", monospace) !important;
+  letter-spacing: 0.1em !important;
+}
+
+.fieldGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fieldGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.typeExerciseRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 380px) {
+  .typeExerciseRow {
+    grid-template-columns: 140px 1fr;
+  }
+}
+
+.addNestedBtn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--cyan-dim);
+  background: transparent;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--f-mono, "Geist Mono", monospace);
+}
+
+.addNestedBtn:hover {
+  background: var(--cyan-soft);
+}
+
+.lineSep8 {
+  border-top: 1px solid var(--line-2);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.tabataSetBlock {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tabataSetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tabataAddSetBtn {
+  font-family: var(--f-mono, "Geist Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: none;
+  background: var(--cyan);
+  color: var(--lime-text);
+  cursor: pointer;
+}
+
+.tabataDelBtn {
+  border: none;
+  background: transparent;
+  color: var(--critical);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.tabataDelBtn:hover {
+  background: var(--critical-soft);
+}

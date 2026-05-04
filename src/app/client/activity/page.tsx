@@ -11,7 +11,8 @@ import { ClientPageShell } from "@/components/client-ui";
 import { LogActivityModal } from "@/components/client/activity/LogActivityModal";
 import { ActivityList } from "@/components/client/activity/ActivityList";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import { Activity, ArrowLeft, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Activity, ArrowLeft, Plus, AlertTriangle } from "lucide-react";
 import {
   logActivity,
   updateActivity,
@@ -56,9 +57,11 @@ function ActivityHubContent() {
   const [editingActivity, setEditingActivity] = useState<ClientActivity | null>(
     null
   );
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadActivities = useCallback(async () => {
     if (!user?.id) return;
+    setLoadError(null);
     setLoading(true);
     try {
       const { start, end } = getDateRange(filter);
@@ -66,6 +69,7 @@ function ActivityHubContent() {
       setActivities(data);
     } catch (err) {
       console.error("Failed to load activities:", err);
+      setLoadError("Could not load activity. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -193,7 +197,7 @@ function ActivityHubContent() {
                 className={cn(
                   "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border transition-colors",
                   filter === f
-                    ? "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]"
+                    ? "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]"
                     : "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)] hover:fc-text-primary"
                 )}
               >
@@ -209,6 +213,22 @@ function ActivityHubContent() {
           {/* Activity List */}
           {loading ? (
             <PageSkeleton variant="list" />
+          ) : loadError ? (
+            <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
+              <AlertTriangle
+                className="w-8 h-8 mx-auto text-[var(--fc-status-error)] mb-3"
+                strokeWidth={1.25}
+                aria-hidden
+              />
+              <p className="text-sm fc-text-dim mb-3">{loadError}</p>
+              <Button
+                type="button"
+                className="fc-btn fc-btn-primary"
+                onClick={() => void loadActivities()}
+              >
+                Retry
+              </Button>
+            </div>
           ) : activities.length > 0 ? (
             <ActivityList
               activities={activities}

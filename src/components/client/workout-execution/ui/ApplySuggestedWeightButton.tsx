@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { Zap } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ApplySuggestedWeightButtonProps {
   suggestedKg: number;
@@ -8,7 +10,7 @@ interface ApplySuggestedWeightButtonProps {
   className?: string;
 }
 
-/** Small button shown below weight input: "Apply suggested (75kg)". */
+/** Mock suggest-pill: lightning + “Apply suggested · X kg”. */
 export function ApplySuggestedWeightButton({
   suggestedKg,
   onApply,
@@ -18,17 +20,13 @@ export function ApplySuggestedWeightButton({
     <button
       type="button"
       onClick={onApply}
-      className={
-        "text-xs font-medium rounded-lg px-3 py-1.5 transition-all active:scale-95 " +
-        className
-      }
-      style={{
-        background: 'color-mix(in srgb, var(--fc-domain-workouts) 10%, var(--fc-surface-card))',
-        border: '1px solid color-mix(in srgb, var(--fc-domain-workouts) 25%, transparent)',
-        color: 'var(--fc-domain-workouts)',
-      }}
+      className={cn(
+        "mb-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[color:var(--fc-glass-border)] bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-semibold text-cyan-400 transition-opacity hover:opacity-95",
+        className,
+      )}
     >
-      Apply suggested ({suggestedKg} kg)
+      <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden />
+      Apply suggested · {suggestedKg} kg
     </button>
   );
 }

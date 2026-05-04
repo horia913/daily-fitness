@@ -1,39 +1,80 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Trophy } from "lucide-react";
-import { PRTimelineChart, type PRMilestone } from "@/components/progress/PRTimelineChart";
+import { ChevronDown } from "lucide-react";
+import { formatPersonalRecordCaption } from "@/lib/personalRecordDisplay";
+import { fetchApi } from "@/lib/apiClient";
+import type { PRMilestone } from "@/components/progress/PRTimelineChart";
+import type { PRTimelineTimeRange } from "@/components/progress/PRTimelineChart";
+import CoachPrV6Chart from "@/components/coach/client-detail/CoachPrV6Chart";
+import sec from "@/components/coach/client-detail/coachClientDetailUi.module.css";
+import prStyles from "@/components/coach/client-views/ClientPRTimeline.module.css";
 
 type RecentPrItem = {
   exerciseId: string | null;
   exerciseName: string | null;
-  weight: number | null;
-  reps: number | null;
+  recordType?: string;
+  recordValue?: number;
+  recordUnit?: string | null;
+  caption: string;
   achievedDate: string;
   workoutLogId: string | null;
 };
 
-type ApiResponse = {
-  clientId: string;
+type ChartSeries = {
+  key: string;
+  exerciseId: string;
+  exerciseName: string;
+  recordType: string;
+  recordUnit: string | null;
   milestones: PRMilestone[];
+};
+
+export type ClientPRTimelinePrefetched = {
+  lifetimePrCount?: number;
+  chart?: {
+    series: ChartSeries[];
+    defaultSeriesKey: string | null;
+  };
   recent: RecentPrItem[];
 };
 
+type ApiResponse = ClientPRTimelinePrefetched & { clientId?: string };
+
+const RANGE_OPTIONS: PRTimelineTimeRange[] = ["3M", "6M", "1Y", "ALL"];
+
 export default function ClientPRTimeline({
   clientId,
+  prefetched,
 }: {
   clientId: string;
+  prefetched?: ApiResponse | null;
 }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!prefetched);
   const [error, setError] = useState<string | null>(null);
-  const [milestones, setMilestones] = useState<PRMilestone[]>([]);
+  const [seriesList, setSeriesList] = useState<ChartSeries[]>([]);
+  const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentPrItem[]>([]);
+  const [timeRange, setTimeRange] = useState<PRTimelineTimeRange>("1Y");
 
   useEffect(() => {
+    if (prefetched) {
+      const series = Array.isArray(prefetched.chart?.series) ? prefetched.chart!.series : [];
+      const defKey = prefetched.chart?.defaultSeriesKey ?? null;
+      setSeriesList(series);
+      setSelectedSeriesKey(defKey ?? series[0]?.key ?? null);
+      setRecent(Array.isArray(prefetched.recent) ? prefetched.recent : []);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/coach/clients/${clientId}/pr-timeline`)
+    setSeriesList([]);
+    setSelectedSeriesKey(null);
+    fetchApi(`/api/coach/clients/${clientId}/pr-timeline`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -43,13 +84,17 @@ export default function ClientPRTimeline({
       })
       .then((data) => {
         if (cancelled) return;
-        setMilestones(Array.isArray(data.milestones) ? data.milestones : []);
+        const series = Array.isArray(data.chart?.series) ? data.chart!.series : [];
+        const defKey = data.chart?.defaultSeriesKey ?? null;
+        setSeriesList(series);
+        setSelectedSeriesKey(defKey ?? series[0]?.key ?? null);
         setRecent(Array.isArray(data.recent) ? data.recent : []);
       })
       .catch((e: unknown) => {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load PR timeline");
-          setMilestones([]);
+          setSeriesList([]);
+          setSelectedSeriesKey(null);
           setRecent([]);
         }
       })
@@ -59,78 +104,124 @@ export default function ClientPRTimeline({
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, prefetched]);
 
-  const latestExerciseName = useMemo(() => {
-    return recent.find((r) => r.exerciseName)?.exerciseName ?? "Top lift";
-  }, [recent]);
+  const selectedSeries = useMemo(() => {
+    if (seriesList.length === 0) return null;
+    if (!selectedSeriesKey) return seriesList[0];
+    return seriesList.find((s) => s.key === selectedSeriesKey) ?? seriesList[0];
+  }, [seriesList, selectedSeriesKey]);
+
+  const hasAnyPrData = recent.length > 0 || seriesList.length > 0;
+  const recentDisplay = recent.slice(0, 10);
+  const showViewAll = recent.length > 10;
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-cyan-300/70">
-        PR History
-      </h2>
+    <section className={sec.section}>
+      <p className={prStyles.prEyebrow}>PR HISTORY</p>
 
       {loading ? (
-        <p className="text-sm text-gray-500 py-6">Loading PR timeline...</p>
+        <p className="text-sm text-[color:var(--fc-text-subtle)] py-6">Loading PR timeline...</p>
       ) : error ? (
-        <p className="text-sm text-red-400 py-4">{error}</p>
-      ) : milestones.length === 0 ? (
-        <p className="text-sm text-gray-500 py-6">No PRs recorded yet</p>
+        <p className="text-sm text-[color:var(--fc-effort-max)] py-4">{error}</p>
+      ) : !hasAnyPrData ? (
+        <p className="text-sm text-[color:var(--fc-text-subtle)] py-6">No PRs recorded yet</p>
       ) : (
-        <div className="space-y-4">
-          <PRTimelineChart
-            milestones={milestones}
-            exerciseName={latestExerciseName}
-            defaultTimeRange="1Y"
-            className="border-white/10"
-          />
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Recent PRs
-            </p>
-            <ul className="space-y-2">
-              {recent.map((item, idx) => (
-                <li key={`${item.achievedDate}-${item.exerciseId ?? "x"}-${idx}`}>
-                  <button
-                    type="button"
-                    className="w-full text-left rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.05] transition-colors"
-                    onClick={() => {
-                      if (item.workoutLogId) {
-                        window.location.href = `/coach/clients/${clientId}/workout-logs/${item.workoutLogId}`;
-                      }
-                    }}
-                    disabled={!item.workoutLogId}
+        <div className="space-y-3">
+          {seriesList.length > 0 && selectedSeries && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <span className={prStyles.fieldLabel}>Exercise / PR type</span>
+                <div className={prStyles.selectWrap}>
+                  <select
+                    className={prStyles.select}
+                    value={selectedSeries.key}
+                    onChange={(e) => setSelectedSeriesKey(e.target.value)}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm text-white truncate">
-                        {item.exerciseName ?? "Exercise"}
-                      </p>
-                      <p className="text-xs text-gray-400">
+                    {seriesList.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.exerciseName} — {s.recordType}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className={prStyles.selectChevron} aria-hidden size={12} />
+                </div>
+              </div>
+
+              <div className={sec.rangeRow}>
+                {RANGE_OPTIONS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className={`${sec.rangeTab} ${timeRange === r ? sec.rangeTabActive : ""}`}
+                    onClick={() => setTimeRange(r)}
+                  >
+                    {r === "ALL" ? "All" : r}
+                  </button>
+                ))}
+              </div>
+
+              <CoachPrV6Chart milestones={selectedSeries.milestones} timeRange={timeRange} />
+            </>
+          )}
+
+          <div>
+            <p className={prStyles.prEyebrow}>
+              RECENT PRS · {recent.length}
+            </p>
+            {recent.length === 0 ? (
+              <p className="text-sm text-[color:var(--fc-text-subtle)]">No recent PRs</p>
+            ) : (
+              <ul className="list-none p-0 m-0">
+                {recentDisplay.map((item, idx) => (
+                  <li
+                    key={`${item.achievedDate}-${item.exerciseId ?? "x"}-${idx}`}
+                    className={idx === 0 ? prStyles.prRow : `${prStyles.prRow} ${prStyles.prRowBorder}`}
+                  >
+                    <button
+                      type="button"
+                      className={prStyles.prRowBtn}
+                      onClick={() => {
+                        if (item.workoutLogId) {
+                          window.location.href = `/coach/clients/${clientId}/workout-logs/${item.workoutLogId}`;
+                        }
+                      }}
+                      disabled={!item.workoutLogId}
+                    >
+                      <div className={prStyles.prRowLeft}>
+                        <span className={prStyles.prExercise}>{item.exerciseName ?? "Exercise"}</span>
+                        <span className={prStyles.prValue}>
+                          {item.caption ??
+                            formatPersonalRecordCaption(
+                              item.recordType,
+                              item.recordValue,
+                              item.recordUnit ?? null
+                            )}
+                        </span>
+                      </div>
+                      <span className={prStyles.prDate}>
                         {new Date(`${item.achievedDate}T12:00:00`).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
-                          year: "numeric",
                         })}
-                      </p>
-                    </div>
-                    <p className="text-xs text-cyan-300 mt-1">
-                      {(item.weight != null ? `${item.weight} kg` : "—")} ×{" "}
-                      {(item.reps != null ? `${item.reps} reps` : "—")}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {showViewAll ? (
+              <button
+                type="button"
+                className={prStyles.viewAll}
+                onClick={() => {
+                  window.location.href = `/coach/clients/${clientId}/progress`;
+                }}
+              >
+                View all PRs →
+              </button>
+            ) : null}
           </div>
-        </div>
-      )}
-
-      {!loading && !error && milestones.length === 0 && (
-        <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-          <Trophy className="w-4 h-4" />
-          Complete workouts to start recording PR milestones.
         </div>
       )}
     </section>

@@ -2,8 +2,16 @@
 
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
+import { isPushNotificationsEnabled } from '@/lib/pushNotificationsEnabled'
 
 export default function OneSignalScript() {
+  if (!isPushNotificationsEnabled()) {
+    return null
+  }
+  return <OneSignalScriptInner />
+}
+
+function OneSignalScriptInner() {
   const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
   const [isClient, setIsClient] = useState(false)
   const [isMobile, setIsMobile] = useState(false)

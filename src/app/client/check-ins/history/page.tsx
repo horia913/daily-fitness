@@ -7,14 +7,19 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
-import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { ClientPageShell, ClientGlassCard, SectionHeader } from "@/components/client-ui";
+import { CheckinHero } from "@/components/client/check-ins/checkinSuite";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { GoalWizard } from "@/components/goals/GoalWizard";
 import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
 import { supabase } from "@/lib/supabase";
 import { CheckInHistory } from "@/components/client/CheckInHistory";
 import { WeeklyComparison } from "@/components/client/WeeklyComparison";
 import { WellnessTrendsCard } from "@/components/client/WellnessTrendsCard";
-import { ArrowLeft } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { getLogRange, DailyWellnessLog, MonthlyStats } from "@/lib/wellnessService";
 import { getClientMeasurements } from "@/lib/measurementService";
 import { usePageData } from "@/hooks/usePageData";
@@ -169,7 +174,10 @@ export default function CheckInsHistoryPage() {
     };
   }, [user?.id]);
 
-  const { data, loading: dataLoading } = usePageData(fetchHistoryData, [user?.id]);
+  const { data, loading: dataLoading, error, refetch } = usePageData(
+    fetchHistoryData,
+    [user?.id],
+  );
 
   const logRange = data?.logRange ?? [];
   const measurementsForComparison = data?.measurementsForComparison ?? [];
@@ -184,7 +192,7 @@ export default function CheckInsHistoryPage() {
   const fetchPillarGoals = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data: rows, error } = await supabase
+      const { data: rows, error: goalsError } = await supabase
         .from("goals")
         .select("id, title, target_value, current_value, target_unit, progress_percentage, target_date, status")
         .eq("client_id", user.id)
@@ -192,7 +200,7 @@ export default function CheckInsHistoryPage() {
         .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(3);
-      if (error) throw error;
+      if (goalsError) throw goalsError;
       setPillarGoals((rows || []).map((r) => ({ ...r, status: r.status ?? "active" })));
     } catch {
       setPillarGoals([]);
@@ -207,23 +215,29 @@ export default function CheckInsHistoryPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4 overflow-x-hidden">
-          <header className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push("/client/check-ins")}
-              className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-              aria-label="Back to check-ins"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">Check-in History</h1>
-              <p className="text-xs fc-text-dim mt-0.5">Calendar, goals, and body trends</p>
-            </div>
-          </header>
+        <ClientPageShell
+          className={cn("max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4 overflow-x-hidden", checkinSuiteStyles.root)}
+        >
+          <CheckinHero
+            onBack={() => router.push("/client/check-ins")}
+            backAriaLabel="Back to check-ins"
+            eyebrow="Wellness · history"
+            eyebrowColor="var(--cs-cyan)"
+            title="Check-in history"
+            subtitle="Calendar, goals, and body trends"
+          />
 
-          {user?.id && !dataLoading && (
+          {error ? (
+            <EmptyState
+              icon={AlertTriangle}
+              title="Couldn't load history"
+              description="Something went wrong while loading your check-in history."
+              actionLabel="Retry"
+              onAction={() => void refetch()}
+            />
+          ) : null}
+
+          {user?.id && !dataLoading && !error && (
             <>
               <section className="mb-4 min-w-0 overflow-x-auto">
                 <CheckInHistory
@@ -294,24 +308,34 @@ export default function CheckInsHistoryPage() {
                 </div>
               ) : (
                 <p className="fc-text-dim text-sm mb-4">
-                  No active check-in goals yet. Add one below to start tracking your progress consistently!
+                  No active check-in goals yet. Add one below to start tracking your progress consistently.
                 </p>
               )}
               <div className="flex flex-col sm:flex-row gap-2">
-                <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>
+                <Button
+                  type="button"
+                  variant="btn-action"
+                  className="h-10 w-full sm:w-auto"
+                  onClick={() => setShowAddGoalModal(true)}
+                >
                   + Add Check-in Goal
-                </PrimaryButton>
-                <SecondaryButton className="w-full sm:w-auto" onClick={() => router.push("/client/goals")}>
+                </Button>
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  className="h-10 w-full sm:w-auto"
+                  onClick={() => router.push("/client/goals")}
+                >
                   Manage all goals
-                </SecondaryButton>
+                </Button>
               </div>
             </ClientGlassCard>
           </section>
 
-          <AddGoalModal
+          <GoalWizard
             open={showAddGoalModal}
             onClose={() => setShowAddGoalModal(false)}
-            defaultPillar="checkins"
+            initialCategory="body_composition"
             onSuccess={fetchPillarGoals}
           />
         </ClientPageShell>

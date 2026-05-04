@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { buildProgramWeekState } from '@/lib/programWeekStateBuilder'
+import { weekdayMon0Sun6InTimezone } from '@/lib/clientZonedCalendar'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,12 +23,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // todayWeekday: 0=Monday .. 6=Sunday (client timezone). Default to server weekday if missing.
     const { searchParams } = new URL(request.url)
     const todayWeekdayParam = searchParams.get('todayWeekday')
-    const todayWeekday = todayWeekdayParam !== null
-      ? Math.min(6, Math.max(0, parseInt(todayWeekdayParam, 10) || 0))
-      : (new Date().getDay() + 6) % 7
+    let todayWeekday: number
+    if (todayWeekdayParam !== null) {
+      todayWeekday = Math.min(6, Math.max(0, parseInt(todayWeekdayParam, 10) || 0))
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', user.id)
+        .maybeSingle()
+      const tz = typeof profile?.timezone === 'string' ? profile.timezone.trim() : ''
+      if (!tz) {
+        return NextResponse.json(
+          {
+            error:
+              'Cannot resolve client timezone; pass todayWeekday explicitly or set profile.timezone.',
+          },
+          { status: 400 },
+        )
+      }
+      todayWeekday = weekdayMon0Sun6InTimezone(new Date(), tz)
+    }
 
     const state = await buildProgramWeekState(supabase, user.id, todayWeekday)
 

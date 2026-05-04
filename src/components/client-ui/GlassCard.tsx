@@ -3,6 +3,13 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Shell decision matrix:
+ * - `Card` (`components/ui/card.tsx`): legacy shadcn layouts (forms/tables) where `fc-card-shell` is not required.
+ * - `AppCard` (`components/ui/AppCard.tsx`): feature row cards with status/header/footer slots.
+ * - `GlassCard` (`components/ui/GlassCard.tsx`): coach/admin prescription shell with elevation + press behavior.
+ * - `ClientGlassCard` (this file): client-route shell with default p-4 and automatic outline when className contains bg-*.
+ */
 export type ClientCardShellTone = "neutral" | "success" | "error" | "warning" | "info";
 
 const toneModifier: Record<Exclude<ClientCardShellTone, "neutral">, string> = {

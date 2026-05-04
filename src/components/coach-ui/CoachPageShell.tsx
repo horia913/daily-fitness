@@ -2,9 +2,18 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import {
+  AtmosphericBackdrop,
+  type AtmosphericVariant,
+} from "@/components/ui/AtmosphericBackdrop";
 
 /**
  * CoachPageShell — the coach-side page container primitive.
+ *
+ * Phase 0b finalization (Sun Apr 26, 2026): `backdrop` prop wires
+ * {@link AtmosphericBackdrop} inside the shell (after parent
+ * {@link AnimatedBackground} in route trees, before page content). Default
+ * `info`. Same stacking pattern as {@link ClientPageShell}.
  *
  * Mirrors `ClientPageShell` structurally:
  *   - `relative z-10 mx-auto w-full fc-page min-w-0 overflow-x-hidden`
@@ -45,6 +54,7 @@ interface CoachPageShellProps {
   widthVariant?: CoachPageShellWidthVariant;
   className?: string;
   style?: React.CSSProperties;
+  backdrop?: AtmosphericVariant;
 }
 
 const WIDTH_BY_VARIANT: Record<CoachPageShellWidthVariant, string> = {
@@ -59,6 +69,7 @@ export function CoachPageShell({
   widthVariant = "default-5xl",
   className,
   style,
+  backdrop = "info",
 }: CoachPageShellProps) {
   const widthClass = WIDTH_BY_VARIANT[widthVariant];
 
@@ -71,7 +82,8 @@ export function CoachPageShell({
         className
       )}
     >
-      {children}
+      <AtmosphericBackdrop variant={backdrop} absolute className="z-0" />
+      <div className="relative z-10 min-w-0">{children}</div>
     </div>
   );
 }

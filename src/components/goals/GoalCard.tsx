@@ -11,15 +11,17 @@ interface Goal {
   title: string;
   description?: string;
   category:
+    | "body_composition"
+    | "performance"
+    | "outcome"
+    | "nutrition"
     | "weight_loss"
     | "muscle_gain"
     | "strength"
     | "endurance"
     | "mobility"
-    | "body_composition"
-    | "performance"
     | "other";
-  type: "target" | "habit" | "milestone";
+  type?: "target" | "habit" | "milestone";
   target_value?: number;
   target_unit?: string;
   current_value?: number;

@@ -1,795 +1,770 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Checkbox } from '@/components/ui/checkbox'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { 
-  CheckCircle, 
-  Flame, 
-  Target, 
-  Calendar, 
-  TrendingUp,
-  Heart,
-  Droplets,
-  Footprints,
-  Moon,
-  Sun,
-  Coffee,
-  Apple,
-  Dumbbell,
-  BookOpen,
-  Zap,
-  Star,
-  Trophy,
-  Award,
-  Sparkles,
-  Clock,
-  CheckCircle2,
-  CircleCheck,
-  CircleX,
-  CircleAlert,
-  CircleMinus,
-  CirclePlus,
-  CircleDot,
-  CirclePause,
-  CirclePlay,
-  CircleStop,
-  CircleHelp,
-  ExternalLink,
-  RefreshCw,
-  Plus,
-  Eye,
-  BarChart3,
-  Activity,
-  Timer,
-  Bell,
-  ArrowRight,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  MoreHorizontal,
-  Settings,
-  Edit,
-  Trash2,
-  Copy,
-  Share2,
-  MessageCircle,
-  Users,
-  User,
-  UserCheck,
-  UserX,
-  UserPlus,
-  UserMinus,
-  UserCog,
-  UserSearch
-} from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
-import Link from 'next/link'
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+  zonedDayInclusiveUtcBounds,
+} from '@/lib/clientZonedCalendar'
+import { Check, Circle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast-provider'
+import {
+  addHabitFromTemplate,
+  deleteHabit,
+  fetchActiveTemplates,
+  fetchClientHabits,
+  toggleManualLogToday,
+  updateHabitTarget,
+  type ClientHabitWithTemplate,
+  type HabitTemplateRow,
+} from '@/lib/habitTemplateService'
+import {
+  deriveCompletion,
+  STUB_SOURCE_TYPES,
+  workoutLogsToCompletedYmds,
+  type HabitSourceData,
+} from '@/lib/habitAutoTracking'
+import { HabitLucideIcon } from '@/components/client/habitLucideIcon'
 
-interface HabitAssignment {
-  id: string
-  habit_id: string
-  habit_name: string
-  habit_description?: string
-  frequency_type: 'daily' | 'weekly'
-  target_days: number
-  start_date: string
-  is_logged_today: boolean
-  streak_days: number
-  completion_rate: number
-  category?: string
-  icon?: string
-  color?: string
+const CATEGORY_ORDER = [
+  'hydration',
+  'nutrition',
+  'movement',
+  'sleep_recovery',
+  'mindfulness',
+  'lifestyle',
+  'checkin',
+] as const
+
+const CATEGORY_LABEL: Record<(typeof CATEGORY_ORDER)[number], string> = {
+  hydration: 'Hydration',
+  nutrition: 'Nutrition',
+  movement: 'Movement',
+  sleep_recovery: 'Sleep & Recovery',
+  mindfulness: 'Mindfulness',
+  lifestyle: 'Lifestyle',
+  checkin: 'Check-in adherence',
 }
 
-interface HabitLog {
-  id: string
-  assignment_id: string
-  log_date: string
+/** Mobile: centered card (safe-area margins + max-h clears tab bar). md+: centered modal. */
+const habitDialogSurfaceClass = cn(
+  'fc-modal flex min-h-0 flex-col gap-0 overflow-hidden p-0 outline-none',
+  'z-[10030] min-w-0 overflow-x-hidden box-border',
+  // Mobile: center in viewport (horizontal + vertical)
+  'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+  'w-[calc(100vw-env(safe-area-inset-left)-env(safe-area-inset-right)-1.5rem)] max-w-lg',
+  'max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-5.25rem))]',
+  'rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl',
+  // md+: same centering, standard desktop max height
+  'md:max-h-[min(88dvh,calc(100dvh-1rem))]',
+  'md:w-full md:max-w-lg md:shadow-lg md:overflow-x-visible'
+)
+
+function isManualLike(t: HabitTemplateRow): boolean {
+  return t.source_type === 'manual' || STUB_SOURCE_TYPES.has(t.source_type)
 }
 
-interface HabitCategory {
-  id: string
-  name: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
-  bgColor: string
-  textColor: string
-  borderColor: string
-  glowColor: string
+function formatWellnessValue(field: string, value: number): string {
+  if (field === 'sleep_hours') return `${value}h`
+  if (field === 'steps') return `${Math.round(value)}`
+  return `${value}`
 }
 
-export default function HabitTracker() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [habits, setHabits] = useState<HabitAssignment[]>([])
-  const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set())
-  const [completedHabits, setCompletedHabits] = useState<Set<string>>(new Set())
-  const [showCelebration, setShowCelebration] = useState(false)
-  const [expandedHabit, setExpandedHabit] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact')
+function formatTargetLabel(field: string, target: number): string {
+  if (field === 'sleep_hours') return `${target}h`
+  if (field === 'steps') return `${Math.round(target)}`
+  return `${target}`
+}
 
-  useEffect(() => {
-    if (user) {
-      loadHabits()
+function formatTodayAutoLine(
+  habit: ClientHabitWithTemplate,
+  derived: ReturnType<typeof deriveCompletion>
+): string {
+  if (!derived) return ''
+  const st = habit.template.source_type
+  if (st === 'wellness_check') {
+    if (derived.done) return 'Auto: ✓ check-in'
+    return 'No check-in yet'
+  }
+  if (st === 'workout_logged') {
+    if (derived.done) return 'Auto: ✓ workout'
+    return 'No workout today'
+  }
+  if (st === 'wellness_field') {
+    const field = String(habit.template.source_config?.field ?? '')
+    if (derived.missingData && derived.value == null) return 'No check-in yet'
+    if (derived.done && derived.value != null) {
+      return `Auto: ✓ ${formatWellnessValue(field, Number(derived.value))}`
     }
-  }, [user])
+    if (derived.value != null && derived.target != null && typeof derived.target === 'number') {
+      return `Auto: ${formatWellnessValue(field, Number(derived.value))} (target ${formatTargetLabel(field, derived.target)})`
+    }
+    return 'No check-in yet'
+  }
+  return ''
+}
 
-  const loadHabits = async () => {
-    if (!user) return
-    
+function buildTargetFromForm(
+  template: HabitTemplateRow,
+  form: Record<string, string>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...template.default_target }
+  for (const key of template.user_configurable_keys) {
+    const raw = form[key]?.trim() ?? ''
+    if (!raw) continue
+    if (key === 'bedtime') {
+      out[key] = raw
+      continue
+    }
+    const n = Number.parseFloat(raw)
+    if (!Number.isNaN(n)) out[key] = n
+  }
+  return out
+}
+
+function buildTargetFromEditForm(habit: ClientHabitWithTemplate, form: Record<string, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...habit.target }
+  for (const key of habit.template.user_configurable_keys) {
+    const raw = form[key]?.trim() ?? ''
+    if (!raw) continue
+    if (key === 'bedtime') {
+      out[key] = raw
+      continue
+    }
+    const n = Number.parseFloat(raw)
+    if (!Number.isNaN(n)) out[key] = n
+  }
+  return out
+}
+
+function initialConfigureForm(template: HabitTemplateRow): Record<string, string> {
+  const d = template.default_target ?? {}
+  const o: Record<string, string> = {}
+  for (const key of template.user_configurable_keys) {
+    const v = d[key]
+    if (v == null) o[key] = ''
+    else o[key] = typeof v === 'number' ? String(v) : String(v)
+  }
+  return o
+}
+
+function initialEditForm(habit: ClientHabitWithTemplate): Record<string, string> {
+  const t = habit.target ?? {}
+  const o: Record<string, string> = {}
+  for (const key of habit.template.user_configurable_keys) {
+    const v = t[key]
+    if (v == null) o[key] = ''
+    else o[key] = typeof v === 'number' ? String(v) : String(v)
+  }
+  return o
+}
+
+function inputModeForKey(key: string): 'text' | 'number' {
+  if (key === 'bedtime') return 'text'
+  return 'number'
+}
+
+interface HabitTrackerProps {
+  userId: string
+}
+
+export default function HabitTracker({ userId }: HabitTrackerProps) {
+  const { addToast } = useToast()
+  const [loading, setLoading] = useState(true)
+  const [timezone, setTimezone] = useState('UTC')
+  const [habits, setHabits] = useState<ClientHabitWithTemplate[]>([])
+  const [logsByHabit, setLogsByHabit] = useState<Record<string, Set<string>>>({})
+  const [sourceBundle, setSourceBundle] = useState<HabitSourceData | null>(null)
+
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerView, setPickerView] = useState<'library' | 'configure'>('library')
+  const [configureTemplate, setConfigureTemplate] = useState<HabitTemplateRow | null>(null)
+  const [configureForm, setConfigureForm] = useState<Record<string, string>>({})
+
+  const [editHabit, setEditHabit] = useState<ClientHabitWithTemplate | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, string>>({})
+  const [editSaving, setEditSaving] = useState(false)
+
+  const [savingHabit, setSavingHabit] = useState(false)
+  const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null)
+
+  const todayYmd = useMemo(() => zonedCalendarDateString(new Date(), timezone), [timezone])
+  const weekStart = useMemo(() => mondayYmdOfZonedWeekContaining(new Date(), timezone), [timezone])
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addCalendarDaysYmd(weekStart, i)),
+    [weekStart]
+  )
+
+  const ownedTemplateIds = useMemo(() => new Set(habits.map((h) => h.template_id)), [habits])
+
+  const loadPageData = useCallback(async () => {
     setLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
-      
-      // Get user's active habit assignments
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('habit_assignments')
-        .select(`
-          id,
-          habit_id,
-          start_date,
-          habits(
-            name,
-            description,
-            frequency_type,
-            target_days
-          )
-        `)
-        .eq('client_id', user.id)
-        .eq('is_active', true)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .maybeSingle()
 
-      if (assignmentsError) throw assignmentsError
+      const userTz = normalizeClientTimezone(profileData?.timezone)
+      setTimezone(userTz)
 
-      if (!assignments || assignments.length === 0) {
-        setHabits([])
-        return
+      const weekStartLocal = mondayYmdOfZonedWeekContaining(new Date(), userTz)
+      const weekEndLocal = addCalendarDaysYmd(weekStartLocal, 6)
+      const { startIso, endIso } = (() => {
+        const a = zonedDayInclusiveUtcBounds(weekStartLocal, userTz).startIso
+        const b = zonedDayInclusiveUtcBounds(weekEndLocal, userTz).endIso
+        return { startIso: a, endIso: b }
+      })()
+
+      const habitRows = await fetchClientHabits(userId)
+      setHabits(habitRows)
+
+      const manualIds = habitRows.filter((h) => isManualLike(h.template)).map((h) => h.id)
+
+      const [wellnessRes, workoutRes] = await Promise.all([
+        supabase
+          .from('daily_wellness_logs')
+          .select('log_date, sleep_hours, sleep_quality, stress_level, steps')
+          .eq('client_id', userId)
+          .gte('log_date', weekStartLocal)
+          .lte('log_date', weekEndLocal),
+        supabase
+          .from('workout_logs')
+          .select('completed_at')
+          .eq('client_id', userId)
+          .not('completed_at', 'is', null)
+          .gte('completed_at', startIso)
+          .lte('completed_at', endIso),
+      ])
+
+      if (wellnessRes.error) throw wellnessRes.error
+      if (workoutRes.error) throw workoutRes.error
+
+      let logRows: { habit_id: string; log_date: string }[] = []
+      if (manualIds.length > 0) {
+        const { data, error } = await supabase
+          .from('habit_logs')
+          .select('habit_id, log_date')
+          .eq('client_id', userId)
+          .in('habit_id', manualIds)
+          .gte('log_date', weekStartLocal)
+          .lte('log_date', weekEndLocal)
+        if (error) throw error
+        logRows = data ?? []
       }
 
-      const assignmentIds = assignments.map(a => a.id)
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0]
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
+      const wellnessByYmd = new Map<string, (typeof wellnessRes.data)[0]>()
+      for (const row of wellnessRes.data ?? []) {
+        if (row?.log_date) wellnessByYmd.set(row.log_date, row)
+      }
 
-      const { data: recentLogs, error: logsError } = await supabase
-        .from('habit_logs')
-        .select('assignment_id, log_date')
-        .in('assignment_id', assignmentIds)
-        .gte('log_date', thirtyDaysAgoStr)
+      const workoutYmds = workoutLogsToCompletedYmds(workoutRes.data ?? [], userTz)
 
-      if (logsError) throw logsError
-
-      const logsByAssignment = new Map<string, string[]>()
-      const loggedToday = new Set<string>()
-
-      ;(recentLogs || []).forEach(log => {
-        if (!logsByAssignment.has(log.assignment_id)) {
-          logsByAssignment.set(log.assignment_id, [])
-        }
-        logsByAssignment.get(log.assignment_id)!.push(log.log_date)
-        if (log.log_date === today) {
-          loggedToday.add(log.assignment_id)
-        }
+      setSourceBundle({
+        clientTimezone: userTz,
+        wellnessByYmd,
+        workoutCompletedYmds: workoutYmds,
       })
 
-      const habitsWithStats: HabitAssignment[] = assignments.map((assignment) => {
-        const habit = Array.isArray(assignment.habits) ? assignment.habits[0] : assignment.habits
-        const assignmentLogs = logsByAssignment.get(assignment.id) || []
-
-        const sortedLogs = [...assignmentLogs].sort(
-          (a, b) => new Date(b).getTime() - new Date(a).getTime()
-        )
-
-        let streakDays = 0
-        if (sortedLogs.length > 0) {
-          let currentDate = new Date()
-          for (const logDateStr of sortedLogs) {
-            const logDate = new Date(logDateStr)
-            const daysDiff = Math.floor((currentDate.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24))
-            if (daysDiff <= 1) {
-              streakDays++
-              currentDate = logDate
-            } else {
-              break
-            }
-          }
-        }
-
-        const completedDays = assignmentLogs.filter(logDateStr =>
-          new Date(logDateStr) >= weekAgo
-        ).length
-
-        const expectedDays = habit?.frequency_type === 'daily' ? 7 : habit?.target_days || 1
-        const completionRate = Math.round((completedDays / expectedDays) * 100)
-
-        return {
-          id: assignment.id,
-          habit_id: assignment.habit_id,
-          habit_name: habit?.name || 'Unknown Habit',
-          habit_description: habit?.description,
-          frequency_type: habit?.frequency_type || 'daily',
-          target_days: habit?.target_days || 1,
-          start_date: assignment.start_date,
-          is_logged_today: loggedToday.has(assignment.id),
-          streak_days: streakDays,
-          completion_rate: completionRate
-        }
-      })
-
-      setHabits(habitsWithStats)
+      const grouped: Record<string, Set<string>> = {}
+      for (const row of logRows) {
+        if (!grouped[row.habit_id]) grouped[row.habit_id] = new Set()
+        grouped[row.habit_id].add(row.log_date)
+      }
+      setLogsByHabit(grouped)
     } catch (error) {
       console.error('Error loading habits:', error)
-      // Set fallback data
-      setHabits([
-        {
-          id: '1',
-          habit_id: '1',
-          habit_name: 'Drink 3L of Water',
-          habit_description: 'Stay hydrated throughout the day',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: false,
-          streak_days: 5,
-          completion_rate: 85,
-          category: 'health',
-          icon: 'droplets',
-          color: 'blue'
-        },
-        {
-          id: '2',
-          habit_id: '2',
-          habit_name: '10,000 Steps',
-          habit_description: 'Walk at least 10,000 steps daily',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: true,
-          streak_days: 12,
-          completion_rate: 92,
-          category: 'fitness',
-          icon: 'footprints',
-          color: 'green'
-        },
-        {
-          id: '3',
-          habit_id: '3',
-          habit_name: 'Meditate 10 Minutes',
-          habit_description: 'Practice mindfulness and meditation',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: false,
-          streak_days: 3,
-          completion_rate: 70,
-          category: 'wellness',
-          icon: 'heart',
-          color: 'purple'
-        },
-        {
-          id: '4',
-          habit_id: '4',
-          habit_name: 'Read 30 Minutes',
-          habit_description: 'Read books or articles for personal growth',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: true,
-          streak_days: 7,
-          completion_rate: 78,
-          category: 'learning',
-          icon: 'book',
-          color: 'orange'
-        }
-      ])
+      addToast({ title: 'Failed to load habits', variant: 'destructive' })
+      setHabits([])
+      setLogsByHabit({})
+      setSourceBundle(null)
     } finally {
       setLoading(false)
     }
-  }
+  }, [addToast, userId])
 
-  const handleHabitToggle = async (assignmentId: string) => {
-    const habit = habits.find(h => h.id === assignmentId)
-    if (!habit) return
+  useEffect(() => {
+    void loadPageData()
+  }, [loadPageData])
 
-    const isCurrentlyCompleted = habit.is_logged_today
-    const isOptimistic = optimisticUpdates.has(assignmentId)
-    const willBeCompleted = isOptimistic ? !isCurrentlyCompleted : !isCurrentlyCompleted
+  const [allTemplates, setAllTemplates] = useState<HabitTemplateRow[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
 
-    // Optimistic UI update
-    setOptimisticUpdates(prev => new Set(prev).add(assignmentId))
-    setHabits(prevHabits =>
-      prevHabits.map(h =>
-        h.id === assignmentId 
-          ? { ...h, is_logged_today: willBeCompleted }
-          : h
-      )
-    )
-
-    // Update completed habits set
-    if (willBeCompleted) {
-      setCompletedHabits(prev => new Set(prev).add(assignmentId))
-    } else {
-      setCompletedHabits(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(assignmentId)
-        return newSet
-      })
-    }
-
-    // Check if all habits are completed for celebration
-    const updatedHabits = habits.map(h => h.id === assignmentId ? { ...h, is_logged_today: willBeCompleted } : h)
-    const allCompleted = updatedHabits.every(h => h.is_logged_today) && updatedHabits.length > 0
-    if (allCompleted && willBeCompleted) {
-      setShowCelebration(true)
-      setTimeout(() => setShowCelebration(false), 3000)
-    }
-
+  const openPicker = async () => {
+    setPickerView('library')
+    setConfigureTemplate(null)
+    setPickerOpen(true)
+    setTemplatesLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
-
-      if (willBeCompleted) {
-        // Log the habit completion
-        const { error } = await supabase
-          .from('habit_logs')
-          .insert({
-            assignment_id: assignmentId,
-            client_id: user?.id,
-            log_date: today
-          })
-
-        if (error) throw error
-      } else {
-        // Remove the habit log
-        const { error } = await supabase
-          .from('habit_logs')
-          .delete()
-          .eq('assignment_id', assignmentId)
-          .eq('log_date', today)
-
-        if (error) throw error
-      }
-    } catch (error) {
-      console.error('Error updating habit log:', error)
-      
-      // Revert optimistic update on error
-      setHabits(prevHabits =>
-        prevHabits.map(h =>
-          h.id === assignmentId 
-            ? { ...h, is_logged_today: !willBeCompleted }
-            : h
-        )
-      )
-      
-      // Revert completed habits set
-      if (willBeCompleted) {
-        setCompletedHabits(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(assignmentId)
-          return newSet
-        })
-      } else {
-        setCompletedHabits(prev => new Set(prev).add(assignmentId))
-      }
+      const t = await fetchActiveTemplates()
+      setAllTemplates(t)
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not load library', variant: 'destructive' })
     } finally {
-      // Remove from optimistic updates
-      setOptimisticUpdates(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(assignmentId)
-        return newSet
-      })
+      setTemplatesLoading(false)
     }
   }
 
-  const getHabitIcon = (iconName: string) => {
-    const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
-      droplets: Droplets,
-      footprints: Footprints,
-      heart: Heart,
-      book: BookOpen,
-      dumbbell: Dumbbell,
-      apple: Apple,
-      coffee: Coffee,
-      moon: Moon,
-      sun: Sun,
-      clock: Clock,
-      target: Target,
-      flame: Flame,
-      star: Star,
-      trophy: Trophy,
-      award: Award,
-      sparkles: Sparkles,
-      zap: Zap,
-      activity: Activity,
-      timer: Timer,
-      bell: Bell
+  const pickableTemplates = useMemo(
+    () => allTemplates.filter((t) => !ownedTemplateIds.has(t.id)),
+    [allTemplates, ownedTemplateIds]
+  )
+
+  const groupedPicker = useMemo(() => {
+    const m = new Map<string, HabitTemplateRow[]>()
+    for (const t of pickableTemplates) {
+      if (!m.has(t.category)) m.set(t.category, [])
+      m.get(t.category)!.push(t)
     }
-    return iconMap[iconName] || Target
+    return m
+  }, [pickableTemplates])
+
+  const onSelectTemplate = async (template: HabitTemplateRow) => {
+    if (template.user_configurable_keys.length === 0) {
+      setSavingHabit(true)
+      try {
+        const { error } = await addHabitFromTemplate(userId, template.id, { ...template.default_target })
+        if (error) throw error
+        addToast({ title: 'Habit added', variant: 'success' })
+        setPickerOpen(false)
+        await loadPageData()
+      } catch (e) {
+        console.error(e)
+        addToast({ title: 'Could not add habit', variant: 'destructive' })
+      } finally {
+        setSavingHabit(false)
+      }
+      return
+    }
+    setConfigureTemplate(template)
+    setConfigureForm(initialConfigureForm(template))
+    setPickerView('configure')
   }
 
-  const getHabitColor = (color: string) => {
-    const colorMap: { [key: string]: { bg: string; text: string; border: string; glow: string } } = {
-      blue: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-workouts',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
-      },
-      green: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-success',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
-      },
-      purple: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-habits',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
-      },
-      orange: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-warning',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
-      },
-      red: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-error',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
-      },
-      yellow: {
-        bg: 'fc-glass-soft',
-        text: 'fc-text-warning',
-        border: 'border border-[color:var(--fc-glass-border)]',
-        glow: ''
+  const saveConfigure = async () => {
+    if (!configureTemplate) return
+    for (const key of configureTemplate.user_configurable_keys) {
+      if (!configureForm[key]?.trim()) {
+        addToast({ title: `Please set ${key.replace(/_/g, ' ')}`, variant: 'default' })
+        return
       }
     }
-    return colorMap[color] || colorMap.blue
+    setSavingHabit(true)
+    try {
+      const target = buildTargetFromForm(configureTemplate, configureForm)
+      const { error } = await addHabitFromTemplate(userId, configureTemplate.id, target)
+      if (error) throw error
+      addToast({ title: 'Habit added', variant: 'success' })
+      setPickerOpen(false)
+      setPickerView('library')
+      setConfigureTemplate(null)
+      await loadPageData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not add habit', variant: 'destructive' })
+    } finally {
+      setSavingHabit(false)
+    }
   }
 
-  const getStreakBadgeColor = (streak: number) => {
-    if (streak >= 30) return 'fc-text-habits'
-    if (streak >= 14) return 'fc-text-warning'
-    if (streak >= 7) return 'fc-text-success'
-    if (streak >= 3) return 'fc-text-workouts'
-    return 'fc-text-subtle'
+  const openEdit = (habit: ClientHabitWithTemplate) => {
+    setEditHabit(habit)
+    setEditForm(initialEditForm(habit))
   }
 
-  const getCompletionRateColor = (rate: number) => {
-    if (rate >= 90) return 'fc-text-success'
-    if (rate >= 70) return 'fc-text-warning'
-    if (rate >= 50) return 'fc-text-warning'
-    return 'fc-text-error'
+  const saveEdit = async () => {
+    if (!editHabit) return
+    if (editHabit.template.user_configurable_keys.length === 0) {
+      setEditHabit(null)
+      return
+    }
+    for (const key of editHabit.template.user_configurable_keys) {
+      if (!editForm[key]?.trim()) {
+        addToast({ title: `Please set ${key.replace(/_/g, ' ')}`, variant: 'default' })
+        return
+      }
+    }
+    setEditSaving(true)
+    try {
+      const target = buildTargetFromEditForm(editHabit, editForm)
+      const { error } = await updateHabitTarget(editHabit.id, target)
+      if (error) throw error
+      addToast({ title: 'Habit updated', variant: 'success' })
+      setEditHabit(null)
+      await loadPageData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not save', variant: 'destructive' })
+    } finally {
+      setEditSaving(false)
+    }
   }
 
-  const getMotivationalMessage = (completed: number, total: number) => {
-    const percentage = Math.round((completed / total) * 100)
-    if (percentage === 100) return "Perfect! You're unstoppable! 🚀"
-    if (percentage >= 75) return "Almost there! Keep going! 💪"
-    if (percentage >= 50) return "Great progress! You're doing amazing! 🌟"
-    if (percentage >= 25) return "Every step counts! Keep building momentum! ⭐"
-    return "Let's start building those healthy habits! 🌱"
+  const removeHabit = async (habit: ClientHabitWithTemplate) => {
+    const confirmed = window.confirm(`Delete “${habit.template.name}”? Logs for this habit will be removed.`)
+    if (!confirmed) return
+    try {
+      const { error } = await deleteHabit(habit.id)
+      if (error) throw error
+      addToast({ title: 'Habit deleted', variant: 'success' })
+      setEditHabit(null)
+      await loadPageData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not delete', variant: 'destructive' })
+    }
   }
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })
+  const onToggleManual = async (habit: ClientHabitWithTemplate) => {
+    if (!isManualLike(habit.template)) return
+    setTogglingHabitId(habit.id)
+    try {
+      const { result, error } = await toggleManualLogToday(habit.id, userId, todayYmd)
+      if (error) throw error
+      if (result === 'error') throw new Error('toggle failed')
+      await loadPageData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not update log', variant: 'destructive' })
+    } finally {
+      setTogglingHabitId(null)
+    }
   }
 
-  const completedHabitsCount = habits.filter(habit => habit.is_logged_today).length
-  const allHabitsCompleted = completedHabitsCount === habits.length && habits.length > 0
-  const currentDate = new Date()
+  const dayDone = (
+    habit: ClientHabitWithTemplate,
+    dayYmd: string,
+    bundle: HabitSourceData | null
+  ): boolean => {
+    if (isManualLike(habit.template)) {
+      return logsByHabit[habit.id]?.has(dayYmd) ?? false
+    }
+    if (!bundle) return false
+    const d = deriveCompletion(habit, dayYmd, bundle)
+    return Boolean(d?.done)
+  }
 
   if (loading) {
-    return (
-      <div className="fc-glass fc-card">
-        <div className="pb-4 px-6 pt-6">
-          <div className="flex items-center gap-3 fc-text-primary font-semibold">
-            <div className="fc-icon-tile fc-icon-habits">
-              <Flame className="w-5 h-5" />
-            </div>
-            Today's Habits
-          </div>
-        </div>
-        <div className="space-y-4 px-6 pb-6">
-          <div className="animate-pulse space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center space-x-3">
-                <div className="w-4 h-4 rounded bg-[color:var(--fc-glass-border)]"></div>
-                <div className="h-4 rounded w-3/4 bg-[color:var(--fc-glass-border)]"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+    return <div className="rounded-xl border border-[color:var(--fc-glass-border)] p-4 text-sm fc-text-dim">Loading habits…</div>
   }
 
-  return (
-    <div className="fc-card-shell fc-accent-habits relative overflow-hidden">
+  const bundle = sourceBundle
 
-      {/* Celebration overlay */}
-      {showCelebration && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center fc-card-shell px-6 py-6">
-            <div className="p-4 fc-icon-tile fc-icon-habits mx-auto mb-4">
-              <Trophy className="w-10 h-10 fc-text-habits animate-bounce" />
-            </div>
-            <h3 className="text-2xl font-bold fc-text-primary mb-2">
-              Amazing! 🎉
-            </h3>
-            <p className="text-lg fc-text-dim">
-              All habits completed today!
-            </p>
-          </div>
+  return (
+    <div className="relative space-y-4 pb-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="min-w-0 shrink text-lg font-semibold fc-text-primary">My Habits</h2>
+        <Button
+          type="button"
+          className="fc-btn fc-btn-primary h-10 shrink-0 gap-1.5 whitespace-nowrap px-3 text-sm sm:px-4"
+          onClick={() => void openPicker()}
+        >
+          <Plus className="h-4 w-4 shrink-0" aria-hidden />
+          Add habit
+        </Button>
+      </div>
+
+      {habits.length === 0 ? (
+        <div className="rounded-xl border border-[color:var(--fc-glass-border)] p-8 text-center">
+          <p className="text-sm fc-text-dim">No habits yet. Tap + to pick from the library.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {habits.map((habit) => {
+            const manual = isManualLike(habit.template)
+            const stub = STUB_SOURCE_TYPES.has(habit.template.source_type)
+            const logSet = logsByHabit[habit.id] ?? new Set<string>()
+            const doneToday = manual ? logSet.has(todayYmd) : bundle ? Boolean(deriveCompletion(habit, todayYmd, bundle)?.done) : false
+            const derivedToday = !manual && bundle ? deriveCompletion(habit, todayYmd, bundle) : null
+            const todayLine = manual ? null : formatTodayAutoLine(habit, derivedToday)
+
+            return (
+              <article
+                key={habit.id}
+                className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-base)]">
+                      <HabitLucideIcon name={habit.template.icon} className="h-5 w-5 fc-text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-semibold fc-text-primary">{habit.template.name}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        {stub ? (
+                          <Badge variant="secondary" className="text-xs">
+                            Auto-tracking activates soon
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {habit.template.description ? (
+                        <p className="mt-2 text-sm fc-text-dim">{habit.template.description}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="fc-btn fc-btn-secondary h-8 w-8 p-0"
+                      onClick={() => openEdit(habit)}
+                      aria-label={`Edit ${habit.template.name}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="fc-btn fc-btn-secondary h-8 w-8 p-0"
+                      onClick={() => void removeHabit(habit)}
+                      aria-label={`Delete ${habit.template.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    {weekDays.map((day) => {
+                      const isToday = day === todayYmd
+                      const done = isManualLike(habit.template)
+                        ? logSet.has(day)
+                        : bundle
+                          ? dayDone(habit, day, bundle)
+                          : false
+                      const inPast = day < todayYmd
+                      const inFuture = day > todayYmd
+                      return (
+                        <div
+                          key={`${habit.id}-${day}`}
+                          className={cn(
+                            'relative flex h-8 w-8 items-center justify-center rounded-full border text-xs',
+                            done
+                              ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                              : 'border-[color:var(--fc-glass-border)] fc-text-dim',
+                            isToday && 'ring-2 ring-[color:var(--fc-accent-cyan)]'
+                          )}
+                          title={day}
+                        >
+                          {done ? (
+                            <Check className="h-4 w-4" />
+                          ) : inPast ? (
+                            <X className="h-3 w-3 opacity-40" />
+                          ) : inFuture ? (
+                            <Circle className="h-3 w-3 opacity-40" />
+                          ) : (
+                            <Circle className="h-3 w-3 opacity-40" />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {manual ? (
+                  <Button
+                    type="button"
+                    className={cn(
+                      'mt-4 h-11 w-full',
+                      doneToday ? 'fc-btn fc-btn-secondary' : 'fc-btn fc-btn-primary'
+                    )}
+                    onClick={() => void onToggleManual(habit)}
+                    disabled={togglingHabitId === habit.id}
+                  >
+                    {doneToday ? 'Logged ✓' : `Log ${habit.template.name}`}
+                  </Button>
+                ) : todayLine ? (
+                  <p className="mt-4 text-sm fc-text-dim">{todayLine}</p>
+                ) : null}
+              </article>
+            )
+          })}
         </div>
       )}
 
-      <div className="pb-4 relative z-10 px-4 sm:px-6 pt-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 fc-text-primary">
-            <div className="fc-icon-tile fc-icon-habits">
-              <Flame className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="fc-pill fc-pill-glass fc-text-habits">Habits</span>
-              <h2 className="text-lg sm:text-xl font-bold mt-2">
-                Daily Habits
-              </h2>
-              <p className="text-sm fc-text-dim">{formatDate(currentDate)}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="fc-pill fc-pill-glass fc-text-habits px-3 py-1">
-              {completedHabitsCount}/{habits.length}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode(viewMode === 'compact' ? 'detailed' : 'compact')}
-              className="text-xs fc-btn fc-btn-ghost"
-            >
-              {viewMode === 'compact' ? 'Detailed' : 'Compact'}
-              <Eye className="w-3 h-3 ml-1" />
-            </Button>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-4 sm:p-6 relative z-10">
-        {habits.length > 0 ? (
-          <div className="space-y-6">
-            {/* Progress Summary */}
-            <div className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)]">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="fc-icon-tile fc-icon-habits">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold fc-text-primary">Today's Progress</h3>
-                    <p className="text-sm fc-text-dim">Keep building those healthy habits!</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-2xl font-bold ${getCompletionRateColor(completedHabitsCount * 100 / habits.length)}`}>
-                    {Math.round((completedHabitsCount / habits.length) * 100)}%
-                  </div>
-                  <p className="text-sm fc-text-dim">
-                    {completedHabitsCount} of {habits.length} completed
-                  </p>
+      <Dialog
+        open={pickerOpen}
+        onOpenChange={(o) => {
+          setPickerOpen(o)
+          if (!o) {
+            setPickerView('library')
+            setConfigureTemplate(null)
+          }
+        }}
+      >
+        <DialogContent layout="unstyled" showCloseButton className={habitDialogSurfaceClass}>
+          {pickerView === 'library' ? (
+            <>
+              <DialogHeader className="shrink-0 space-y-1 border-b border-[color:var(--fc-glass-border)] px-4 pb-3 pt-4 pr-12 text-left sm:px-6 sm:pr-14 sm:pt-6">
+                <DialogTitle>Habit library</DialogTitle>
+                <DialogDescription>Pick a habit to track. Auto-tracked habits sync from your logs when available.</DialogDescription>
+              </DialogHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-6">
+                {templatesLoading ? (
+                  <p className="py-8 text-center text-sm fc-text-dim">Loading library…</p>
+                ) : null}
+                {!templatesLoading &&
+                  CATEGORY_ORDER.map((cat) => {
+                  const list = groupedPicker.get(cat)
+                  if (!list?.length) return null
+                  return (
+                    <section key={cat} className="mb-6">
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide fc-text-dim">
+                        {CATEGORY_LABEL[cat]}
+                      </h4>
+                      <div className="space-y-2">
+                        {list.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            disabled={savingHabit}
+                            onClick={() => void onSelectTemplate(t)}
+                            className="flex w-full items-start gap-3 rounded-xl border border-[color:var(--fc-glass-border)] p-3 text-left transition hover:bg-[color:var(--fc-glass-soft)]"
+                          >
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]">
+                              <HabitLucideIcon name={t.icon} className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium fc-text-primary">{t.name}</span>
+                                {t.source_type !== 'manual' ? (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Auto-tracked
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              {t.description ? (
+                                <p className="mt-1 text-xs fc-text-dim">{t.description}</p>
+                              ) : null}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })}
+                {!templatesLoading && pickableTemplates.length === 0 ? (
+                  <p className="py-6 text-center text-sm fc-text-dim">You already added every habit from the library.</p>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader className="shrink-0 space-y-1 border-b border-[color:var(--fc-glass-border)] px-4 pb-3 pt-2 pr-12 text-left sm:px-6 sm:pr-14 sm:pt-6 md:pt-4">
+                <DialogTitle>{configureTemplate?.name}</DialogTitle>
+                <DialogDescription>{configureTemplate?.description ?? 'Set your targets.'}</DialogDescription>
+              </DialogHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-6">
+                <div className="space-y-3">
+                  {configureTemplate?.user_configurable_keys.map((key) => (
+                    <div key={key}>
+                      <label className="mb-1 block text-sm capitalize fc-text-primary">{key.replace(/_/g, ' ')}</label>
+                      <Input
+                        type={inputModeForKey(key)}
+                        inputMode={key === 'bedtime' ? 'text' : 'decimal'}
+                        value={configureForm[key] ?? ''}
+                        onChange={(e) =>
+                          setConfigureForm((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        placeholder={key === 'bedtime' ? '23:00' : ''}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="fc-text-dim">Progress to Perfect Day</span>
-                  <span className={`font-medium ${getCompletionRateColor(completedHabitsCount * 100 / habits.length)}`}>
-                    {completedHabitsCount}/{habits.length} habits
-                  </span>
-                </div>
-                <div className="fc-progress-track">
-                  <div 
-                    className="fc-progress-fill"
-                    style={{ width: `${(completedHabitsCount / habits.length) * 100}%` }}
-                  />
-                </div>
-                <p className={`text-sm font-medium ${getCompletionRateColor(completedHabitsCount * 100 / habits.length)} mt-2`}>
-                  {getMotivationalMessage(completedHabitsCount, habits.length)}
-                </p>
-              </div>
-            </div>
-
-            {/* Habits List */}
-            <div className="space-y-3">
-              {habits.map((habit) => {
-                const Icon = getHabitIcon(habit.icon || 'target')
-                const habitColors = getHabitColor(habit.color || 'blue')
-                const isExpanded = expandedHabit === habit.id
-                const isCompleted = habit.is_logged_today
-                const isOptimistic = optimisticUpdates.has(habit.id)
-                
-                return (
-                  <div 
-                    key={habit.id}
-                    className={`fc-list-row p-4 group ${habitColors.border} ${isCompleted ? 'fc-completed' : ''}`}
+              <div className="shrink-0 space-y-2 border-t border-[color:var(--fc-glass-border)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    className="fc-btn fc-btn-primary flex-1"
+                    disabled={savingHabit}
+                    onClick={() => void saveConfigure()}
                   >
-                    <div className="flex items-start gap-4">
-                      {/* Habit Icon */}
-                      <div className={`p-3 rounded-xl ${habitColors.bg} group-hover:scale-110 transition-transform duration-300`}>
-                        <Icon className={`w-5 h-5 ${habitColors.text}`} />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className={`font-bold text-sm sm:text-base ${isCompleted ? 'line-through fc-text-subtle' : 'fc-text-primary'}`}>
-                                {habit.habit_name}
-                              </h3>
-                              {isCompleted && (
-                                <CheckCircle className="w-4 h-4 fc-text-success" />
-                              )}
-                            </div>
-                            {habit.habit_description && (
-                              <p className="text-xs fc-text-dim mb-2">
-                                {habit.habit_description}
-                              </p>
-                            )}
-                          </div>
-                          
-                          <div className="flex items-center gap-2 ml-2">
-                            <span className={`fc-pill fc-pill-glass text-xs ${getStreakBadgeColor(habit.streak_days)}`}>
-                              <Flame className="w-3 h-3 mr-1" />
-                              {habit.streak_days}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setExpandedHabit(isExpanded ? null : habit.id)}
-                              className="text-xs p-1 h-6 w-6 fc-btn fc-btn-ghost"
-                            >
-                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3 text-xs fc-text-subtle">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{habit.frequency_type}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className="w-3 h-3" />
-                              <span className={getCompletionRateColor(habit.completion_rate)}>
-                                {habit.completion_rate}% this week
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id={`habit-${habit.id}`}
-                              checked={isCompleted}
-                              onCheckedChange={() => handleHabitToggle(habit.id)}
-                              disabled={isOptimistic}
-                              className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                            />
-                            <label
-                              htmlFor={`habit-${habit.id}`}
-                              className={`text-sm font-medium cursor-pointer ${
-                                isCompleted ? 'fc-text-success' : 'fc-text-primary'
-                              }`}
-                            >
-                              {isCompleted ? 'Completed' : 'Mark Complete'}
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Expanded details */}
-                        {isExpanded && (
-                          <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="fc-text-subtle">Target Days</span>
-                                <span className="font-medium fc-text-primary">{habit.target_days} per week</span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="fc-text-subtle">Started</span>
-                                <span className="font-medium fc-text-primary">
-                                  {new Date(habit.start_date).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="fc-text-subtle">Current Streak</span>
-                                <span className={`font-medium ${getCompletionRateColor(habit.streak_days * 10)}`}>
-                                  {habit.streak_days} days
-                                </span>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full mt-2 rounded-xl text-xs fc-btn fc-btn-secondary"
-                              >
-                                View History
-                                <ArrowRight className="w-3 h-3 ml-1" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Completion Summary */}
-            <div className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="fc-icon-tile fc-icon-habits">
-                    {allHabitsCompleted ? (
-                      <Trophy className="w-5 h-5 fc-text-habits" />
-                    ) : (
-                      <Target className="w-5 h-5 fc-text-habits" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold fc-text-primary">
-                      {allHabitsCompleted ? 'Perfect Day! 🎉' : 'Keep Going! 💪'}
-                    </h3>
-                    <p className="text-sm fc-text-dim">
-                      {completedHabitsCount}/{habits.length} habits completed today
-                    </p>
-                  </div>
+                    {savingHabit ? 'Saving…' : 'Save habit'}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="fc-btn fc-btn-secondary"
+                    disabled={savingHabit}
+                    onClick={() => {
+                      setPickerView('library')
+                      setConfigureTemplate(null)
+                    }}
+                  >
+                    Back
+                  </Button>
                 </div>
-                
-                {allHabitsCompleted && (
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 fc-text-success">
-                      <Sparkles className="w-5 h-5" />
-                      <span className="font-bold">Amazing!</span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editHabit)} onOpenChange={(o) => !o && setEditHabit(null)}>
+        <DialogContent layout="unstyled" className={habitDialogSurfaceClass}>
+          <DialogHeader className="shrink-0 space-y-1 border-b border-[color:var(--fc-glass-border)] px-4 pb-3 pt-4 pr-12 text-left sm:px-6 sm:pr-14 sm:pt-6">
+            <DialogTitle>Edit habit</DialogTitle>
+            <DialogDescription>
+              <span className="font-medium fc-text-primary">{editHabit?.template.name}</span>
+              <span className="fc-text-dim"> — template cannot be changed.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-6">
+            {editHabit && editHabit.template.user_configurable_keys.length === 0 ? (
+              <p className="text-sm fc-text-dim">This habit has no numeric settings to edit.</p>
+            ) : (
+              <div className="space-y-3">
+                {editHabit?.template.user_configurable_keys.map((key) => (
+                  <div key={key}>
+                    <label className="mb-1 block text-sm capitalize fc-text-primary">{key.replace(/_/g, ' ')}</label>
+                    <Input
+                      type={inputModeForKey(key)}
+                      inputMode={key === 'bedtime' ? 'text' : 'decimal'}
+                      value={editForm[key] ?? ''}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="p-6 fc-icon-tile fc-icon-habits rounded-2xl w-fit mx-auto mb-6">
-              <Target className="w-12 h-12 fc-text-habits" />
-            </div>
-            <h3 className="text-xl font-bold fc-text-primary mb-2">
-              No habits assigned yet
-            </h3>
-            <p className="text-sm fc-text-dim mb-4">
-              Your coach will assign habits for you to track. Check back soon!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button className="fc-btn fc-btn-primary fc-press rounded-xl">
-                <Plus className="w-4 h-4 mr-2" />
-                Request Habits
+          <div className="shrink-0 space-y-2 border-t border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-base)] px-4 py-3 sm:px-6">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                className="fc-btn fc-btn-primary flex-1"
+                disabled={editSaving || !editHabit || editHabit.template.user_configurable_keys.length === 0}
+                onClick={() => void saveEdit()}
+              >
+                {editSaving ? 'Saving…' : 'Save changes'}
               </Button>
-              <Button variant="outline" className="rounded-xl fc-btn fc-btn-secondary">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+              <Button type="button" className="fc-btn fc-btn-secondary" onClick={() => setEditHabit(null)}>
+                Cancel
               </Button>
             </div>
+            {editHabit ? (
+              <Button
+                type="button"
+                className="fc-btn fc-btn-secondary w-full text-red-300"
+                onClick={() => void removeHabit(editHabit)}
+              >
+                Delete habit
+              </Button>
+            ) : null}
           </div>
-        )}
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

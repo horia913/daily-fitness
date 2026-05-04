@@ -988,15 +988,20 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
             </Card>
           )}
 
-          {/* Floating Action Button */}
-          <div className="fixed bottom-6 right-6 z-50">
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="fc-btn fc-btn-primary w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 hover:scale-110"
-            >
-              <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
-            </Button>
-          </div>
+          {/*
+            Phase 0b 6-FAB extension — workout templates FAB migration.
+            Spec ref: design-system-v4 §6.21. Was: wrapper fixed bottom-6 right-6;
+            Button fc-btn fc-btn-primary + responsive sizes + scale hover.
+            Header create CTA unchanged (Phase 1+). Now: fab-action, no wrapper.
+          */}
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(true)}
+            className="fab-action"
+            aria-label="Create workout template"
+          >
+            <Plus />
+          </button>
 
           {/* Modals */}
           <WorkoutTemplateForm

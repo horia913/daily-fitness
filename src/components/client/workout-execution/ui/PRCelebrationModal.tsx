@@ -7,6 +7,8 @@ import {
   fireCelebrationConfettiBurst,
   PR_CELEBRATION_CONFETTI_COLORS,
 } from "@/lib/celebrationConfetti";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export interface PRDetectedPayload {
   type: "weight" | "reps";
@@ -221,17 +223,25 @@ function PRCelebrationContent({
 
               {showImprovement && pillText && (
                 <div className="flex justify-center mb-3">
-                  <span className="inline-flex rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-3 py-1 text-sm font-semibold">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-400",
+                    )}
+                  >
                     {pillText}
-                  </span>
+                  </Badge>
                 </div>
               )}
 
               {showFirstPr && (
                 <div className="flex justify-center mb-3">
-                  <span className="inline-flex rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-3 py-1 text-sm font-semibold">
+                  <Badge
+                    variant="outline"
+                    className="inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-400"
+                  >
                     First PR on this lift!
-                  </span>
+                  </Badge>
                 </div>
               )}
 

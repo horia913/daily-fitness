@@ -1,52 +1,66 @@
 "use client";
 
-import React, { useState } from "react";
-import { Calculator } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { PlateCalculatorInline } from "./PlateCalculatorInline";
+import React from "react";
+import { cn } from "@/lib/utils";
 
-interface LargeInputProps {
-  label?: string;
-  /** Shown under the field (e.g. full rep range when default is lower bound). */
-  hint?: string;
-  value: string;
-  onChange: (value: string) => void;
+export interface LargeInputProps {
+  label: string;
+  unit?: string;
+  value: string | number;
+  onChange?: (value: string) => void;
+  onIncrement?: () => void;
+  onDecrement?: () => void;
+  disabled?: boolean;
+  /** `decimal` → text input + decimal keypad (no native number spinners). */
+  inputType?: "number" | "decimal";
+  /** Native-style mode when not using `inputType`. */
   type?: "text" | "number";
+  hint?: string;
+  showStepper?: boolean;
+  className?: string;
   placeholder?: string;
   step?: string;
+  stepAmount?: number;
   min?: string;
   max?: string;
-  unit?: string;
   autoFocus?: boolean;
-  disabled?: boolean;
-  className?: string;
-  showStepper?: boolean;
-  stepAmount?: number;
-  plateCalculatorEnabled?: boolean;
-  barKg?: number;
+  /** Tighter chrome for narrow modals (e.g. gym console log set). */
+  density?: "default" | "compact";
+}
+
+function resolveInputType(
+  type: LargeInputProps["type"],
+  inputType: LargeInputProps["inputType"],
+): "text" | "number" {
+  if (inputType === "number") return "number";
+  if (inputType === "decimal") return "text";
+  return type ?? "number";
 }
 
 export function LargeInput({
   label,
-  hint,
+  unit,
   value,
   onChange,
+  onIncrement,
+  onDecrement,
+  disabled = false,
+  inputType,
   type = "number",
+  hint,
+  showStepper = true,
+  className = "",
   placeholder = "0",
   step = "0.5",
+  stepAmount,
   min,
   max,
-  unit,
   autoFocus = false,
-  disabled = false,
-  className = "",
-  showStepper = false,
-  stepAmount,
-  plateCalculatorEnabled = false,
-  barKg = 20,
+  density = "default",
 }: LargeInputProps) {
-  const [plateOpen, setPlateOpen] = useState(false);
+  const stringValue =
+    value === null || value === undefined ? "" : String(value);
+  const resolvedType = resolveInputType(type, inputType);
   const parsedMin = min !== undefined ? parseFloat(min) : undefined;
   const parsedMax = max !== undefined ? parseFloat(max) : undefined;
   const numericStep =
@@ -56,9 +70,20 @@ export function LargeInput({
     : 0;
   const formatValue = (next: number) =>
     decimals > 0 ? next.toFixed(decimals) : String(Math.round(next));
+
+  const emitChange = onChange ?? (() => {});
+
   const handleStep = (direction: 1 | -1) => {
     if (disabled) return;
-    const current = value === "" ? 0 : parseFloat(value);
+    if (direction === 1 && onIncrement) {
+      onIncrement();
+      return;
+    }
+    if (direction === -1 && onDecrement) {
+      onDecrement();
+      return;
+    }
+    const current = stringValue === "" ? 0 : parseFloat(stringValue);
     const safeCurrent = Number.isFinite(current) ? current : 0;
     const delta = Number.isFinite(numericStep) ? numericStep : 1;
     let next = safeCurrent + delta * direction;
@@ -68,89 +93,128 @@ export function LargeInput({
     if (Number.isFinite(parsedMax)) {
       next = Math.min(parsedMax as number, next);
     }
-    onChange(formatValue(next));
+    emitChange(formatValue(next));
   };
-  const numericValue = parseFloat(value);
-  const effectiveWeight = Number.isFinite(numericValue) ? numericValue : 0;
+
+  const hasLabel = Boolean(label?.trim());
+  const showTopRow = hasLabel || Boolean(unit);
+
+  const showRightColumn =
+    showStepper || Boolean(onIncrement) || Boolean(onDecrement);
+
+  const incrementDisabled = disabled || (!showStepper && !onIncrement);
+  const decrementDisabled = disabled || (!showStepper && !onDecrement);
+
+  const isCompact = density === "compact";
+  const padX = isCompact ? "px-3" : "px-[14px]";
+  const padY = isCompact ? "py-2.5" : "py-[12px]";
+  const numClass = isCompact
+    ? "text-[26px] font-bold leading-none tracking-[-0.02em]"
+    : "text-[30px] font-bold leading-none tracking-[-0.02em]";
+  const stepperCol = isCompact ? "w-6" : "w-[26px]";
+  /* fc-logset-step-btn: excluded from mobile.css 44×44 min touch rule so column width matches */
+  const stepBtn = isCompact
+    ? "fc-logset-step-btn box-border grid h-[18px] w-6 min-h-0 min-w-0 max-h-[18px] max-w-6 shrink-0 place-items-center rounded-[6px] border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] text-[12px] font-semibold leading-none text-[var(--fc-text-primary,#fff)] transition hover:bg-[rgba(255,255,255,0.10)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation p-0"
+    : "fc-logset-step-btn box-border grid h-[20px] w-[26px] min-h-0 min-w-0 max-h-[20px] max-w-[26px] shrink-0 place-items-center rounded-[6px] border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] text-[13px] font-semibold leading-none text-[var(--fc-text-primary,#fff)] transition hover:bg-[rgba(255,255,255,0.10)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation p-0";
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {label ? (
-        <Label className="text-xs font-medium uppercase tracking-wider text-gray-400">
-          {label}
-          {unit && (
-            <span className="ml-1 font-normal normal-case text-gray-500">({unit})</span>
+    <div className={cn("w-full min-w-0", className)}>
+      <div
+        className={cn(
+          "box-border w-full min-w-0 overflow-hidden rounded-[14px] border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] transition-colors",
+          padX,
+          padY,
+          "focus-within:border-[rgba(197,255,74,0.40)] focus-within:bg-[rgba(255,255,255,0.06)]",
+          disabled && "pointer-events-none opacity-50",
+        )}
+      >
+        {showTopRow ? (
+          <div
+            className={cn(
+              "mb-[6px] flex min-w-0 items-center justify-between gap-x-2",
+              "text-[9.5px] font-bold uppercase tracking-[0.10em] text-[var(--fc-text-tertiary,#a1a1aa)]",
+            )}
+          >
+            <span className="min-w-0 shrink-0 whitespace-nowrap text-left">
+              {hasLabel ? label.trim() : "\u00a0"}
+            </span>
+            {unit ? (
+              <span className="shrink-0 font-medium normal-case tracking-normal text-[var(--fc-text-quaternary,#71717a)]">
+                {unit}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div
+          className={cn(
+            "grid w-full min-w-0 items-center",
+            isCompact ? "grid-cols-[minmax(0,1fr)_auto] gap-2" : "grid-cols-[minmax(0,1fr)_auto] gap-[6px]",
           )}
-        </Label>
-      ) : null}
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Input
-            type={type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            step={step}
-            min={min}
-            max={max}
-            autoFocus={autoFocus}
-            disabled={disabled}
-            className="min-h-[64px] border p-3 text-center text-3xl font-bold font-mono rounded-xl fc-text-primary w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-0 focus-visible:border-cyan-500/60"
-            style={{
-              background: "var(--fc-surface-sunken)",
-              border: "1px solid var(--fc-surface-card-border)",
-            }}
-          />
-          {plateCalculatorEnabled ? (
-            <button
-              type="button"
-              onClick={() => setPlateOpen((v) => !v)}
-              className="absolute right-2 top-2 rounded-md p-1.5 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              aria-label="Toggle plate calculator"
-              title="Plate calculator"
+        >
+          <div
+            className={cn(
+              "min-w-0 overflow-hidden font-[family-name:var(--f-display,var(--font-display,var(--font-number,ui-sans-serif)))]",
+              numClass,
+              "text-[var(--fc-text-primary,#fff)] tabular-nums",
+            )}
+          >
+            <input
+              type={
+                resolvedType === "number" || inputType === "decimal"
+                  ? "text"
+                  : resolvedType
+              }
+              inputMode={
+                resolvedType === "number" || inputType === "decimal"
+                  ? "decimal"
+                  : undefined
+              }
+              value={stringValue}
+              onChange={(e) => emitChange(e.target.value)}
+              placeholder={placeholder}
+              autoFocus={autoFocus}
+              disabled={disabled}
+              aria-label={label.trim() || "Value"}
+              title={hint ? String(hint) : undefined}
+              readOnly={!onChange}
+              className={cn(
+                "fc-logset-num w-full min-w-0 border-0 bg-transparent p-0",
+                numClass,
+                "text-inherit outline-none",
+                "placeholder:text-zinc-500",
+                !onChange && "cursor-default",
+              )}
+            />
+          </div>
+          {showRightColumn ? (
+            <div
+              className={cn(
+                "flex shrink-0 flex-col justify-center gap-[3px] justify-self-end",
+                stepperCol,
+              )}
             >
-              <Calculator
-                className={`h-[14px] w-[14px] ${plateOpen ? "text-cyan-300" : "text-gray-400"}`}
-              />
-            </button>
+              <button
+                type="button"
+                onClick={() => handleStep(1)}
+                disabled={incrementDisabled}
+                aria-label={`${label.trim() || "Value"} increase`}
+                className={stepBtn}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStep(-1)}
+                disabled={decrementDisabled}
+                aria-label={`${label.trim() || "Value"} decrease`}
+                className={stepBtn}
+              >
+                −
+              </button>
+            </div>
           ) : null}
         </div>
-        {plateCalculatorEnabled && plateOpen ? (
-          <PlateCalculatorInline weightKg={effectiveWeight} barKg={barKg} />
-        ) : null}
-        {hint ? (
-          <p className="text-center text-xs text-gray-500">{hint}</p>
-        ) : null}
-        {showStepper && (
-          <div className="flex items-center justify-center gap-3">
-            <button
-              type="button"
-              className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
-              style={{
-                background: "var(--fc-surface-sunken)",
-                border: "1px solid var(--fc-surface-card-border)",
-              }}
-              onClick={() => handleStep(-1)}
-              disabled={disabled}
-              aria-label={`${label || "Value"} decrease`}
-            >
-              –
-            </button>
-            <button
-              type="button"
-              className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
-              style={{
-                background: "var(--fc-surface-sunken)",
-                border: "1px solid var(--fc-surface-card-border)",
-              }}
-              onClick={() => handleStep(1)}
-              disabled={disabled}
-              aria-label={`${label || "Value"} increase`}
-            >
-              +
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

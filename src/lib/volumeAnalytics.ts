@@ -1,4 +1,11 @@
 import { supabase } from "./supabase";
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+  normalizeClientTimezone,
+  zonedCalendarDateString,
+  zonedDayInclusiveUtcBounds,
+} from "@/lib/clientZonedCalendar";
 
 export interface WeeklyVolume {
   weekStart: string; // Monday of that week (ISO date string)
@@ -24,16 +31,6 @@ export interface VolumeByWorkout {
   totalVolume: number;
   sets: number;
   duration: number | null;
-}
-
-/**
- * Get the Monday (start of ISO week) for a given date
- */
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-  return new Date(d.setDate(diff));
 }
 
 /**
@@ -116,25 +113,33 @@ export function calculateSetVolume(setLog: any): number {
 }
 
 /**
- * Get weekly volume data for the specified number of weeks
+ * Get weekly volume data for the specified number of weeks (week buckets = Mon–Sun in `clientTimezone`, same basis as coach summary).
  */
 export async function getWeeklyVolume(
   clientId: string,
-  weeks: number = 12
+  weeks: number = 12,
+  clientTimezone: string
 ): Promise<VolumeStats> {
   try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - weeks * 7);
+    const tzRaw = typeof clientTimezone === "string" ? clientTimezone.trim() : "";
+    if (!tzRaw) {
+      throw new Error("getWeeklyVolume: clientTimezone is required");
+    }
+    const tz = normalizeClientTimezone(tzRaw);
+    const now = new Date();
+    const todayYmd = zonedCalendarDateString(now, tz);
+    const currentMonday = mondayYmdOfZonedWeekContaining(now, tz);
+    const oldestMonday = addCalendarDaysYmd(currentMonday, -(weeks - 1) * 7);
+    const rangeStartIso = zonedDayInclusiveUtcBounds(oldestMonday, tz).startIso;
+    const rangeEndIso = zonedDayInclusiveUtcBounds(todayYmd, tz).endIso;
 
-    // Get all workout logs in date range
     const { data: workoutLogs, error: logsError } = await supabase
       .from("workout_logs")
       .select("id, completed_at")
       .eq("client_id", clientId)
       .not("completed_at", "is", null)
-      .gte("completed_at", startDate.toISOString())
-      .lte("completed_at", endDate.toISOString())
+      .gte("completed_at", rangeStartIso)
+      .lte("completed_at", rangeEndIso)
       .order("completed_at", { ascending: true });
 
     if (logsError) throw logsError;
@@ -186,13 +191,8 @@ export async function getWeeklyVolume(
     const weekMap = new Map<string, WeeklyVolume>();
     const workoutWeekMap = new Map<string, Set<string>>(); // week -> set of workout_log_ids
 
-    // Initialize weeks
-    const now = new Date();
     for (let i = weeks - 1; i >= 0; i--) {
-      const weekDate = new Date(now);
-      weekDate.setDate(weekDate.getDate() - i * 7);
-      const weekStart = getWeekStart(weekDate);
-      const weekKey = weekStart.toISOString().split("T")[0];
+      const weekKey = addCalendarDaysYmd(currentMonday, -(weeks - 1 - i) * 7);
       weekMap.set(weekKey, {
         weekStart: weekKey,
         totalVolume: 0,
@@ -204,14 +204,11 @@ export async function getWeeklyVolume(
       workoutWeekMap.set(weekKey, new Set());
     }
 
-    // Process set logs
     setLogs?.forEach((setLog) => {
       const completedAt = new Date(setLog.completed_at);
-      const weekStart = getWeekStart(completedAt);
-      const weekKey = weekStart.toISOString().split("T")[0];
+      const weekKey = mondayYmdOfZonedWeekContaining(completedAt, tz);
 
       if (!weekMap.has(weekKey)) {
-        // Week outside our range, skip
         return;
       }
 

@@ -1,3 +1,4 @@
+import { fetchApi } from "@/lib/apiClient";
 // Helper functions for sending notifications throughout the app
 // These call the API route to send notifications securely
 
@@ -14,7 +15,7 @@ interface SendNotificationParams {
 
 export async function sendNotification(params: SendNotificationParams) {
   try {
-    const response = await fetch('/api/notifications/send', {
+    const response = await fetchApi('/api/notifications/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

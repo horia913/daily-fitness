@@ -3,11 +3,41 @@
 import React from "react";
 import { Lightbulb, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 import type { ProgressionSuggestion } from "@/lib/clientProgressionService";
 import {
+  clientEffortLabelFromStoredRpe,
   formatEffortSuffix,
   formatEffortSuffixFromAverage,
+  rpeToEffortTier,
+  type EffortTier,
 } from "@/lib/workoutEffortLabels";
+
+const TIER_PILL_CLASS: Record<EffortTier, string> = {
+  easy: "text-[color:var(--fc-effort-easy)] bg-[color:var(--fc-effort-easy-soft)] border-[color:var(--fc-effort-easy-border)]",
+  medium:
+    "text-[color:var(--fc-effort-medium)] bg-[color:var(--fc-effort-medium-soft)] border-[color:var(--fc-effort-medium-border)]",
+  hard: "text-[color:var(--fc-effort-hard)] bg-[color:var(--fc-effort-hard-soft)] border-[color:var(--fc-effort-hard-border)]",
+  max: "text-[color:var(--fc-effort-max)] bg-[color:var(--fc-effort-max-soft)] border-[color:var(--fc-effort-max-border)]",
+};
+
+/** Inline effort pill for "Last time: …kg × …reps [Hard]" rows. */
+function EffortInlinePill({ rpe }: { rpe: number | null | undefined }) {
+  const tier = rpeToEffortTier(rpe);
+  const label = clientEffortLabelFromStoredRpe(rpe);
+  if (!tier || !label) return null;
+  return (
+    <span
+      className={cn(
+        "ml-1.5 inline-flex items-center rounded-full border py-[2px] px-[7px] text-[12px] font-semibold leading-tight",
+        "font-sans",
+        TIER_PILL_CLASS[tier],
+      )}
+    >
+      {label}
+    </span>
+  );
+}
 
 interface PreviousPerformanceData {
   lastWorkout: {
@@ -73,20 +103,38 @@ function getIconColor(type: ProgressionSuggestion["type"]): string {
   }
 }
 
-/** Build “Last time: …” for PrescriptionCard / nudge logic. Uses setDetails row 1 when aggregate weight/reps are empty. */
-export function formatLastTimeSummary(
-  lastWorkout: {
-    weight?: number | null;
-    reps?: number | null;
-    avgRpe?: number | null;
-    setDetails?: Array<{
-      set_number?: number;
-      weight_kg: number | null;
-      reps_completed: number | null;
-      rpe?: number | null;
-    }> | null;
-  } | null | undefined,
-): string | null {
+type LastWorkoutShape = {
+  weight?: number | null;
+  reps?: number | null;
+  avgRpe?: number | null;
+  setDetails?: Array<{
+    set_number?: number;
+    weight_kg: number | null;
+    reps_completed: number | null;
+    rpe?: number | null;
+  }> | null;
+};
+
+interface LastTimeDisplay {
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+}
+
+function isLastTimeEmpty(d: LastTimeDisplay | null | undefined): boolean {
+  if (!d) return true;
+  const hasW = d.weight != null && d.weight > 0;
+  const hasR = d.reps != null;
+  return !hasW && !hasR;
+}
+
+function formatWeightNumForLastTime(w: number): string {
+  return Number.isInteger(w) ? String(w) : String(w);
+}
+
+function pickLastTimeDisplay(
+  lastWorkout: LastWorkoutShape | null | undefined,
+): LastTimeDisplay | null {
   if (!lastWorkout) return null;
   let weight: number | null | undefined = lastWorkout.weight ?? null;
   let reps: number | null | undefined = lastWorkout.reps ?? null;
@@ -105,57 +153,76 @@ export function formatLastTimeSummary(
     if (reps == null || (typeof reps === "number" && reps <= 0))
       reps = row.reps_completed;
   }
-  const parts: string[] = [];
-  if (weight != null && weight > 0) parts.push(`${weight}kg`);
-  if (reps != null) parts.push(`× ${reps}`);
-  if (parts.length === 0) return null;
-  const base = `Last time: ${parts.join(" ")}`;
-  const effort = formatEffortSuffixFromAverage(lastWorkout.avgRpe);
-  return effort ? `${base}${effort}` : base;
+  const avg =
+    lastWorkout.avgRpe != null && lastWorkout.avgRpe > 0
+      ? Math.round(lastWorkout.avgRpe)
+      : null;
+  const wn =
+    weight != null && weight > 0 ? (typeof weight === "number" ? weight : Number(weight)) : null;
+  const rn = reps != null ? (typeof reps === "number" ? reps : Number(reps)) : null;
+  const d: LastTimeDisplay = {
+    weight: wn != null && Number.isFinite(wn) && wn > 0 ? wn : null,
+    reps: rn != null && Number.isFinite(rn) ? rn : null,
+    rpe: avg,
+  };
+  return isLastTimeEmpty(d) ? null : d;
 }
 
-type LastWorkoutShape = NonNullable<Parameters<typeof formatLastTimeSummary>[0]>;
-
-/**
- * Text for one exercise’s previous log for a specific set_number (e.g. superset round 2).
- * Prefers the matching row in setDetails; otherwise falls back to session aggregate.
- */
-export function formatLastTimeForSetNumber(
+function pickLastTimeDisplayForSet(
   lastWorkout: LastWorkoutShape | null | undefined,
   setNumber: number,
-): string | null {
+): LastTimeDisplay | null {
   if (!lastWorkout || setNumber < 1) return null;
-
   const details = lastWorkout.setDetails;
   if (Array.isArray(details) && details.length > 0) {
     const row = details.find((s) => Number(s.set_number) === setNumber);
     if (row) {
-      const parts: string[] = [];
-      if (row.weight_kg != null && row.weight_kg > 0)
-        parts.push(`${row.weight_kg}kg`);
-      if (row.reps_completed != null) parts.push(`× ${row.reps_completed}`);
-      if (parts.length > 0) {
-        let s = parts.join(" ");
-        const effort = formatEffortSuffix(row.rpe);
-        if (effort) s += effort;
-        return s;
-      }
+      const w =
+        row.weight_kg != null && row.weight_kg > 0 ? row.weight_kg : null;
+      const r =
+        row.reps_completed != null && Number.isFinite(Number(row.reps_completed))
+          ? row.reps_completed
+          : null;
+      const d: LastTimeDisplay = {
+        weight: w,
+        reps: r,
+        rpe: row.rpe != null && row.rpe > 0 ? Math.round(Number(row.rpe)) : null,
+      };
+      if (!isLastTimeEmpty(d)) return d;
     }
   }
-
-  return formatLastTimeSummary(lastWorkout);
+  return pickLastTimeDisplay(lastWorkout);
 }
 
-function buildLastTimeLine(
-  lastWorkout: PreviousPerformanceData["lastWorkout"],
+/** Back-compat: build "Last time: …" string (kept in case external callers import). */
+export function formatLastTimeSummary(
+  lastWorkout: LastWorkoutShape | null | undefined,
 ): string | null {
-  return formatLastTimeSummary(lastWorkout ?? undefined);
+  const d = pickLastTimeDisplay(lastWorkout);
+  if (!d || isLastTimeEmpty(d)) return null;
+  const parts: string[] = [];
+  if (d.weight != null && d.weight > 0)
+    parts.push(`${formatWeightNumForLastTime(d.weight)}kg`);
+  if (d.reps != null) parts.push(`× ${d.reps}`);
+  const text = parts.join(" ");
+  const effort = formatEffortSuffix(d.rpe) ?? formatEffortSuffixFromAverage(d.rpe);
+  return `Last time: ${text}${effort ?? ""}`;
 }
 
-function normalizeLastTimeDisplay(raw: string | null): string | null {
-  if (raw == null || !raw.trim()) return null;
-  if (raw.startsWith("Last time")) return raw;
-  return `Last time: ${raw}`;
+/** Back-compat for set-specific text. */
+export function formatLastTimeForSetNumber(
+  lastWorkout: LastWorkoutShape | null | undefined,
+  setNumber: number,
+): string | null {
+  const d = pickLastTimeDisplayForSet(lastWorkout, setNumber);
+  if (!d || isLastTimeEmpty(d)) return null;
+  const parts: string[] = [];
+  if (d.weight != null && d.weight > 0)
+    parts.push(`${formatWeightNumForLastTime(d.weight)}kg`);
+  if (d.reps != null) parts.push(`× ${d.reps}`);
+  const text = parts.join(" ");
+  const effort = formatEffortSuffix(d.rpe);
+  return effort ? `${text}${effort}` : text;
 }
 
 export function ProgressionNudge({
@@ -167,13 +234,12 @@ export function ProgressionNudge({
   className,
 }: ProgressionNudgeProps) {
   const lw = previousPerformance?.lastWorkout ?? null;
-  const rawLastTime =
+  const lastTimeDisplay: LastTimeDisplay | null =
     showPreviousSession === false
       ? null
       : previousSessionSetNumber != null && previousSessionSetNumber >= 1
-        ? formatLastTimeForSetNumber(lw as LastWorkoutShape, previousSessionSetNumber)
-        : buildLastTimeLine(lw);
-  const lastTimeLine = normalizeLastTimeDisplay(rawLastTime);
+        ? pickLastTimeDisplayForSet(lw as LastWorkoutShape, previousSessionSetNumber)
+        : pickLastTimeDisplay(lw as LastWorkoutShape);
 
   const showSuggestionText = Boolean(
     suggestion &&
@@ -185,9 +251,11 @@ export function ProgressionNudge({
     suggestion?.suggestedWeight != null || suggestion?.suggestedReps != null;
   const showApply = !!onApplySuggestion && hasSuggestedValues;
 
-  if (suggestion?.type === "first_time" && !lastTimeLine) return null;
+  if (suggestion?.type === "first_time" && isLastTimeEmpty(lastTimeDisplay))
+    return null;
 
-  if (!lastTimeLine && !showSuggestionText && !showApply) return null;
+  if (isLastTimeEmpty(lastTimeDisplay) && !showSuggestionText && !showApply)
+    return null;
 
   const colorClasses = getBorderAndBg(suggestion?.type);
   const iconColorClass = getIconColor(suggestion?.type);
@@ -204,17 +272,72 @@ export function ProgressionNudge({
         className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${iconColorClass}`}
       />
       <div className="flex-1 min-w-0 space-y-1">
-        {previousSessionSetNumber != null && lastTimeLine ? (
-          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+        {previousSessionSetNumber != null && lastTimeDisplay ? (
+          <Eyebrow
+            tone="zinc"
+            density="section"
+            className="!text-[10px] !font-medium !text-gray-500"
+          >
             Previous session · Set {previousSessionSetNumber}
-          </p>
+          </Eyebrow>
         ) : null}
-        {lastTimeLine ? (
-          <p className="text-xs text-gray-300 leading-snug">{lastTimeLine}</p>
+        {lastTimeDisplay ? (
+          <p
+            className="leading-snug text-[14px] font-semibold text-[color:var(--fc-text-primary)]"
+            style={{
+              fontFamily:
+                "var(--font-bricolage-grotesque, var(--font-sans), ui-sans-serif)",
+            }}
+          >
+            <span className="font-sans font-normal text-[color:var(--fc-text-dim)]">
+              Last time:{" "}
+            </span>
+            {lastTimeDisplay.weight != null && lastTimeDisplay.weight > 0 ? (
+              <>
+                <span
+                  className="num mx-px text-[18px] font-bold text-[color:var(--fc-text-primary)]"
+                  style={{
+                    fontFamily:
+                      "var(--font-display, var(--font-number, ui-sans-serif))",
+                  }}
+                >
+                  {formatWeightNumForLastTime(lastTimeDisplay.weight)}
+                </span>
+                <span className="font-sans text-[14px] font-medium text-[color:var(--fc-text-quaternary)]">
+                  {" "}
+                  kg
+                </span>
+              </>
+            ) : null}
+            {lastTimeDisplay.reps != null ? (
+              <>
+                {lastTimeDisplay.weight != null && lastTimeDisplay.weight > 0 ? (
+                  <span className="font-sans font-normal text-[color:var(--fc-text-dim)]">
+                    {" "}
+                    ×{" "}
+                  </span>
+                ) : null}
+                <span
+                  className="num mx-px text-[18px] font-bold text-[color:var(--fc-text-primary)]"
+                  style={{
+                    fontFamily:
+                      "var(--font-display, var(--font-number, ui-sans-serif))",
+                  }}
+                >
+                  {String(lastTimeDisplay.reps)}
+                </span>
+                <span className="font-sans text-[14px] font-medium text-[color:var(--fc-text-quaternary)]">
+                  {" "}
+                  reps
+                </span>
+              </>
+            ) : null}
+            <EffortInlinePill rpe={lastTimeDisplay.rpe} />
+          </p>
         ) : null}
         {showSuggestionText ? (
           <p
-            className={`text-xs text-gray-200 leading-snug ${lastTimeLine ? "pt-0.5" : ""}`}
+            className={`text-xs text-gray-200 leading-snug ${lastTimeDisplay ? "pt-0.5" : ""}`}
           >
             {suggestion!.message}
           </p>

@@ -12,6 +12,10 @@ import {
   getProgramScheduleSlotsForAssignment,
   getCompletedSlots,
 } from './programStateService'
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+} from '@/lib/clientZonedCalendar'
 
 const MS_PER_DAY = 86400000
 
@@ -101,26 +105,38 @@ export async function computeWeekCompliance(
     return emptyResult()
   }
 
-  let ianaTimezone: string = (assignment as any).timezone_snapshot ?? ''
-  if (!ianaTimezone && (assignment as any).client_id) {
+  let ianaTimezone = ((assignment as { timezone_snapshot?: string | null }).timezone_snapshot ?? '').trim()
+  const clientId = (assignment as { client_id?: string }).client_id
+  if (!ianaTimezone && clientId) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('timezone')
-      .eq('id', (assignment as any).client_id)
+      .eq('id', clientId)
       .single()
-    ianaTimezone = (profile?.timezone as string) ?? 'UTC'
+    ianaTimezone = ((profile?.timezone as string) ?? '').trim()
   }
-  if (!ianaTimezone) ianaTimezone = 'UTC'
+  if (!ianaTimezone) {
+    throw new Error(
+      '[weekCompliance] Cannot compute week compliance: client timezone missing (timezone_snapshot and profile.timezone empty)',
+    )
+  }
+
+  const startDateRaw = assignment.start_date as string | null | undefined
+  if (!startDateRaw?.trim()) {
+    throw new Error('[weekCompliance] Cannot compute week compliance: assignment start_date missing')
+  }
 
   const [slots, completedSlots] = await Promise.all([
     getProgramScheduleSlotsForAssignment(supabase, assignment.program_id, programAssignmentId),
     getCompletedSlots(supabase, programAssignmentId),
   ])
 
-  const startDate = assignment.start_date
+  const startDate = startDateRaw
   const slotsInWeek = slots.filter((s) => s.week_number === weekNumber)
-  const requiredSlotsInWeek = slotsInWeek.filter((s) => !s.is_optional)
-  const requiredScheduleIds = new Set(requiredSlotsInWeek.map((s) => s.id))
+  const requiredSlotsInWeek = slotsInWeek.filter((s) => !s.is_optional && s.id != null)
+  const requiredScheduleIds = new Set(
+    requiredSlotsInWeek.map((s) => s.id).filter((id): id is string => id != null),
+  )
   const completedInWeek = completedSlots.filter((c) => c.week_number === weekNumber)
   const completedScheduleIds = new Set(completedInWeek.map((c) => c.program_schedule_id))
 
@@ -133,7 +149,7 @@ export async function computeWeekCompliance(
     assigned === 0 ? null : Math.round((completed / assigned) * 100)
   const weekCompleted = assigned > 0 && completed >= assigned
 
-  const weekStartDateStr = toWeekStartDateString(startDate, weekNumber)
+  const weekStartDateStr = toWeekStartDateString(startDate, weekNumber, ianaTimezone)
   const weekStartTs = midnightInTimezone(weekStartDateStr, ianaTimezone)
 
   let weekFinishTs: string | null = null
@@ -191,11 +207,22 @@ export async function computeWeekCompliance(
   }
 }
 
-function toWeekStartDateString(startDate: string | null, weekNumber: number): string {
-  if (!startDate) return new Date().toISOString().slice(0, 10)
-  const d = new Date(startDate + 'T00:00:00.000Z')
-  d.setUTCDate(d.getUTCDate() + (weekNumber - 1) * 7)
-  return d.toISOString().slice(0, 10)
+function toWeekStartDateString(
+  startDate: string | null,
+  weekNumber: number,
+  timezone: string
+): string {
+  const tz = timezone?.trim()
+  if (!tz) throw new Error('[weekCompliance] toWeekStartDateString: timezone required')
+  if (!startDate?.trim()) {
+    throw new Error('[weekCompliance] toWeekStartDateString: start_date required')
+  }
+  const startYmd = startDate.slice(0, 10)
+  const monContainingStart = mondayYmdOfZonedWeekContaining(
+    new Date(`${startYmd}T12:00:00.000Z`),
+    tz
+  )
+  return addCalendarDaysYmd(monContainingStart, (weekNumber - 1) * 7)
 }
 
 function emptyResult(): WeekComplianceResult {
@@ -229,7 +256,7 @@ export async function getCurrentWeekNumber(
     getCompletedSlots(supabase, assignment.id),
   ])
   const completedIds = new Set(completedSlots.map((c) => c.program_schedule_id))
-  const nextSlot = slots.find((s) => !completedIds.has(s.id))
+  const nextSlot = slots.find((s) => s.id != null && !completedIds.has(s.id))
   if (!nextSlot) {
     const last = slots[slots.length - 1]
     return last?.week_number ?? null

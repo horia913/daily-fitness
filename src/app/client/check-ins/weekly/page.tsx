@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 import { WeeklyCheckInFlow } from "@/components/client/weekly-checkin/WeeklyCheckInFlow";
 import { getClientCheckInConfig } from "@/lib/checkInConfigService";
 import { getLatestMeasurement } from "@/lib/measurementService";
@@ -57,7 +59,7 @@ export default function WeeklyCheckInPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg px-4 pb-32">
+          <ClientPageShell className={cn("max-w-lg px-4 pb-32", checkinSuiteStyles.root)}>
             <PageSkeleton variant="form" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -69,7 +71,7 @@ export default function WeeklyCheckInPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg px-4 pb-32">
+        <ClientPageShell className={cn("max-w-lg px-4 pb-32", checkinSuiteStyles.root)}>
           <WeeklyCheckInFlow
             clientId={user.id}
             config={config}

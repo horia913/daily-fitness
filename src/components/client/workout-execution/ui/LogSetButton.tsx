@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface LogSetButtonProps {
@@ -12,7 +13,7 @@ export interface LogSetButtonProps {
 }
 
 /**
- * Primary log CTA: cyan/teal gradient always; dimmer when not ready (no gray).
+ * Primary log CTA — mock log-btn: lime gradient, uppercase 14px tracking 0.06em.
  * Never uses `disabled` — parent should no-op in onClick when not ready.
  */
 export function LogSetButton({
@@ -23,22 +24,19 @@ export function LogSetButton({
   className,
 }: LogSetButtonProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant="btn-action"
       onClick={onClick}
       aria-busy={loading}
       className={cn(
-        "relative w-full overflow-hidden rounded-xl px-4 py-3.5 text-base font-semibold text-white shadow-lg transition-all active:scale-[0.98]",
-        "bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-500 ring-1 ring-cyan-400/30 ring-inset shadow-cyan-500/25",
-        ready && !loading && "active:brightness-110",
-        !ready && !loading && "opacity-50",
+        "w-full",
+        !ready && !loading && "pointer-events-auto opacity-50",
         loading && "opacity-90",
         className,
       )}
     >
-      <span className="relative z-10 uppercase tracking-wide">
-        {loading ? "Saving…" : label}
-      </span>
-    </button>
+      {loading ? "Saving…" : label}
+    </Button>
   );
 }

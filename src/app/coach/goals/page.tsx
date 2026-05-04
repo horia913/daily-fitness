@@ -1,8 +1,13 @@
 'use client'
 
+/**
+ * Phase 0b Task 8: `var(--fc-accent)` → `var(--fc-accent-cyan)` (see `docs/ui-rollout-notes.md`).
+ * Active Clients stat tile: Option A — `var(--fc-accent-secondary, var(--fc-accent-cyan))` only
+ * (inner fallback cyan; outer token reserved for a future v5 definition).
+ */
+
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CoachHabitsLibraryPage } from '@/components/coach/CoachHabitsLibraryPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
@@ -108,8 +113,7 @@ const nutrientOptions = [
 function CoachGoalsContent() {
   const { performanceSettings } = useTheme()
   const { addToast } = useToast()
-  const router = useRouter()
-  
+
   const [goals, setGoals] = useState<Goal[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [exercises, setExercises] = useState<any[]>([])
@@ -476,7 +480,7 @@ function CoachGoalsContent() {
               <GlassCard elevation={2} className="fc-card-shell p-6 md:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)]">
                       <Target className="w-6 h-6" />
                     </div>
                     <div>
@@ -488,36 +492,12 @@ function CoachGoalsContent() {
                       </p>
                     </div>
                   </div>
-                  <div
-                    role="tablist"
-                    aria-label="Goals or Habits"
-                    className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)] w-full md:w-auto shrink-0"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={true}
-                      onClick={() => router.push('/coach/goals', { scroll: false })}
-                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-glass-soft fc-text-primary"
-                    >
-                      Goals
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={false}
-                      onClick={() => router.push('/coach/goals?tab=habits', { scroll: false })}
-                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] fc-text-dim hover:fc-text-primary"
-                    >
-                      Habits
-                    </button>
-                  </div>
                 </div>
               </GlassCard>
 
             <GlassCard className="p-6">
               <div className="flex items-start gap-4">
-                <div className="rounded-xl bg-[color:var(--fc-accent-primary)] p-3 text-white shadow-lg">
+                <div className="rounded-xl bg-[color:var(--fc-accent-cyan)] p-3 text-white shadow-lg">
                   <Zap className="w-6 h-6" />
                 </div>
                 <div className="flex-1">
@@ -571,7 +551,7 @@ function CoachGoalsContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] text-[color:var(--fc-accent-cyan)]">
                     <Target className="w-7 h-7" />
                   </div>
                   <div>
@@ -604,7 +584,7 @@ function CoachGoalsContent() {
               </GlassCard>
               <GlassCard elevation={1} className="p-5">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent-secondary,var(--fc-accent))_18%,transparent)] text-[color:var(--fc-accent-secondary,var(--fc-accent))]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--fc-accent-secondary,var(--fc-accent-cyan))_18%,transparent)] text-[color:var(--fc-accent-secondary,var(--fc-accent-cyan))]">
                     <Users className="w-7 h-7" />
                   </div>
                   <div>
@@ -618,7 +598,7 @@ function CoachGoalsContent() {
             {/* Goals List */}
             <div className="space-y-6">
               <h2 className="text-2xl font-bold fc-text-primary flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] text-[color:var(--fc-accent-cyan)]">
                   <Target className="w-5 h-5" />
                 </div>
                 Client Goals
@@ -641,11 +621,11 @@ function CoachGoalsContent() {
                             <div className="flex items-start justify-between">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent)_18%,transparent)] text-[color:var(--fc-accent)] shrink-0">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--fc-accent-cyan)_18%,transparent)] text-[color:var(--fc-accent-cyan)] shrink-0">
                                     {getMetricIcon(goal.metric_type)}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-bold fc-text-primary truncate group-hover:text-[color:var(--fc-accent)] transition-colors">
+                                    <h3 className="text-lg font-bold fc-text-primary truncate group-hover:text-[color:var(--fc-accent-cyan)] transition-colors">
                                       {goal.title}
                                     </h3>
                                     {goal.client && (
@@ -1056,9 +1036,14 @@ function CoachGoalsContent() {
 
 function GoalsHabitsHubInner() {
   const searchParams = useSearchParams()
-  if (searchParams.get('tab') === 'habits') {
-    return <CoachHabitsLibraryPage />
-  }
+  const router = useRouter()
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'habits') {
+      router.replace('/coach/goals', { scroll: false })
+    }
+  }, [searchParams, router])
+
   return <CoachGoalsContent />
 }
 

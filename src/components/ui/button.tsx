@@ -30,6 +30,11 @@ const buttonVariants = cva(
         "fc-secondary": "fc-btn fc-btn-secondary fc-press h-11",
         "fc-ghost": "fc-btn fc-btn-ghost fc-press",
         "fc-destructive": "fc-btn fc-btn-destructive fc-press",
+        "btn-action":
+          "btn-action rounded-[14px] text-[14px] font-bold px-[15px] py-[15px] tracking-[0.06em] uppercase active:scale-[0.98]",
+        "btn-action-coach":
+          "btn-action-coach rounded-[14px] text-[14px] font-bold px-[15px] py-[15px] tracking-[0.06em] uppercase active:scale-[0.98]",
+        "btn-pill": "btn-pill",
         // New gradient variants
         energy:
           "bg-gradient-to-r from-[#FF6B35] to-[#FF4E50] text-white shadow-md hover:shadow-xl hover:from-[#FF8A5B] hover:to-[#FF6B6B]",

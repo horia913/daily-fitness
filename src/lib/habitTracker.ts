@@ -42,8 +42,6 @@ export interface UserHabit {
   is_active: boolean
   start_date: string
   end_date?: string
-  reminder_time?: string
-  reminder_enabled: boolean
   created_at: string
   updated_at: string
   habit?: Habit
@@ -95,17 +93,6 @@ export interface HabitAnalytics {
   updated_at: string
 }
 
-export interface HabitReminder {
-  id: string
-  user_habit_id: string
-  reminder_time: string
-  days_of_week: number[]
-  is_active: boolean
-  last_sent?: string
-  created_at: string
-  updated_at: string
-}
-
 export class HabitTracker {
   private static readonly FREQUENCY_TYPES = {
     daily: { label: 'Daily', days: 1 },
@@ -133,8 +120,6 @@ export class HabitTracker {
       customDescription?: string
       targetValue?: number
       frequencyType?: 'daily' | 'weekly' | 'monthly'
-      reminderTime?: string
-      reminderEnabled?: boolean
     } = {}
   ): Promise<UserHabit> {
     const userHabit: UserHabit = {
@@ -148,8 +133,6 @@ export class HabitTracker {
       frequency_type: options.frequencyType || 'daily',
       is_active: true,
       start_date: new Date().toISOString().split('T')[0],
-      reminder_time: options.reminderTime,
-      reminder_enabled: options.reminderEnabled || false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
@@ -417,7 +400,7 @@ export class HabitTracker {
     // Recommendations based on performance
     if (stats.completionRate < 50) {
       recommendations.push('Try setting a smaller, more achievable target to build momentum')
-      recommendations.push('Consider adding a reminder to help you remember this habit')
+      recommendations.push('Try anchoring this habit to a consistent time of day')
     } else if (stats.completionRate < 80) {
       recommendations.push('You\'re making good progress! Try to increase consistency by planning ahead')
       recommendations.push('Consider tracking your mood to understand what helps you succeed')

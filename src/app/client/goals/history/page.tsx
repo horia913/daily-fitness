@@ -11,8 +11,11 @@ import {
   ClientPageShell,
   ClientGlassCard,
   SectionHeader,
-  SecondaryButton,
+  IconButton,
+  Eyebrow,
 } from "@/components/client-ui";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { ArrowLeft, Filter } from "lucide-react";
@@ -54,15 +57,13 @@ function categoryLabel(cat: string): string {
   return cat.charAt(0).toUpperCase() + cat.slice(1);
 }
 
-function statusPillClasses(status: string): string {
+function goalStatusBadgeVariant(
+  status: string,
+): "status-info" | "status-success" | "outline" {
   const s = (status || "").toLowerCase();
-  if (s === "active") {
-    return "bg-[color-mix(in_srgb,var(--fc-status-info)_20%,transparent)] text-[color:var(--fc-status-info)] border-[color-mix(in_srgb,var(--fc-status-info)_30%,transparent)]";
-  }
-  if (s === "completed" || s === "complete") {
-    return "bg-[color-mix(in_srgb,var(--fc-status-success)_20%,transparent)] text-[color:var(--fc-status-success)] border-[color-mix(in_srgb,var(--fc-status-success)_30%,transparent)]";
-  }
-  return "bg-[color-mix(in_srgb,var(--fc-text-subtle)_20%,transparent)] fc-text-subtle border-[color:var(--fc-glass-border)]";
+  if (s === "active") return "status-info";
+  if (s === "completed" || s === "complete") return "status-success";
+  return "outline";
 }
 
 function formatStatusLabel(status: string): string {
@@ -131,14 +132,15 @@ export default function GoalHistoryPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
           <div className="flex items-center gap-4 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push("/client/goals")}
-              className="p-2 rounded-xl fc-glass hover:opacity-80 transition-opacity"
+            <IconButton
+              size="md"
+              variant="filled"
+              className="fc-glass hover:opacity-80"
               aria-label="Back to Goals"
+              onClick={() => router.push("/client/goals")}
             >
-              <ArrowLeft className="w-5 h-5 fc-text-primary" />
-            </button>
+              <ArrowLeft className="h-5 w-5 fc-text-primary" />
+            </IconButton>
             <div>
               <h1 className="text-xl font-bold fc-text-primary mb-4">Goal History</h1>
               <p className="text-sm fc-text-dim">All goals across Training, Nutrition, Lifestyle</p>
@@ -182,12 +184,14 @@ export default function GoalHistoryPage() {
             <div className="py-8 px-4 text-center">
               <p className="text-sm fc-text-dim mb-2">No goals found</p>
               <p className="text-sm fc-text-dim mb-6">Create goals from the Goals page to see them here.</p>
-              <SecondaryButton
+              <Button
                 type="button"
+                variant="fc-secondary"
+                className="h-10 w-auto"
                 onClick={() => router.push("/client/goals")}
               >
                 Open Goals
-              </SecondaryButton>
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col">
@@ -225,6 +229,7 @@ export default function GoalHistoryPage() {
                       const currentDisplay =
                         g.current_value != null ? String(g.current_value) : null;
 
+                      const statusVariant = goalStatusBadgeVariant(g.status);
                       return (
                         <ClientGlassCard
                           key={g.id}
@@ -234,11 +239,16 @@ export default function GoalHistoryPage() {
                             <h3 className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight fc-text-primary">
                               {g.title}
                             </h3>
-                            <span
-                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${statusPillClasses(g.status)}`}
+                            <Badge
+                              variant={statusVariant}
+                              className={
+                                statusVariant === "outline"
+                                  ? "shrink-0 border-[color:var(--fc-glass-border)] bg-[color-mix(in_srgb,var(--fc-text-subtle)_20%,transparent)] text-[10px] font-bold uppercase tracking-[0.1em] fc-text-subtle"
+                                  : "shrink-0"
+                              }
                             >
                               {formatStatusLabel(g.status)}
-                            </span>
+                            </Badge>
                           </div>
                           {g.description ? (
                             <p className="mb-2 mt-1 text-sm leading-relaxed fc-text-dim line-clamp-2">
@@ -248,9 +258,14 @@ export default function GoalHistoryPage() {
                           <div
                             className={`flex flex-wrap items-baseline gap-x-1 text-xs fc-text-dim mb-0 ${g.description ? "" : "mt-2"}`}
                           >
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-[color:var(--fc-accent)]">
+                            <Eyebrow
+                              as="span"
+                              tone="cyan"
+                              density="section"
+                              className="!mb-0 !text-[10px] !font-medium"
+                            >
                               {categoryLabel(cat)}
-                            </span>
+                            </Eyebrow>
                             <span className="fc-text-subtle" aria-hidden>
                               ·
                             </span>
@@ -291,7 +306,7 @@ export default function GoalHistoryPage() {
                               </div>
                               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--fc-glass-border)]">
                                 <div
-                                  className="h-full rounded-full bg-[color:var(--fc-accent)]"
+                                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)]"
                                   style={{ width: `${progressPct}%` }}
                                 />
                               </div>

@@ -301,7 +301,7 @@ export default function FoodDetailPage() {
               <Button
                 variant="outline"
                 onClick={() => router.push(`/client/nutrition/foods/create?edit=${food.id}`)}
-                className="w-full h-11 rounded-lg border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)] font-semibold text-sm gap-1.5"
+                className="w-full h-11 rounded-lg border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)] font-semibold text-sm gap-1.5"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 Edit food

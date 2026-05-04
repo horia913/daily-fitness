@@ -247,7 +247,7 @@ export default function CoachClientWorkoutLogDetailPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex p-2 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] fc-glass hover:border-[color:var(--fc-domain-workouts)]/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]"
+          className="inline-flex p-2 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] fc-glass hover:border-[color:var(--fc-domain-workouts)]/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]"
           aria-label="Go back"
         >
           <ArrowLeft className="w-5 h-5 shrink-0" aria-hidden />

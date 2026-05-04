@@ -142,7 +142,7 @@ export default function AddFoodModal({
               onClick={() => setActiveTab("food")}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 activeTab === "food"
-                  ? "fc-text-primary bg-[color:var(--fc-accent)]/20 font-medium"
+                  ? "fc-text-primary bg-[color:var(--fc-accent-cyan)]/20 font-medium"
                   : "fc-text-dim hover:fc-text-primary"
               }`}
             >

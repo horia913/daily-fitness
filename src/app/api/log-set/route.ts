@@ -1021,44 +1021,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 6: Sync strength goals if e1RM was updated (non-blocking)
-    if (shouldCalculateE1RM && primaryExerciseId && e1rmUpdated) {
-      try {
-        const { syncStrengthGoal } = await import('@/lib/goalSyncService')
-        const { data: rawEx } = await supabaseAdmin
-          .from('exercises')
-          .select('id, name')
-          .eq('id', primaryExerciseId)
-          .single()
-        const exercise = rawEx as { id: string; name: string } | null
-
-        if (exercise) {
-          const { data: strengthGoals } = await (supabaseAdmin as any)
-            .from('goals')
-            .select('id, title')
-            .eq('client_id', effectiveClientId)
-            .eq('status', 'active')
-            .or(`title.ilike.%${exercise.name}%,title.ilike.%bench%,title.ilike.%squat%,title.ilike.%deadlift%,title.ilike.%hip thrust%`)
-
-          if (strengthGoals && strengthGoals.length > 0) {
-            for (const goal of strengthGoals) {
-              const goalTitleLower = goal.title.toLowerCase()
-              const exerciseNameLower = exercise.name.toLowerCase()
-              if (
-                goalTitleLower.includes(exerciseNameLower) ||
-                (exerciseNameLower.includes('bench') && goalTitleLower.includes('bench')) ||
-                (exerciseNameLower.includes('squat') && goalTitleLower.includes('squat')) ||
-                (exerciseNameLower.includes('deadlift') && goalTitleLower.includes('deadlift')) ||
-                (exerciseNameLower.includes('hip') && goalTitleLower.includes('hip'))
-              ) {
-                await syncStrengthGoal(goal.id, userId, primaryExerciseId)
-              }
-            }
-          }
-        }
-      } catch (syncError) {
-        console.error('Failed to sync strength goals (non-blocking):', syncError)
-      }
+    // Step 6: Sync goals from goal_source_links (non-blocking, full client sync)
+    try {
+      const { syncGoalsForClient } = await import('@/lib/goalSyncService')
+      await syncGoalsForClient(effectiveClientId)
+    } catch (syncError) {
+      console.error('Failed to sync goals (non-blocking):', syncError)
     }
 
     const anyWeightPR = prResults.some((r) => r.weight_pr)

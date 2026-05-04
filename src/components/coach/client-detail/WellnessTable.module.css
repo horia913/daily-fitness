@@ -1,0 +1,60 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--fc-divider);
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid var(--fc-divider);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 60px;
+  gap: 8px;
+  padding: 9px 10px;
+  align-items: center;
+  font-size: 11px;
+  background: var(--fc-surface-card);
+}
+
+.head {
+  background: var(--fc-glass-soft);
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fc-text-subtle);
+}
+
+.metric {
+  color: var(--fc-text-primary);
+}
+
+.right {
+  text-align: right;
+}
+
+.valDefault {
+  color: var(--fc-text-primary);
+}
+
+.valWarn {
+  color: var(--fc-effort-medium);
+}
+
+.valGood {
+  color: var(--fc-effort-easy);
+}
+
+.trend {
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-subtle);
+}
+
+.dash {
+  color: var(--fc-text-quaternary);
+  font-style: italic;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+}

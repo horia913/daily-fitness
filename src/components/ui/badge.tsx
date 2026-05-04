@@ -21,6 +21,20 @@ const badgeVariants = cva(
         "fc-outline":
           "fc-badge border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)]",
         "fc-filled": "fc-badge bg-[var(--fc-accent-cyan)] text-black",
+        "status-success":
+          "rounded-full border px-[9px] py-1 text-[10px] font-bold tracking-[0.10em] uppercase border-[color:color-mix(in_srgb,var(--fc-status-success)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--fc-status-success)_16%,transparent)] text-[color:var(--fc-status-success)]",
+        "status-warning":
+          "rounded-full border px-[9px] py-1 text-[10px] font-bold tracking-[0.10em] uppercase border-[color:color-mix(in_srgb,var(--fc-status-warning)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--fc-status-warning)_16%,transparent)] text-[color:var(--fc-status-warning)]",
+        "status-error":
+          "rounded-full border px-[9px] py-1 text-[10px] font-bold tracking-[0.10em] uppercase border-[color:color-mix(in_srgb,var(--fc-status-error)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--fc-status-error)_16%,transparent)] text-[color:var(--fc-status-error)]",
+        "status-info":
+          "rounded-full border px-[9px] py-1 text-[10px] font-bold tracking-[0.10em] uppercase border-[color:color-mix(in_srgb,var(--fc-accent-cyan)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--fc-accent-cyan)_16%,transparent)] text-[color:var(--fc-accent-cyan)]",
+        "status-active":
+          "rounded-full border px-[9px] py-1 text-[10px] font-bold tracking-[0.10em] uppercase border-[color:var(--fc-accent-lime)] bg-[color:var(--fc-accent-lime)] text-[#061018]",
+        "status-critical":
+          "rounded-full border px-[9px] py-1 text-[9px] font-bold tracking-[0.10em] uppercase border-[color:color-mix(in_srgb,var(--fc-accent-cyan)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--fc-accent-cyan)_12%,transparent)] text-[color:var(--fc-accent-cyan)]",
+        "status-new":
+          "rounded-full border px-[9px] py-1 text-[9px] font-bold tracking-[0.10em] uppercase border-[color:var(--fc-sev-new-border)] bg-[color:var(--fc-sev-new-soft)] text-[color:var(--fc-sev-new)]",
       },
     },
     defaultVariants: {

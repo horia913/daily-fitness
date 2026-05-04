@@ -16,11 +16,16 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
  * - Cron expression: 0 1 * * * (Every day at 1 AM)
  */
 export async function GET(req: NextRequest) {
-  // Verify cron secret (optional but recommended)
+  // Verify cron secret (required)
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    console.error('[cron][daily-sync] CRON_SECRET not configured. Refusing to run.')
+    return NextResponse.json({ error: 'Cron not configured' }, { status: 500 })
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

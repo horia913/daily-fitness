@@ -159,18 +159,6 @@ This document provides a comprehensive checklist for manually testing coach-side
 - [ ] Save
 - [ ] Verify rest-pause parameters displayed
 
-### Exercise Type: Pyramid Set
-- [ ] Add new exercise block
-- [ ] Select "Pyramid Set"
-- [ ] Select exercise: "Squat"
-- [ ] Add pyramid sets:
-  - [ ] Set 1: 12 reps, 50kg
-  - [ ] Set 2: 10 reps, 60kg
-  - [ ] Set 3: 8 reps, 70kg
-  - [ ] Set 4: 6 reps, 80kg
-- [ ] Save
-- [ ] Verify pyramid progression displayed
-
 ### Exercise Type: Pre-Exhaustion
 - [ ] Add new exercise block
 - [ ] Select "Pre-Exhaustion"
@@ -226,17 +214,6 @@ This document provides a comprehensive checklist for manually testing coach-side
   - [ ] Time cap: 15 minutes
 - [ ] Save
 - [ ] Verify For Time parameters displayed
-
-### Exercise Type: Ladder
-- [ ] Add new exercise block
-- [ ] Select "Ladder"
-- [ ] Select exercise: "Pull-ups"
-- [ ] Add ladder rungs:
-  - [ ] Rung 1: 5 reps, 60kg
-  - [ ] Rung 2: 6 reps, 65kg
-  - [ ] Rung 3: 7 reps, 70kg
-- [ ] Save
-- [ ] Verify ladder progression displayed
 
 ### Workout Management
 - [ ] Reorder exercises (drag and drop)
@@ -326,21 +303,21 @@ This document provides a comprehensive checklist for manually testing coach-side
 - [ ] Switch back to Week 1, Day 1
 - [ ] **VERIFY**: Week 1 still has original values (unchanged)
 
-#### All 13 Exercise Types in Progression Rules
-- [ ] For each exercise type, verify fields are editable:
+#### All supported exercise types in Progression Rules
+- [ ] For each exercise type present in the template, verify fields are editable:
   - [ ] **Straight Set**: Edit sets, reps, rest, tempo, RIR
   - [ ] **Superset**: Edit first_exercise_reps, second_exercise_reps, rest_between_pairs
   - [ ] **Giant Set**: Edit exercise_order, sets, reps
   - [ ] **Drop Set**: Edit exercise_reps, drop_set_reps, weight_reduction_percentage
   - [ ] **Cluster Set**: Edit reps_per_cluster, clusters_per_set, intra_cluster_rest
   - [ ] **Rest-Pause**: Edit rest_pause_duration, max_rest_pauses
-  - [ ] **Pyramid**: Edit pyramid_order, sets, reps, weight
   - [ ] **Pre-Exhaustion**: Edit isolation_reps, compound_reps, compound_exercise_id
   - [ ] **AMRAP**: Edit duration_minutes, target_reps
   - [ ] **EMOM**: Edit emom_mode, duration_minutes, target_reps
   - [ ] **Tabata**: Edit work_seconds, rest_seconds, rounds
   - [ ] **For Time**: Edit target_reps, time_cap_minutes
-  - [ ] **Ladder**: Edit ladder_order, reps, weight_kg
+  - [ ] **Speed Work**: Edit prescribed intervals, distance, and rest as shown in the UI
+  - [ ] **Endurance**: Edit distance, time, pace, or HR targets as shown in the UI
 - [ ] For each type, save changes and verify persistence
 
 #### Exercise Replacement
@@ -394,7 +371,7 @@ This document provides a comprehensive checklist for manually testing coach-side
 - [ ] Create workout with no exercises
 - [ ] Create workout with 50+ exercises
 - [ ] Create workout with duplicate exercises
-- [ ] Create workout with all 13 exercise types
+- [ ] Create workout covering all supported exercise types you use in production
 - [ ] Edit workout while it's assigned to clients
 - [ ] Delete workout that's used in programs
 

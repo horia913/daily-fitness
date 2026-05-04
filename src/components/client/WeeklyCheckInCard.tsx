@@ -1,14 +1,12 @@
 "use client";
 
 import React from "react";
-import {
-  ChevronDown,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { BodyMeasurement } from "@/lib/measurementService";
+import { CheckinStatusPill } from "@/components/client/check-ins/checkinSuite";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 
-/** Days since last measurement at which the check-in is considered due (e.g. 7→6, 14→12, 30→25). */
 function getDueThreshold(frequencyDays: number): number {
   if (frequencyDays <= 7) return Math.max(1, frequencyDays - 1);
   if (frequencyDays <= 14) return frequencyDays - 2;
@@ -29,11 +27,7 @@ interface WeeklyCheckInCardProps {
   }>;
 }
 
-type MetricKey =
-  | "weight_kg"
-  | "body_fat_percentage"
-  | "waist_circumference"
-  | "muscle_mass_kg";
+type MetricKey = "weight_kg" | "body_fat_percentage" | "waist_circumference" | "muscle_mass_kg";
 
 interface MetricDef {
   key: MetricKey;
@@ -73,10 +67,7 @@ function getDueDateText(lastMeasuredDate: string | null, frequencyDays: number):
   return dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function matchesMetricGoal(
-  goal: WeeklyCheckInCardProps["activeCheckInGoals"][number],
-  metric: MetricKey,
-): boolean {
+function matchesMetricGoal(goal: WeeklyCheckInCardProps["activeCheckInGoals"][number], metric: MetricKey): boolean {
   const metricType = (goal.metric_type ?? "").toLowerCase();
   const title = (goal.title ?? "").toLowerCase();
   if (metric === "weight_kg") return metricType.includes("weight") || title.includes("weight");
@@ -87,11 +78,7 @@ function matchesMetricGoal(
   return metricType.includes("muscle") || metricType.includes("lean") || title.includes("muscle");
 }
 
-function getDeltaToneWithGoal(
-  current: number,
-  previous: number,
-  target: number,
-): "green" | "amber" | "gray" {
+function getDeltaToneWithGoal(current: number, previous: number, target: number): "green" | "amber" | "gray" {
   const delta = current - previous;
   if (delta === 0) return "gray";
   const prevDistance = Math.abs(target - previous);
@@ -115,6 +102,9 @@ function toneClasses(tone: "green" | "amber" | "gray"): string {
   return "bg-white/5 text-gray-400 border border-white/10";
 }
 
+const metricNumClass =
+  "tabular-nums [font-family:var(--f-display,var(--font-display,var(--font-number,var(--font-mono,ui-monospace,monospace))))]";
+
 export function WeeklyCheckInCard({
   daysSinceLast,
   lastMeasuredDate,
@@ -131,47 +121,51 @@ export function WeeklyCheckInCard({
   const latestMeasurement = recentMeasurements[0] ?? null;
   const previousMeasurement = recentMeasurements[1] ?? null;
   const isDoneThisPeriod =
-    daysSinceLast != null && latestMeasurement?.measured_date != null
-      ? daysSinceLast < frequencyDays
-      : false;
+    daysSinceLast != null && latestMeasurement?.measured_date != null ? daysSinceLast < frequencyDays : false;
   const dueDateText = getDueDateText(lastMeasuredDate, frequencyDays);
   const isUpcoming = !isDoneThisPeriod && !isDue;
-  const statusPill = isDoneThisPeriod
-    ? { label: "COMPLETED", classes: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" }
-    : isDue
-      ? { label: "DUE", classes: "bg-amber-500/20 text-amber-300 border border-amber-500/30" }
-      : {
-          label: `IN ${Math.max(0, daysUntilDue ?? 0)} DAYS`,
-          classes: "bg-white/5 text-gray-400 border border-white/10",
-        };
 
-  const currentMetricRows = METRIC_DEFS
-    .map((def) => {
-      const current = latestMeasurement?.[def.key];
-      if (current == null || typeof current !== "number") return null;
-      const previous = previousMeasurement?.[def.key];
-      const hasPrevious = previous != null && typeof previous === "number";
-      const delta = hasPrevious ? current - previous : null;
-      const goal = activeCheckInGoals.find((g) => matchesMetricGoal(g, def.key));
-      const tone =
-        delta == null || delta === 0
-          ? "gray"
-          : goal?.target_value != null
-            ? getDeltaToneWithGoal(current, previous as number, goal.target_value)
-            : getFallbackDeltaTone(def.key, delta);
-      return {
-        ...def,
-        current,
-        previous: hasPrevious ? (previous as number) : null,
-        delta,
-        tone,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row != null);
+  const currentMetricRows = METRIC_DEFS.map((def) => {
+    const current = latestMeasurement?.[def.key];
+    if (current == null || typeof current !== "number") return null;
+    const previous = previousMeasurement?.[def.key];
+    const hasPrevious = previous != null && typeof previous === "number";
+    const delta = hasPrevious ? current - previous : null;
+    const goal = activeCheckInGoals.find((g) => matchesMetricGoal(g, def.key));
+    const tone =
+      delta == null || delta === 0
+        ? "gray"
+        : goal?.target_value != null
+          ? getDeltaToneWithGoal(current, previous as number, goal.target_value)
+          : getFallbackDeltaTone(def.key, delta);
+    return {
+      ...def,
+      current,
+      previous: hasPrevious ? (previous as number) : null,
+      delta,
+      tone,
+    };
+  }).filter((row): row is NonNullable<typeof row> => row != null);
+
+  const shellStyle: React.CSSProperties = isDoneThisPeriod
+    ? {
+        background: "linear-gradient(135deg, var(--cs-good-soft, rgba(52,211,153,0.12)), var(--cs-card, #0e1f2e))",
+        borderColor: "var(--cs-good-dim, rgba(52,211,153,0.25))",
+      }
+    : isDue
+      ? {
+          background: "linear-gradient(135deg, var(--cs-warning-soft, rgba(245,194,66,0.12)), var(--cs-card, #0e1f2e))",
+          borderColor: "var(--cs-warning-dim, rgba(245,194,66,0.25))",
+        }
+      : {
+          background: "var(--cs-card, #0e1f2e)",
+          borderColor: "var(--cs-line, rgba(255,255,255,0.08))",
+        };
 
   return (
     <div
-      className="rounded-xl border border-white/10 bg-white/[0.04] p-4 cursor-pointer"
+      className={cn(checkinSuiteStyles.root, checkinSuiteStyles.sectionCard, "cursor-pointer !gap-2")}
+      style={{ ...shellStyle, position: "relative", overflow: "hidden" }}
       onClick={() => setExpanded((v) => !v)}
       role="button"
       tabIndex={0}
@@ -183,72 +177,125 @@ export function WeeklyCheckInCard({
       }}
       aria-expanded={expanded}
     >
-      <div className="flex items-start justify-between gap-3"
-      >
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300/70">
-          SCHEDULED CHECK-IN
-        </p>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusPill.classes}`}>
-          {statusPill.label}
+      <div className="flex items-start justify-between gap-3">
+        <span
+          className={cn(checkinSuiteStyles.fontMono, "text-[9.5px] font-semibold uppercase tracking-[0.16em]")}
+          style={{
+            color: isDoneThisPeriod ? "var(--cs-good)" : isDue ? "var(--cs-warning)" : "var(--cs-cyan)",
+          }}
+        >
+          Scheduled check-in
         </span>
-      </div>
-
-      <div className="mt-3">
-        {isDoneThisPeriod && latestMeasurement?.measured_date ? (
-          <p className="text-sm text-gray-300">Completed {formatDate(latestMeasurement.measured_date)}</p>
+        {isDoneThisPeriod ? (
+          <CheckinStatusPill variant="completed" label="Completed" />
         ) : isDue ? (
-          <p className="text-sm text-white">
-            {isOverdue && overdueDays > 0 ? `Overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}` : "Due today"}
-          </p>
+          <CheckinStatusPill variant="due" label={isOverdue && overdueDays > 0 ? "Overdue" : "Due"} />
         ) : (
-          <p className="text-sm text-gray-300">{dueDateText ? `Due ${dueDateText}` : "No check-in data yet"}</p>
+          <span
+            className={cn(checkinSuiteStyles.fontMono, "shrink-0 rounded-[5px] border px-2 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]")}
+            style={{
+              borderColor: "var(--cs-line-2)",
+              background: "var(--cs-card-2)",
+              color: "var(--cs-t4)",
+            }}
+          >
+            In {Math.max(0, daysUntilDue ?? 0)} days
+          </span>
         )}
       </div>
 
-      <div className="mt-3">
+      <div className={cn(checkinSuiteStyles.fontBody, "text-[12.5px] font-medium")} style={{ color: "var(--cs-t1)" }}>
+        {isDoneThisPeriod && latestMeasurement?.measured_date ? (
+          <>Completed {formatDate(latestMeasurement.measured_date)}</>
+        ) : isDue ? (
+          <>Weekly review · 3 quick steps</>
+        ) : dueDateText ? (
+          <>Next review on {dueDateText}</>
+        ) : (
+          "No check-in data yet"
+        )}
+      </div>
+
+      <div
+        className="pt-1.5 mt-0.5 border-t flex items-center justify-between gap-2"
+        style={{ borderColor: "var(--cs-line-2)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {isDoneThisPeriod ? (
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>Tap to see comparison</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          </div>
-        ) : isUpcoming ? (
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>Tap for last week&apos;s data</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          </div>
+          <button
+            type="button"
+            className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
+            style={{ color: "var(--cs-cyan)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+          >
+            Tap to see comparison
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+          </button>
+        ) : isDue ? (
+          <button
+            type="button"
+            className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
+            style={{ color: "var(--cs-cyan)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.location.href = "/client/check-ins/weekly";
+            }}
+          >
+            Start now
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+          </button>
         ) : (
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              window.location.href = "/client/check-ins/weekly";
+            className={cn(checkinSuiteStyles.fontBody, "flex flex-1 items-center justify-between text-left text-[11px] font-medium py-1")}
+            style={{ color: "var(--cs-cyan)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
             }}
-            className="w-full fc-btn fc-btn-primary justify-center text-sm font-semibold py-2.5 rounded-xl"
           >
-            Start check-in
+            View schedule
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
           </button>
         )}
       </div>
 
+      {isDue && isOverdue && overdueDays > 0 && (
+        <p className={cn(checkinSuiteStyles.fontBody, "text-xs")} style={{ color: "var(--cs-warning)" }}>
+          Overdue by {overdueDays} day{overdueDays === 1 ? "" : "s"}
+        </p>
+      )}
+
       {expanded && (
-        <div className="mt-4 border-t border-white/10 pt-4">
+        <div className="mt-2 border-t pt-3 space-y-3" style={{ borderColor: "var(--cs-line-2)" }} onClick={(e) => e.stopPropagation()}>
           {isDoneThisPeriod ? (
             <>
               {previousMeasurement == null ? (
-                <p className="text-sm text-gray-400">No previous data to compare</p>
+                <p className="text-sm" style={{ color: "var(--cs-t3)" }}>
+                  No previous data to compare
+                </p>
               ) : currentMetricRows.length === 0 ? (
-                <p className="text-sm text-gray-400">No metrics available for comparison</p>
+                <p className="text-sm" style={{ color: "var(--cs-t3)" }}>
+                  No metrics available for comparison
+                </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {currentMetricRows.map((metric) => (
-                    <div key={metric.key} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-gray-500">{metric.label}</p>
-                      <p className="text-lg font-semibold text-white tabular-nums mt-1">
-                        {formatNumber(metric.current, metric.unit)}
-                      </p>
+                    <div
+                      key={metric.key}
+                      className="rounded-xl border p-3"
+                      style={{ borderColor: "var(--cs-line)", background: "var(--cs-card-2)" }}
+                    >
+                      <span className={cn(checkinSuiteStyles.fontMono, "text-[10px] uppercase tracking-wide")} style={{ color: "var(--cs-t4)" }}>
+                        {metric.label}
+                      </span>
+                      <p className={cn("mt-1 text-lg font-semibold text-white", metricNumClass)}>{formatNumber(metric.current, metric.unit)}</p>
                       {metric.delta != null ? (
-                        <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneClasses(metric.tone)}`}>
-                          {metric.delta === 0 ? null : metric.delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${metricNumClass} ${toneClasses(metric.tone)}`}>
+                          {metric.delta === 0 ? null : metric.delta > 0 ? "↑" : "↓"}
                           {formatDelta(metric.delta, metric.unit)}
                         </span>
                       ) : (
@@ -263,30 +310,40 @@ export function WeeklyCheckInCard({
             </>
           ) : (
             <>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+              <p className={cn(checkinSuiteStyles.fontMono, "text-[10px] uppercase mb-2")} style={{ color: "var(--cs-t4)" }}>
                 LAST CHECK-IN {latestMeasurement?.measured_date ? `· ${formatDate(latestMeasurement.measured_date)}` : ""}
               </p>
               {currentMetricRows.length === 0 ? (
-                <p className="text-sm text-gray-400">No previous check-in data available</p>
+                <p className="text-sm" style={{ color: "var(--cs-t3)" }}>
+                  No previous check-in data available
+                </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {currentMetricRows.map((metric) => (
-                    <div key={metric.key} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-gray-500">{metric.label}</p>
-                      <p className="text-lg font-semibold text-white tabular-nums mt-1">
-                        {formatNumber(metric.current, metric.unit)}
-                      </p>
+                    <div
+                      key={metric.key}
+                      className="rounded-xl border p-3"
+                      style={{ borderColor: "var(--cs-line)", background: "var(--cs-card-2)" }}
+                    >
+                      <span className={cn(checkinSuiteStyles.fontMono, "text-[10px] uppercase tracking-wide")} style={{ color: "var(--cs-t4)" }}>
+                        {metric.label}
+                      </span>
+                      <p className={cn("mt-1 text-lg font-semibold text-white", metricNumClass)}>{formatNumber(metric.current, metric.unit)}</p>
                     </div>
                   ))}
                 </div>
               )}
               <button
                 type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
+                onClick={(e) => {
+                  e.stopPropagation();
                   window.location.href = "/client/check-ins/weekly";
                 }}
-                className="mt-3 w-full fc-btn fc-btn-primary justify-center text-sm font-semibold py-2.5 rounded-xl"
+                className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                style={{
+                  color: "var(--cs-lime-text)",
+                  background: "linear-gradient(135deg, var(--cs-lime), var(--cs-lime-2))",
+                }}
               >
                 Start this week&apos;s check-in
               </button>

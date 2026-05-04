@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
+import { fetchApi } from "@/lib/apiClient";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Dumbbell,
@@ -163,7 +164,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
     loadingRef.current = true
     setLoading(true)
     try {
-      const res = await fetch(`/api/coach/analytics/overview?period=${selectedPeriod}`, { signal: signal ?? null })
+      const res = await fetchApi(`/api/coach/analytics/overview?period=${selectedPeriod}`, { signal: signal ?? null })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body?.error ?? `HTTP ${res.status}`)

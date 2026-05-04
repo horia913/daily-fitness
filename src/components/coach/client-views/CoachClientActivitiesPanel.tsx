@@ -5,6 +5,9 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Activity, Clock, TrendingUp, MapPin } from "lucide-react";
+import ActivityRow from "@/components/coach/client-detail/ActivityRow";
+import EmptyStateBlock from "@/components/coach/client-detail/EmptyStateBlock";
+import sec from "@/components/coach/client-detail/coachClientDetailUi.module.css";
 import {
   getClientActivitiesForCoach,
   ACTIVITY_META,
@@ -15,11 +18,13 @@ import {
 export type CoachClientActivitiesPanelProps = {
   clientId: string;
   showPageHeader?: boolean;
+  layoutVariant?: "default" | "coachV6";
 };
 
 export function CoachClientActivitiesPanel({
   clientId,
   showPageHeader = true,
+  layoutVariant = "default",
 }: CoachClientActivitiesPanelProps) {
   const [activities, setActivities] = useState<ClientActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +49,66 @@ export function CoachClientActivitiesPanel({
     (sum, a) => sum + a.duration_minutes,
     0
   );
+
+  if (layoutVariant === "coachV6") {
+    if (loading) {
+      return (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-16 rounded-[11px] bg-[color:var(--fc-glass-highlight)] animate-pulse"
+            />
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className={`${sec.statTileLg}`}>
+            <div
+              className={sec.statTileIcon}
+              style={{
+                background: "var(--fc-set-type-straight-soft)",
+                color: "var(--fc-set-type-straight)",
+              }}
+            >
+              <Activity className="w-4 h-4" aria-hidden />
+            </div>
+            <div className={`${sec.statTileNum28} ${sec.statTileNumCyan}`}>{activities.length}</div>
+            <div className={sec.statTileLabel}>Activities</div>
+          </div>
+          <div className={`${sec.statTileLg}`}>
+            <div
+              className={sec.statTileIcon}
+              style={{
+                background: "color-mix(in srgb, var(--fc-effort-medium) 16%, transparent)",
+                color: "var(--fc-effort-medium)",
+              }}
+            >
+              <Clock className="w-4 h-4" aria-hidden />
+            </div>
+            <div className={`${sec.statTileNum28} ${sec.statTileNumWarn}`}>{totalDuration}</div>
+            <div className={sec.statTileLabel}>Total minutes</div>
+          </div>
+        </div>
+        {activities.length > 0 ? (
+          <div className="space-y-2">
+            {activities.map((a) => (
+              <ActivityRow key={a.id} activity={a} />
+            ))}
+          </div>
+        ) : (
+          <EmptyStateBlock
+            icon={Activity}
+            title="No extra activities logged"
+            description="Activities outside programmed workouts will appear here."
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={showPageHeader ? "mx-auto w-full max-w-4xl fc-page" : "w-full"}>

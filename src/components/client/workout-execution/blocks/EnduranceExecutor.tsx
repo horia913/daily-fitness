@@ -1,14 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Route, Activity, Heart, Clock } from "lucide-react";
+import { Route, Activity, Heart, Clock, Flame } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
+import logPairStyles from "../ui/logWeightRepsPair.module.css";
 import { BaseBlockExecutorProps } from "../types";
 import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { LogSetButton } from "../ui/LogSetButton";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
+import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
+import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 
@@ -46,7 +50,6 @@ export function EnduranceExecutor({
   formatTime: formatTimeProp,
   onVideoClick,
   onAlternativesClick,
-  onPlateCalculatorClick,
   onRestTimerClick,
   progressionSuggestion,
   registerSetLogIdResolved,
@@ -82,7 +85,6 @@ export function EnduranceExecutor({
   const [distanceKmStr, setDistanceKmStr] = useState("");
   const [timeMmss, setTimeMmss] = useState("");
   const [hrAvg, setHrAvg] = useState("");
-  const [rpeStr, setRpeStr] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
 
@@ -160,6 +162,11 @@ export function EnduranceExecutor({
       value: formatTimeProp(targetTimeSec),
     });
   }
+  appendTargetEffortItem(
+    prescriptionItems,
+    currentExercise ? (currentExercise as { rir?: unknown }).rir : undefined,
+    Flame,
+  );
 
   const instructions =
     currentExercise?.notes ||
@@ -200,8 +207,6 @@ export function EnduranceExecutor({
     const distM = km * 1000;
     const hrNum =
       hrAvg.trim() === "" ? undefined : parseFloat(String(hrAvg).trim());
-    const rpeNum =
-      rpeStr.trim() === "" ? null : parseInt(String(rpeStr).trim(), 10);
     const speedKmh = km / (t / 3600);
 
     setIsLoggingSet(true);
@@ -218,14 +223,6 @@ export function EnduranceExecutor({
       if (hrNum != null && Number.isFinite(hrNum)) {
         logData.actual_hr_avg = hrNum;
       }
-      if (
-        rpeNum != null &&
-        !Number.isNaN(rpeNum) &&
-        rpeNum >= 1 &&
-        rpeNum <= 10
-      ) {
-        logData.rpe = rpeNum;
-      }
 
       const result = await logSetToDatabase(logData);
       if (result.success) {
@@ -240,7 +237,6 @@ export function EnduranceExecutor({
           ...(hrNum != null && Number.isFinite(hrNum)
             ? { actual_hr_avg: hrNum }
             : {}),
-          ...(rpeNum != null && !Number.isNaN(rpeNum) ? { rpe: rpeNum } : {}),
           completed_at: new Date(),
         } as LoggedSet;
         onSetLogUpsert?.(block.block.id, loggedSet);
@@ -255,6 +251,29 @@ export function EnduranceExecutor({
 
   const exerciseName = currentExercise?.exercise?.name || "Endurance";
 
+  const updateSetRpe = useUpdateSetRpe({
+    blockId: block.block.id,
+    onSetLogUpsert,
+  });
+  const loggedSetRows: LoggedSetRow[] = loggedSetsList.map((entry) => {
+    const distKm = (entry.actual_distance_meters ?? 0) / 1000;
+    const timeSec = entry.actual_time_seconds ?? 0;
+    const title =
+      `${distKm.toFixed(2)} km · ${formatTimeProp(timeSec)}` +
+      (entry.actual_speed_kmh != null
+        ? ` · ${entry.actual_speed_kmh.toFixed(2)} km/h`
+        : "");
+    return {
+      id: entry.id,
+      title,
+      rpe: entry.rpe ?? null,
+      onEffortChange: (rpe) => updateSetRpe(entry, rpe),
+      disabled: entry.id.startsWith("temp-"),
+    };
+  });
+  const aboveStickyContent =
+    loggedSetRows.length > 0 ? <LoggedSetsList rows={loggedSetRows} /> : null;
+
   return (
     <BaseBlockExecutorLayout
       block={block}
@@ -263,7 +282,6 @@ export function EnduranceExecutor({
       instructions={instructions}
       onVideoClick={onVideoClick}
       onAlternativesClick={onAlternativesClick}
-      onPlateCalculatorClick={onPlateCalculatorClick}
       onRestTimerClick={onRestTimerClick}
       progressionSuggestion={progressionSuggestion}
       onBlockComplete={onBlockComplete}
@@ -280,74 +298,53 @@ export function EnduranceExecutor({
       formatTime={formatTimeProp}
       loggingInputs={
         <div className="space-y-4">
-          {completed && loggedSetsList[0] && (
-            <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-sm">
-              <p className="font-medium">Last effort</p>
-              <p className="tabular-nums text-muted-foreground">
-                {(
-                  (loggedSetsList[0].actual_distance_meters ?? 0) / 1000
-                ).toFixed(2)}{" "}
-                km ·{" "}
-                {formatTimeProp(loggedSetsList[0].actual_time_seconds ?? 0)}
-                {loggedSetsList[0].actual_speed_kmh != null
-                  ? ` · ${loggedSetsList[0].actual_speed_kmh.toFixed(2)} km/h`
-                  : ""}
-              </p>
-            </div>
-          )}
           {!completed && (
             <>
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Actual distance (km)
-                </label>
-                <LargeInput
-                  type="number"
-                  value={distanceKmStr}
-                  onChange={setDistanceKmStr}
-                  placeholder="e.g. 5.0"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Time (mm:ss or seconds)
-                </label>
-                <LargeInput
-                  type="text"
-                  value={timeMmss}
-                  onChange={setTimeMmss}
-                  placeholder="28:30"
-                />
+              <div className={`w-full min-w-0 ${logPairStyles.pair}`}>
+                <div className="flex min-h-0 min-w-0 flex-col">
+                  <LargeInput
+                    label="Distance"
+                    unit="km"
+                    inputType="decimal"
+                    value={distanceKmStr}
+                    onChange={setDistanceKmStr}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                    showStepper
+                    stepAmount={0.01}
+                    hint="Actual distance in km"
+                  />
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col">
+                  <LargeInput
+                    label="Duration"
+                    type="text"
+                    value={timeMmss}
+                    onChange={setTimeMmss}
+                    placeholder="28:30"
+                    hint="mm:ss or seconds"
+                    showStepper={false}
+                  />
+                </div>
               </div>
               {actualPaceSec != null && (
                 <p className="text-sm text-muted-foreground">
                   Pace: {formatPaceMinSecPerKm(actualPaceSec)}
                 </p>
               )}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Avg HR (optional)
-                </label>
+              <div className="w-full min-w-0">
                 <LargeInput
-                  type="number"
+                  label="Avg HR"
+                  unit="bpm"
+                  inputType="decimal"
                   value={hrAvg}
                   onChange={setHrAvg}
-                  placeholder="e.g. 152"
+                  placeholder="—"
                   min="0"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  RPE (1–10, optional)
-                </label>
-                <LargeInput
-                  type="number"
-                  value={rpeStr}
-                  onChange={setRpeStr}
-                  min="1"
-                  max="10"
+                  showStepper
+                  stepAmount={1}
+                  hint="Optional average heart rate"
                 />
               </div>
             </>
@@ -362,7 +359,7 @@ export function EnduranceExecutor({
           label={completed ? "Logged" : "Log effort"}
         />
       }
-      logSectionTitle="LOG YOUR EFFORT"
+      aboveStickyContent={aboveStickyContent}
       currentSet={1}
       totalSets={1}
       currentExercise={currentExercise as any}

@@ -140,32 +140,33 @@ export function AthleteScoreRing({
   const wrapClass = tierWrapClass(tierKey);
   const trackStroke =
     tierKey === "benched"
-      ? "#374151"
+      ? "var(--fc-surface-sunken)"
       : tierKey === "slipping"
-        ? "rgba(245, 158, 11, 0.25)"
+        ? "color-mix(in srgb, var(--fc-status-warning) 25%, transparent)"
         : "var(--fc-surface-sunken)";
 
-  const scoreTextClass =
+  const scoreTextColor =
     tierKey === "benched"
-      ? "text-gray-500"
+      ? "var(--fc-text-subtle)"
       : tierKey === "slipping"
-        ? "text-amber-600 dark:text-amber-400"
-        : tierKey === "showing_up"
-          ? "text-sky-800 dark:text-white"
-          : tierKey === "locked_in"
-            ? "text-orange-950 dark:text-white"
-            : "text-white font-bold";
+        ? "var(--fc-status-warning)"
+        : "var(--fc-text-primary)";
 
   const labelClass =
+    tierKey === "beast_mode"
+      ? "bg-gradient-to-r from-sky-400 via-cyan-200 to-lime-300 bg-clip-text font-semibold text-transparent"
+      : tierKey === "benched" || tierKey === "slipping" || tierKey === "locked_in"
+        ? ""
+        : "fc-text-dim";
+
+  const labelColor =
     tierKey === "benched"
-      ? "text-gray-500"
+      ? "var(--fc-text-subtle)"
       : tierKey === "slipping"
-        ? "text-amber-700 dark:text-amber-400"
-        : tierKey === "beast_mode"
-          ? "bg-gradient-to-r from-sky-400 via-cyan-200 to-lime-300 bg-clip-text font-semibold text-transparent"
-          : tierKey === "locked_in"
-            ? "text-orange-900/90 dark:text-orange-100"
-            : "fc-text-dim";
+        ? "var(--fc-status-warning)"
+        : tierKey === "locked_in"
+          ? "var(--fc-text-dim)"
+          : undefined;
 
   const lockedOuterR = radius + strokeW / 2 + 3 + 2;
   const lockedHotDash = circumference * 0.1;
@@ -436,7 +437,7 @@ export function AthleteScoreRing({
             fill="none"
             stroke={
               tierKey === "benched"
-                ? "#374151"
+                ? "var(--fc-surface-sunken)"
                 : tierKey === "slipping"
                   ? `url(#${gid})`
                   : tierKey === "showing_up"
@@ -461,9 +462,10 @@ export function AthleteScoreRing({
             className={`tabular-nums leading-none ${
               tierKey === "beast_mode"
                 ? "as-ring-beast-score text-3xl sm:text-5xl font-bold text-white"
-                : `font-extrabold ${scoreTextClass}`
+                : "font-extrabold"
             }`}
             style={{
+              color: tierKey === "beast_mode" ? undefined : scoreTextColor,
               fontSize:
                 tierKey === "beast_mode"
                   ? undefined
@@ -480,7 +482,10 @@ export function AthleteScoreRing({
             <>
               <span
                 className={`mt-0.5 font-semibold leading-tight ${labelClass}`}
-                style={{ fontSize: size < 80 ? "0.45rem" : "clamp(0.65rem, 2.8vw, 0.95rem)" }}
+                style={{
+                  fontSize: size < 80 ? "0.45rem" : "clamp(0.65rem, 2.8vw, 0.95rem)",
+                  color: labelColor,
+                }}
               >
                 {tierInfo.label}
               </span>

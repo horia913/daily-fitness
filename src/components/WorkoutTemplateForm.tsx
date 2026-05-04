@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -62,6 +63,7 @@ import VolumeCalculatorWidget from "@/components/coach/VolumeCalculatorWidget";
 import {
   isGuidelineCategory,
   getAllowedBlockTypesForVolumeCalculator,
+  calculateVolumePerMuscleGroup,
 } from "@/lib/coachGuidelinesService";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import ExerciseDetailForm from "@/components/features/workouts/ExerciseDetailForm";
@@ -71,7 +73,8 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { GripVertical } from "lucide-react";
+import { GripVertical, ChevronLeft } from "lucide-react";
+import wt from "@/components/coach/workouts/workoutTemplateEditV1.module.css";
 import { convertBlocksToExercises } from '@/lib/blockConversion';
 import { exercisesToWorkoutBlocks } from '@/utils/exercisesToWorkoutBlocks';
 import { buildExerciseFromNewExercise } from '@/utils/buildExerciseFromNewExercise';
@@ -91,6 +94,8 @@ interface WorkoutTemplateFormProps {
   renderMode?: "modal" | "page";
   /** Called when dirty state changes (edit page uses this for "Saved" vs "Unsaved changes" indicator). */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Edit page passes live dirty flag for hero status (optional). */
+  pageIsDirty?: boolean;
 }
 
 const difficultyLevels = [
@@ -117,6 +122,7 @@ export default function WorkoutTemplateForm({
   initialBlocks,
   renderMode = "modal",
   onDirtyChange,
+  pageIsDirty,
 }: WorkoutTemplateFormProps) {
   const { isDark, getThemeStyles } = useTheme();
   const theme = getThemeStyles();
@@ -294,6 +300,7 @@ export default function WorkoutTemplateForm({
           <LoadPercentageWeightToggle
             value={currentMode}
             onValueChange={handleToggle}
+            visualVariant={renderMode === "page" ? "coachPill" : "default"}
           />
         </div>
         {currentMode === "load" ? (
@@ -399,9 +406,6 @@ export default function WorkoutTemplateForm({
 
   // Workout Block System (integrated with exercises)
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
-  const [excludeFromRecommendations, setExcludeFromRecommendations] =
-    useState(false);
-  const [daysPerWeek, setDaysPerWeek] = useState(3);
   const hasLoadedBlocks = useRef(false);
   const previousTemplateId = useRef<string | null>(null);
 
@@ -413,10 +417,8 @@ export default function WorkoutTemplateForm({
 
   // Determine if volume calculator is active
   const isVolumeCalculatorActive = useMemo(() => {
-    return (
-      isGuidelineCategory(formData.category) && !excludeFromRecommendations
-    );
-  }, [formData.category, excludeFromRecommendations]);
+    return isGuidelineCategory(formData.category);
+  }, [formData.category]);
 
   // Get allowed block types for volume calculator
   const allowedBlockTypes = useMemo(() => {
@@ -425,6 +427,34 @@ export default function WorkoutTemplateForm({
     }
     return undefined;
   }, [isVolumeCalculatorActive]);
+
+  const heroTotalSets = useMemo(() => {
+    return currentWorkoutBlocks.reduce((sum, b) => {
+      const n = Number(b.total_sets);
+      return sum + (Number.isFinite(n) && n > 0 ? n : 1);
+    }, 0);
+  }, [currentWorkoutBlocks]);
+
+  const muscleGroupCountForHero = useMemo(() => {
+    if (isGuidelineCategory(formData.category)) {
+      return calculateVolumePerMuscleGroup(currentWorkoutBlocks).size;
+    }
+    const names = new Set<string>();
+    for (const ex of exercises) {
+      const lib = availableExercises.find((e: any) => e.id === ex.exercise_id);
+      const mg = lib?.primary_muscle_group;
+      if (mg) names.add(mg);
+    }
+    return names.size;
+  }, [exercises, availableExercises, formData.category, currentWorkoutBlocks]);
+
+  const durationLabel = useMemo(() => {
+    const o = durationOptions.find((d) => d.value === formData.estimated_duration);
+    return o?.label || `${formData.estimated_duration} min`;
+  }, [formData.estimated_duration]);
+
+  const isPage = renderMode === "page";
+  const newTemplateStatsMuted = !template && exercises.length === 0;
 
   // Save draft to localStorage (debounced)
   const saveDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1166,7 +1196,6 @@ export default function WorkoutTemplateForm({
     setShowAddExercise(true);
   };
 
-  const isPage = renderMode === "page";
   if (!isPage && !isOpen) return null;
 
   return (
@@ -1223,20 +1252,113 @@ export default function WorkoutTemplateForm({
         )}
 
         <div
-          className={`flex-1 ${
-            isPage ? "overflow-y-visible" : "overflow-y-auto"
-          } ${isPage ? "px-0" : "px-3"} pb-4 ${
-            isPage ? "sm:px-0" : "sm:px-6"
-          } sm:pb-6`}
+          className={cn(
+            "flex-1 pb-4 sm:pb-6",
+            isPage ? "overflow-y-visible px-0 sm:px-0" : "overflow-y-auto px-3 sm:px-6",
+            isPage && wt.wrap,
+          )}
         >
           <form
             onSubmit={handleSubmit}
-            className={`space-y-3 ${isPage ? "" : "pt-2"}`}
+            className={cn("space-y-3", !isPage && "pt-2")}
           >
+            {isPage && (
+              <div
+                className={cn(
+                  wt.hero,
+                  !template ? wt.heroGlowLime : wt.heroGlowCyan,
+                )}
+              >
+                <div className="relative z-[1] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(wt.eyebrow, !template && wt.eyebrowLime)}
+                      >
+                        {!template ? "New template" : "Editing template"}
+                      </span>
+                      {!template ? (
+                        <span className={wt.statusDraft}>Draft</span>
+                      ) : pageIsDirty ? (
+                        <span className={wt.statusUnsaved}>Unsaved</span>
+                      ) : (
+                        <span className={wt.statusSaved}>Saved</span>
+                      )}
+                    </div>
+                    <h1
+                      className={cn(
+                        wt.heroTitle,
+                        !template &&
+                          !String(formData.name || "").trim() &&
+                          wt.heroTitlePlaceholder,
+                      )}
+                    >
+                      {!template && !String(formData.name || "").trim()
+                        ? "Untitled template"
+                        : formData.name ||
+                          template?.name ||
+                          "Untitled template"}
+                    </h1>
+                    <p className={wt.heroSub}>
+                      {!template
+                        ? "Add a name and details to get started."
+                        : `${formData.category || template?.category || "—"} · ${durationLabel} · ${formData.difficulty_level}`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={wt.backBtn}
+                    onClick={onClose}
+                  >
+                    <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={2} />
+                    Back
+                  </button>
+                </div>
+                <div className={cn(wt.statStrip, "relative z-[1]")}>
+                  <div className={wt.statCell}>
+                    <div
+                      className={cn(
+                        wt.statNum,
+                        newTemplateStatsMuted && wt.statNumMuted,
+                        !newTemplateStatsMuted && wt.statValLime,
+                      )}
+                    >
+                      {exercises.length}
+                    </div>
+                    <div className={wt.statLbl}>Exercises</div>
+                  </div>
+                  <div className={wt.statCell}>
+                    <div
+                      className={cn(
+                        wt.statNum,
+                        newTemplateStatsMuted && wt.statNumMuted,
+                        !newTemplateStatsMuted && wt.statValCyan,
+                      )}
+                    >
+                      {heroTotalSets}
+                    </div>
+                    <div className={wt.statLbl}>Total sets</div>
+                  </div>
+                  <div className={wt.statCell}>
+                    <div
+                      className={cn(
+                        wt.statNum,
+                        newTemplateStatsMuted && wt.statNumMuted,
+                      )}
+                    >
+                      {muscleGroupCountForHero}
+                    </div>
+                    <div className={wt.statLbl}>Muscle grps</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <BasicInfoSection
               formData={formData}
               setFormData={setFormData}
               categories={categories}
+              coachTemplateV1={isPage}
             />
 
             {/* Volume Calculator Widget */}
@@ -1244,11 +1366,7 @@ export default function WorkoutTemplateForm({
               <VolumeCalculatorWidget
                 blocks={currentWorkoutBlocks}
                 category={formData.category}
-                difficulty={formData.difficulty_level}
-                daysPerWeek={daysPerWeek}
-                excludeFromRecommendations={excludeFromRecommendations}
-                onToggleExclude={setExcludeFromRecommendations}
-                onDaysPerWeekChange={setDaysPerWeek}
+                coachV1={isPage}
               />
             )}
 
@@ -1258,22 +1376,43 @@ export default function WorkoutTemplateForm({
               {/* Unified Workout Structure - ref so we can scroll here when adding new exercise */}
               <div
                 ref={workoutFlowSectionRef}
-                className="space-y-3 border-t border-black/5 dark:border-white/5 mt-4 pt-4"
+                className={cn(
+                  "space-y-3 mt-4 pt-4",
+                  isPage
+                    ? "border-t border-[var(--line)]"
+                    : "border-t border-black/5 dark:border-white/5",
+                )}
                 style={{ order: 1 }}
               >
-                <div className="flex flex-wrap w-full items-center gap-2 justify-between">
-                  <h3 className={`text-sm font-semibold ${theme.text}`}>
-                    Exercises ({workoutItems.length})
-                  </h3>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setShowAddExercise(true)}
-                    className={`h-8 text-xs px-3 rounded-lg ${theme.primary} shrink-0`}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Add exercise
-                  </Button>
+                <div className={cn(isPage ? wt.exercisesHeader : "flex flex-wrap w-full items-center gap-2 justify-between px-0")}>
+                  <div className="flex items-baseline flex-wrap gap-1 min-w-0">
+                    <span className={isPage ? wt.exercisesEyebrow : `text-sm font-semibold ${theme.text}`}>
+                      Exercises
+                    </span>
+                    <span className={isPage ? wt.exercisesCount : ""}>
+                      {isPage ? workoutItems.length : `(${workoutItems.length})`}
+                    </span>
+                  </div>
+                  {isPage ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddExercise(true)}
+                      className={cn(wt.btnLimePrimary, "shrink-0")}
+                    >
+                      <Plus className="w-4 h-4" strokeWidth={2.25} />
+                      Add exercise
+                    </button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setShowAddExercise(true)}
+                      className={`h-8 text-xs px-3 rounded-lg ${theme.primary} shrink-0`}
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Add exercise
+                    </Button>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -1308,16 +1447,26 @@ export default function WorkoutTemplateForm({
                                     <div
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
+                                      {...(isPage ? {} : provided.dragHandleProps)}
                                       className={
                                         snapshot.isDragging ? "opacity-50" : ""
                                       }
                                     >
-                                      <div className="flex items-start gap-2">
-                                        <div className="flex items-center mt-2 text-[color:var(--fc-text-dim)] cursor-grab active:cursor-grabbing flex-shrink-0">
-                                          <GripVertical className="w-4 h-4" />
-                                        </div>
-                                        <div className="flex-1">
+                                      <div className="flex items-stretch gap-0 min-w-0">
+                                        {isPage ? (
+                                          <div
+                                            {...provided.dragHandleProps}
+                                            className={wt.dragStrip}
+                                            aria-label="Drag to reorder"
+                                          >
+                                            <GripVertical className="w-4 h-4 text-[var(--t4)]" />
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center mt-2 text-[color:var(--fc-text-dim)] cursor-grab active:cursor-grabbing flex-shrink-0">
+                                            <GripVertical className="w-4 h-4" />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
                                           <ExerciseBlockCard
                                             exercise={exercise}
                                             index={index}
@@ -1328,6 +1477,7 @@ export default function WorkoutTemplateForm({
                                             onDelete={removeExercise}
                                             renderMode="form"
                                             compact
+                                            coachEditorV1={isPage}
                                             isExpanded={
                                               expandedExerciseId === exercise.id
                                             }
@@ -1352,6 +1502,7 @@ export default function WorkoutTemplateForm({
                                                   allowedBlockTypes
                                                 }
                                                 mode="inline"
+                                                coachTemplateV1={isPage}
                                               />
                                             )}
                                           </ExerciseBlockCard>
@@ -1370,6 +1521,7 @@ export default function WorkoutTemplateForm({
                   ) : (
                     <EmptyExerciseState
                       onAddExercise={() => setShowAddExercise(true)}
+                      visualVariant={isPage ? "coachV1" : "default"}
                     />
                   )}
                 </div>
@@ -1406,6 +1558,7 @@ export default function WorkoutTemplateForm({
           onSubmit={(e) => handleSubmit(e ?? ({} as React.FormEvent<HTMLFormElement>))}
           loading={loading}
           template={template}
+          visualVariant={isPage ? "coachV1" : "default"}
         />
       </div>
 

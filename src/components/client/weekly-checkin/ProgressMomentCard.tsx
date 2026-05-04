@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getPhotosForDate } from "@/lib/progressPhotoService";
 import type { ProgressPhoto } from "@/lib/progressPhotoService";
 import { Check } from "lucide-react";
@@ -59,6 +59,10 @@ export function ProgressMomentCard({
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onContinue(); }}>
       <DialogContent className="max-w-md p-8 text-center overflow-hidden">
+        <DialogTitle className="sr-only">Check-in saved</DialogTitle>
+        <DialogDescription className="sr-only">
+          Progress check-in confirmation modal with optional before and after photo comparison.
+        </DialogDescription>
         <div
           aria-hidden
           className="absolute top-4 left-4 w-12 h-12 rounded-full bg-[color:var(--fc-status-success)]/20 flex items-center justify-center"

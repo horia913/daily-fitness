@@ -1,711 +1,581 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Target, Calendar, Plus, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { EmptyState } from '@/components/ui/EmptyState'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Apple,
+  CheckCircle2,
+  Dumbbell,
+  Hand,
+  Moon,
+  Scale,
+  Target,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/toast-provider'
-import type { Pillar } from '@/components/goals/AddGoalModal'
+import { useCoachClient } from '@/contexts/CoachClientContext'
+import GoalCard, { type GoalCardPillar } from '@/components/coach/client-detail/GoalCard'
+import EmptyStateBlock from '@/components/coach/client-detail/EmptyStateBlock'
+import sec from '@/components/coach/client-detail/coachClientDetailUi.module.css'
 
-const PILLAR_LABELS: Record<string, string> = {
-  training: 'Training',
-  nutrition: 'Nutrition',
-  lifestyle: 'Lifestyle',
-  checkins: 'Check-ins',
-  general: 'General',
-}
+type GoalStatusFilter = 'all' | 'active' | 'completed' | 'paused'
 
-const GOAL_TYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  training: [
-    { value: 'strength', label: 'Strength' },
-    { value: 'endurance', label: 'Endurance' },
-    { value: 'mobility', label: 'Mobility' },
-    { value: 'performance', label: 'Performance' },
-  ],
-  nutrition: [
-    { value: 'calorie', label: 'Calorie' },
-    { value: 'protein', label: 'Protein' },
-    { value: 'water', label: 'Water' },
-    { value: 'macro', label: 'Macros' },
-  ],
-  lifestyle: [
-    { value: 'habit', label: 'Habit' },
-    { value: 'sleep', label: 'Sleep' },
-    { value: 'activity', label: 'Activity' },
-  ],
-  checkins: [
-    { value: 'body_composition', label: 'Body Composition' },
-    { value: 'weight', label: 'Weight' },
-    { value: 'measurements', label: 'Measurements' },
-  ],
-  general: [
-    { value: 'other', label: 'Other' },
-    { value: 'custom', label: 'Custom' },
-  ],
-}
+type GoalCategory =
+  | 'body_composition'
+  | 'performance'
+  | 'outcome'
+  | 'nutrition'
+  | 'weight_loss'
+  | 'muscle_gain'
+  | 'strength'
+  | 'endurance'
+  | 'mobility'
+  | 'other'
 
-interface GoalRow {
+type SourceType =
+  | 'body_metric'
+  | 'personal_record'
+  | 'workout_count'
+  | 'wellness_field'
+  | 'meal_plan'
+  | 'manual'
+
+type CoachGoalRow = {
   id: string
-  client_id: string
-  coach_id: string | null
   title: string
-  description: string | null
-  category: string
-  pillar?: string | null
-  goal_type: string | null
-  target_value: number | null
-  target_date: string | null
-  current_value: number | null
+  category: GoalCategory
   status: string
-  priority: string
-  start_date: string
+  priority: string | null
+  current_value: number | null
+  target_value: number | null
+  target_unit: string | null
+  target_date: string | null
   completed_date: string | null
   progress_percentage: number | null
-  target_unit: string | null
   notes: string | null
   created_at: string
   updated_at: string
+  goal_source_links:
+    | { source_type: SourceType; source_config?: Record<string, unknown> }
+    | { source_type: SourceType; source_config?: Record<string, unknown> }[]
+    | null
 }
 
-function pillarLabel(goal: GoalRow): string {
-  const key = goal.pillar ?? goal.category
-  return PILLAR_LABELS[key] ?? key ?? 'General'
+type PillarId = 'training' | 'nutrition' | 'body' | 'lifestyle'
+
+const PILLARS: { id: PillarId; label: string; emptyText: string }[] = [
+  { id: 'training', label: 'Training', emptyText: 'No training goals set.' },
+  { id: 'nutrition', label: 'Nutrition', emptyText: 'No nutrition goals set.' },
+  { id: 'body', label: 'Body', emptyText: 'No body goals set.' },
+  { id: 'lifestyle', label: 'Lifestyle', emptyText: 'No lifestyle goals set.' },
+]
+
+function unwrapSourceType(goal: CoachGoalRow): SourceType | 'manual' {
+  const raw = goal.goal_source_links
+  if (!raw) return 'manual'
+  const row = Array.isArray(raw) ? raw[0] : raw
+  return row?.source_type ?? 'manual'
 }
 
-function initialPillar(g: GoalRow): Pillar {
-  const p = g.pillar as Pillar | undefined
-  if (p && PILLAR_LABELS[p]) return p
-  const c = g.category as Pillar | undefined
-  if (c && PILLAR_LABELS[c]) return c
-  return 'general'
+function unwrapSourceConfig(goal: CoachGoalRow): Record<string, unknown> | null {
+  const raw = goal.goal_source_links
+  if (!raw) return null
+  const row = Array.isArray(raw) ? raw[0] : raw
+  const c = row?.source_config
+  return c && typeof c === 'object' ? (c as Record<string, unknown>) : null
+}
+
+function sourcePresentation(
+  sourceType: SourceType | 'manual',
+  sourceConfig?: Record<string, unknown> | null
+) {
+  if (sourceType === 'body_metric') {
+    return { Icon: Scale, label: 'Auto-tracked from body metrics' }
+  }
+  if (sourceType === 'personal_record') {
+    return { Icon: Dumbbell, label: 'Auto-tracked from PRs' }
+  }
+  if (sourceType === 'workout_count') {
+    return { Icon: CheckCircle2, label: 'Auto-tracked from workouts' }
+  }
+  if (sourceType === 'wellness_field') {
+    return { Icon: Moon, label: 'Auto-tracking activates soon' }
+  }
+  if (sourceType === 'meal_plan') {
+    const tracking = sourceConfig && typeof sourceConfig.tracking === 'string' ? sourceConfig.tracking : null
+    if (tracking === 'daily_macro') {
+      const macro = sourceConfig && typeof sourceConfig.macro === 'string' ? sourceConfig.macro : ''
+      const label =
+        macro === 'protein_g'
+          ? 'Linked to daily protein (sync pending)'
+          : macro === 'water_l'
+            ? 'Linked to daily water (sync pending)'
+            : 'Linked to daily calories (sync pending)'
+      return { Icon: Apple, label }
+    }
+    return { Icon: Apple, label: 'Linked to meal plan adherence (sync pending)' }
+  }
+  return { Icon: Hand, label: 'Updated manually by client' }
+}
+
+function normalizeCategory(
+  category: GoalCategory
+): 'performance' | 'nutrition' | 'body_composition' | 'outcome' {
+  const raw = category as string
+  if (raw === 'behavioral') return 'outcome'
+  if (category === 'strength' || category === 'endurance' || category === 'mobility') {
+    return 'performance'
+  }
+  if (category === 'weight_loss' || category === 'muscle_gain') {
+    return 'body_composition'
+  }
+  if (category === 'other') {
+    return 'outcome'
+  }
+  return category as 'performance' | 'nutrition' | 'body_composition' | 'outcome'
+}
+
+function pillarForCategory(category: GoalCategory): PillarId {
+  const normalized = normalizeCategory(category)
+  if (normalized === 'performance') return 'training'
+  if (normalized === 'nutrition') return 'nutrition'
+  if (normalized === 'body_composition') return 'body'
+  return 'lifestyle'
+}
+
+function categoryLabel(category: GoalCategory): string {
+  const normalized = normalizeCategory(category)
+  if (normalized === 'body_composition') return 'Body composition'
+  if (normalized === 'performance') return 'Performance'
+  if (normalized === 'outcome') return 'Outcome'
+  return 'Nutrition'
+}
+
+function priorityClass(priority: string | null): string {
+  if (priority === 'high') return 'text-red-600 bg-red-50 border-red-200'
+  if (priority === 'medium') return 'text-amber-700 bg-amber-50 border-amber-200'
+  return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+}
+
+function statusClass(status: string): string {
+  if (status === 'completed') return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  if (status === 'paused') return 'text-amber-700 bg-amber-50 border-amber-200'
+  return 'text-blue-700 bg-blue-50 border-blue-200'
+}
+
+function statusLabel(status: string): string {
+  if (status === 'active') return 'Active'
+  if (status === 'completed') return 'Completed'
+  if (status === 'paused') return 'Paused'
+  return status
+}
+
+function formatNumber(value: number | null): string {
+  if (value == null) return '—'
+  const rounded = Math.round(value * 100) / 100
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded)
+}
+
+function deadlineCopy(goal: CoachGoalRow): { text: string; className: string } | null {
+  if (!goal.target_date) return null
+  const target = new Date(goal.target_date)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  target.setHours(0, 0, 0, 0)
+  const daysLeft = Math.ceil((target.getTime() - today.getTime()) / 86400000)
+  const labelDate = target.toLocaleDateString()
+
+  if (goal.status === 'completed' && goal.completed_date) {
+    const completed = new Date(goal.completed_date)
+    completed.setHours(0, 0, 0, 0)
+    if (completed.getTime() <= target.getTime()) {
+      return {
+        text: `Deadline: ${labelDate} (completed on time)`,
+        className: 'text-emerald-600',
+      }
+    }
+  }
+
+  if (daysLeft < 0) {
+    return {
+      text: `Deadline: ${labelDate} (${Math.abs(daysLeft)} days overdue)`,
+      className: 'text-red-600',
+    }
+  }
+
+  return {
+    text: `Deadline: ${labelDate} (${daysLeft} days left)`,
+    className: 'fc-text-dim',
+  }
 }
 
 interface ClientGoalsViewProps {
   clientId: string
+  layoutVariant?: 'default' | 'coachV6'
 }
 
-export default function ClientGoalsView({ clientId }: ClientGoalsViewProps) {
-  const { user } = useAuth()
+function pillarToCardPillar(id: PillarId): GoalCardPillar {
+  return id
+}
+
+export default function ClientGoalsView({
+  clientId,
+  layoutVariant = 'default',
+}: ClientGoalsViewProps) {
   const { addToast } = useToast()
-  const [goals, setGoals] = useState<GoalRow[]>([])
+  const { clientName } = useCoachClient()
+  const [goals, setGoals] = useState<CoachGoalRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [showGoalModal, setShowGoalModal] = useState(false)
-  const [goalBeingEdited, setGoalBeingEdited] = useState<GoalRow | null>(null)
+  const [statusFilter, setStatusFilter] = useState<GoalStatusFilter>('active')
 
   const loadGoals = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      let query = supabase
         .from('goals')
-        .select('*')
+        .select(
+          'id,title,category,status,priority,current_value,target_value,target_unit,target_date,completed_date,progress_percentage,notes,created_at,updated_at,goal_source_links(source_type,source_config)'
+        )
         .eq('client_id', clientId)
+        .order('priority', { ascending: false })
         .order('created_at', { ascending: false })
 
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter)
+      }
+
+      const { data, error } = await query
       if (error) throw error
-      setGoals((data as GoalRow[]) ?? [])
+      setGoals((data as CoachGoalRow[]) ?? [])
     } catch (err) {
-      console.error('Error loading goals:', err)
+      console.error('[ClientGoalsView] load goals failed:', err)
       addToast({ title: 'Failed to load goals', variant: 'destructive' })
       setGoals([])
     } finally {
       setLoading(false)
     }
-  }, [clientId, addToast])
+  }, [clientId, statusFilter, addToast])
 
   useEffect(() => {
-    loadGoals()
+    void loadGoals()
   }, [loadGoals])
 
-  const activeGoals = goals.filter((g) => g.status === 'active')
-  const completedGoals = goals.filter((g) => g.status === 'completed')
-  const achievedCount = completedGoals.length
-  const avgProgress =
-    activeGoals.length > 0
-      ? Math.round(
-          activeGoals.reduce((sum, g) => {
-            const pct = g.progress_percentage ?? (g.target_value != null && g.target_value !== 0 && g.current_value != null
-              ? (Number(g.current_value) / Number(g.target_value)) * 100
-              : 0)
-            return sum + pct
-          }, 0) / activeGoals.length
-        )
-      : null
+  const activeGoals = useMemo(
+    () => goals.filter((g) => g.status === 'active'),
+    [goals]
+  )
+  const averageProgress = useMemo(() => {
+    if (activeGoals.length === 0) return 0
+    const total = activeGoals.reduce(
+      (sum, g) => sum + (g.progress_percentage ?? 0),
+      0
+    )
+    return Math.round(total / activeGoals.length)
+  }, [activeGoals])
 
-  const openCreateGoal = () => {
-    setGoalBeingEdited(null)
-    setShowGoalModal(true)
-  }
+  const goalsByPillar = useMemo(() => {
+    const grouped: Record<PillarId, CoachGoalRow[]> = {
+      training: [],
+      nutrition: [],
+      body: [],
+      lifestyle: [],
+    }
+    for (const goal of goals) {
+      grouped[pillarForCategory(goal.category)].push(goal)
+    }
+    return grouped
+  }, [goals])
 
-  const openEditGoal = (g: GoalRow) => {
-    setGoalBeingEdited(g)
-    setShowGoalModal(true)
-  }
+  const latestSync = useMemo(() => {
+    if (goals.length === 0) return null
+    const latest = goals.reduce((acc, g) =>
+      new Date(g.updated_at).getTime() > new Date(acc.updated_at).getTime() ? g : acc
+    )
+    return new Date(latest.updated_at)
+  }, [goals])
+
+  const showNoGoalsAtAll = goals.length === 0 && statusFilter === 'all'
+  const showNoFilteredResults = goals.length === 0 && statusFilter !== 'all'
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="fc-card-shell p-8 text-center fc-text-dim">
-          Loading goals…
-        </div>
-      </div>
-    )
-  }
-
-  if (goals.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="fc-card-shell p-8">
-          <EmptyState
-            icon={Target}
-            title="No goals set for this client"
-            description="Create a goal to track progress together."
-            actionLabel="Create goal"
-            onAction={() => openCreateGoal()}
-          />
-        </div>
-        {showGoalModal && (
-          <CoachCreateGoalModal
-            clientId={clientId}
-            coachId={user?.id ?? ''}
-            existingGoal={goalBeingEdited}
-            onClose={() => {
-              setShowGoalModal(false)
-              setGoalBeingEdited(null)
-            }}
-            onSuccess={() => {
-              setShowGoalModal(false)
-              setGoalBeingEdited(null)
-              void loadGoals()
-            }}
-          />
-        )}
-      </div>
-    )
-  }
-
-  const displayGoals = [...activeGoals, ...completedGoals]
-
-  return (
-    <div className="space-y-6">
-      {/* Overview */}
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="fc-icon-tile fc-icon-workouts">
-                <Target className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">Goals</span>
-                <h3 className="text-lg font-semibold fc-text-primary mt-2">Progress Snapshot</h3>
-                <p className="text-sm fc-text-dim">Current targets and progress momentum</p>
-              </div>
-            </div>
-            <Button
-              onClick={() => openCreateGoal()}
-              variant="outline"
-              size="sm"
-              className="gap-2 fc-btn fc-btn-secondary"
-            >
-              <Plus className="w-4 h-4" />
-              Create Goal
-            </Button>
-          </div>
-        </div>
-        <div className="px-3 py-2">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-              <p className="text-3xl font-bold fc-text-primary">{activeGoals.length}</p>
-              <p className="text-sm fc-text-dim">Active Goals</p>
-            </div>
-            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-              <p className="text-3xl font-bold fc-text-primary">{achievedCount}</p>
-              <p className="text-sm fc-text-dim">Achieved</p>
-            </div>
-            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
-              <p className="text-3xl font-bold fc-text-primary">
-                {avgProgress != null ? `${avgProgress}%` : '—'}
-              </p>
-              <p className="text-sm fc-text-dim">Avg Progress</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Goals List */}
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-          <div className="flex items-center gap-3">
-            <div className="fc-icon-tile fc-icon-workouts">
-              <Target className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">Goal Timeline</span>
-              <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                {activeGoals.length ? 'Active' : 'Completed'} Goals
-              </h3>
-            </div>
-            <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
-              {goals.length}
-            </span>
-          </div>
-        </div>
-        <div className="px-2 py-1">
-          {displayGoals.map((goal) => {
-            const targetVal = goal.target_value != null ? Number(goal.target_value) : null
-            const currentVal = goal.current_value != null ? Number(goal.current_value) : null
-            const progress =
-              goal.progress_percentage != null
-                ? Number(goal.progress_percentage)
-                : targetVal != null && targetVal !== 0 && currentVal != null
-                  ? Math.round((currentVal / targetVal) * 100)
-                  : 0
-            const unit = goal.target_unit ?? ''
-
-            return (
-              <div
-                key={goal.id}
-                className="border-b border-[color:var(--fc-glass-border)] px-2 py-3 last:border-b-0"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="fc-icon-tile fc-icon-workouts">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="fc-text-primary mb-1 text-lg font-semibold">{goal.title}</h4>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                            {pillarLabel(goal)}
-                          </span>
-                          <span
-                            className={`fc-pill fc-pill-glass text-xs ${
-                              goal.status === 'completed'
-                                ? 'fc-text-success'
-                                : goal.status === 'paused'
-                                  ? 'fc-text-subtle'
-                                  : 'fc-text-warning'
-                            }`}
-                          >
-                            {goal.status}
-                          </span>
-                        </div>
-                      </div>
-                      {goal.target_date && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 fc-text-subtle" />
-                          <span className="text-sm fc-text-subtle">
-                            {new Date(goal.target_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {(targetVal != null || goal.status === 'active') && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="fc-text-subtle">
-                            {currentVal != null ? currentVal : '—'} / {targetVal != null ? targetVal : '—'} {unit}
-                          </span>
-                          <span className="font-bold text-cyan-400 tabular-nums">
-                            {Math.min(100, Math.max(0, progress))}%
-                          </span>
-                        </div>
-                        <div className="fc-progress-track h-3 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
-                            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {goal.created_at && (
-                      <p className="text-xs fc-text-subtle mt-2">
-                        Created {new Date(goal.created_at).toLocaleDateString()}
-                      </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="fc-btn fc-btn-secondary"
-                        onClick={() => openEditGoal(goal)}
-                      >
-                        Edit goal
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {showGoalModal && (
-        <CoachCreateGoalModal
-          clientId={clientId}
-          coachId={user?.id ?? ''}
-          existingGoal={goalBeingEdited}
-          onClose={() => {
-            setShowGoalModal(false)
-            setGoalBeingEdited(null)
-          }}
-          onSuccess={() => {
-            setShowGoalModal(false)
-            setGoalBeingEdited(null)
-            void loadGoals()
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-interface CoachCreateGoalModalProps {
-  clientId: string
-  coachId: string
-  onClose: () => void
-  onSuccess: () => void
-  existingGoal?: GoalRow | null
-}
-
-function CoachCreateGoalModal({
-  clientId,
-  coachId,
-  onClose,
-  onSuccess,
-  existingGoal = null,
-}: CoachCreateGoalModalProps) {
-  const { addToast } = useToast()
-  const isEdit = existingGoal != null
-
-  const [title, setTitle] = useState('')
-  const [pillar, setPillar] = useState<Pillar>('general')
-  const [targetValue, setTargetValue] = useState('')
-  const [targetUnit, setTargetUnit] = useState('')
-  const [targetDate, setTargetDate] = useState('')
-  const [goalType, setGoalType] = useState('')
-  const [currentValueStr, setCurrentValueStr] = useState('')
-  const [progressPctStr, setProgressPctStr] = useState('')
-  const [status, setStatus] = useState('active')
-  const [description, setDescription] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (existingGoal) {
-      setTitle(existingGoal.title)
-      setPillar(initialPillar(existingGoal))
-      setTargetValue(
-        existingGoal.target_value != null ? String(existingGoal.target_value) : ''
-      )
-      setTargetUnit(existingGoal.target_unit ?? '')
-      setTargetDate(
-        existingGoal.target_date
-          ? existingGoal.target_date.split('T')[0]
-          : ''
-      )
-      setGoalType(existingGoal.goal_type ?? '')
-      setCurrentValueStr(
-        existingGoal.current_value != null ? String(existingGoal.current_value) : ''
-      )
-      setProgressPctStr(
-        existingGoal.progress_percentage != null
-          ? String(existingGoal.progress_percentage)
-          : ''
-      )
-      setStatus(existingGoal.status || 'active')
-      setDescription(existingGoal.description ?? '')
-    } else {
-      setTitle('')
-      setPillar('general')
-      setTargetValue('')
-      setTargetUnit('')
-      setTargetDate('')
-      setGoalType('')
-      setCurrentValueStr('')
-      setProgressPctStr('')
-      setStatus('active')
-      setDescription('')
-    }
-  }, [existingGoal])
-
-  const handleDelete = async () => {
-    if (!existingGoal || !confirm('Delete this goal?')) return
-    setIsSubmitting(true)
-    try {
-      const { error } = await supabase.from('goals').delete().eq('id', existingGoal.id)
-      if (error) throw error
-      addToast({ title: 'Goal deleted', variant: 'default' })
-      onSuccess()
-    } catch (e) {
-      console.error(e)
-      addToast({ title: 'Could not delete goal', variant: 'destructive' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!coachId || !title || !targetValue) return
-
-    setIsSubmitting(true)
-    try {
-      const parsed = parseFloat(targetValue)
-      if (Number.isNaN(parsed)) {
-        addToast({ title: 'Please enter a valid number for target.', variant: 'destructive' })
-        return
-      }
-
-      const cur =
-        currentValueStr.trim() === '' ? null : Number(currentValueStr)
-      const pct =
-        progressPctStr.trim() === '' ? null : Number(progressPctStr)
-      if (isEdit) {
-        if (cur != null && Number.isNaN(cur)) {
-          addToast({ title: 'Invalid current value', variant: 'destructive' })
-          return
-        }
-        if (pct != null && Number.isNaN(pct)) {
-          addToast({ title: 'Invalid progress %', variant: 'destructive' })
-          return
-        }
-        const completed_date =
-          status === 'completed'
-            ? (existingGoal!.completed_date ??
-              new Date().toISOString().split('T')[0])
-            : null
-
-        const { error } = await supabase
-          .from('goals')
-          .update({
-            title,
-            pillar,
-            target_value: parsed,
-            target_unit: targetUnit || 'units',
-            target_date: targetDate || null,
-            goal_type: goalType || null,
-            current_value: cur,
-            progress_percentage: pct,
-            status,
-            completed_date,
-            description: description.trim() || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingGoal!.id)
-
-        if (error) throw error
-        addToast({ title: 'Goal updated', variant: 'default' })
-      } else {
-        const { error } = await supabase.from('goals').insert({
-          client_id: clientId,
-          coach_id: coachId,
-          title,
-          pillar,
-          target_value: parsed,
-          target_unit: targetUnit || 'units',
-          target_date: targetDate || null,
-          goal_type: goalType || null,
-          current_value: 0,
-          status: 'active',
-          priority: 'medium',
-          start_date: new Date().toISOString().split('T')[0],
-          progress_percentage: 0,
-          category: 'other',
-          description: description.trim() || null,
-        })
-
-        if (error) throw error
-        addToast({ title: 'Goal created', variant: 'default' })
-      }
-
-      onSuccess()
-    } catch (error) {
-      console.error('Error saving goal:', error)
-      addToast({
-        title:
-          error instanceof Error ? error.message : 'Failed to save goal. Please try again.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
       <div
-        className="w-full max-w-md mt-8 mb-8 fc-modal fc-card p-6 md:p-8"
-        onClick={(e) => e.stopPropagation()}
+        className={
+          layoutVariant === 'coachV6'
+            ? `${sec.section} animate-pulse h-24`
+            : 'fc-card-shell p-8 text-center fc-text-dim'
+        }
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold fc-text-primary">
-            {isEdit ? 'Edit goal' : 'Create goal for client'}
-          </h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 fc-press">
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
+        {layoutVariant === 'coachV6' ? '' : 'Loading goals...'}
+      </div>
+    )
+  }
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Goal title *</label>
-            <input
-              type="text"
-              placeholder="e.g., Run 5K, Hit 150g protein daily"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Description (optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary resize-y min-h-[60px]"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Pillar</label>
+  if (layoutVariant === 'coachV6') {
+    return (
+      <div className="space-y-3">
+        <section className={sec.section}>
+          <div className={sec.sectionHead}>
+            <div>
+              <span className={sec.eyebrow}>Client goals</span>
+              <h2 className={sec.sectionTitle}>
+                {activeGoals.length} active goals · avg {averageProgress}%
+              </h2>
+            </div>
             <select
-              value={pillar}
-              onChange={(e) => setPillar(e.target.value as Pillar)}
-              className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as GoalStatusFilter)}
+              className="w-full sm:w-48 rounded-[11px] border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] px-3 py-2 text-sm fc-text-primary"
             >
-              {(Object.keys(PILLAR_LABELS) as Pillar[]).map((p) => (
-                <option key={p} value={p}>
-                  {PILLAR_LABELS[p]}
-                </option>
-              ))}
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="all">All</option>
+              <option value="paused">Paused</option>
             </select>
           </div>
+        </section>
 
-          <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Target *</label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                placeholder="Number"
-                value={targetValue}
-                onChange={(e) => setTargetValue(e.target.value)}
-                required
-                min={0}
-                step="0.01"
-                className="flex-1 px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
-              />
-              <input
-                type="text"
-                placeholder="Unit (kg, reps, min)"
-                value={targetUnit}
-                onChange={(e) => setTargetUnit(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
-              />
-            </div>
-          </div>
+        {showNoGoalsAtAll && (
+          <EmptyStateBlock
+            icon={Target}
+            title="No goals set yet"
+            description={`${clientName || 'This client'} has not added any goals.`}
+          />
+        )}
 
-          {GOAL_TYPE_OPTIONS[pillar]?.length > 0 && (
-            <div>
-              <label className="text-sm font-medium fc-text-subtle block mb-2">Goal type (optional)</label>
-              <select
-                value={goalType}
-                onChange={(e) => setGoalType(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
-              >
-                <option value="">—</option>
-                {GOAL_TYPE_OPTIONS[pillar].map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {showNoFilteredResults && (
+          <EmptyStateBlock
+            icon={Target}
+            title="No goals in this filter"
+            description="Switch to All to see every goal."
+          />
+        )}
 
-          <div>
-            <label className="text-sm font-medium fc-text-subtle block mb-2">Deadline (optional)</label>
-            <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary"
-            />
-          </div>
-
-          {isEdit && (
-            <>
-              <div>
-                <label className="text-sm font-medium fc-text-subtle block mb-2">Current value</label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={currentValueStr}
-                  onChange={(e) => setCurrentValueStr(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium fc-text-subtle block mb-2">Progress % (0–100)</label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={progressPctStr}
-                  onChange={(e) => setProgressPctStr(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium fc-text-subtle block mb-2">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full rounded-xl border border-[color:var(--fc-glass-border)] bg-transparent px-3 py-2 text-sm fc-text-primary"
+        {PILLARS.map((pillar) => {
+          const items = goalsByPillar[pillar.id]
+          if (items.length === 0) return null
+          return (
+            <section key={pillar.id} className={sec.section}>
+              <div className="flex items-center justify-between px-0.5">
+                <span
+                  style={{
+                    fontFamily: 'var(--font-geist-mono, monospace)',
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--fc-text-subtle)',
+                  }}
                 >
-                  <option value="active">active</option>
-                  <option value="completed">completed</option>
-                  <option value="paused">paused</option>
-                  <option value="cancelled">cancelled</option>
-                </select>
+                  {pillar.label}
+                </span>
+                <span
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    color: 'var(--fc-text-secondary)',
+                  }}
+                >
+                  {items.length}
+                </span>
               </div>
-            </>
-          )}
-
-          <div className="flex flex-wrap gap-2 pt-4">
-            <Button
-              type="submit"
-              disabled={isSubmitting || !title || !targetValue}
-              className="flex-1 fc-btn fc-btn-primary"
-            >
-              {isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create goal'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 fc-btn fc-btn-secondary">
-              Cancel
-            </Button>
-            {isEdit && (
-              <Button
-                type="button"
-                variant="destructive"
-                className="w-full sm:w-auto sm:ml-auto"
-                disabled={isSubmitting}
-                onClick={() => void handleDelete()}
-              >
-                Delete
-              </Button>
-            )}
-          </div>
-        </form>
+              <div className="space-y-2">
+                {items.map((goal) => {
+                  const progress = Math.max(
+                    0,
+                    Math.min(100, Math.round(goal.progress_percentage ?? 0))
+                  )
+                  const sourceType = unwrapSourceType(goal)
+                  const source = sourcePresentation(sourceType, unwrapSourceConfig(goal))
+                  const unit = goal.target_unit ?? ''
+                  const deadline = deadlineCopy(goal)
+                  const currentStr =
+                    goal.current_value != null
+                      ? `${formatNumber(goal.current_value)}${unit}`
+                      : '—'
+                  const targetStr =
+                    goal.target_value != null ? `${formatNumber(goal.target_value)}${unit}` : null
+                  const foot =
+                    deadline != null
+                      ? `${source.label} · ${deadline.text.replace(/^Deadline:?\s*/i, '')}`
+                      : source.label
+                  const pri = (goal.priority ?? 'low').charAt(0).toUpperCase() + (goal.priority ?? 'low').slice(1)
+                  return (
+                    <GoalCard
+                      key={goal.id}
+                      pillar={pillarToCardPillar(pillar.id)}
+                      title={goal.title}
+                      categoryLabel={categoryLabel(goal.category)}
+                      statusLabel={statusLabel(goal.status)}
+                      priorityLabel={pri}
+                      progressPct={progress}
+                      currentDisplay={currentStr}
+                      targetDisplay={targetStr}
+                      footIcon={source.Icon}
+                      footText={foot}
+                    />
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
       </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-xl border border-[color:var(--fc-glass-border)] p-4 fc-glass-soft">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-wider fc-text-subtle">Client goals</p>
+            <h3 className="text-lg font-semibold fc-text-primary">
+              {clientName || 'Client'} · {activeGoals.length} active goals
+            </h3>
+            <p className="text-sm fc-text-dim">Average progress: {averageProgress}%</p>
+          </div>
+
+          <div className="w-full sm:w-48">
+            <label className="block text-xs uppercase tracking-wider fc-text-subtle mb-1">
+              Filter
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as GoalStatusFilter)}
+              className="w-full rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)] px-3 py-2 text-sm fc-text-primary"
+            >
+              <option value="all">All goals</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {showNoGoalsAtAll && (
+        <section className="rounded-xl border border-[color:var(--fc-glass-border)] p-6 text-center">
+          <Target className="w-8 h-8 mx-auto mb-2 fc-text-dim" />
+          <p className="text-sm fc-text-primary">No goals set yet.</p>
+          <p className="text-sm fc-text-dim">
+            {clientName || 'This client'} hasn&apos;t set any goals.
+          </p>
+        </section>
+      )}
+
+      {showNoFilteredResults && (
+        <section className="rounded-xl border border-[color:var(--fc-glass-border)] p-6 text-center">
+          <p className="text-sm fc-text-primary">
+            {statusFilter === 'completed'
+              ? 'No completed goals yet.'
+              : statusFilter === 'paused'
+                ? 'No paused goals.'
+                : 'No active goals.'}
+          </p>
+        </section>
+      )}
+
+      {PILLARS.map((pillar) => {
+        const items = goalsByPillar[pillar.id]
+        return (
+          <section
+            key={pillar.id}
+            className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-4"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold uppercase tracking-wider fc-text-primary">
+                {pillar.label}
+              </h4>
+              <span className="text-xs fc-text-dim">{items.length}</span>
+            </div>
+
+            {items.length === 0 ? (
+              <p className="text-sm fc-text-dim py-2">{pillar.emptyText}</p>
+            ) : (
+              <div className="space-y-3">
+                {items.map((goal) => {
+                  const progress = Math.max(
+                    0,
+                    Math.min(100, Math.round(goal.progress_percentage ?? 0))
+                  )
+                  const sourceType = unwrapSourceType(goal)
+                  const source = sourcePresentation(sourceType, unwrapSourceConfig(goal))
+                  const unit = goal.target_unit ?? ''
+                  const deadline = deadlineCopy(goal)
+
+                  return (
+                    <article
+                      key={goal.id}
+                      className="rounded-lg border border-[color:var(--fc-glass-border)] p-3 bg-[color:var(--fc-glass-highlight)]"
+                    >
+                      <h5 className="text-base font-semibold fc-text-primary mb-2">{goal.title}</h5>
+
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="px-2 py-1 rounded-full border text-xs fc-text-subtle border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface)]">
+                          {categoryLabel(goal.category)}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-full border text-xs ${statusClass(goal.status)}`}
+                        >
+                          {statusLabel(goal.status)}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-full border text-xs ${priorityClass(goal.priority)}`}
+                        >
+                          {(goal.priority ?? 'low').charAt(0).toUpperCase() + (goal.priority ?? 'low').slice(1)}
+                        </span>
+                      </div>
+
+                      <div className="h-2 rounded-full bg-[color:var(--fc-glass-border)] overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-2 text-sm fc-text-dim">
+                        {goal.current_value != null && goal.target_value != null ? (
+                          <span>
+                            {formatNumber(goal.current_value)}
+                            {unit} / {formatNumber(goal.target_value)}
+                            {unit}
+                          </span>
+                        ) : goal.current_value != null ? (
+                          <span>
+                            Current: {formatNumber(goal.current_value)}
+                            {unit}
+                          </span>
+                        ) : (
+                          <span className="italic">No targets set</span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2 text-xs fc-text-dim">
+                        <source.Icon className="w-4 h-4" />
+                        <span>{source.label}</span>
+                      </div>
+
+                      {deadline ? (
+                        <p className={`text-xs mt-2 ${deadline.className}`}>{deadline.text}</p>
+                      ) : null}
+
+                      {goal.notes ? (
+                        <p className="text-xs mt-2 italic fc-text-dim">{goal.notes}</p>
+                      ) : null}
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )
+      })}
+
+      <p className="text-xs fc-text-dim">
+        Last auto-sync:{' '}
+        {latestSync ? latestSync.toLocaleString() : 'No sync data yet'}
+      </p>
     </div>
   )
 }

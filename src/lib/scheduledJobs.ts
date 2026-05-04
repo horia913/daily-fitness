@@ -9,12 +9,15 @@
  * - Or call these functions from a separate Node.js service
  */
 
-import { syncAllClientGoals, resetWeeklyGoals, resetDailyGoals } from './goalSyncService'
+import { syncGoalsForClient, resetWeeklyGoals, resetDailyGoals } from './goalSyncService'
 import { createClient } from '@supabase/supabase-js'
 import { getTrackedFetch } from '@/lib/supabaseQueryLogger'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!supabaseServiceKey) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for this operation. Refusing to fall back to anon key.')
+}
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   global: { fetch: getTrackedFetch() },
@@ -114,14 +117,22 @@ export async function runDailyGoalSync() {
       return
     }
 
-    // Sync goals for each client
     let totalSynced = 0
+    let totalSkipped = 0
+    let totalErrors = 0
     for (const client of clients) {
-      const results = await syncAllClientGoals(client.id)
-      totalSynced += results.filter(r => r.updated).length
+      const res = await syncGoalsForClient(client.id)
+      totalSynced += res.syncedGoals
+      totalSkipped += res.skippedGoals
+      totalErrors += res.errors.length
+      if (res.errors.length > 0) {
+        console.error(`[dailyGoalSync] errors for client ${client.id}:`, res.errors)
+      }
     }
 
-    console.log(`✅ Synced goals for ${clients.length} clients (${totalSynced} goals updated)`)
+    console.log(
+      `✅ Synced goals for ${clients.length} clients (updated: ${totalSynced}, skipped: ${totalSkipped}, errors: ${totalErrors})`
+    )
   } catch (error) {
     console.error('Error in daily goal sync:', error)
   }

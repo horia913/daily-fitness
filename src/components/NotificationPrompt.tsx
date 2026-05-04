@@ -6,8 +6,16 @@ import { Card } from '@/components/ui/card'
 import { Bell, X } from 'lucide-react'
 import { requestPushPermission, getPermissionStatus } from '@/lib/onesignal'
 import { useTheme } from '@/contexts/ThemeContext'
+import { isPushNotificationsEnabled } from '@/lib/pushNotificationsEnabled'
 
 export default function NotificationPrompt() {
+  if (!isPushNotificationsEnabled()) {
+    return null
+  }
+  return <NotificationPromptInner />
+}
+
+function NotificationPromptInner() {
   const { getThemeStyles } = useTheme()
   const theme = getThemeStyles()
   const [showPrompt, setShowPrompt] = useState(false)
@@ -76,7 +84,7 @@ export default function NotificationPrompt() {
               <div>
                 <h3 className={`font-bold text-base sm:text-lg ${theme.text}`}>Stay in the Loop!</h3>
                 <p className={`text-xs sm:text-sm ${theme.textSecondary} mt-1`}>
-                  Get notified about workouts, sessions, and achievements
+                  Coach messages, program updates, and challenge alerts.
                 </p>
               </div>
             </div>
@@ -125,4 +133,3 @@ export default function NotificationPrompt() {
     </div>
   )
 }
-

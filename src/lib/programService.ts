@@ -112,7 +112,9 @@ export async function getCompleteWeeks(clientId: string): Promise<WeekCompletion
 
     return uniqueWeeks.map(weekNum => {
       const slotsInWeek = state.slots.filter(s => s.week_number === weekNum)
-      const completedInWeek = slotsInWeek.filter(s => completedScheduleIds.has(s.id)).length
+      const completedInWeek = slotsInWeek.filter(
+        (s) => s.id != null && completedScheduleIds.has(s.id),
+      ).length
 
       return {
         week_number: weekNum,

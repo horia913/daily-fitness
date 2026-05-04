@@ -71,21 +71,25 @@ export async function GET(request: NextRequest) {
     const assignment = await getActiveProgramAssignment(supabase, user.id)
     const currentWeekNumber = await getCurrentWeekNumber(supabase, user.id)
     if (assignment && currentWeekNumber != null) {
-      const weekCompliance = await perf.time('compute_week_compliance', () =>
-        computeWeekCompliance(supabase, {
-          programAssignmentId: assignment.id,
-          weekNumber: currentWeekNumber,
-        })
-      )
-      if (data.todaysWorkout && typeof data.todaysWorkout === 'object') {
-        payload = {
-          ...data,
-          todaysWorkout: {
-            ...data.todaysWorkout,
-            weekCompleted: weekCompliance.weekCompleted,
-            currentWeek: currentWeekNumber,
-          },
+      try {
+        const weekCompliance = await perf.time('compute_week_compliance', () =>
+          computeWeekCompliance(supabase, {
+            programAssignmentId: assignment.id,
+            weekNumber: currentWeekNumber,
+          })
+        )
+        if (data.todaysWorkout && typeof data.todaysWorkout === 'object') {
+          payload = {
+            ...data,
+            todaysWorkout: {
+              ...data.todaysWorkout,
+              weekCompleted: weekCompliance.weekCompleted,
+              currentWeek: currentWeekNumber,
+            },
+          }
         }
+      } catch (complianceErr) {
+        console.error('[summary] computeWeekCompliance skipped:', complianceErr)
       }
     }
 

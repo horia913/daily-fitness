@@ -252,7 +252,12 @@ export class WorkoutSetEntryService {
       const idChunks = this.chunk(ids, this.QUERY_CHUNK_SIZE)
       for (const idChunk of idChunks) {
         const { data } = await safeQuery(
-          () => supabase.from('exercises').select('id, name, description, video_url').in('id', idChunk),
+          // `exercises` has `primary_muscle_group_id` (FK); resolve name via `muscle_groups` below (no `muscle_groups` column on exercises).
+          () =>
+            supabase
+              .from('exercises')
+              .select('id, name, description, video_url, primary_muscle_group_id')
+              .in('id', idChunk),
           'exercises'
         )
         if (data?.length) exercisesData = exercisesData.concat(data)
@@ -263,9 +268,33 @@ export class WorkoutSetEntryService {
       console.log('[buildBlocks] exercises ids=', allExerciseIds.size, 'rows=', exercisesData.length)
     }
 
+    const muscleGroupNameById = new Map<string, string>()
+    const muscleIds = [
+      ...new Set(
+        (exercisesData || [])
+          .map((e: any) => e.primary_muscle_group_id)
+          .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ]
+    if (muscleIds.length > 0) {
+      const mgChunks = this.chunk(muscleIds, this.QUERY_CHUNK_SIZE)
+      for (const chunk of mgChunks) {
+        const { data: mgRows } = await safeQuery(
+          () => supabase.from('muscle_groups').select('id, name').in('id', chunk),
+          'muscle_groups'
+        )
+        ;(mgRows || []).forEach((mg: { id: string; name: string }) => {
+          muscleGroupNameById.set(mg.id, mg.name)
+        })
+      }
+    }
+
     const exercisesMap = new Map<string, any>()
     ;(exercisesData || []).forEach((ex: any) => {
-      exercisesMap.set(ex.id, ex)
+      const primary_muscle_group = ex.primary_muscle_group_id
+        ? muscleGroupNameById.get(ex.primary_muscle_group_id) ?? null
+        : null
+      exercisesMap.set(ex.id, { ...ex, primary_muscle_group })
     })
 
     const exercisesByBlock = new Map<string, any[]>()

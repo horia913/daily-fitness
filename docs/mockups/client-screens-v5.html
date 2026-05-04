@@ -1,0 +1,3420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Client Screens — v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* SURFACES */
+    --bg-page: #07101A;
+    --bg-page-deep: #030911;
+    --bg-card: #0E1F2E;
+    --bg-card-hi: #142838;
+    --bg-elevated: #19324A;
+    --bg-input: rgba(255, 255, 255, 0.025);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hi: rgba(255, 255, 255, 0.14);
+    --divider: rgba(255, 255, 255, 0.06);
+
+    /* TEXT */
+    --t1: #FFFFFF;
+    --t2: rgba(255, 255, 255, 0.65);
+    --t3: rgba(255, 255, 255, 0.42);
+    --t4: rgba(255, 255, 255, 0.26);
+    --t5: rgba(255, 255, 255, 0.16);
+    --ink: #061018;
+
+    /* ACCENTS */
+    --aqua: #4FE3E8;
+    --aqua-soft: rgba(79, 227, 232, 0.13);
+    --lime: #C5FF4A;
+    --lime-2: #7FE89A;
+    --lime-glow: rgba(197, 255, 74, 0.38);
+    --gold: #F5C242;
+    --gold-soft: rgba(245, 194, 66, 0.13);
+    --warning: #F59E42;
+    --danger: #FF3B5C;
+
+    /* TYPE */
+    --f-display: 'Big Shoulders Display', sans-serif;
+    --f-headline: 'Bricolage Grotesque', sans-serif;
+    --f-body: 'Geist', system-ui, sans-serif;
+    --f-mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--f-body);
+    background: #15161c;
+    background-image:
+      radial-gradient(circle at 20% 0%, #25232f 0%, transparent 55%),
+      radial-gradient(circle at 80% 100%, #1a1f28 0%, transparent 55%);
+    min-height: 100vh;
+    padding: 40px 20px;
+    color: var(--t1);
+  }
+
+  .stage {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone-label {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .phone-label .tag {
+    color: var(--lime);
+    font-family: var(--f-mono);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-right: 8px;
+  }
+
+  /* PHONE FRAME */
+  .phone {
+    width: 390px;
+    height: 880px;
+    background: var(--bg-page);
+    border-radius: 48px;
+    border: 10px solid #0a0a0c;
+    box-shadow:
+      0 0 0 2px #1a1a20,
+      0 50px 100px -20px rgba(0, 0, 0, 0.7),
+      0 0 100px -10px rgba(197, 255, 74, 0.06);
+    overflow: hidden;
+    position: relative;
+  }
+  /* Default backdrop — glow at top (action lives near top) */
+  .phone::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 100% 60% at 50% -20%, rgba(197, 255, 74, 0.10), transparent 70%),
+      radial-gradient(ellipse 80% 50% at 100% 100%, rgba(79, 227, 232, 0.05), transparent 70%),
+      linear-gradient(180deg, transparent 0%, var(--bg-page-deep) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* WORKOUT EXEC variant — glow at bottom where LOG SET button is */
+  .phone.exec-bg::before {
+    background:
+      radial-gradient(ellipse 110% 50% at 50% 80%, rgba(197, 255, 74, 0.13), transparent 70%),
+      radial-gradient(ellipse 80% 40% at 0% 0%, rgba(79, 227, 232, 0.04), transparent 70%),
+      linear-gradient(180deg, var(--bg-page-deep) 0%, transparent 60%);
+  }
+  /* TRAIN variant — softer/quieter, info-dominant */
+  .phone.train-bg::before {
+    background:
+      radial-gradient(ellipse 90% 50% at 50% -20%, rgba(79, 227, 232, 0.06), transparent 70%),
+      linear-gradient(180deg, transparent 0%, var(--bg-page-deep) 100%);
+  }
+
+  .phone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .screen {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 0 100px;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+
+  /* STATUS BAR */
+  .status-bar {
+    height: 54px;
+    padding: 0 28px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .status-icons svg { width: 16px; height: 16px; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px 0;
+  }
+  .avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bg-card-hi), var(--bg-card));
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    font-size: 14px; font-weight: 600;
+    color: var(--t2);
+  }
+  .topbar .right { display: flex; gap: 10px; align-items: center; }
+  .icon-btn {
+    width: 38px; height: 38px;
+    display: grid; place-items: center;
+    color: var(--t2);
+    position: relative;
+    border-radius: 50%;
+    border: 1px solid transparent;
+  }
+  .icon-btn.has-dot::after {
+    content: "";
+    position: absolute;
+    top: 8px; right: 9px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 8px var(--lime-glow);
+  }
+
+  /* GREETING */
+  .greeting {
+    padding: 22px 20px 22px;
+  }
+  .greeting .eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--lime);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .greeting .eyebrow::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 12px var(--lime-glow);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+  .greeting h1 {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 30px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+  .greeting h1 .accent {
+    background: linear-gradient(120deg, var(--lime), var(--lime-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-style: italic;
+  }
+  .greeting .date {
+    font-size: 13px;
+    color: var(--t3);
+    margin-top: 8px;
+  }
+
+  /* SECTION HEADER */
+  .section-head {
+    padding: 0 20px;
+    margin: 4px 0 12px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-head .lhs { display: flex; align-items: baseline; gap: 10px; }
+  .section-title {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--t1);
+    letter-spacing: -0.01em;
+  }
+  .section-link {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t3);
+    text-decoration: none;
+  }
+
+  /* ───────────────────────── DASHBOARD HERO ───────────────────────── */
+  .hero-workout {
+    margin: 0 16px 22px;
+    border-radius: 28px;
+    background:
+      radial-gradient(ellipse 80% 60% at 100% 0%, rgba(127, 232, 154, 0.18), transparent 60%),
+      radial-gradient(ellipse 100% 80% at 0% 100%, rgba(197, 255, 74, 0.14), transparent 65%),
+      linear-gradient(135deg, #1a2530 0%, #0E1F2E 100%);
+    border: 1px solid rgba(197, 255, 74, 0.20);
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 20px 50px -20px rgba(197, 255, 74, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .hero-workout::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 220px; height: 220px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 8px
+    );
+    pointer-events: none;
+  }
+  .hw-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .hw-eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--lime);
+  }
+  .hw-pill {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--t1);
+    letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .hw-pill svg { width: 11px; height: 11px; }
+  .hw-name {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .hw-meta {
+    font-size: 12.5px;
+    color: var(--t2);
+    margin-bottom: 18px;
+  }
+  .hw-meta .sep {
+    color: var(--t4);
+    margin: 0 8px;
+  }
+  .hw-cta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn-action {
+    flex: 1;
+    background: linear-gradient(135deg, var(--lime), var(--lime-2));
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 14.5px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow:
+      0 12px 30px -8px var(--lime-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.01em;
+  }
+  .btn-action svg { width: 16px; height: 16px; }
+  .btn-ghost-icon {
+    width: 50px; height: 50px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--t2);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .btn-ghost-icon svg { width: 18px; height: 18px; }
+
+  /* DASHBOARD TELEMETRY STRIP */
+  .strip {
+    margin: 0 20px 22px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .strip-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+  }
+  .strip-card .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--t3);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .strip-card .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    color: var(--t1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .strip-card .v .frac { color: var(--t4); font-weight: 500; font-size: 18px; }
+  .strip-card .v .flame {
+    color: var(--warning);
+    flex-shrink: 0;
+  }
+  .strip-card .v .flame svg { width: 18px; height: 18px; }
+  .strip-card .sub {
+    font-size: 10.5px;
+    color: var(--t3);
+    margin-top: 4px;
+  }
+
+  /* DAILY / CHECK-IN ROW */
+  .duo {
+    margin: 0 20px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .duo-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .duo-card .ico {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    margin-bottom: 12px;
+  }
+  .duo-card.daily .ico {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t3);
+  }
+  .duo-card.checkin .ico {
+    background: rgba(197, 255, 74, 0.10);
+    color: var(--lime);
+  }
+  .duo-card .ico svg { width: 14px; height: 14px; }
+  .duo-card .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--t3);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .duo-card .v {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--t1);
+  }
+
+  /* ACHIEVEMENTS */
+  .achievements {
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ach-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ach-row .ach-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    background: var(--gold-soft);
+    color: var(--gold);
+  }
+  .ach-row .ach-icon svg { width: 14px; height: 14px; }
+  .ach-row .info { flex: 1; min-width: 0; }
+  .ach-row .name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--t1);
+    line-height: 1.2;
+  }
+  .ach-row .meta {
+    font-size: 11px;
+    color: var(--t3);
+    margin-top: 2px;
+  }
+  .ach-row .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: -0.02em;
+  }
+
+  /* ───────────────────────── TRAIN SCREEN ───────────────────────── */
+  .page-title {
+    padding: 16px 20px 22px;
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  /* TRAIN program card — restrained, info-dominant (NOT lime-glowy) */
+  .program-card {
+    margin: 0 20px 24px;
+    border-radius: 22px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .pc-eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--t3);
+  }
+  .pc-link {
+    font-size: 12px;
+    color: var(--aqua);
+    text-decoration: none;
+    font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .pc-link svg { width: 12px; height: 12px; }
+  .pc-name {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .pc-tag {
+    display: inline-block;
+    background: rgba(79, 227, 232, 0.10);
+    color: var(--aqua);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .pc-progress {
+    margin: 16px 0 4px;
+  }
+  .pc-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .pc-progress-meta .l {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 600;
+  }
+  .pc-progress-meta .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--t1);
+  }
+  .pc-progress-meta .v .frac {
+    color: var(--t3);
+    font-weight: 500;
+    font-size: 12px;
+  }
+  .pc-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .pc-bar > span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--lime), var(--lime-2));
+    border-radius: 3px;
+  }
+  .pc-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 16px -20px;
+  }
+  .pc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .pc-row .info .l {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--t3);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .pc-row .info .v {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--t1);
+  }
+
+  /* WEEK CALENDAR */
+  .week {
+    padding: 0 16px;
+    margin-bottom: 22px;
+  }
+  .week-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 4px 8px;
+  }
+  .week-strip::-webkit-scrollbar { display: none; }
+  .day {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 6px 12px;
+    text-align: center;
+    position: relative;
+  }
+  .day.today {
+    background: var(--bg-elevated);
+    border-color: var(--aqua);
+    box-shadow: 0 0 0 3px rgba(79, 227, 232, 0.10);
+  }
+  .day .dow {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .day .num {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--t1);
+    line-height: 1;
+  }
+  .day .check {
+    margin: 6px auto 0;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--t5);
+    display: grid; place-items: center;
+    color: var(--t4);
+  }
+  .day.done .check {
+    background: var(--lime);
+    border-color: var(--lime);
+    color: var(--ink);
+  }
+  .day.done .check svg { width: 10px; height: 10px; }
+  .day .name {
+    font-size: 9.5px;
+    color: var(--t3);
+    margin-top: 6px;
+    font-weight: 500;
+  }
+  .day.today .name { color: var(--aqua); }
+
+  /* REST CARD */
+  .rest-card {
+    margin: 0 20px 18px;
+    background:
+      linear-gradient(135deg, rgba(79, 227, 232, 0.05) 0%, transparent 100%),
+      var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 16px;
+    text-align: center;
+  }
+  .rest-card .ico {
+    width: 36px; height: 36px;
+    margin: 0 auto 8px;
+    border-radius: 50%;
+    background: var(--aqua-soft);
+    display: grid; place-items: center;
+    color: var(--aqua);
+  }
+  .rest-card .ico svg { width: 18px; height: 18px; }
+  .rest-card .name {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+  .rest-card .meta {
+    font-size: 12px;
+    color: var(--t3);
+  }
+
+  .goal-link {
+    margin: 8px 20px 0;
+    color: var(--aqua);
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+
+  /* ───────────────────────── WORKOUT EXECUTION ───────────────────────── */
+  .exec-top {
+    padding: 14px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--t2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .back-btn svg { width: 16px; height: 16px; }
+  .exec-progress {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .exec-progress .seg {
+    width: 26px; height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.10);
+  }
+  .exec-progress .seg.active {
+    background: var(--lime);
+    box-shadow: 0 0 10px var(--lime-glow);
+  }
+
+  /* PRESCRIPTION CARD */
+  .rx-card {
+    margin: 22px 16px 16px;
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(127, 232, 154, 0.04), transparent 70%),
+      linear-gradient(180deg, #112335 0%, #0E1F2E 100%);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 22px 20px 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 30px 60px -25px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .rx-card::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 200px; height: 200px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.022) 0px,
+      rgba(255, 255, 255, 0.022) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+    pointer-events: none;
+  }
+  .rx-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .rx-head .left { flex: 1; min-width: 0; }
+  .rx-eyebrow {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--lime);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .rx-name {
+    font-family: var(--f-headline);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin-bottom: 10px;
+  }
+  .rx-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: rgba(79, 227, 232, 0.12);
+    color: var(--aqua);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+  }
+  .tag.muscle {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--t2);
+  }
+  .rx-refresh {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    color: var(--t2);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .rx-refresh svg { width: 16px; height: 16px; }
+
+  .rx-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 18px -20px;
+  }
+  .sub-eyebrow {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .info-dot {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 1px solid var(--t4);
+    color: var(--t3);
+    font-size: 9px;
+    font-weight: 700;
+    display: inline-grid; place-items: center;
+    cursor: pointer;
+    font-family: var(--f-body);
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* PREV REF — neutral (not gold) */
+  .rx-prev {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .rx-prev .ico {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--t2);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .rx-prev .ico svg { width: 14px; height: 14px; }
+  .rx-prev .text { flex: 1; }
+  .rx-prev .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .rx-prev .v {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--t1);
+  }
+  .rx-prev .v .num {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 18px;
+    margin: 0 1px;
+  }
+
+  /* TARGET GRID — icons now neutral */
+  .target-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+  }
+  .target-stat .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .target-stat .l svg {
+    width: 11px; height: 11px;
+    color: var(--t4); /* fix: was aqua, now neutral */
+  }
+  .target-stat .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 0.9;
+    color: var(--t1);
+    letter-spacing: -0.02em;
+  }
+  .target-stat .v .unit {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--t3);
+    margin-left: 2px;
+  }
+  .target-stat.tempo {
+    grid-column: span 2;
+  }
+  .target-stat.tempo .v {
+    font-family: var(--f-mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* COACH NOTES */
+  .rx-notes {
+    background: rgba(79, 227, 232, 0.05);
+    border-left: 2px solid var(--aqua);
+    border-radius: 2px 10px 10px 2px;
+    padding: 10px 14px;
+    margin: 0 -4px;
+  }
+  .rx-notes .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--aqua);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .rx-notes .v {
+    font-size: 13px;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  /* LOG SET ZONE */
+  .rx-log {
+    margin: 18px -20px -20px;
+    padding: 18px 20px 20px;
+    border-top: 1px solid var(--divider);
+    background:
+      radial-gradient(ellipse 80% 60% at 100% 100%, rgba(197, 255, 74, 0.07), transparent 65%),
+      radial-gradient(ellipse 60% 50% at 0% 0%, rgba(127, 232, 154, 0.05), transparent 65%);
+    border-radius: 0 0 28px 28px;
+  }
+  .rx-log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .rx-log-head .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--lime);
+    font-weight: 700;
+  }
+  .log-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .log-nav .arrow {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t2);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .log-nav .arrow svg { width: 12px; height: 12px; }
+  .log-nav .label {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--t1);
+    letter-spacing: 0.04em;
+    padding: 0 6px;
+    min-width: 56px;
+    text-align: center;
+  }
+  .log-nav .label .total { color: var(--t3); font-weight: 500; }
+
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .input-cell {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .input-cell .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .input-cell .l .unit { font-weight: 500; }
+  .input-cell .input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .input-cell .num {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--t1);
+    flex: 1;
+    letter-spacing: -0.02em;
+  }
+  .stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .stepper button {
+    width: 24px; height: 18px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--t2);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: grid; place-items: center;
+    padding: 0;
+  }
+
+  /* SUGGEST PILL — neutral bg (was aqua-tinted) */
+  .suggest-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--aqua);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+    cursor: pointer;
+  }
+  .suggest-pill svg { width: 12px; height: 12px; }
+
+  .log-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--lime), var(--lime-2));
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 15px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow:
+      0 12px 30px -8px var(--lime-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* EX NAV */
+  .ex-nav-row {
+    margin: 0 20px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ex-nav-meta {
+    font-size: 11.5px;
+    color: var(--t3);
+    font-weight: 500;
+  }
+  .ex-nav-buttons { display: flex; gap: 8px; }
+  .ex-nav-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--t1);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ex-nav-btn svg { width: 12px; height: 12px; }
+  .ex-nav-btn.disabled { color: var(--t4); cursor: not-allowed; }
+
+  /* HISTORY — effort labels now use opacity scale, not warning colors */
+  .history {
+    margin: 0 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 16px;
+  }
+  .history-head {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .history-head .link { color: var(--aqua); font-weight: 600; }
+  .hist-row {
+    display: grid;
+    grid-template-columns: 24px 1fr 60px 70px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 12.5px;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row .n { color: var(--t3); font-family: var(--f-mono); font-size: 11px; }
+  .hist-row .w { color: var(--t1); font-weight: 600; font-family: var(--f-headline); }
+  .hist-row .r { color: var(--t2); }
+  .hist-row .e {
+    text-align: right;
+    font-size: 11px;
+    color: var(--t4);
+    font-weight: 500;
+  }
+  /* effort intensity = brightness gradient */
+  .hist-row .e.moderate { color: var(--t3); }
+  .hist-row .e.hard { color: var(--t2); font-weight: 600; }
+  .hist-row .e.veryhard { color: var(--t1); font-weight: 700; }
+
+  /* BOTTOM NAV — unified: ALL active states use aqua */
+  .nav {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    right: 14px;
+    background: rgba(7, 16, 26, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-hi);
+    border-radius: 999px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 10;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 0 6px;
+    color: var(--t3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    border-radius: 999px;
+    position: relative;
+  }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item.active { color: var(--aqua); }
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--aqua);
+    box-shadow: 0 0 10px var(--aqua);
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- ─────────────────────────  PHONE 1 · DASHBOARD  ─────────────────────────  -->
+  <div class="phone-wrap">
+    <div class="phone-label"><span class="tag">01</span>Client · Dashboard</div>
+    <div class="phone">
+      <div class="screen">
+
+        <div class="status-bar">
+          <span>07:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/><rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5" opacity="0.4"/></svg>
+            <svg viewBox="0 0 18 14" fill="currentColor"><path d="M9 14l3.5-3.5a4.95 4.95 0 00-7 0L9 14zm0-7a9.9 9.9 0 017 2.9l1.4-1.4A11.9 11.9 0 009 5a11.9 11.9 0 00-8.4 3.5L2 10A9.9 9.9 0 019 7zm0-5a14.9 14.9 0 0110.5 4.4l1.4-1.4A16.9 16.9 0 009 0a16.9 16.9 0 00-11.9 5L-1.5 6.4A14.9 14.9 0 019 2z"/></svg>
+            <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="24" height="13" rx="3"/><rect x="2" y="2" width="21" height="10" rx="1.5" fill="currentColor"/><rect x="25.5" y="4" width="2" height="6" rx="1" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="topbar">
+          <div class="avatar">R</div>
+          <div class="right">
+            <div class="icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M16 8l-5 5-2-2"/></svg>
+            </div>
+            <div class="icon-btn has-dot">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="greeting">
+          <div class="eyebrow">Up next · Day 1 of 4</div>
+          <h1>Hey, <span class="accent">Roxi</span>.</h1>
+          <div class="date">Saturday · April 25</div>
+        </div>
+
+        <div class="hero-workout">
+          <div class="hw-top">
+            <div class="hw-eyebrow">Today's Work</div>
+            <div class="hw-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              ~60 min
+            </div>
+          </div>
+          <div class="hw-name">Lower · Day 1</div>
+          <div class="hw-meta">5 exercises<span class="sep">·</span>Lower body<span class="sep">·</span>Hypertrophy</div>
+          <div class="hw-cta">
+            <button class="btn-action">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+              Start Training
+            </button>
+            <div class="btn-ghost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="strip">
+          <div class="strip-card">
+            <div class="l">Streak</div>
+            <div class="v">
+              <span class="flame">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-1 4-5 5-5 9.5C7 15.5 9.5 18 12 18s5-2.5 5-6.5C17 7 13 6 12 2z" opacity="0.95"/><path d="M12 9c-.5 2-2 2.5-2 4.5C10 15 11 16 12 16s2-1 2-2.5c0-2-1.5-2.5-2-4.5z" fill="rgba(255,255,255,0.4)"/></svg>
+              </span>
+              0
+            </div>
+            <div class="sub">Starting today</div>
+          </div>
+          <div class="strip-card">
+            <div class="l">This week</div>
+            <div class="v">0<span class="frac">/4</span></div>
+            <div class="sub">workouts done</div>
+          </div>
+          <div class="strip-card">
+            <div class="l">Program</div>
+            <div class="v">6<span class="frac">%</span></div>
+            <div class="sub">Week 4 of 8</div>
+          </div>
+        </div>
+
+        <div class="duo">
+          <div class="duo-card daily">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <div class="l">Daily</div>
+            <div class="v">Not done</div>
+          </div>
+          <div class="duo-card checkin">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="l">Check-in</div>
+            <div class="v">Done</div>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <div class="lhs"><div class="section-title">Recent wins</div></div>
+          <a class="section-link" href="#">All →</a>
+        </div>
+
+        <div class="achievements">
+          <div class="ach-row">
+            <div class="ach-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>
+            </div>
+            <div class="info">
+              <div class="name">PR Champion · Platinum</div>
+              <div class="meta">Latest medal earned</div>
+            </div>
+            <div class="v">8</div>
+          </div>
+          <div class="ach-row">
+            <div class="ach-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.39 7.36H22l-6.18 4.49 2.36 7.36L12 16.72l-6.18 4.49 2.36-7.36L2 9.36h7.61z"/></svg>
+            </div>
+            <div class="info">
+              <div class="name">#1 · Leg Extension leaderboard</div>
+              <div class="meta">Top of your cohort</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="nav">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <span>Check-in</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M5 9.5v5M19 9.5v5"/></svg>
+          <span>Train</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 00-4 4c0 2 1 3 1 3-3 0-7 2-7 8 0 4 3 5 5 5h10c2 0 5-1 5-5 0-6-4-8-7-8 0 0 1-1 1-3a4 4 0 00-4-4z"/></svg>
+          <span>Fuel</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          <span>Me</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────  PHONE 2 · TRAIN  ─────────────────────────  -->
+  <div class="phone-wrap">
+    <div class="phone-label"><span class="tag">02</span>Client · Train</div>
+    <div class="phone train-bg">
+      <div class="screen">
+
+        <div class="status-bar">
+          <span>07:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/><rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5" opacity="0.4"/></svg>
+            <svg viewBox="0 0 18 14" fill="currentColor"><path d="M9 14l3.5-3.5a4.95 4.95 0 00-7 0L9 14zm0-7a9.9 9.9 0 017 2.9l1.4-1.4A11.9 11.9 0 009 5a11.9 11.9 0 00-8.4 3.5L2 10A9.9 9.9 0 019 7zm0-5a14.9 14.9 0 0110.5 4.4l1.4-1.4A16.9 16.9 0 009 0a16.9 16.9 0 00-11.9 5L-1.5 6.4A14.9 14.9 0 019 2z"/></svg>
+            <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="24" height="13" rx="3"/><rect x="2" y="2" width="21" height="10" rx="1.5" fill="currentColor"/><rect x="25.5" y="4" width="2" height="6" rx="1" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="topbar">
+          <div class="avatar">R</div>
+          <div class="right">
+            <div class="icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <h1 class="page-title">Training</h1>
+
+        <div class="program-card">
+          <div class="pc-top">
+            <div class="pc-eyebrow">Active Program</div>
+            <a class="pc-link" href="#">View outline
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+          </div>
+          <div class="pc-name">Hypertrophy 1</div>
+          <span class="pc-tag">Hypertrophy</span>
+
+          <div class="pc-progress">
+            <div class="pc-progress-meta">
+              <div class="l">This Week</div>
+              <div class="v">100<span class="frac">% · 4/4</span></div>
+            </div>
+            <div class="pc-bar"><span style="width: 100%"></span></div>
+          </div>
+
+          <div class="pc-divider"></div>
+
+          <div class="pc-row">
+            <div class="info">
+              <div class="l">Phase</div>
+              <div class="v">Week 1 of 4</div>
+            </div>
+            <div class="info" style="text-align: right">
+              <div class="l">Today</div>
+              <div class="v">Day 5 of 4</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <div class="lhs"><div class="section-title">This week</div></div>
+          <a class="section-link" href="#">Apr 21–27</a>
+        </div>
+
+        <div class="week">
+          <div class="week-strip">
+            <div class="day done">
+              <div class="dow">Mon</div><div class="num">21</div>
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="name">Day 4</div>
+            </div>
+            <div class="day done">
+              <div class="dow">Tue</div><div class="num">22</div>
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="name">Day 2</div>
+            </div>
+            <div class="day">
+              <div class="dow">Wed</div><div class="num">23</div>
+              <div class="check"></div>
+              <div class="name">Rest</div>
+            </div>
+            <div class="day done">
+              <div class="dow">Thu</div><div class="num">24</div>
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="name">Day 3</div>
+            </div>
+            <div class="day done">
+              <div class="dow">Fri</div><div class="num">25</div>
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="name">Day 4</div>
+            </div>
+            <div class="day today">
+              <div class="dow">Sat</div><div class="num">26</div>
+              <div class="check"></div>
+              <div class="name">Today</div>
+            </div>
+            <div class="day">
+              <div class="dow">Sun</div><div class="num">27</div>
+              <div class="check"></div>
+              <div class="name">Rest</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rest-card">
+          <div class="ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          </div>
+          <div class="name">Rest day</div>
+          <div class="meta">All workouts this week completed. Next week unlocks Monday.</div>
+        </div>
+
+        <a class="goal-link" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          Set a training goal
+        </a>
+
+      </div>
+
+      <div class="nav">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <span>Check-in</span>
+        </div>
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M5 9.5v5M19 9.5v5"/></svg>
+          <span>Train</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 00-4 4c0 2 1 3 1 3-3 0-7 2-7 8 0 4 3 5 5 5h10c2 0 5-1 5-5 0-6-4-8-7-8 0 0 1-1 1-3a4 4 0 00-4-4z"/></svg>
+          <span>Fuel</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          <span>Me</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────  PHONE 3 · WORKOUT EXEC  ─────────────────────────  -->
+  <div class="phone-wrap">
+    <div class="phone-label"><span class="tag">03</span>Client · Workout Execution</div>
+    <div class="phone exec-bg">
+      <div class="screen">
+
+        <div class="status-bar">
+          <span>07:42</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/><rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5" opacity="0.4"/></svg>
+            <svg viewBox="0 0 18 14" fill="currentColor"><path d="M9 14l3.5-3.5a4.95 4.95 0 00-7 0L9 14zm0-7a9.9 9.9 0 017 2.9l1.4-1.4A11.9 11.9 0 009 5a11.9 11.9 0 00-8.4 3.5L2 10A9.9 9.9 0 019 7zm0-5a14.9 14.9 0 0110.5 4.4l1.4-1.4A16.9 16.9 0 009 0a16.9 16.9 0 00-11.9 5L-1.5 6.4A14.9 14.9 0 019 2z"/></svg>
+            <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="24" height="13" rx="3"/><rect x="2" y="2" width="21" height="10" rx="1.5" fill="currentColor"/><rect x="25.5" y="4" width="2" height="6" rx="1" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="exec-top">
+          <div class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </div>
+          <div class="exec-progress">
+            <div class="seg active"></div>
+            <div class="seg"></div>
+            <div class="seg"></div>
+            <div class="seg"></div>
+          </div>
+        </div>
+
+        <div class="rx-card">
+          <div class="rx-head">
+            <div class="left">
+              <div class="rx-eyebrow">Exercise · Up now</div>
+              <h2 class="rx-name">Cable Glute Kickback</h2>
+              <div class="rx-tags">
+                <span class="tag">Straight set</span>
+                <span class="tag muscle">Glutes</span>
+              </div>
+            </div>
+            <button class="rx-refresh" title="Swap exercise">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <div class="sub-eyebrow">Last session</div>
+          <div class="rx-prev">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+            </div>
+            <div class="text">
+              <div class="l">Set 1 · Apr 21</div>
+              <div class="v"><span class="num">23.5</span> kg × <span class="num">4</span> reps</div>
+            </div>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <div class="sub-eyebrow">Your target today</div>
+          <div class="target-grid">
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+                Sets
+              </div>
+              <div class="v">10</div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-9-9"/><polyline points="21 4 21 9 16 9"/></svg>
+                Reps
+              </div>
+              <div class="v">6</div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 15"/><line x1="9" y1="2" x2="15" y2="2"/></svg>
+                Rest
+              </div>
+              <div class="v">30<span class="unit">s</span></div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
+                Load
+              </div>
+              <div class="v">65<span class="unit">%</span></div>
+            </div>
+            <div class="target-stat tempo">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Tempo
+                <span class="info-dot" title="Eccentric · Pause · Concentric · Pause">i</span>
+              </div>
+              <div class="v">2 · 0 · 1 · 0</div>
+            </div>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <div class="rx-notes">
+            <div class="l">Coach Notes</div>
+            <div class="v">cu genunchiul îndoit</div>
+          </div>
+
+          <div class="rx-log">
+            <div class="rx-log-head">
+              <div class="l">Log Set</div>
+              <div class="log-nav">
+                <button class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+                <span class="label">1<span class="total"> / 10</span></span>
+                <button class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <div class="input-cell">
+                <div class="l"><span>Weight</span><span class="unit">kg</span></div>
+                <div class="input-row">
+                  <div class="num">23.5</div>
+                  <div class="stepper"><button>+</button><button>−</button></div>
+                </div>
+              </div>
+              <div class="input-cell">
+                <div class="l"><span>Reps</span></div>
+                <div class="input-row">
+                  <div class="num">6</div>
+                  <div class="stepper"><button>+</button><button>−</button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="suggest-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11H7l3-9h4l-2 6h4l-3 9h-4l3-7z"/></svg>
+              Apply suggested · 25.5 kg
+            </div>
+
+            <button class="log-btn">Log Set</button>
+          </div>
+        </div>
+
+        <div class="ex-nav-row">
+          <div class="ex-nav-meta">Exercise 1 of 4</div>
+          <div class="ex-nav-buttons">
+            <button class="ex-nav-btn disabled">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              Prev
+            </button>
+            <button class="ex-nav-btn">
+              Next
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="history">
+          <div class="history-head">
+            <span>Last session · 5 sets</span>
+            <span class="link">Show all 10 →</span>
+          </div>
+          <div class="hist-row"><div class="n">1</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e">—</div></div>
+          <div class="hist-row"><div class="n">2</div><div class="w">23.5 kg</div><div class="r">3 reps</div><div class="e veryhard">Very hard</div></div>
+          <div class="hist-row"><div class="n">3</div><div class="w">23.5 kg</div><div class="r">3 reps</div><div class="e veryhard">Very hard</div></div>
+          <div class="hist-row"><div class="n">4</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e hard">Hard</div></div>
+          <div class="hist-row"><div class="n">5</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e veryhard">Very hard</div></div>
+        </div>
+
+      </div>
+
+      <div class="nav">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <span>Check-in</span>
+        </div>
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M5 9.5v5M19 9.5v5"/></svg>
+          <span>Train</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 00-4 4c0 2 1 3 1 3-3 0-7 2-7 8 0 4 3 5 5 5h10c2 0 5-1 5-5 0-6-4-8-7-8 0 0 1-1 1-3a4 4 0 00-4-4z"/></svg>
+          <span>Fuel</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          <span>Me</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Coach Dashboard — v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Surfaces */
+    --bg-page:        #07101A;
+    --bg-page-deep:   #030911;
+    --bg-card:        #0E1F2E;
+    --bg-card-hi:     #142838;
+    --border:         rgba(255, 255, 255, 0.08);
+    --border-hi:      rgba(255, 255, 255, 0.14);
+
+    /* Text */
+    --t1: #FFFFFF;
+    --t2: rgba(255, 255, 255, 0.65);
+    --t3: rgba(255, 255, 255, 0.42);
+    --t4: rgba(255, 255, 255, 0.26);
+
+    /* Accents */
+    --aqua:        #4FE3E8;
+    --aqua-soft:   rgba(79, 227, 232, 0.14);
+    --action:      #FF5A36;
+    --action-2:    #FFB13B;          /* amber pair */
+    --action-glow: rgba(255, 90, 54, 0.4);
+    --gold:        #F5C242;
+    --warning:     #F59E42;
+    --success:     #34D399;
+    --danger:      #FF3B5C;
+
+    /* Type */
+    --f-display: 'Big Shoulders Display', sans-serif;
+    --f-headline: 'Bricolage Grotesque', sans-serif;
+    --f-body: 'Geist', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--f-body);
+    background: #15161c;
+    background-image:
+      radial-gradient(circle at 25% 0%, #25232f 0%, transparent 55%),
+      radial-gradient(circle at 75% 100%, #1a1f28 0%, transparent 55%);
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 40px 20px;
+    color: var(--t1);
+  }
+
+  /* PHONE */
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg-page);
+    border-radius: 48px;
+    border: 10px solid #0a0a0c;
+    box-shadow:
+      0 0 0 2px #1a1a20,
+      0 50px 100px -20px rgba(0, 0, 0, 0.7),
+      0 0 100px -10px rgba(255, 90, 54, 0.10);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Atmospheric backdrop */
+  .phone::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 100% 60% at 50% -20%, rgba(255, 90, 54, 0.18), transparent 70%),
+      radial-gradient(ellipse 80% 50% at 100% 100%, rgba(79, 227, 232, 0.06), transparent 70%),
+      linear-gradient(180deg, transparent 0%, var(--bg-page-deep) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Subtle grain */
+  .phone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .screen {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 0 100px;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+
+  /* STATUS BAR */
+  .status-bar {
+    height: 54px;
+    padding: 0 28px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .status-icons svg { width: 16px; height: 16px; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px 0;
+  }
+  .avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bg-card-hi), var(--bg-card));
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    font-size: 14px; font-weight: 600;
+    color: var(--t2);
+  }
+  .bell {
+    width: 38px; height: 38px;
+    display: grid; place-items: center;
+    color: var(--t2);
+    position: relative;
+  }
+  .bell::after {
+    content: "";
+    position: absolute;
+    top: 8px; right: 9px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--action);
+    box-shadow: 0 0 8px var(--action-glow);
+  }
+
+  /* GREETING */
+  .greeting {
+    padding: 22px 20px 24px;
+  }
+  .greeting .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--action);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .greeting .eyebrow::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--action);
+    box-shadow: 0 0 12px var(--action-glow);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .greeting h1 {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 30px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+  .greeting h1 .accent {
+    background: linear-gradient(120deg, var(--action), var(--action-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-style: italic;
+  }
+  .greeting .date {
+    font-size: 13px;
+    color: var(--t3);
+    margin-top: 8px;
+  }
+
+  /* HERO CARD */
+  .hero {
+    margin: 0 16px 24px;
+    border-radius: 28px;
+    background:
+      radial-gradient(ellipse 80% 60% at 100% 0%, rgba(255, 177, 59, 0.22), transparent 60%),
+      radial-gradient(ellipse 100% 80% at 0% 100%, rgba(255, 90, 54, 0.18), transparent 65%),
+      linear-gradient(135deg, #1a2030 0%, #0E1F2E 100%);
+    border: 1px solid rgba(255, 90, 54, 0.22);
+    padding: 22px 22px 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 20px 50px -20px rgba(255, 90, 54, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  /* diagonal lines pattern */
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 220px; height: 220px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 8px
+    );
+    pointer-events: none;
+  }
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .hero-eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 177, 59, 0.95);
+  }
+  .hero-roster-pill {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hero-roster-pill svg { width: 12px; height: 12px; }
+
+  .hero-num-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin: 6px 0 4px;
+    position: relative;
+  }
+  .hero-num {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 96px;
+    line-height: 0.85;
+    letter-spacing: -0.04em;
+    background: linear-gradient(180deg, #fff 0%, rgba(255, 255, 255, 0.65) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero-num-slash {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 48px;
+    color: var(--t4);
+    margin: 0 4px;
+  }
+  .hero-num-total {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 48px;
+    line-height: 1;
+    color: var(--t3);
+  }
+  .hero-label {
+    font-size: 13px;
+    color: var(--t2);
+    font-weight: 500;
+    margin-top: 6px;
+    position: relative;
+  }
+
+  .hero-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10) 30%, rgba(255, 255, 255, 0.10) 70%, transparent);
+    margin: 18px 0 14px;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    position: relative;
+  }
+  .hero-stat {
+    text-align: left;
+    padding: 0 6px;
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .hero-stat:first-child { padding-left: 0; }
+  .hero-stat:last-child { border-right: none; padding-right: 0; }
+  .hero-stat .v {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--t1);
+    font-feature-settings: "tnum";
+    line-height: 1;
+  }
+  .hero-stat .v .frac { color: var(--t4); font-weight: 500; }
+  .hero-stat .l {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  /* SECONDARY METRICS — telemetry-style */
+  .telemetry {
+    margin: 0 20px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .tel-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tel-card .tel-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--t3);
+    margin-bottom: 8px;
+  }
+  .tel-card .tel-value {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 26px;
+    color: var(--t1);
+    line-height: 1;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.01em;
+  }
+  .tel-card .tel-value .denom {
+    color: var(--t4);
+    font-weight: 500;
+  }
+  .tel-card .tel-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .tel-card .tel-trend.down { color: var(--warning); }
+  .tel-card .tel-trend.up   { color: var(--success); }
+  .tel-card .tel-trend svg { width: 10px; height: 10px; }
+  .tel-bar {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  .tel-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  /* SECTION */
+  .section-head {
+    padding: 0 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-head .lhs {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .section-title {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--t1);
+    letter-spacing: -0.01em;
+  }
+  .section-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--action);
+    background: rgba(255, 90, 54, 0.12);
+    padding: 3px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+  .section-link {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t3);
+    text-decoration: none;
+  }
+
+  /* EMPTY CHECKIN */
+  .empty-row {
+    margin: 0 20px 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .empty-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    display: grid; place-items: center;
+    color: var(--t3);
+  }
+  .empty-icon svg { width: 16px; height: 16px; }
+  .empty-text {
+    flex: 1;
+    font-size: 13px;
+    color: var(--t2);
+  }
+  .empty-text .sub { color: var(--t3); font-size: 11.5px; margin-top: 2px; }
+
+  /* CLIENT ATTENTION ROWS */
+  .clients { padding: 0 20px; }
+
+  .client-critical {
+    background:
+      radial-gradient(ellipse 60% 100% at 100% 0%, rgba(255, 90, 54, 0.18), transparent 70%),
+      var(--bg-card);
+    border: 1px solid rgba(255, 90, 54, 0.30);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .client-critical .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .severity-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 90, 54, 0.15);
+    color: var(--action);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+  }
+  .severity-tag svg { width: 11px; height: 11px; }
+  .days-badge {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 0.9;
+    color: var(--action);
+    letter-spacing: -0.02em;
+  }
+  .days-badge .unit {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t3);
+    margin-left: 4px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+  .client-critical .name {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--t1);
+    margin-bottom: 4px;
+  }
+  .client-critical .meta {
+    font-size: 12px;
+    color: var(--t3);
+    margin-bottom: 12px;
+  }
+  .client-critical .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-primary {
+    flex: 1;
+    background: linear-gradient(135deg, var(--action), #FF7A5A);
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -6px var(--action-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-primary svg { width: 14px; height: 14px; }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t1);
+    font-weight: 500;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .client-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .client-row .day-pill {
+    background: rgba(245, 158, 66, 0.12);
+    color: var(--warning);
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    min-width: 52px;
+    text-align: center;
+    line-height: 1;
+  }
+  .client-row .day-pill .u {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.8;
+    display: block;
+    margin-top: 3px;
+    font-weight: 600;
+  }
+  .client-row .info { flex: 1; min-width: 0; }
+  .client-row .name {
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--t1);
+  }
+  .client-row .meta {
+    font-size: 11.5px;
+    color: var(--t3);
+    margin-top: 2px;
+  }
+  .client-row .chev { color: var(--t3); }
+  .client-row .chev svg { width: 18px; height: 18px; }
+
+  .client-row.new .day-pill {
+    background: rgba(79, 227, 232, 0.10);
+    color: var(--aqua);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    font-weight: 700;
+    padding: 8px 10px;
+  }
+
+  /* BOTTOM NAV */
+  .nav {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    right: 14px;
+    background: rgba(7, 16, 26, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-hi);
+    border-radius: 999px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 10;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 0 6px;
+    color: var(--t3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: color 0.2s;
+    border-radius: 999px;
+    position: relative;
+  }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item.active {
+    color: var(--aqua);
+  }
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--aqua);
+    box-shadow: 0 0 10px var(--aqua);
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen">
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span>07:40</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/><rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5" opacity="0.4"/></svg>
+        <svg viewBox="0 0 18 14" fill="currentColor"><path d="M9 14l3.5-3.5a4.95 4.95 0 00-7 0L9 14zm0-7a9.9 9.9 0 017 2.9l1.4-1.4A11.9 11.9 0 009 5a11.9 11.9 0 00-8.4 3.5L2 10A9.9 9.9 0 019 7zm0-5a14.9 14.9 0 0110.5 4.4l1.4-1.4A16.9 16.9 0 009 0a16.9 16.9 0 00-11.9 5L-1.5 6.4A14.9 14.9 0 019 2z"/></svg>
+        <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="24" height="13" rx="3"/><rect x="2" y="2" width="21" height="10" rx="1.5" fill="currentColor"/><rect x="25.5" y="4" width="2" height="6" rx="1" fill="currentColor"/></svg>
+      </div>
+    </div>
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="avatar">H</div>
+      <div class="bell">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+      </div>
+    </div>
+
+    <!-- Greeting -->
+    <div class="greeting">
+      <div class="eyebrow">9 sessions on deck</div>
+      <h1>Morning, <span class="accent">Coach</span>.</h1>
+      <div class="date">Saturday · April 25</div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-top">
+        <div class="hero-eyebrow">Today's Roster</div>
+        <div class="hero-roster-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          07:40
+        </div>
+      </div>
+
+      <div class="hero-num-row">
+        <span class="hero-num">0</span>
+        <span class="hero-num-slash">/</span>
+        <span class="hero-num-total">9</span>
+      </div>
+      <div class="hero-label">athletes have trained today</div>
+
+      <div class="hero-divider"></div>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="v">0<span class="frac">/9</span></div>
+          <div class="l">Checked in</div>
+        </div>
+        <div class="hero-stat">
+          <div class="v">41<span class="frac">%</span></div>
+          <div class="l">Compliance</div>
+        </div>
+        <div class="hero-stat">
+          <div class="v">9<span class="frac">/9</span></div>
+          <div class="l">Active</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELLNESS -->
+    <div class="section-head">
+      <div class="lhs">
+        <div class="section-title">Wellness</div>
+      </div>
+      <a class="section-link" href="#">Last 48h</a>
+    </div>
+    <div class="empty-row">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div class="empty-text">
+        No check-ins yet today
+        <div class="sub">Nudge clients with a wellness reminder</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--aqua)"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
+    <!-- ATTENTION -->
+    <div class="section-head">
+      <div class="lhs">
+        <div class="section-title">Needs Attention</div>
+        <div class="section-count">3</div>
+      </div>
+      <a class="section-link" href="#">See all</a>
+    </div>
+
+    <div class="clients">
+
+      <!-- Critical -->
+      <div class="client-critical">
+        <div class="top-row">
+          <div class="severity-tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            Critical
+          </div>
+          <div class="days-badge">66<span class="unit">days</span></div>
+        </div>
+        <div class="name">Client Popescu</div>
+        <div class="meta">No wellness check-in · Last session 2 months ago</div>
+        <div class="actions">
+          <button class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Reach out
+          </button>
+          <button class="btn-secondary">View profile</button>
+        </div>
+      </div>
+
+      <!-- Standard rows -->
+      <div class="client-row new">
+        <div class="day-pill">New</div>
+        <div class="info">
+          <div class="name">e t</div>
+          <div class="meta">Hasn't checked in yet · onboarding</div>
+        </div>
+        <div class="chev">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="client-row">
+        <div class="day-pill">8<span class="u">days</span></div>
+        <div class="info">
+          <div class="name">Roxana Micu</div>
+          <div class="meta">Last check-in · Apr 17</div>
+        </div>
+        <div class="chev">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="nav">
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      <span>Clients</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M5 9.5v5M19 9.5v5"/></svg>
+      <span>Train</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 00-4 4c0 2 1 3 1 3-3 0-7 2-7 8 0 4 3 5 5 5h10c2 0 5-1 5-5 0-6-4-8-7-8 0 0 1-1 1-3a4 4 0 00-4-4z"/></svg>
+      <span>Fuel</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 14l4-4 4 4 5-5"/></svg>
+      <span>Stats</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Workout Exec — v4 (single card)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-page: #07101A;
+    --bg-page-deep: #030911;
+    --bg-card: #0E1F2E;
+    --bg-card-hi: #142838;
+    --bg-elevated: #19324A;
+    --bg-input: rgba(255, 255, 255, 0.025);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hi: rgba(255, 255, 255, 0.14);
+    --divider: rgba(255, 255, 255, 0.06);
+
+    --t1: #FFFFFF;
+    --t2: rgba(255, 255, 255, 0.65);
+    --t3: rgba(255, 255, 255, 0.42);
+    --t4: rgba(255, 255, 255, 0.26);
+    --ink: #061018;
+
+    --aqua: #4FE3E8;
+    --aqua-soft: rgba(79, 227, 232, 0.13);
+    --lime: #C5FF4A;
+    --lime-2: #7FE89A;
+    --lime-glow: rgba(197, 255, 74, 0.38);
+    --gold: #F5C242;
+    --warning: #F59E42;
+    --danger: #FF3B5C;
+
+    --f-display: 'Big Shoulders Display', sans-serif;
+    --f-headline: 'Bricolage Grotesque', sans-serif;
+    --f-body: 'Geist', system-ui, sans-serif;
+    --f-mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--f-body);
+    background: #15161c;
+    background-image:
+      radial-gradient(circle at 20% 0%, #25232f 0%, transparent 55%),
+      radial-gradient(circle at 80% 100%, #1a1f28 0%, transparent 55%);
+    min-height: 100vh;
+    padding: 40px 20px;
+    color: var(--t1);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .stage {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .phone-label {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .phone-label .tag {
+    color: var(--lime);
+    font-family: var(--f-mono);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-right: 8px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 880px;
+    background: var(--bg-page);
+    border-radius: 48px;
+    border: 10px solid #0a0a0c;
+    box-shadow:
+      0 0 0 2px #1a1a20,
+      0 50px 100px -20px rgba(0, 0, 0, 0.7),
+      0 0 100px -10px rgba(197, 255, 74, 0.06);
+    overflow: hidden;
+    position: relative;
+  }
+  .phone::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 100% 60% at 50% -20%, rgba(197, 255, 74, 0.10), transparent 70%),
+      radial-gradient(ellipse 80% 50% at 100% 100%, rgba(79, 227, 232, 0.05), transparent 70%),
+      linear-gradient(180deg, transparent 0%, var(--bg-page-deep) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .phone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .screen {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 0 100px;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+
+  /* STATUS BAR */
+  .status-bar {
+    height: 54px;
+    padding: 0 28px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .status-icons svg { width: 16px; height: 16px; }
+
+  /* TOP NAV */
+  .exec-top {
+    padding: 14px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--t2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .back-btn svg { width: 16px; height: 16px; }
+  .exec-progress {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .exec-progress .seg {
+    width: 26px; height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.10);
+  }
+  .exec-progress .seg.active {
+    background: var(--lime);
+    box-shadow: 0 0 10px var(--lime-glow);
+  }
+  .exec-progress .label {
+    font-size: 11px;
+    color: var(--t3);
+    font-family: var(--f-mono);
+    margin-left: 8px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  /* ───────────────────────  PRESCRIPTION CARD  ─────────────────────── */
+  .rx-card {
+    margin: 22px 16px 16px;
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(127, 232, 154, 0.05), transparent 70%),
+      linear-gradient(180deg, #112335 0%, #0E1F2E 100%);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 22px 20px 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 30px 60px -25px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  /* subtle diagonal pattern in upper-right */
+  .rx-card::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 200px; height: 200px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.022) 0px,
+      rgba(255, 255, 255, 0.022) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+    pointer-events: none;
+  }
+
+  /* HEADER */
+  .rx-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .rx-head .left { flex: 1; min-width: 0; }
+  .rx-eyebrow {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--lime);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .rx-name {
+    font-family: var(--f-headline);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin-bottom: 10px;
+  }
+  .rx-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: rgba(79, 227, 232, 0.12);
+    color: var(--aqua);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+  }
+  .tag.muscle {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--t2);
+  }
+  .rx-refresh {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    color: var(--t2);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .rx-refresh svg { width: 16px; height: 16px; }
+
+  /* SECTION DIVIDER (inside card) */
+  .rx-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 18px -20px;
+  }
+
+  /* SUBSECTION EYEBROW */
+  .sub-eyebrow {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  /* PREV REF (inside card) */
+  .rx-prev {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .rx-prev .ico {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: rgba(245, 194, 66, 0.12);
+    color: var(--gold);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .rx-prev .ico svg { width: 14px; height: 14px; }
+  .rx-prev .text { flex: 1; }
+  .rx-prev .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .rx-prev .v {
+    font-family: var(--f-headline);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--t1);
+  }
+  .rx-prev .v .num {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 18px;
+    margin: 0 1px;
+  }
+
+  /* TARGET GRID */
+  .target-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+  }
+  .target-stat .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .target-stat .l svg { width: 11px; height: 11px; color: var(--aqua); }
+  .target-stat .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 0.9;
+    color: var(--t1);
+    letter-spacing: -0.02em;
+  }
+  .target-stat .v .unit {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--t3);
+    margin-left: 2px;
+  }
+  .target-stat.tempo {
+    grid-column: span 2;
+  }
+  .target-stat.tempo .v {
+    font-family: var(--f-mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* COACH NOTES (inside card) */
+  .rx-notes {
+    background: rgba(79, 227, 232, 0.05);
+    border-left: 2px solid var(--aqua);
+    border-radius: 2px 10px 10px 2px;
+    padding: 10px 14px;
+    margin: 0 -4px;
+  }
+  .rx-notes .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--aqua);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .rx-notes .v {
+    font-size: 13px;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  /* LOG SET ZONE — visually elevated within card */
+  .rx-log {
+    margin: 18px -20px -20px;
+    padding: 18px 20px 20px;
+    border-top: 1px solid var(--divider);
+    background:
+      radial-gradient(ellipse 80% 60% at 100% 100%, rgba(197, 255, 74, 0.07), transparent 65%),
+      radial-gradient(ellipse 60% 50% at 0% 0%, rgba(127, 232, 154, 0.05), transparent 65%);
+    border-radius: 0 0 28px 28px;
+  }
+  .rx-log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .rx-log-head .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--lime);
+    font-weight: 700;
+  }
+  .log-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .log-nav .arrow {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--t2);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .log-nav .arrow svg { width: 12px; height: 12px; }
+  .log-nav .label {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--t1);
+    letter-spacing: 0.04em;
+    padding: 0 6px;
+    min-width: 56px;
+    text-align: center;
+  }
+  .log-nav .label .total {
+    color: var(--t3);
+    font-weight: 500;
+  }
+
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .input-cell {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .input-cell .l {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .input-cell .l .unit { font-weight: 500; }
+  .input-cell .input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .input-cell .num {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--t1);
+    flex: 1;
+    letter-spacing: -0.02em;
+  }
+  .stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .stepper button {
+    width: 24px; height: 18px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--t2);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: grid; place-items: center;
+    padding: 0;
+  }
+
+  .suggest-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(79, 227, 232, 0.10);
+    color: var(--aqua);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(79, 227, 232, 0.20);
+    margin-bottom: 14px;
+    cursor: pointer;
+  }
+  .suggest-pill svg { width: 12px; height: 12px; }
+
+  .log-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--lime), var(--lime-2));
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 15px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow:
+      0 12px 30px -8px var(--lime-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* EXERCISE NAV (outside card) */
+  .ex-nav-row {
+    margin: 0 20px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ex-nav-meta {
+    font-size: 11.5px;
+    color: var(--t3);
+    font-weight: 500;
+  }
+  .ex-nav-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .ex-nav-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--t1);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ex-nav-btn svg { width: 12px; height: 12px; }
+  .ex-nav-btn.disabled {
+    color: var(--t4);
+    cursor: not-allowed;
+  }
+
+  /* HISTORY */
+  .history {
+    margin: 0 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 16px;
+  }
+  .history-head {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--t3);
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .history-head .link {
+    color: var(--aqua);
+    font-weight: 600;
+  }
+  .hist-row {
+    display: grid;
+    grid-template-columns: 24px 1fr 60px 70px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 12.5px;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row .n { color: var(--t3); font-family: var(--f-mono); font-size: 11px; }
+  .hist-row .w { color: var(--t1); font-weight: 600; font-family: var(--f-headline); }
+  .hist-row .r { color: var(--t2); }
+  .hist-row .e { text-align: right; font-size: 11px; color: var(--t3); }
+  .hist-row .e.hard { color: var(--warning); }
+  .hist-row .e.veryhard { color: var(--danger); }
+
+  /* BOTTOM NAV */
+  .nav {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    right: 14px;
+    background: rgba(7, 16, 26, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-hi);
+    border-radius: 999px;
+    padding: 8px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 10;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 0 6px;
+    color: var(--t3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    border-radius: 999px;
+    position: relative;
+  }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item.active {
+    color: var(--lime);
+  }
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 10px var(--lime);
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone-label"><span class="tag">v4</span>Workout Execution · Single prescription card</div>
+
+    <div class="phone">
+      <div class="screen">
+
+        <div class="status-bar">
+          <span>07:42</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/><rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5" opacity="0.4"/></svg>
+            <svg viewBox="0 0 18 14" fill="currentColor"><path d="M9 14l3.5-3.5a4.95 4.95 0 00-7 0L9 14zm0-7a9.9 9.9 0 017 2.9l1.4-1.4A11.9 11.9 0 009 5a11.9 11.9 0 00-8.4 3.5L2 10A9.9 9.9 0 019 7zm0-5a14.9 14.9 0 0110.5 4.4l1.4-1.4A16.9 16.9 0 009 0a16.9 16.9 0 00-11.9 5L-1.5 6.4A14.9 14.9 0 019 2z"/></svg>
+            <svg viewBox="0 0 28 14" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="24" height="13" rx="3"/><rect x="2" y="2" width="21" height="10" rx="1.5" fill="currentColor"/><rect x="25.5" y="4" width="2" height="6" rx="1" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="exec-top">
+          <div class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </div>
+          <div class="exec-progress">
+            <div class="seg active"></div>
+            <div class="seg"></div>
+            <div class="seg"></div>
+            <div class="seg"></div>
+            <span class="label">1 / 4</span>
+          </div>
+        </div>
+
+        <!-- ───────────  PRESCRIPTION CARD (single)  ─────────── -->
+        <div class="rx-card">
+
+          <!-- Header -->
+          <div class="rx-head">
+            <div class="left">
+              <div class="rx-eyebrow">Exercise · Up now</div>
+              <h2 class="rx-name">Cable Glute Kickback</h2>
+              <div class="rx-tags">
+                <span class="tag">Straight set</span>
+                <span class="tag muscle">Glutes</span>
+              </div>
+            </div>
+            <button class="rx-refresh" title="Swap exercise">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <!-- Previous reference -->
+          <div class="sub-eyebrow">Last session</div>
+          <div class="rx-prev">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+            </div>
+            <div class="text">
+              <div class="l">Set 1 · Apr 21</div>
+              <div class="v"><span class="num">23.5</span> kg × <span class="num">4</span> reps</div>
+            </div>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <!-- Target -->
+          <div class="sub-eyebrow">Your target today</div>
+          <div class="target-grid">
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+                Sets
+              </div>
+              <div class="v">10</div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-9-9"/><polyline points="21 4 21 9 16 9"/></svg>
+                Reps
+              </div>
+              <div class="v">6</div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 15"/><line x1="9" y1="2" x2="15" y2="2"/></svg>
+                Rest
+              </div>
+              <div class="v">30<span class="unit">s</span></div>
+            </div>
+            <div class="target-stat">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="6" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
+                Load
+              </div>
+              <div class="v">65<span class="unit">%</span></div>
+            </div>
+            <div class="target-stat tempo">
+              <div class="l">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Tempo
+              </div>
+              <div class="v">2 · 0 · 1 · 0</div>
+            </div>
+          </div>
+
+          <div class="rx-divider"></div>
+
+          <!-- Coach notes -->
+          <div class="rx-notes">
+            <div class="l">Coach Notes</div>
+            <div class="v">cu genunchiul îndoit</div>
+          </div>
+
+          <!-- LOG SET ZONE (visually elevated within card via tinted bg) -->
+          <div class="rx-log">
+            <div class="rx-log-head">
+              <div class="l">Log Set</div>
+              <div class="log-nav">
+                <button class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+                <span class="label">1<span class="total"> / 10</span></span>
+                <button class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <div class="input-cell">
+                <div class="l"><span>Weight</span><span class="unit">kg</span></div>
+                <div class="input-row">
+                  <div class="num">23.5</div>
+                  <div class="stepper"><button>+</button><button>−</button></div>
+                </div>
+              </div>
+              <div class="input-cell">
+                <div class="l"><span>Reps</span></div>
+                <div class="input-row">
+                  <div class="num">6</div>
+                  <div class="stepper"><button>+</button><button>−</button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="suggest-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11H7l3-9h4l-2 6h4l-3 9h-4l3-7z"/></svg>
+              Apply suggested · 25.5 kg
+            </div>
+
+            <button class="log-btn">Log Set</button>
+          </div>
+
+        </div>
+        <!-- ───────────  end card  ─────────── -->
+
+        <!-- Exercise nav -->
+        <div class="ex-nav-row">
+          <div class="ex-nav-meta">Exercise 1 of 4</div>
+          <div class="ex-nav-buttons">
+            <button class="ex-nav-btn disabled">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              Prev
+            </button>
+            <button class="ex-nav-btn">
+              Next
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="history">
+          <div class="history-head">
+            <span>Last session · 5 sets</span>
+            <span class="link">Show all 10 →</span>
+          </div>
+          <div class="hist-row"><div class="n">1</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e">—</div></div>
+          <div class="hist-row"><div class="n">2</div><div class="w">23.5 kg</div><div class="r">3 reps</div><div class="e veryhard">Very hard</div></div>
+          <div class="hist-row"><div class="n">3</div><div class="w">23.5 kg</div><div class="r">3 reps</div><div class="e veryhard">Very hard</div></div>
+          <div class="hist-row"><div class="n">4</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e hard">Hard</div></div>
+          <div class="hist-row"><div class="n">5</div><div class="w">23.5 kg</div><div class="r">4 reps</div><div class="e veryhard">Very hard</div></div>
+        </div>
+
+      </div>
+
+      <div class="nav">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <span>Check-in</span>
+        </div>
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M5 9.5v5M19 9.5v5"/></svg>
+          <span>Train</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 00-4 4c0 2 1 3 1 3-3 0-7 2-7 8 0 4 3 5 5 5h10c2 0 5-1 5-5 0-6-4-8-7-8 0 0 1-1 1-3a4 4 0 00-4-4z"/></svg>
+          <span>Fuel</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          <span>Me</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

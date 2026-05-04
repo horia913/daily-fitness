@@ -1,21 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import {
   Dumbbell,
-  Calendar,
-  Clock,
-  Target,
   X,
   Star,
-  Layers,
   Plus,
   ExternalLink,
   ChevronRight,
+  Minus,
+  Check,
+  Eye,
+  Pencil,
+  Building2,
+  ClipboardList,
 } from 'lucide-react'
+import ClientDetailHero from '@/components/coach/client-detail/ClientDetailHero'
+import tw from './ClientWorkoutsView.module.css'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -26,16 +30,7 @@ import ClientProgressionEditor from '@/components/coach/client-views/ClientProgr
 import ResponsiveModal from '@/components/ui/ResponsiveModal'
 import { useCoachClient } from '@/contexts/CoachClientContext'
 import { cn } from '@/lib/utils'
-import { getCategoryAccent } from '@/lib/workoutCategoryColors'
-import type { AdherenceTier } from '@/lib/coachWorkoutAdherence'
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
-
-function sessionAdherenceTierClass(tier: AdherenceTier | null | undefined) {
-  if (tier === 'green') return 'text-emerald-400'
-  if (tier === 'amber') return 'text-amber-400'
-  if (tier === 'red') return 'text-red-400'
-  return 'text-gray-500'
-}
 
 // Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
 // workout_set_entry_exercises -> protocol tables (workout_time_protocols,
@@ -46,6 +41,7 @@ interface ClientWorkoutsViewProps {
 
 interface WorkoutAssignment {
   id: string
+  name?: string
   scheduled_date: string | null
   notes?: string | null
   status: string
@@ -176,39 +172,42 @@ function parseWeekSchedule(raw: unknown): WeekScheduleSlot[] {
     )
 }
 
-function truncateLabel(s: string, max = 20) {
-  const t = s.trim()
-  if (t.length <= max) return t
-  return `${t.slice(0, max)}…`
+function mondayFirstDow(d = new Date()) {
+  const day = d.getDay()
+  return day === 0 ? 6 : day - 1
 }
 
-/** One cell per Mon–Sun from flat week schedule rows. */
-function buildScheduleStripCells(slots: WeekScheduleSlot[]) {
-  return SCHEDULE_DAY_LABELS.map((label, dow) => {
-    const daySlots = slots.filter((s) => s.dayOfWeek === dow)
-    if (daySlots.length === 0) {
-      return {
-        dayLabel: label,
-        symbol: 'dash' as const,
-        line: '',
-        title: 'Rest day',
-      }
-    }
-    const names = [...new Set(daySlots.map((s) => s.templateName))].join(' · ')
-    const required = daySlots.filter((s) => !s.isOptional)
-    let done: boolean
-    if (required.length > 0) {
-      done = required.every((s) => s.isCompleted)
-    } else {
-      done = daySlots.every((s) => s.isCompleted)
-    }
-    return {
-      dayLabel: label,
-      symbol: done ? ('check' as const) : ('circle' as const),
-      line: truncateLabel(names),
-      title: names,
-    }
-  })
+type DayPillState = 'empty' | 'assigned' | 'done'
+
+function dayPillStateForDow(dow: number, slots: WeekScheduleSlot[]): DayPillState {
+  const daySlots = slots.filter((s) => s.dayOfWeek === dow)
+  if (daySlots.length === 0) return 'empty'
+  const required = daySlots.filter((s) => !s.isOptional)
+  const check = required.length > 0 ? required : daySlots
+  return check.every((s) => s.isCompleted) ? 'done' : 'assigned'
+}
+
+type StandaloneGroup = { key: string; sortKey: number; items: WorkoutAssignment[] }
+
+function buildStandaloneGroups(workouts: WorkoutAssignment[]): StandaloneGroup[] {
+  const map = new Map<string, { sortKey: number; items: WorkoutAssignment[] }>()
+  for (const w of workouts) {
+    const dateStr = w.scheduled_date ?? w.created_at?.slice(0, 10) ?? ''
+    const t = dateStr ? new Date(`${dateStr}T12:00:00`).getTime() : 0
+    const mmm = dateStr
+      ? new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { month: 'short' })
+      : '—'
+    const tpl =
+      w.workout_templates?.name?.trim() || w.name?.trim() || 'Workout'
+    const key = `${mmm} — ${tpl}`
+    const g = map.get(key) ?? { sortKey: t, items: [] as WorkoutAssignment[] }
+    g.items.push(w)
+    g.sortKey = Math.max(g.sortKey, t)
+    map.set(key, g)
+  }
+  return [...map.entries()]
+    .map(([key, v]) => ({ key, sortKey: v.sortKey, items: v.items }))
+    .sort((a, b) => b.sortKey - a.sortKey)
 }
 
 async function fetchWeekScheduleSlotsClient(
@@ -312,44 +311,11 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   const [activeProgramSummary, setActiveProgramSummary] =
     useState<ActiveProgramSummary | null>(null)
   const [recentLogs, setRecentLogs] = useState<RecentWorkoutLogRow[]>([])
-  const [sessionAdherence, setSessionAdherence] = useState<
-    Record<
-      string,
-      { adherencePercent: number | null; tier: AdherenceTier | null }
-    >
-  >({})
   const [assignWorkoutOpen, setAssignWorkoutOpen] = useState(false)
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [customizeOpen, setCustomizeOpen] = useState(false)
-
-  const getWorkoutStatusMeta = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return { label: 'Completed', color: 'fc-text-success' }
-      case 'in_progress':
-        return { label: 'In progress', color: 'fc-text-warning' }
-      case 'skipped':
-        return { label: 'Skipped', color: 'fc-text-error' }
-      case 'assigned':
-      default:
-        return { label: 'Assigned', color: 'fc-text-subtle' }
-    }
-  }
-
-  const getProgramStatusMeta = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { label: 'Active', color: 'fc-text-warning' }
-      case 'paused':
-        return { label: 'Paused', color: 'fc-text-subtle' }
-      case 'completed':
-        return { label: 'Completed', color: 'fc-text-success' }
-      case 'cancelled':
-        return { label: 'Cancelled', color: 'fc-text-error' }
-      default:
-        return { label: status, color: 'fc-text-subtle' }
-    }
-  }
+  const [totalCompletedLogs, setTotalCompletedLogs] = useState(0)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   const loadTrainingData = useCallback(async () => {
     setLoading(true)
@@ -357,7 +323,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     setRecentLogs([])
 
     try {
-      const [waRes, paRes] = await Promise.all([
+      const [waRes, paRes, logCountRes] = await Promise.all([
         supabase
           .from('workout_assignments')
           .select(`*, workout_templates(*)`)
@@ -368,7 +334,13 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
           .select(`*, workout_programs(*)`)
           .eq('client_id', clientId)
           .order('start_date', { ascending: false }),
+        supabase
+          .from('workout_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .not('completed_at', 'is', null),
       ])
+      setTotalCompletedLogs(logCountRes.count ?? 0)
 
       const waData = waRes.data
       const waErr = waRes.error
@@ -722,6 +694,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       setPrograms([])
       setActiveProgramSummary(null)
       setRecentLogs([])
+      setTotalCompletedLogs(0)
     } finally {
       setLoading(false)
     }
@@ -730,43 +703,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   useEffect(() => {
     loadTrainingData()
   }, [loadTrainingData])
-
-  useEffect(() => {
-    if (recentLogs.length === 0) {
-      setSessionAdherence({})
-      return
-    }
-    const ids = recentLogs.map((l) => l.id).filter(Boolean)
-    if (ids.length === 0) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch(
-          `/api/coach/clients/${clientId}/workout-logs/adherence-batch?logIds=${encodeURIComponent(ids.join(','))}`
-        )
-        if (!res.ok) return
-        const json = (await res.json()) as {
-          byLogId?: Record<
-            string,
-            { adherencePercent: number | null; tier: AdherenceTier | null }
-          >
-        }
-        if (cancelled) return
-        setSessionAdherence(json.byLogId ?? {})
-      } catch {
-        /* ignore */
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [recentLogs, clientId])
-
-  const scheduleStrip = useMemo(
-    () =>
-      buildScheduleStripCells(activeProgramSummary?.weekScheduleSlots ?? []),
-    [activeProgramSummary?.weekScheduleSlots]
-  )
 
   const startEditWorkoutMeta = (w: WorkoutAssignment, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -995,563 +931,496 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     })
   }
 
+  const standaloneGroups = useMemo(
+    () => buildStandaloneGroups(workouts),
+    [workouts]
+  )
+
+  const todayDowMonday = useMemo(() => mondayFirstDow(), [])
+
+  const weekSlots = activeProgramSummary?.weekScheduleSlots ?? []
+
+  const heroEyebrow = activeProgramSummary
+    ? `Active program · W${activeProgramSummary.displayWeek} / ${activeProgramSummary.durationWeeks ?? '—'}`
+    : 'Training'
+
+  const heroTitle = activeProgramSummary?.programName ?? 'No active program'
+
+  const heroSubtitle = activeProgramSummary
+    ? `${overallProgramPct}% complete · Active program, session history, and assignments`
+    : 'Assign a program to get started'
+
+  const heroStats = [
+    { num: recentLogs.length, label: 'recent sessions' },
+    {
+      num: activeProgramSummary ? programs.length : 0,
+      label: 'programs',
+    },
+    { num: totalCompletedLogs, label: 'workouts' },
+  ]
+
+  const requiredSlotsRight =
+    activeProgramSummary && activeProgramSummary.requiredCount === 0
+      ? 'No required slots'
+      : activeProgramSummary
+        ? `${Math.max(0, activeProgramSummary.requiredCount - activeProgramSummary.completedCount)} remaining`
+        : ''
+
   return (
     <>
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">
-          Training
-        </h2>
-      </div>
+      <ClientDetailHero
+        eyebrow={heroEyebrow}
+        title={heroTitle}
+        subtitle={heroSubtitle}
+        stats={heroStats}
+        accent="lime"
+      />
 
       {activeProgramSummary && programHubHref ? (
-        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] border-l-2 border-l-cyan-500 shadow-lg shadow-cyan-500/10 overflow-hidden">
-          <div className="p-4 sm:p-5 space-y-4 bg-gradient-to-br from-cyan-500/5 to-transparent">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 space-y-2">
-                <span className="fc-pill fc-pill-glass fc-text-workouts text-[10px] font-bold uppercase tracking-wider">
+        <div className={tw.activeCard}>
+          <div className={tw.activeInner}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-[color:var(--fc-set-type-straight)]">
                   Active program
                 </span>
-                <h3 className="text-2xl sm:text-3xl font-bold fc-text-primary leading-tight break-words">
+                <h3
+                  className="max-w-full break-words text-[17px] font-bold leading-tight text-[color:var(--fc-text-primary)]"
+                  style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
+                >
                   {activeProgramSummary.programName}
                 </h3>
-                <p className="text-sm fc-text-dim">
+                <p className="text-[11px] text-[color:var(--fc-text-subtle)]">
                   Week {activeProgramSummary.displayWeek}
                   {activeProgramSummary.durationWeeks != null &&
-                    activeProgramSummary.durationWeeks > 0 &&
-                    ` of ${activeProgramSummary.durationWeeks}`}
+                  activeProgramSummary.durationWeeks > 0
+                    ? ` of ${activeProgramSummary.durationWeeks}`
+                    : ''}
                 </p>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs fc-text-dim">
-                <span>Program progress</span>
-                <span className="font-mono">{overallProgramPct}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] overflow-hidden">
+              <div className="shrink-0 text-right">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all"
-                  style={{ width: `${overallProgramPct}%` }}
-                />
-              </div>
-            </div>
-
-            <p className="text-base fc-text-primary">
-              <span className="font-semibold">This week:</span>{' '}
-              <span className="font-bold tabular-nums">
-                {activeProgramSummary.completedCount}/
-                {activeProgramSummary.requiredCount}
-              </span>{' '}
-              workouts completed
-              {activeProgramSummary.requiredCount === 0 && (
-                <span className="block text-xs fc-text-dim mt-2 font-normal">
-                  No required slots scheduled for this program week (check the
-                  program builder).
-                </span>
-              )}
-            </p>
-
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider fc-text-dim">
-                Schedule
-              </p>
-              <div className="overflow-x-auto -mx-1 px-1">
-                <div className="flex gap-2 sm:gap-3 min-w-0 justify-between">
-                  {scheduleStrip.map((cell) => {
-                    const sym =
-                      cell.symbol === 'dash'
-                        ? '—'
-                        : cell.symbol === 'check'
-                          ? '✓'
-                          : '○'
-                    const isDash = cell.symbol === 'dash'
-                    const isCheck = cell.symbol === 'check'
-                    return (
-                      <div
-                        key={cell.dayLabel}
-                        className="flex-1 min-w-[3rem] max-w-[5.5rem] text-center"
-                        title={cell.title}
-                      >
-                        <div
-                          className={`mx-auto mb-1 flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-bold ${
-                            isDash
-                              ? 'bg-slate-700 border-slate-600 text-slate-300'
-                              : isCheck
-                                ? 'border-cyan-500 bg-cyan-500 text-white'
-                                : 'border-cyan-500/50 bg-transparent text-cyan-200/90'
-                          }`}
-                        >
-                          {sym}
-                        </div>
-                        <p className="text-[10px] sm:text-xs font-semibold fc-text-subtle">
-                          {cell.dayLabel}
-                        </p>
-                        {cell.line ? (
-                          <p className="text-[9px] sm:text-[10px] leading-tight fc-text-dim mt-0.5 line-clamp-2 break-words px-0.5">
-                            {cell.line}
-                          </p>
-                        ) : null}
-                      </div>
-                    )
-                  })}
+                  className="text-[24px] font-extrabold leading-none text-[color:var(--fc-set-type-straight)]"
+                  style={{ fontFamily: 'var(--f-display, var(--font-geist-sans))' }}
+                >
+                  {overallProgramPct}%
+                </div>
+                <div className="mt-[3px] font-mono text-[9px] uppercase tracking-[0.1em] text-[color:var(--fc-text-subtle)]">
+                  Progress
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button
+            <div className="mt-3 h-[5px] w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-set-type-straight)] to-[color:var(--fc-accent-lime-2)]"
+                style={{ width: `${overallProgramPct}%` }}
+              />
+            </div>
+
+            <div className={tw.metaRow}>
+              <span>
+                This week · {activeProgramSummary.completedCount}/
+                {activeProgramSummary.requiredCount} workouts
+              </span>
+              <span className={tw.metaRight}>{requiredSlotsRight}</span>
+            </div>
+
+            <div className={tw.dayGrid}>
+              {SCHEDULE_DAY_LABELS.map((label, dow) => {
+                const state = dayPillStateForDow(dow, weekSlots)
+                const isToday = dow === todayDowMonday
+                const iconCls =
+                  state === 'empty'
+                    ? tw.iconEmpty
+                    : state === 'done'
+                      ? tw.iconDone
+                      : tw.iconAssigned
+                return (
+                  <div
+                    key={label}
+                    className={cn(tw.dayPill, isToday && tw.dayPillToday)}
+                    title={label}
+                  >
+                    <span className={cn(tw.dayLabel, isToday && tw.dayLabelToday)}>{label}</span>
+                    <div className={cn(tw.dayIcon, iconCls)}>
+                      {state === 'empty' ? (
+                        <Minus className="h-3 w-3" aria-hidden />
+                      ) : state === 'done' ? (
+                        <Check className="h-3 w-3" aria-hidden />
+                      ) : (
+                        <Dumbbell className="h-3 w-3" aria-hidden />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className={tw.actionGrid3}>
+              <button
                 type="button"
-                size="sm"
-                className="fc-btn fc-btn-secondary"
+                className={tw.btnOutlineSm}
                 onClick={() => setReviewModalOpen(true)}
               >
-                Review week
-              </Button>
-              <Button
+                <Eye className="h-[13px] w-[13px]" aria-hidden />
+                Review
+              </button>
+              <button
                 type="button"
-                size="sm"
-                variant="ghost"
-                className="fc-btn fc-btn-ghost text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
+                className={tw.btnOutlineSm}
                 onClick={() => setCustomizeOpen(true)}
               >
+                <Pencil className="h-[13px] w-[13px]" aria-hidden />
                 Customize
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="fc-btn fc-btn-ghost text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
-                asChild
-              >
-                <Link href={programHubHref}>
-                  View full program
-                  <ExternalLink className="w-3.5 h-3.5 ml-1.5 opacity-70" />
-                </Link>
-              </Button>
+              </button>
+              <Link href={programHubHref} className={tw.btnOutlineSm}>
+                <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
+                Full plan
+              </Link>
             </div>
           </div>
         </div>
       ) : (
-        <div className="fc-card-shell rounded-3xl border border-[color:var(--fc-glass-border)] p-8 sm:p-10 text-center space-y-6">
-          <div className="fc-icon-tile fc-icon-workouts mx-auto">
-            <Target className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold fc-text-primary">
-              No active program
-            </h3>
-            <p className="text-sm fc-text-dim mt-2 max-w-md mx-auto">
-              Assign a program to get started. You can still add one-off workouts
-              anytime.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button className="fc-btn fc-btn-primary gap-2" asChild>
-              <Link href="/coach/programs">
-                <Layers className="w-4 h-4 shrink-0" />
-                Assign program
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="fc-btn fc-btn-ghost gap-2 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
-              onClick={() => setAssignWorkoutOpen(true)}
-            >
-              <Plus className="w-4 h-4 shrink-0" />
-              Assign workout
-            </Button>
-          </div>
+        <div className={cn(tw.section, 'text-center')}>
+          <p className="text-sm text-[color:var(--fc-text-subtle)]">
+            No active program · Assign one to schedule weekly workouts
+          </p>
+          <Button className="fc-btn fc-btn-primary mx-auto mt-4 gap-2" asChild>
+            <Link href="/coach/programs">
+              <ClipboardList className="w-4 h-4 shrink-0" />
+              Assign program
+            </Link>
+          </Button>
         </div>
       )}
 
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)] flex flex-wrap items-center justify-between gap-3">
+      <div className={tw.section}>
+        <div className={tw.sectionHead}>
           <div>
-            <h3 className="text-lg font-semibold fc-text-primary">
+            <h3
+              className="text-base font-semibold text-[color:var(--fc-text-primary)]"
+              style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
+            >
               Recent sessions
             </h3>
-            <p className="text-xs fc-text-dim mt-0.5">
-              Last completed workouts (from session logs).
+            <p className="mt-0.5 font-mono text-[10px] text-[color:var(--fc-text-quaternary)]">
+              Last completed
             </p>
           </div>
           <Link
             href={`/coach/clients/${clientId}/workout-logs`}
-            className="inline-flex items-center gap-1 text-sm font-medium fc-text-workouts hover:underline"
+            className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[color:var(--fc-set-type-straight)]"
           >
             View all
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="h-3 w-3" aria-hidden />
           </Link>
         </div>
-        <div className="flex flex-col border-t border-white/5 px-2 py-1">
-          {recentLogs.length === 0 ? (
-            <EmptyState
-              variant="compact"
-              icon={Dumbbell}
-              title="No completed sessions yet"
-              description="Finished workouts will appear here."
-            />
-          ) : (
-            recentLogs.map((log) => {
-              const accent = getCategoryAccent(log.templateCategory || '')
-              const ad = sessionAdherence[log.id]
-              return (
-                <Link
-                  key={log.id}
-                  href={`/coach/clients/${clientId}/workout-logs/${log.id}`}
-                  className={cn(
-                    'block border-b border-white/5 py-3 pl-2 transition-colors last:border-b-0 hover:bg-white/[0.02] border-l-2',
-                    accent.border
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        'rounded-lg p-2 shrink-0',
-                        accent.iconBg
-                      )}
-                      aria-hidden
-                    >
-                      <Dumbbell className={cn('w-4 h-4', accent.text)} />
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0 flex-1">
-                      <div className="min-w-0">
-                        <p className="text-sm fc-text-dim">
-                          {formatSessionDate(log.completed_at)}{' '}
-                          <span className="fc-text-dim">—</span>{' '}
-                          <span className="font-semibold fc-text-primary">
-                            {log.workoutName}
-                          </span>
-                        </p>
-                        <p className="text-xs fc-text-subtle mt-1">
-                          {log.total_duration_minutes != null
-                            ? `${log.total_duration_minutes} min`
-                            : '—'}{' '}
-                          ·{' '}
-                          {log.total_sets_completed != null
-                            ? `${log.total_sets_completed} sets`
-                            : '—'}{' '}
-                          · {formatWeight(log.total_weight_lifted)} volume
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {ad?.adherencePercent != null && (
-                          <span
-                            className={cn(
-                              'text-xs font-semibold tabular-nums',
-                              sessionAdherenceTierClass(ad.tier)
-                            )}
-                          >
-                            {Math.round(ad.adherencePercent)}% on target
-                          </span>
-                        )}
-                        <span
-                          className={cn(
-                            'text-xs font-medium inline-flex items-center gap-0.5',
-                            accent.text
-                          )}
-                        >
-                          Open log
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })
-          )}
-        </div>
+        {recentLogs.length === 0 ? (
+          <EmptyState
+            variant="compact"
+            icon={Dumbbell}
+            title="No completed sessions yet"
+            description="Finished workouts will appear here."
+          />
+        ) : (
+          recentLogs.map((log) => (
+            <Link
+              key={log.id}
+              href={`/coach/clients/${clientId}/workout-logs/${log.id}`}
+              className={tw.sessionRow}
+            >
+              <div className={tw.sessionIcon} aria-hidden>
+                <Dumbbell className="h-[13px] w-[13px]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-medium text-[color:var(--fc-text-primary)]">
+                  <b>{log.workoutName}</b>
+                </p>
+                <p className="mt-0.5 font-mono text-[10px] text-[color:var(--fc-text-subtle)]">
+                  {formatSessionDate(log.completed_at)} ·{' '}
+                  {log.total_duration_minutes != null ? `${log.total_duration_minutes}min` : '—'} ·{' '}
+                  {log.total_sets_completed != null ? `${log.total_sets_completed} sets` : '—'} ·{' '}
+                  {formatWeight(log.total_weight_lifted)}
+                </p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-[color:var(--fc-set-type-straight)]">
+                Open
+                <ChevronRight className="h-2.5 w-2.5" aria-hidden />
+              </span>
+            </Link>
+          ))
+        )}
       </div>
 
-      {/* Programs Section */}
       {otherPrograms.length > 0 && (
-        <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-          <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-            <div className="flex items-center gap-3">
-              <div className="fc-icon-tile fc-icon-workouts">
-                <Target className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                  Programs
-                </span>
-                <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                  Other program assignments
-                </h3>
-              </div>
-              <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
-                {otherPrograms.length}
-              </span>
+        <div className={tw.section}>
+          <div className={tw.sectionHead}>
+            <div>
+              <div className={tw.eyebrowCyan}>Programs · {otherPrograms.length}</div>
+              <h3
+                className="mt-1 text-[15px] font-semibold text-[color:var(--fc-text-primary)]"
+                style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
+              >
+                Other assignments
+              </h3>
             </div>
+            <span className={tw.countPill}>{otherPrograms.length}</span>
           </div>
-          <div className="px-2 py-1">
-            {otherPrograms.map((program) => {
-              const programStatus = getProgramStatusMeta(program.status)
-              return (
+          {otherPrograms.map((program) => {
+            const badgeCls =
+              program.status === 'completed'
+                ? tw.badgeDone
+                : program.status === 'active' || program.status === 'paused'
+                  ? tw.badgeProg
+                  : tw.badgeAssigned
+            const badgeText =
+              program.status === 'completed'
+                ? 'Done'
+                : program.status === 'active' || program.status === 'paused'
+                  ? 'In progress'
+                  : 'Assigned'
+            return (
+              <div
+                key={program.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleProgramClick(program)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleProgramClick(program)
+                  }
+                }}
+                className={tw.programRow}
+              >
                 <div
-                  key={program.id}
-                  onClick={() => handleProgramClick(program)}
-                  className={`border-b border-[color:var(--fc-glass-border)] px-2 py-3 transition-colors w-full cursor-pointer last:border-b-0 ${
-                    program.status === 'active' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
-                  }`}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]"
+                  style={{
+                    background: 'var(--fc-set-type-straight-soft)',
+                    color: 'var(--fc-set-type-straight)',
+                  }}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
-                    {/* Row 1: Icon, Title, Button */}
-                    <div className="flex items-center gap-4 w-full">
-                      {/* Icon */}
-                      <div className="fc-icon-tile fc-icon-workouts">
-                        <Target className="w-6 h-6" />
-                      </div>
-
-                      {/* Title */}
-                      <h4 className="fc-text-primary break-words leading-tight flex-1 min-w-0 text-lg font-semibold">
-                        {program.workout_programs?.name || 'Program'}
-                      </h4>
-
-                      {/* Action Buttons - Right Side */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Set as Active Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setAsActiveProgram(program.id)
-                          }}
-                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
-                          title="Set as Active Program"
-                        >
-                          <Star className="w-4 h-4" />
-                        </button>
-
-                        {/* Unassign Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleUnassignProgram(program.id)
-                          }}
-                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
-                          title="Unassign Program"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Row 2: Details - Mobile: Full width, Desktop: Side */}
-                    <div className="flex items-center gap-2 text-xs sm:ml-0 sm:flex-shrink-0">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 fc-text-workouts flex-shrink-0" />
-                        <span className="fc-text-subtle font-medium">
-                          {new Date(program.start_date).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      {program.workout_programs?.duration_weeks && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 fc-text-workouts flex-shrink-0" />
-                          <span className="fc-text-subtle font-medium">
-                            {program.workout_programs.duration_weeks}w
-                          </span>
-                        </div>
-                      )}
-
-                      <span className={`fc-pill fc-pill-glass text-xs ${programStatus.color}`}>
-                        {programStatus.label}
-                      </span>
-                    </div>
-                  </div>
+                  <Building2 className="h-3.5 w-3.5" aria-hidden />
                 </div>
-              )
-            })}
-          </div>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[color:var(--fc-text-primary)]">
+                  {program.workout_programs?.name || 'Program'}
+                </span>
+                <span className={cn(tw.badge, badgeCls)}>{badgeText}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setAsActiveProgram(program.id)
+                  }}
+                  className="fc-btn fc-btn-ghost fc-press h-7 w-7 shrink-0 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
+                  title="Set as Active Program"
+                >
+                  <Star className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleUnassignProgram(program.id)
+                  }}
+                  className="fc-btn fc-btn-ghost fc-press h-7 w-7 shrink-0 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
+                  title="Unassign Program"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Standalone workout assignments */}
       {workouts.length > 0 && (
-      <div className="rounded-xl border border-[color:var(--fc-glass-border)]">
-        <div className="px-3 py-2 border-b border-[color:var(--fc-glass-border)]">
-          <div className="flex items-center gap-3">
-            <div className="fc-icon-tile fc-icon-workouts">
-              <Dumbbell className="w-4 h-4" />
-            </div>
+        <div className={tw.section}>
+          <div className={tw.sectionHead}>
             <div>
-              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                Workouts
-              </span>
-              <h3 className="text-lg font-semibold fc-text-primary mt-2">
-                Standalone workout assignments
+              <div className={tw.eyebrowCyan}>Workouts · {workouts.length}</div>
+              <h3
+                className="mt-1 text-[15px] font-semibold text-[color:var(--fc-text-primary)]"
+                style={{ fontFamily: 'var(--f-headline, var(--font-geist-sans))' }}
+              >
+                Standalone assignments
               </h3>
-              <p className="text-xs fc-text-dim mt-1">
-                One-off assignments outside the active program calendar.
-              </p>
             </div>
-            <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
-              {workouts.length}
-            </span>
+            <span className={tw.countPill}>{workouts.length}</span>
           </div>
-        </div>
-        <div className="px-2 py-1">
-            {workouts.map((workout) => {
-              const workoutStatus = getWorkoutStatusMeta(workout.status)
-              return (
-                <div 
-                  key={workout.id} 
-                  data-workout-id={workout.id}
-                  onClick={() => handleWorkoutClick(workout)}
-                  className={`border-b border-[color:var(--fc-glass-border)] px-2 py-3 transition-colors w-full cursor-pointer last:border-b-0 ${
-                    workout.status === 'in_progress' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
-                    {/* Row 1: Icon, Title, Button */}
-                    <div className="flex items-center gap-4 w-full">
-                      {/* Icon */}
-                      <div className="fc-icon-tile fc-icon-workouts">
-                        <Dumbbell className="w-6 h-6" />
-                      </div>
-
-                      {/* Title */}
-                      <h4 className="fc-text-primary break-words leading-tight flex-1 min-w-0 text-lg font-semibold">
-                        {workout.workout_templates?.name || 'Workout'}
-                      </h4>
-
-                      {/* Action Buttons - Right Side */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Set as Active Button */}
+          {standaloneGroups.map((group) => {
+            const expanded = expandedGroups[group.key] === true
+            const limit = 3
+            const rows = expanded ? group.items : group.items.slice(0, limit)
+            const hidden = group.items.length - rows.length
+            return (
+              <div key={group.key} className="mb-3">
+                <div className={tw.groupHead}>
+                  <div className={tw.groupTitle}>{group.key}</div>
+                  <span className={tw.countPill}>{group.items.length} sessions</span>
+                </div>
+                {rows.map((workout) => {
+                  const wBadge =
+                    workout.status === 'completed'
+                      ? { t: 'Done', c: tw.badgeDone }
+                      : workout.status === 'in_progress'
+                        ? { t: 'In progress', c: tw.badgeProg }
+                        : { t: 'Assigned', c: tw.badgeAssigned }
+                  const dateStr = workout.scheduled_date
+                    ? new Date(workout.scheduled_date).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : '—'
+                  return (
+                    <React.Fragment key={workout.id}>
+                      <div
+                        data-workout-id={workout.id}
+                        className={tw.groupRow}
+                        onClick={() => handleWorkoutClick(workout)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleWorkoutClick(workout)
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]"
+                          style={{
+                            background: 'rgba(255,255,255,0.04)',
+                            color: 'var(--fc-text-subtle)',
+                          }}
+                        >
+                          <Dumbbell className="h-3.5 w-3.5" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate text-[12px] font-medium text-[color:var(--fc-text-primary)]">
+                            {workout.workout_templates?.name || workout.name || 'Workout'}
+                          </span>
+                          {workout.workout_templates?.difficulty_level ? (
+                            <span className="text-[10px] text-[color:var(--fc-text-subtle)]">
+                              {' '}
+                              · {workout.workout_templates.difficulty_level}
+                            </span>
+                          ) : null}
+                          <div className="mt-0.5 font-mono text-[9.5px] text-[color:var(--fc-text-subtle)]">
+                            {dateStr}
+                          </div>
+                        </div>
+                        <span className={cn(tw.badge, wBadge.c)}>{wBadge.t}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => startEditWorkoutMeta(workout, e)}
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 shrink-0 p-0 border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-subtle)]"
+                          title="Edit date & notes"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             setAsActiveWorkout(workout.id)
                           }}
-                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 shrink-0 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
                           title="Set as Today's Workout"
                         >
-                          <Star className="w-4 h-4" />
+                          <Star className="w-3.5 h-3.5" />
                         </button>
-
-                        {/* Unassign Button */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleUnassignWorkout(workout.id)
                           }}
-                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 shrink-0 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
                           title="Unassign Workout"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    </div>
-
-                    {/* Row 2: Details - Mobile: Full width, Desktop: Side */}
-                    <div className="flex items-center gap-2 text-xs sm:ml-0 sm:flex-shrink-0">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 fc-text-workouts flex-shrink-0" />
-                        <span className="fc-text-subtle font-medium">
-                          {workout.scheduled_date
-                            ? new Date(workout.scheduled_date).toLocaleDateString()
-                            : 'No date'}
-                        </span>
-                      </div>
-
-                      {workout.workout_templates?.estimated_duration && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 fc-text-workouts flex-shrink-0" />
-                          <span className="fc-text-subtle font-medium">
-                            {workout.workout_templates.estimated_duration}m
-                          </span>
-                        </div>
-                      )}
-
-                      {workout.workout_templates?.difficulty_level && (
-                        <div className="flex items-center gap-1">
-                          <Dumbbell className="w-3 h-3 fc-text-warning flex-shrink-0" />
-                          <span className="fc-text-subtle font-medium">
-                            {workout.workout_templates.difficulty_level}
-                          </span>
-                        </div>
-                      )}
-
-                      <span className={`fc-pill fc-pill-glass text-xs ${workoutStatus.color}`}>
-                        {workoutStatus.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {editWorkoutId === workout.id && (
-                    <div
-                      className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] space-y-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div>
-                        <label className="text-xs fc-text-dim block mb-1">Scheduled date</label>
-                        <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-xs fc-text-dim block mb-1">Notes</label>
-                        <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Optional notes for this assignment" />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="fc-btn fc-btn-primary"
-                          disabled={savingWorkoutMeta}
-                          onClick={(e) => saveWorkoutMeta(workout.id, e)}
+                      {editWorkoutId === workout.id ? (
+                        <div
+                          className="mt-2 space-y-3 rounded-[11px] border border-[color:var(--fc-divider)] p-3"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {savingWorkoutMeta ? 'Saving…' : 'Save'}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="fc-btn fc-btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditWorkoutId(null)
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                          <div>
+                            <label className="mb-1 block text-xs text-[color:var(--fc-text-subtle)]">
+                              Scheduled date
+                            </label>
+                            <Input
+                              type="date"
+                              value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-[color:var(--fc-text-subtle)]">
+                              Notes
+                            </label>
+                            <Input
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              placeholder="Optional notes for this assignment"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="fc-btn fc-btn-primary"
+                              disabled={savingWorkoutMeta}
+                              onClick={(e) => saveWorkoutMeta(workout.id, e)}
+                            >
+                              {savingWorkoutMeta ? 'Saving…' : 'Save'}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="fc-btn fc-btn-secondary"
+                              onClick={() => setEditWorkoutId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </React.Fragment>
+                  )
+                })}
+                {!expanded && hidden > 0 ? (
+                  <button
+                    type="button"
+                    className={tw.expandBtn}
+                    onClick={() =>
+                      setExpandedGroups((m) => ({ ...m, [group.key]: true }))
+                    }
+                  >
+                    Show all in {group.key.split(' — ')[0] ?? 'group'} ({hidden} more)
+                  </button>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
-      </div>
       )}
 
-      <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start pt-2 border-t border-[color:var(--fc-glass-border)]">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="fc-btn fc-btn-ghost gap-2 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
-          onClick={() => setAssignWorkoutOpen(true)}
-        >
-          <Plus className="w-4 h-4 shrink-0" />
+      <div className={tw.bottomGrid}>
+        <button type="button" className={tw.btnOutline} onClick={() => setAssignWorkoutOpen(true)}>
+          <Plus className="h-[13px] w-[13px]" aria-hidden />
           Assign workout
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="fc-btn fc-btn-ghost gap-2 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/10"
-          asChild
-        >
-          <Link href="/coach/programs">
-            <Layers className="w-4 h-4 shrink-0" />
-            Assign program
-          </Link>
-        </Button>
+        </button>
+        <Link href="/coach/programs" className={tw.btnCyan}>
+          <ClipboardList className="h-[13px] w-[13px]" aria-hidden />
+          Assign program
+        </Link>
       </div>
     </div>
 

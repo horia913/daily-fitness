@@ -1,0 +1,100 @@
+.rangeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.rangeTab {
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fc-text-subtle);
+  cursor: pointer;
+}
+
+.rangeTab:hover {
+  color: var(--fc-text-primary);
+}
+
+.rangeTabActive {
+  background: var(--fc-set-type-straight-soft);
+  border-color: var(--fc-set-type-straight-border);
+  color: var(--fc-set-type-straight);
+}
+
+.stripWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-divider);
+  border-radius: 11px;
+  padding: 10px;
+}
+
+.rowFlex {
+  display: flex;
+  gap: 2px;
+}
+
+.grid90 {
+  display: grid;
+  grid-template-columns: repeat(45, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 14px);
+  gap: 2px;
+}
+
+.cell {
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.grid90 .cell {
+  flex: unset;
+  min-width: unset;
+}
+
+.cellEmpty {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cellL1 {
+  background: rgba(52, 211, 153, 0.18);
+}
+
+.cellL2 {
+  background: rgba(52, 211, 153, 0.4);
+}
+
+.cellL3 {
+  background: var(--fc-effort-easy);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  color: var(--fc-text-quaternary);
+}
+
+.avgCrit {
+  color: var(--fc-effort-max);
+}
+
+.avgWarn {
+  color: var(--fc-effort-medium);
+}
+
+.avgGood {
+  color: var(--fc-effort-easy);
+}

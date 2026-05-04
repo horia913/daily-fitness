@@ -28,7 +28,11 @@ import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { WorkoutBlock } from "@/types/workoutBlocks";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/toast-provider";
-import type { WorkoutSpeedSet, WorkoutEnduranceSet } from "@/types/workoutSetEntries";
+import type {
+  WorkoutSpeedSet,
+  WorkoutEnduranceSet,
+  WorkoutTimeProtocol,
+} from "@/types/workoutSetEntries";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
 
 function formatSpeedPrescriptionRow(row: WorkoutSpeedSet | undefined): string | null {
@@ -70,55 +74,151 @@ function formatEndurancePrescriptionRow(row: WorkoutEnduranceSet | undefined): s
   return parts.length ? parts.join(" · ") : null;
 }
 
-function flatExerciseRowsFromBlocks(blocks: WorkoutBlock[]) {
-  const rows: { key: string; name: string; setsReps: string }[] = [];
-  blocks.forEach((block, bi) => {
-    const exs = block.exercises || [];
-    const setType = block.set_type;
-    if (exs.length === 0) {
-      rows.push({
-        key: `empty-${block.id ?? bi}`,
-        name:
-          (block as { set_name?: string }).set_name ||
-          String(block.set_type || "Block"),
-        setsReps: "—",
-      });
-      return;
-    }
-    exs.forEach(
-      (
-        ex: {
-          exercise?: { name?: string };
-          exercise_id?: string;
-          sets?: number;
-          reps?: string | number;
-          speed_sets?: WorkoutSpeedSet[];
-          endurance_sets?: WorkoutEnduranceSet[];
-        },
-        ei: number,
-      ) => {
-        const name = ex.exercise?.name || "Exercise";
-        const sets = ex.sets ?? block.total_sets ?? "—";
-        const reps = ex.reps ?? block.reps_per_set ?? "—";
-        let setsReps: string;
-        if (setType === "speed_work") {
-          const sp = formatSpeedPrescriptionRow(ex.speed_sets?.[0]);
-          setsReps = sp ?? `${sets} × ${reps}`;
-        } else if (setType === "endurance") {
-          const ep = formatEndurancePrescriptionRow(ex.endurance_sets?.[0]);
-          setsReps = ep ?? `${sets} × ${reps}`;
-        } else {
-          setsReps = `${sets} × ${reps}`;
-        }
-        rows.push({
-          key: `${block.id}-${ex.exercise_id ?? ei}-${ei}`,
-          name,
-          setsReps,
-        });
-      },
-    );
+function blockTypeBadgeLabel(setType: string): string {
+  const labels: Record<string, string> = {
+    straight_set: "STRAIGHT SET",
+    superset: "SUPERSET",
+    giant_set: "GIANT SET",
+    drop_set: "DROP SET",
+    cluster_set: "CLUSTER SET",
+    rest_pause: "REST-PAUSE",
+    pre_exhaustion: "PRE-EXHAUSTION",
+    amrap: "AMRAP",
+    emom: "EMOM",
+    for_time: "FOR-TIME",
+    tabata: "TABATA",
+    speed_work: "SPEED WORK",
+    endurance: "ENDURANCE",
+  };
+  return labels[setType] ?? setType.replace(/_/g, " ").toUpperCase();
+}
+
+function displayExerciseName(ex: {
+  exercise?: { name?: string | null } | null;
+  exercise_order?: number | null;
+}): string {
+  return ex.exercise?.name?.trim() || `Exercise ${ex.exercise_order ?? ""}`.trim();
+}
+
+function displayReps(
+  reps: string | number | null | undefined,
+  fallback: string | number | null | undefined,
+): string {
+  const val = reps ?? fallback;
+  if (val == null || String(val).trim() === "") return "—";
+  return String(val);
+}
+
+function blockPrimaryLine(block: WorkoutBlock): string {
+  const setType = String(block.set_type || "straight_set");
+  const exercises = (block.exercises ?? []).slice().sort((a, b) => {
+    const ao = a.exercise_order ?? 0;
+    const bo = b.exercise_order ?? 0;
+    return ao - bo;
   });
-  return rows;
+  const first = exercises[0];
+  const second = exercises[1];
+  const tp = (block.time_protocols?.[0] ?? null) as WorkoutTimeProtocol | null;
+
+  switch (setType) {
+    case "superset": {
+      const a = first
+        ? `A: ${displayExerciseName(first)} ${displayReps(first.reps, block.reps_per_set)} reps`
+        : "A: —";
+      const b = second
+        ? `B: ${displayExerciseName(second)} ${displayReps(second.reps, block.reps_per_set)} reps`
+        : "B: —";
+      return `${a}, ${b}`;
+    }
+    case "giant_set": {
+      const parts = exercises.map((ex, i) => {
+        const letter = String.fromCharCode(65 + i);
+        return `${letter}: ${displayExerciseName(ex)} × ${displayReps(ex.reps, block.reps_per_set)}`;
+      });
+      return parts.join(", ");
+    }
+    case "drop_set": {
+      const ex = first;
+      const exName = ex ? displayExerciseName(ex) : "Exercise";
+      const mainReps = displayReps(ex?.reps, block.reps_per_set);
+      const firstDrop = ex?.drop_sets?.slice().sort((a, b) => (a.drop_order ?? 0) - (b.drop_order ?? 0))[0];
+      const dropReps = firstDrop?.reps ? `${firstDrop.reps}` : "—";
+      const dropPct =
+        firstDrop?.drop_percentage != null ? `${firstDrop.drop_percentage}% drop` : "drop set";
+      return `${exName} ${mainReps} reps → ${dropReps} reps (${dropPct})`;
+    }
+    case "cluster_set": {
+      const ex = first;
+      const exName = ex ? displayExerciseName(ex) : "Exercise";
+      const cfg = ex?.cluster_sets?.[0];
+      const clusters = cfg?.clusters_per_set ?? block.total_sets ?? "—";
+      const repsPerCluster = cfg?.reps_per_cluster ?? ex?.reps ?? block.reps_per_set ?? "—";
+      const intraRest = cfg?.intra_cluster_rest ?? "—";
+      return `${exName} ${clusters} × ${repsPerCluster} (intra-cluster rest ${intraRest}s)`;
+    }
+    case "rest_pause": {
+      const ex = first;
+      const exName = ex ? displayExerciseName(ex) : "Exercise";
+      const reps = displayReps(ex?.reps, block.reps_per_set);
+      const rp = ex?.rest_pause_sets?.[0];
+      const pauses = rp?.max_rest_pauses ?? "—";
+      const rpDur = rp?.rest_pause_duration ?? "—";
+      return `${exName} ${reps} reps + up to ${pauses} rest-pauses of ${rpDur}s`;
+    }
+    case "pre_exhaustion": {
+      const a = first
+        ? `A: ${displayExerciseName(first)} × ${displayReps(first.reps, block.reps_per_set)}`
+        : "A: —";
+      const b = second
+        ? `B: ${displayExerciseName(second)} × ${displayReps(second.reps, block.reps_per_set)}`
+        : "B: —";
+      return `${a} → ${b}`;
+    }
+    case "amrap": {
+      const exName = first ? displayExerciseName(first) : "Exercise";
+      const mins =
+        (tp?.total_duration_minutes ?? Math.round((block.duration_seconds ?? 0) / 60)) || "—";
+      const target = tp?.target_reps ?? first?.reps ?? "—";
+      return `${exName} — AMRAP ${mins} min, target ${target} reps`;
+    }
+    case "emom": {
+      const exName = first ? displayExerciseName(first) : "Exercise";
+      const mins =
+        (tp?.total_duration_minutes ?? Math.round((block.duration_seconds ?? 0) / 60)) || "—";
+      const reps = tp?.reps_per_round ?? first?.reps ?? "—";
+      return `${exName} — ${mins} minutes × ${reps} reps`;
+    }
+    case "for_time": {
+      const exName = first ? displayExerciseName(first) : "Exercise";
+      const target = tp?.target_reps ?? first?.reps ?? "—";
+      const cap = tp?.time_cap_minutes ?? "—";
+      return `${exName} — ${target} reps for time (cap ${cap} min)`;
+    }
+    case "tabata": {
+      const rounds = tp?.rounds ?? "8";
+      const work = tp?.work_seconds ?? "20";
+      const rest = tp?.rest_seconds ?? "10";
+      return `${rounds} rounds × ${work}s on / ${rest}s off`;
+    }
+    case "speed_work": {
+      const summary = formatSpeedPrescriptionRow(first?.speed_sets?.[0]);
+      return summary ?? "Speed work";
+    }
+    case "endurance": {
+      const summary = formatEndurancePrescriptionRow(first?.endurance_sets?.[0]);
+      return summary ?? "Endurance block";
+    }
+    case "straight_set":
+    default: {
+      const ex = first;
+      const exName = ex ? displayExerciseName(ex) : "Exercise";
+      const sets = ex?.sets ?? block.total_sets ?? "—";
+      const reps = displayReps(ex?.reps, block.reps_per_set);
+      const rpe = ex?.rir != null ? ` @ RPE ${ex.rir}` : "";
+      const tempo = ex?.tempo ? `, tempo ${ex.tempo}` : "";
+      return `${exName} ${sets} × ${reps}${rpe}${tempo}`;
+    }
+  }
 }
 
 export default function WorkoutTemplateDetailsPage() {
@@ -165,6 +265,7 @@ export default function WorkoutTemplateDetailsPage() {
   useEffect(() => {
     if (!authLoading && templateId && user?.id) {
       if (templateTimeoutRef.current) clearTimeout(templateTimeoutRef.current);
+      setLoading(true);
       templateTimeoutRef.current = setTimeout(() => {
         templateTimeoutRef.current = null;
         setLoading(false);
@@ -174,6 +275,7 @@ export default function WorkoutTemplateDetailsPage() {
           clearTimeout(templateTimeoutRef.current);
           templateTimeoutRef.current = null;
         }
+        setLoading(false);
       });
       return () => {
         if (templateTimeoutRef.current) {
@@ -193,7 +295,6 @@ export default function WorkoutTemplateDetailsPage() {
   const loadTemplate = async () => {
     if (!user?.id) return;
     try {
-      setLoading(true);
       setError(null);
 
       // Use efficient single-template fetch; skip exercise count (we derive it from blocks below)
@@ -206,8 +307,6 @@ export default function WorkoutTemplateDetailsPage() {
     } catch (error: any) {
       console.error("Error loading template:", error);
       setError(error?.message || "Failed to load template");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -383,18 +482,23 @@ export default function WorkoutTemplateDetailsPage() {
             </div>
 
             {workoutBlocks.length > 0 ? (
-              <div className="divide-y divide-[color:var(--fc-glass-border)]/40 border-b border-[color:var(--fc-glass-border)]/40">
-                {flatExerciseRowsFromBlocks(workoutBlocks).map((row) => (
+              <div className="space-y-2 border-b border-[color:var(--fc-glass-border)]/40 py-2">
+                {workoutBlocks.map((block, idx) => (
                   <div
-                    key={row.key}
-                    className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                    key={`${block.id}-${idx}`}
+                    className="rounded-xl border border-[color:var(--fc-glass-border)]/40 bg-[color:var(--fc-glass-soft)]/30 px-3 py-2.5"
                   >
-                    <span className="min-w-0 flex-1 truncate font-medium fc-text-primary">
-                      {row.name}
-                    </span>
-                    <span className="shrink-0 tabular-nums fc-text-dim">
-                      {row.setsReps}
-                    </span>
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                        {blockTypeBadgeLabel(String(block.set_type || ""))}
+                      </span>
+                      <span className="text-xs font-medium fc-text-dim">
+                        Exercise {idx + 1}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-snug fc-text-primary">
+                      {blockPrimaryLine(block)}
+                    </p>
                   </div>
                 ))}
               </div>

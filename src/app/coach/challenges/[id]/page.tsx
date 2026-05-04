@@ -30,6 +30,7 @@ import Link from "next/link";
 import { getChallengeDetails, getChallengeParticipants, getPendingVideoSubmissions, reviewVideoSubmission, startChallenge, finalizeChallenge, inviteParticipants, updateChallenge, getChallengeScoringCategories, ChallengeVideoSubmission } from "@/lib/challengeService";
 import { notifyChallengeInvitation, notifyChallengeStarted } from "@/lib/notificationHelpers";
 import { supabase } from "@/lib/supabase";
+import { fetchApi } from "@/lib/apiClient";
 
 function CoachChallengeDetailContent() {
   const params = useParams();
@@ -146,7 +147,7 @@ function CoachChallengeDetailContent() {
       setShowEndConfirm(false);
       if (result.success) {
         try {
-          await fetch("/api/coach/challenges/notify-finalized", {
+          await fetchApi("/api/coach/challenges/notify-finalized", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ challengeId }),
@@ -217,7 +218,7 @@ function CoachChallengeDetailContent() {
 
       if (success) {
         try {
-          await fetch("/api/coach/challenges/notify-video-reviewed", {
+          await fetchApi("/api/coach/challenges/notify-video-reviewed", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ submissionId, status, categoryName }),
@@ -473,7 +474,7 @@ function CoachChallengeDetailContent() {
                     <label
                       key={client.id}
                       htmlFor={`invite-client-${client.id}`}
-                      className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer hover:border-[color:var(--fc-accent)] transition-colors"
+                      className="flex items-center gap-2 fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)] cursor-pointer hover:border-[color:var(--fc-accent-cyan)] transition-colors"
                     >
                       <Checkbox
                         id={`invite-client-${client.id}`}

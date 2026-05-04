@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, Fragment } from "react";
+import { useMemo } from "react";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
 import { dbToUiScale } from "@/lib/wellnessService";
+import { CheckinDeltaPill, type DeltaTone } from "@/components/client/check-ins/checkinSuite";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 
 function avgSleep(logs: DailyWellnessLog[]): number | null {
   const withSleep = logs.filter((l) => l.sleep_hours != null);
@@ -24,34 +27,21 @@ function avgSoreness(logs: DailyWellnessLog[]): number | null {
   return sum / withS.length;
 }
 
-type Arrow = "up" | "down" | "flat";
-
-function sleepArrow(last: number | null, thisW: number | null): Arrow {
-  if (last == null || thisW == null) return "flat";
-  if (thisW > last + 0.05) return "up";
-  if (thisW < last - 0.05) return "down";
-  return "flat";
+function deltaSleep(last: number | null, thisW: number | null): { tone: DeltaTone; text: string } {
+  if (last == null || thisW == null) return { tone: "stable", text: "—" };
+  const d = thisW - last;
+  if (Math.abs(d) < 0.05) return { tone: "stable", text: "stable" };
+  if (d > 0) return { tone: "up", text: `+${d.toFixed(1)}` };
+  return { tone: "down", text: d.toFixed(1) };
 }
 
-/** Lower stress/soreness = improving */
-function lowerIsBetterArrow(last: number | null, thisW: number | null): Arrow {
-  if (last == null || thisW == null) return "flat";
-  if (thisW < last - 0.15) return "up";
-  if (thisW > last + 0.15) return "down";
-  return "flat";
-}
-
-function arrowMeta(
-  kind: "sleep" | "stress" | "soreness",
-  arrow: Arrow
-): { char: string; className: string } {
-  if (arrow === "flat") return { char: "→", className: "text-[color:var(--fc-text-subtle)] opacity-70" };
-  if (kind === "sleep") {
-    if (arrow === "up") return { char: "↑", className: "text-[color:var(--fc-status-success)]" };
-    return { char: "↓", className: "text-red-500 dark:text-red-400" };
-  }
-  if (arrow === "up") return { char: "↑", className: "text-[color:var(--fc-status-success)]" };
-  return { char: "↓", className: "text-red-500 dark:text-red-400" };
+/** Lower stress/soreness = improving (same thresholds as arrow helpers in prior version). */
+function deltaLowerIsBetter(last: number | null, thisW: number | null): { tone: DeltaTone; text: string } {
+  if (last == null || thisW == null) return { tone: "stable", text: "—" };
+  const d = thisW - last;
+  if (Math.abs(d) < 0.15) return { tone: "stable", text: "stable" };
+  if (d < 0) return { tone: "up", text: d.toFixed(1) };
+  return { tone: "down", text: `+${d.toFixed(1)}` };
 }
 
 interface WellnessTrendsProps {
@@ -84,70 +74,102 @@ export function WellnessTrends({ thisWeekLogs, lastWeekLogs }: WellnessTrendsPro
       lastSore,
       thisSore,
       hasAny,
-      sleepA: sleepArrow(lastSleep, thisSleep),
-      stressA: lowerIsBetterArrow(lastStress, thisStress),
-      soreA: lowerIsBetterArrow(lastSore, thisSore),
+      sleepDelta: deltaSleep(lastSleep, thisSleep),
+      stressDelta: deltaLowerIsBetter(lastStress, thisStress),
+      soreDelta: deltaLowerIsBetter(lastSore, thisSore),
     };
   }, [thisWeekLogs, lastWeekLogs]);
 
   if (!row.hasAny) {
     return (
-      <div className="pt-2">
-        <h3 className="text-sm font-semibold fc-text-primary mb-2">Wellness Trends</h3>
-        <p className="text-xs fc-text-dim">Log a few more days this week to see trends.</p>
-      </div>
+      <section className={cn(checkinSuiteStyles.root, checkinSuiteStyles.sectionCard)}>
+        <p
+          className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em] mb-2")}
+          style={{ color: "var(--cs-t3)" }}
+        >
+          Wellness trends
+        </p>
+        <div
+          className="rounded-[11px] border border-dashed px-3.5 py-3.5 text-center"
+          style={{
+            background: "var(--cs-card-2)",
+            borderColor: "var(--cs-line)",
+          }}
+        >
+          <p className={cn(checkinSuiteStyles.fontBody, "text-[11px] leading-relaxed")} style={{ color: "var(--cs-t3)" }}>
+            Log a few more days this week to see trends.
+          </p>
+        </div>
+      </section>
     );
   }
 
   const fmtSleep = (n: number | null) => (n != null ? `${n.toFixed(1)} hrs` : "—");
   const fmtScale = (n: number | null) => (n != null ? n.toFixed(1) : "—");
 
-  const rows: { label: string; last: string; thisV: string; kind: "sleep" | "stress" | "soreness"; arrow: Arrow }[] = [
+  const rows: {
+    name: string;
+    last: string;
+    thisV: string;
+    delta: { tone: DeltaTone; text: string };
+  }[] = [
     {
-      label: "Sleep",
+      name: "Avg sleep",
       last: fmtSleep(row.lastSleep),
       thisV: fmtSleep(row.thisSleep),
-      kind: "sleep",
-      arrow: row.sleepA,
+      delta: row.sleepDelta,
     },
     {
-      label: "Stress",
+      name: "Avg stress",
       last: fmtScale(row.lastStress),
       thisV: fmtScale(row.thisStress),
-      kind: "stress",
-      arrow: row.stressA,
+      delta: row.stressDelta,
     },
     {
-      label: "Soreness",
+      name: "Avg soreness",
       last: fmtScale(row.lastSore),
       thisV: fmtScale(row.thisSore),
-      kind: "soreness",
-      arrow: row.soreA,
+      delta: row.soreDelta,
     },
   ];
 
   return (
-    <div className="pt-2">
-      <h3 className="text-sm font-semibold fc-text-primary mb-3">Wellness Trends</h3>
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 gap-y-2 text-xs items-center">
-        <span className="fc-text-subtle font-medium" />
-        <span className="fc-text-subtle text-right">Last wk</span>
-        <span className="fc-text-subtle text-right">This wk</span>
-        <span className="w-5" />
-        {rows.map((r) => {
-          const m = arrowMeta(r.kind, r.arrow);
-          return (
-            <Fragment key={r.label}>
-              <span className="fc-text-primary font-medium">{r.label}</span>
-              <span className="text-right fc-text-dim font-mono">{r.last}</span>
-              <span className="text-right fc-text-primary font-mono">{r.thisV}</span>
-              <span className={`text-center font-bold ${m.className}`} aria-hidden>
-                {m.char}
-              </span>
-            </Fragment>
-          );
-        })}
+    <section className={cn(checkinSuiteStyles.root, checkinSuiteStyles.sectionCard)}>
+      <p
+        className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em]")}
+        style={{ color: "var(--cs-cyan)" }}
+      >
+        Wellness trends
+      </p>
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-x-2 gap-y-0 items-center text-[9px] font-medium uppercase tracking-[0.1em] pb-2 border-b" style={{ borderColor: "var(--cs-line-2)", color: "var(--cs-t3)" }}>
+        <span className="justify-self-start font-mono">Metric</span>
+        <span className="text-center font-mono">Last week</span>
+        <span className="text-center font-mono">This week</span>
+        <span className="text-right font-mono pr-0.5">Δ</span>
       </div>
-    </div>
+      <div className="flex flex-col">
+        {rows.map((r, i) => (
+          <div
+            key={r.name}
+            className={cn(
+              "grid grid-cols-[1fr_1fr_1fr_auto] gap-x-2 gap-y-0 items-center py-2.5 text-xs",
+              i > 0 && "border-t",
+            )}
+            style={i > 0 ? { borderColor: "var(--cs-line-2)" } : undefined}
+          >
+            <span className={cn(checkinSuiteStyles.fontBody, "font-medium")} style={{ color: "var(--cs-t1)" }}>
+              {r.name}
+            </span>
+            <span className={cn(checkinSuiteStyles.fontDisplay, "text-right text-sm font-bold")} style={{ color: "var(--cs-t2)" }}>
+              {r.last}
+            </span>
+            <span className={cn(checkinSuiteStyles.fontDisplay, "text-right text-sm font-bold")} style={{ color: "var(--cs-t1)" }}>
+              {r.thisV}
+            </span>
+            <CheckinDeltaPill tone={r.delta.tone} text={r.delta.text} />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

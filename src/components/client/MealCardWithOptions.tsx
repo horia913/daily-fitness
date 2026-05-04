@@ -3,14 +3,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Camera, 
-  CheckCircle, 
-  ChevronLeft, 
+import {
+  Camera,
+  CheckCircle,
+  ChevronLeft,
   ChevronRight,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sun,
+  Moon,
+  Leaf,
+  type LucideIcon,
 } from 'lucide-react'
+import { IconButton } from '@/components/client-ui'
+import { cn } from '@/lib/utils'
+import fuelMeal from '@/components/client/mealCardFuel.module.css'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getFoodVisuals } from '@/lib/foodIconMap'
 import { useToast } from '@/components/ui/toast-provider'
@@ -58,13 +65,49 @@ export interface MealOptionDisplay {
   totals: MacroTotals
 }
 
+function ingredientQtyParts(item: MealFoodItemDisplay): { num: string; unit: string } {
+  const raw = (item.food?.serving_unit || 'g').trim()
+  const lower = raw.toLowerCase()
+  const q = item.quantity
+  const num =
+    Math.abs(q - Math.round(q)) < 0.001 ? String(Math.round(q)) : String(Math.round(q * 10) / 10)
+  if (lower === 'g' || lower === 'ml') return { num, unit: lower }
+  return { num, unit: raw.length <= 4 ? raw : `${raw.slice(0, 4)}…` }
+}
+
+const FUEL_MEAL_ICON: Record<
+  MealWithOptionsDisplay['meal_type'],
+  { Icon: LucideIcon; softVar: string; colorVar: string }
+> = {
+  breakfast: {
+    Icon: Sun,
+    softVar: 'var(--fc-meal-breakfast-soft)',
+    colorVar: 'var(--fc-meal-breakfast, var(--fc-accent-gold))',
+  },
+  lunch: {
+    Icon: Leaf,
+    softVar: 'var(--fc-meal-lunch-soft)',
+    colorVar: 'var(--fc-meal-lunch)',
+  },
+  dinner: {
+    Icon: Moon,
+    softVar: 'var(--fc-meal-dinner-soft)',
+    colorVar: 'var(--fc-meal-dinner)',
+  },
+  snack: {
+    Icon: Leaf,
+    softVar: 'var(--fc-meal-lunch-soft)',
+    colorVar: 'var(--fc-meal-lunch)',
+  },
+}
+
 interface MealCardWithOptionsProps {
   meal: MealWithOptionsDisplay
   clientId: string
   /** Called when user logs via photo (legacy flow). */
   onMealLogged?: (mealId: string, optionId: string | null, photoUrl: string) => void
   /** When provided, Fuel flow: primary "Mark Complete" and optional photo; no photo required. */
-  onMarkComplete?: (mealId: string, optionId: string | null) => void
+  onMarkComplete?: (mealId: string, optionId: string | null) => void | Promise<void>
   /** Called when user taps Undo on a completed meal. */
   onUndo?: () => void
   /** Fuel mode: add photo to completion (optional). Parent calls addPhotoToCompletion and refetches. */
@@ -270,6 +313,44 @@ export default function MealCardWithOptions({
   const surfaceCard =
     "relative overflow-hidden border-b border-white/5 bg-transparent"
 
+  const fuelMealIcon = FUEL_MEAL_ICON[meal.meal_type]
+  const FuelMealGlyph = fuelMealIcon.Icon
+
+  const macroMetaLine = (t: MacroTotals) =>
+    `${Math.round(t.calories)} kcal · ${Math.round(t.protein)}g P · ${Math.round(t.carbs)}g C · ${Math.round(t.fat)}g F`
+
+  const fuelMacroStatRow = (t: MacroTotals) => (
+    <div className={fuelMeal.macroLine}>
+      <div className={fuelMeal.stat}>
+        <span className={fuelMeal.statVal} style={{ color: "var(--fc-accent-lime)" }}>
+          {Math.round(t.calories)}
+        </span>
+        <span className={fuelMeal.statLbl}>kcal</span>
+      </div>
+      <span className={fuelMeal.dotSep} aria-hidden />
+      <div className={fuelMeal.stat}>
+        <span className={fuelMeal.statVal} style={{ color: "var(--fc-macro-protein)" }}>
+          {Math.round(t.protein)}g
+        </span>
+        <span className={fuelMeal.statLbl}>P</span>
+      </div>
+      <span className={fuelMeal.dotSep} aria-hidden />
+      <div className={fuelMeal.stat}>
+        <span className={fuelMeal.statVal} style={{ color: "var(--fc-macro-carbs)" }}>
+          {Math.round(t.carbs)}g
+        </span>
+        <span className={fuelMeal.statLbl}>C</span>
+      </div>
+      <span className={fuelMeal.dotSep} aria-hidden />
+      <div className={fuelMeal.stat}>
+        <span className={fuelMeal.statVal} style={{ color: "var(--fc-macro-fat)" }}>
+          {Math.round(t.fat)}g
+        </span>
+        <span className={fuelMeal.statLbl}>F</span>
+      </div>
+    </div>
+  )
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -285,9 +366,114 @@ export default function MealCardWithOptions({
         className="hidden"
         aria-hidden
       />
-      <div className={surfaceCard + " flex flex-col h-full"}>
+      <div
+        className={cn(
+          "flex flex-col h-full min-w-0",
+          isFuelMode ? fuelMeal.shell : surfaceCard
+        )}
+      >
         {meal.logged ? (
-          // ===== LOGGED MEAL =====
+          isFuelMode ? (
+          <>
+            <div className={fuelMeal.headRow}>
+              <div
+                className={fuelMeal.mealIconWrap}
+                style={{
+                  background: fuelMealIcon.softVar,
+                  color: fuelMealIcon.colorVar,
+                }}
+              >
+                <FuelMealGlyph className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className={fuelMeal.headInfo}>
+                <h3 className={fuelMeal.mealTitle}>{meal.name}</h3>
+                <p className={fuelMeal.mealMeta}>{macroMetaLine(completedTotals)}</p>
+              </div>
+              <span className={cn(fuelMeal.statusPill, fuelMeal.statusPillLogged)}>Logged</span>
+            </div>
+            {onOpenMealDetails && (
+              <div className="px-4 pb-1 -mt-1">
+                <button
+                  type="button"
+                  onClick={onOpenMealDetails}
+                  className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-0"
+                >
+                  Details
+                </button>
+              </div>
+            )}
+            <div className={fuelMeal.divider} />
+            {meal.loggedOptionId && hasOptions && completedOption?.name && (
+              <p className="px-4 pt-3 text-xs text-[color:var(--fc-text-dim)]">{completedOption.name}</p>
+            )}
+            {meal.photoUrl ? (
+              <div className="px-4 pt-3">
+                <div className={cn(fuelMeal.photoThumbWrap, fuelMeal.loggedPhotoHero)}>
+                  <img src={meal.photoUrl} alt="" className={fuelMeal.photoThumb} />
+                  <div className={fuelMeal.photoReplaceRow}>
+                    <span className="text-xs text-[color:var(--fc-text-dim)]">Meal photo</span>
+                    {onAddPhoto ? (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-1"
+                      >
+                        Replace
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {completedItems.length > 0 ? (
+              <>
+                <div className={fuelMeal.ingredients}>
+                  {completedItems.map((item, idx) => {
+                    const q = ingredientQtyParts(item)
+                    return (
+                      <div key={item.food?.id ?? idx} className={fuelMeal.ingRow}>
+                        {onFoodClick && item.food?.id ? (
+                          <button
+                            type="button"
+                            onClick={() => onFoodClick(item.food!.id)}
+                            className={cn(fuelMeal.ingName, "truncate text-left hover:underline min-h-[40px]")}
+                          >
+                            {item.food?.name ?? "Unknown"}
+                          </button>
+                        ) : (
+                          <span className={cn(fuelMeal.ingName, "truncate")}>{item.food?.name ?? "Unknown"}</span>
+                        )}
+                        <span className={fuelMeal.ingQty}>
+                          {q.num}
+                          <span className={fuelMeal.ingQtyUnit}>{q.unit}</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {fuelMacroStatRow(completedTotals)}
+              </>
+            ) : null}
+            <div className={fuelMeal.actions}>
+              {!meal.photoUrl && onAddPhoto ? (
+                <button type="button" className={fuelMeal.photoDashed} onClick={() => fileInputRef.current?.click()}>
+                  <Camera className="h-4 w-4 shrink-0" />
+                  Add photo
+                </button>
+              ) : null}
+              {onUndo ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onUndo}
+                  className="w-full min-h-[44px] rounded-xl border-[color:var(--fc-status-warning)]/50 text-[color:var(--fc-status-warning)] hover:bg-[color:var(--fc-status-warning)]/10"
+                >
+                  Undo
+                </Button>
+              ) : null}
+            </div>
+          </>
+          ) : (
           <>
             <div className="p-5 border-b border-[color:var(--fc-glass-border)]">
               <div className="flex justify-between items-start mb-1 gap-2">
@@ -407,10 +593,10 @@ export default function MealCardWithOptions({
               )}
             </div>
           </>
-        ) : (
-          // ===== UNLOGGED MEAL =====
+          )
+        ) : !isFuelMode ? (
           <>
-            {/* Header */}
+            {/* Header — legacy (non–Fuel) */}
             <div className="p-5">
               <div className="flex justify-between items-start mb-1 gap-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -519,41 +705,143 @@ export default function MealCardWithOptions({
             <div className="mx-5 mb-4 flex flex-col items-center justify-center py-6 bg-[color:var(--fc-glass-highlight)] rounded-2xl border border-dashed border-[color:var(--fc-glass-border)]">
               <ImageIcon className="w-8 h-8 mb-2 text-[color:var(--fc-text-subtle)]" />
               <p className="text-xs italic text-[color:var(--fc-text-subtle)]">
-                {showPhotoPreview ? (isFuelMode ? 'Photo selected' : 'Photo selected - ready to log') : (isFuelMode ? 'Add photo below' : 'No photo uploaded yet')}
+                {showPhotoPreview ? 'Photo selected - ready to log' : 'No photo uploaded yet'}
               </p>
             </div>
 
-            {/* Actions: Fuel mode = Mark Complete (primary, accent) + Add Photo (secondary); 44px min touch targets */}
+            {/* Actions — legacy: photo log only */}
             <div className="px-5 pb-5 space-y-2">
-              {isFuelMode && onMarkComplete ? (
-                <>
-                  <Button
-                    type="button"
-                    onClick={() => onMarkComplete(meal.id, currentOption?.id ?? null)}
-                    className="w-full min-h-[44px] rounded-xl flex items-center justify-center gap-2 font-semibold text-base bg-gradient-to-r from-cyan-600 to-cyan-400 text-white border-0 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-shadow"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    Mark Complete
-                  </Button>
-                  <Button
-                    onClick={handlePhotoSelect}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full min-h-[44px] rounded-xl text-sm text-[color:var(--fc-text-dim)] hover:bg-[color:var(--fc-glass-highlight)]"
-                  >
-                    <Camera className="w-4 h-4 mr-2" />
-                    Add Photo
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={handlePhotoSelect}
-                  disabled={meal.logged}
-                  variant="fc-primary"
-                  className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all"
+              <Button
+                onClick={handlePhotoSelect}
+                disabled={meal.logged}
+                variant="fc-primary"
+                className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all"
+              >
+                <Camera className="w-5 h-5" />
+                Upload Photo
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={fuelMeal.headRow}>
+              <div
+                className={fuelMeal.mealIconWrap}
+                style={{
+                  background: fuelMealIcon.softVar,
+                  color: fuelMealIcon.colorVar,
+                }}
+              >
+                <FuelMealGlyph className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className={fuelMeal.headInfo}>
+                <h3 className={fuelMeal.mealTitle}>{meal.name}</h3>
+                <p className={fuelMeal.mealMeta}>{macroMetaLine(currentTotals)}</p>
+              </div>
+              <span className={fuelMeal.statusPill}>Not logged</span>
+            </div>
+            {onOpenMealDetails && (
+              <div className="px-4 pb-1 -mt-1">
+                <button
+                  type="button"
+                  onClick={onOpenMealDetails}
+                  className="text-xs font-semibold text-[color:var(--fc-accent-cyan)] hover:underline min-h-[40px] px-0"
                 >
-                  <Camera className="w-5 h-5" />
-                  Upload Photo
+                  Details
+                </button>
+              </div>
+            )}
+            <div className={fuelMeal.divider} />
+            {hasOptions && meal.options.length > 1 && (
+              <div className={fuelMeal.carousel}>
+                <div className={fuelMeal.carouselInner}>
+                  <IconButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label="Previous option"
+                    onClick={handlePrevOption}
+                    disabled={selectedOptionIndex === 0 || showPhotoPreview}
+                    className="!h-7 !w-7 min-h-7 min-w-7 shrink-0 rounded-full"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </IconButton>
+                  <div className={fuelMeal.carouselCenter}>
+                    <p className={fuelMeal.optionTitle}>{currentOption?.name || 'Option'}</p>
+                    <div className={fuelMeal.dots}>
+                      {meal.options.map((_, idx) => (
+                        <span
+                          key={idx}
+                          className={cn(fuelMeal.dot, idx === selectedOptionIndex && fuelMeal.dotActive)}
+                          aria-hidden
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <IconButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label="Next option"
+                    onClick={handleNextOption}
+                    disabled={selectedOptionIndex === meal.options.length - 1 || showPhotoPreview}
+                    className="!h-7 !w-7 min-h-7 min-w-7 shrink-0 rounded-full"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </IconButton>
+                </div>
+              </div>
+            )}
+            {hasOptions && meal.options.length === 1 && currentOption && (
+              <div className="px-4 pt-3 pb-0">
+                <p className={fuelMeal.optionTitle}>{currentOption.name}</p>
+              </div>
+            )}
+            <div className={fuelMeal.ingredients}>
+              {currentItems.map((item, idx) => {
+                const q = ingredientQtyParts(item)
+                return (
+                  <div key={item.food?.id ?? idx} className={fuelMeal.ingRow}>
+                    {onFoodClick && item.food?.id ? (
+                      <button
+                        type="button"
+                        onClick={() => onFoodClick(item.food!.id)}
+                        className={cn(fuelMeal.ingName, 'truncate text-left hover:underline min-h-[40px]')}
+                      >
+                        {item.food?.name ?? 'Unknown'}
+                      </button>
+                    ) : (
+                      <span className={cn(fuelMeal.ingName, 'truncate')}>{item.food?.name ?? 'Unknown'}</span>
+                    )}
+                    <span className={fuelMeal.ingQty}>
+                      {q.num}
+                      <span className={fuelMeal.ingQtyUnit}>{q.unit}</span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            {fuelMacroStatRow(currentTotals)}
+            <div className={fuelMeal.actions}>
+              <button
+                type="button"
+                className={fuelMeal.photoDashed}
+                onClick={handlePhotoSelect}
+                disabled={showPhotoPreview}
+              >
+                <Camera className="h-4 w-4 shrink-0" />
+                {showPhotoPreview ? 'Photo selected' : 'Add photo'}
+              </button>
+              {onMarkComplete && (
+                <Button
+                  type="button"
+                  variant="btn-action"
+                  onClick={() => onMarkComplete(meal.id, currentOption?.id ?? null)}
+                  disabled={showPhotoPreview}
+                  className="w-full min-h-[44px] gap-1.5 py-3 text-[13px] font-bold tracking-[0.06em] uppercase"
+                >
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  Mark Complete
                 </Button>
               )}
             </div>
@@ -640,7 +928,19 @@ export default function MealCardWithOptions({
               </Button>
               <Button
                 onClick={async () => {
-                  if (isFuelMode && onAddPhoto && previewFile) {
+                  if (isFuelMode && !meal.logged && previewFile && onMarkComplete && onAddPhoto) {
+                    setUploading(true);
+                    setError(null);
+                    try {
+                      await Promise.resolve(onMarkComplete(meal.id, currentOption?.id ?? null));
+                      await onAddPhoto(meal.id, previewFile);
+                      handleDiscardPhoto();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Save failed');
+                    } finally {
+                      setUploading(false);
+                    }
+                  } else if (isFuelMode && meal.logged && onAddPhoto && previewFile) {
                     setUploading(true);
                     setError(null);
                     try {
@@ -655,18 +955,29 @@ export default function MealCardWithOptions({
                     handleLogMeal();
                   }
                 }}
-                disabled={uploading || (isFuelMode ? !onAddPhoto : !onMealLogged)}
+                disabled={
+                  uploading ||
+                  (!isFuelMode && !onMealLogged) ||
+                  (isFuelMode &&
+                    meal.logged &&
+                    !onAddPhoto) ||
+                  (isFuelMode && !meal.logged && (!onAddPhoto || !onMarkComplete))
+                }
                 className="flex-1 rounded-xl bg-[color:var(--fc-status-success)] hover:opacity-90 text-white"
               >
                 {uploading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    {isFuelMode ? 'Adding...' : 'Logging...'}
+                    {isFuelMode ? 'Saving...' : 'Logging...'}
                   </>
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    {isFuelMode ? 'Add Photo' : 'Log Meal'}
+                    {isFuelMode && !meal.logged && previewFile
+                      ? 'Log meal & photo'
+                      : isFuelMode
+                        ? 'Add Photo'
+                        : 'Log Meal'}
                   </>
                 )}
               </Button>

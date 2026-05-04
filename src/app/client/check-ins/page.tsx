@@ -8,6 +8,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { ClientPageShell } from "@/components/client-ui";
+import { CheckinHero, CheckinLimeAddButton, CheckinLinkRow } from "@/components/client/check-ins/checkinSuite";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DailyCheckInForm } from "@/components/client/check-ins/DailyCheckInForm";
 import { AddCheckInSheet } from "@/components/client/check-ins/AddCheckInSheet";
@@ -17,7 +20,7 @@ import { WeeklyCheckInCard } from "@/components/client/WeeklyCheckInCard";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
-import { ArrowLeft, Plus, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   getTodayLog,
   getLogRange,
@@ -268,34 +271,20 @@ export default function ClientCheckInsPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4">
-          <header className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <button
-                type="button"
-                onClick={() => router.push("/client")}
-                className="shrink-0 p-2 -ml-2 rounded-xl fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-                aria-label="Back to home"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-xl font-bold tracking-tight fc-text-primary truncate">Check-ins</h1>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAddSheet(true)}
-              className="relative shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary text-sm font-semibold hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Add
-              {addButtonOverdueDot && (
-                <span
-                  className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[color:var(--fc-accent)] ring-2 ring-[color:var(--fc-bg-deep)]"
-                  aria-label="Scheduled check-in overdue"
-                />
-              )}
-            </button>
-          </header>
+          <ClientPageShell
+            className={cn("max-w-lg mx-auto px-3 sm:px-6 pb-40 pt-2 sm:pt-4", checkinSuiteStyles.root)}
+          >
+          <CheckinHero
+            onBack={() => router.push("/client")}
+            backAriaLabel="Back to home"
+            eyebrow="Daily wellness"
+            eyebrowColor="var(--cs-cyan)"
+            title="Check-ins"
+            subtitle="Sleep, stress, soreness & steps"
+            rightSlot={
+              <CheckinLimeAddButton onClick={() => setShowAddSheet(true)} showDot={addButtonOverdueDot} />
+            }
+          />
 
           {user?.id && (
             <>
@@ -317,13 +306,9 @@ export default function ClientCheckInsPage() {
                 <div className="mt-6 pt-4 border-t border-[color:var(--fc-glass-border)]/60 space-y-5">
                   <WeeklyStrip weekStart={weekStart} todayStr={todayStr} logsThisWeek={thisWeekLogs} />
                   <WellnessTrends thisWeekLogs={thisWeekLogs} lastWeekLogs={lastWeekLogs} />
-                  <button
-                    type="button"
-                    onClick={() => router.push("/client/check-ins/history")}
-                    className="w-full text-left text-sm font-medium fc-text-primary py-2 rounded-lg hover:bg-[color:var(--fc-glass-highlight)] px-1 transition-colors"
-                  >
-                    View Full History →
-                  </button>
+                  <CheckinLinkRow onClick={() => router.push("/client/check-ins/history")}>
+                    View full history
+                  </CheckinLinkRow>
                 </div>
               )}
             </>
@@ -346,14 +331,12 @@ export default function ClientCheckInsPage() {
                 setHistoryKey(Date.now());
               }}
               onAchievementsUnlocked={(raw) => {
-                const tierToRarity = (tier: string | null): Achievement["rarity"] =>
-                  !tier ? "uncommon" : tier === "platinum" ? "epic" : tier === "gold" ? "rare" : tier === "silver" ? "uncommon" : "common";
                 const mapped: Achievement[] = raw.map((a) => ({
                   id: a.templateId,
                   name: a.templateName,
                   description: a.description ?? "",
                   icon: a.templateIcon ?? "🏆",
-                  rarity: tierToRarity(a.tier),
+                  tier: (a.tier ?? null) as Achievement["tier"],
                   unlocked: true,
                 }));
                 setNewAchievementsQueue(mapped);

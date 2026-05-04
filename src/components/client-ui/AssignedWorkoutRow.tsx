@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Dumbbell, Play } from "lucide-react";
-import { PrimaryButton } from "./PrimaryButton";
+import { Button } from "@/components/ui/button";
 import { getCategoryAccent } from "@/lib/workoutCategoryColors";
 import { cn } from "@/lib/utils";
 
@@ -43,13 +43,15 @@ export function AssignedWorkoutRow({
       {rightMeta && (
         <div className="shrink-0 text-xs fc-text-dim">{rightMeta}</div>
       )}
-      <PrimaryButton
-        className="shrink-0 h-8 px-3 text-xs w-auto"
+      <Button
+        type="button"
+        variant="btn-action"
+        className="h-8 w-auto shrink-0 px-3 text-xs"
         onClick={onStart}
       >
-        <Play className="w-3.5 h-3.5 mr-1" />
+        <Play className="mr-1 h-3.5 w-3.5" />
         Start
-      </PrimaryButton>
+      </Button>
     </div>
   );
 }

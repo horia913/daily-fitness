@@ -4,12 +4,10 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import {
-  ClientPageShell,
-  SectionHeader,
-  PrimaryButton,
-  SecondaryButton,
-} from "@/components/client-ui";
+import { ClientPageShell, SectionHeader, Eyebrow } from "@/components/client-ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
   ArrowLeft,
@@ -32,6 +30,10 @@ import {
   formatPaceMinSecPerKm,
   formatDurationFromSeconds,
 } from "@/lib/enduranceFormUtils";
+import {
+  formatPersonalRecordCaption,
+  formatPersonalRecordImprovementSuffix,
+} from "@/lib/personalRecordDisplay";
 
 interface WorkoutAssignment {
   id: string;
@@ -415,20 +417,12 @@ function WorkoutCompleteContent() {
 
             const rawNew = result.new_achievements ?? [];
             if (rawNew.length > 0) {
-              const tierToRarity = (tier: string | null): Achievement["rarity"] => {
-                if (!tier) return "uncommon";
-                if (tier === "platinum") return "legendary";
-                if (tier === "gold") return "epic";
-                if (tier === "silver") return "rare";
-                if (tier === "bronze") return "uncommon";
-                return "common";
-              };
               const mapped: Achievement[] = rawNew.map((a: any) => ({
                 id: a.templateId ?? a.template_id,
                 name: a.templateName ?? a.template_name ?? "Achievement",
                 description: a.description ?? (a.nextTier ? `Next: ${a.nextTier?.label} — ${a.currentMetricValue ?? 0}/${a.nextTier?.threshold ?? 0}` : ""),
                 icon: a.templateIcon ?? a.template_icon ?? "🏆",
-                rarity: tierToRarity(a.tier),
+                tier: (a.tier ?? null) as Achievement["tier"],
                 unlocked: true,
               }));
               setNewAchievementsQueue(mapped);
@@ -1524,7 +1518,9 @@ function WorkoutCompleteContent() {
               <p className="mb-1 text-sm fc-text-dim">{loadError}</p>
               <p className="mb-4 text-xs fc-text-subtle">Try again or return to your workouts.</p>
               <div className="flex flex-wrap justify-center gap-3">
-                <PrimaryButton
+                <Button
+                  type="button"
+                  variant="btn-action"
                   onClick={() => {
                     setLoadError(null);
                     setLoading(true);
@@ -1546,16 +1542,19 @@ function WorkoutCompleteContent() {
                         setLoading(false);
                       });
                   }}
+                  className="h-10 w-full min-w-[140px] sm:w-auto"
                 >
                   Retry
-                </PrimaryButton>
-                <SecondaryButton
-                  className="w-auto"
+                </Button>
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  className="h-10 w-auto"
                   onClick={() => router.push("/client/train")}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Workouts
-                </SecondaryButton>
+                </Button>
               </div>
             </div>
           </ClientPageShell>
@@ -1575,13 +1574,15 @@ function WorkoutCompleteContent() {
                 This workout does not exist or you do not have access to it.
               </p>
               <div className="mt-6 flex justify-center">
-                <SecondaryButton
-                  className="w-auto"
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  className="h-10 w-auto"
                   onClick={() => router.push("/client/train")}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Workouts
-                </SecondaryButton>
+                </Button>
               </div>
             </div>
           </ClientPageShell>
@@ -1805,7 +1806,11 @@ function WorkoutCompleteContent() {
                           <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: "var(--fc-status-warning)" }} />
                           <span className="text-sm font-semibold fc-text-primary truncate">{exerciseName}</span>
                           <span className="ml-auto text-sm font-bold font-mono flex-shrink-0" style={{ color: "var(--fc-status-success)" }}>
-                            {pr.record_value} {pr.record_type === "weight" ? pr.record_unit || "kg" : "reps"}
+                            {formatPersonalRecordCaption(
+                              pr.record_type,
+                              pr.record_value,
+                              pr.record_unit
+                            )}
                           </span>
                         </div>
                       );
@@ -1820,15 +1825,19 @@ function WorkoutCompleteContent() {
                       >
                         <span className="text-lg flex-shrink-0">{ach.icon}</span>
                         <span className="text-sm font-semibold fc-text-primary truncate">{ach.name}</span>
-                        <span
-                          className="ml-auto text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                        <Badge
+                          variant="outline"
+                          className="ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                           style={{
-                            background: "color-mix(in srgb, var(--fc-accent-purple) 15%, transparent)",
+                            background:
+                              "color-mix(in srgb, var(--fc-accent-purple) 15%, transparent)",
+                            borderColor:
+                              "color-mix(in srgb, var(--fc-accent-purple) 35%, transparent)",
                             color: "var(--fc-accent-purple)",
                           }}
                         >
                           {ach.rarity}
-                        </span>
+                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -1841,10 +1850,13 @@ function WorkoutCompleteContent() {
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
                     <Trophy className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold fc-text-primary">
-                      PRs This Workout
-                    </h2>
+                  <div className="min-w-0">
+                    <SectionHeader
+                      title="PRs This Workout"
+                      titleTone="plain"
+                      titleClassName="text-base font-bold fc-text-primary"
+                      className="!mb-1"
+                    />
                     <p className="text-xs fc-text-dim">
                       {personalRecords.length} new {personalRecords.length === 1 ? "PR" : "PRs"} this session
                     </p>
@@ -1857,18 +1869,22 @@ function WorkoutCompleteContent() {
                       pr.exercises?.name || pr.exercise?.name || "Exercise";
                     const improvement =
                       pr.previous_record_value != null
-                        ? pr.record_value - pr.previous_record_value
+                        ? Number(pr.record_value) - Number(pr.previous_record_value)
                         : null;
+                    const cap = formatPersonalRecordCaption(
+                      pr.record_type,
+                      pr.record_value,
+                      pr.record_unit
+                    );
                     const improvementStr =
                       improvement != null && improvement > 0
-                        ? ` (+${improvement} ${pr.record_type === "weight" ? pr.record_unit || "kg" : "reps"})`
+                        ? ` (${formatPersonalRecordImprovementSuffix(
+                            pr.record_type,
+                            improvement,
+                            pr.record_unit
+                          )})`
                         : "";
-                    const valueStr =
-                      pr.record_type === "weight"
-                        ? `${pr.record_value || 0} ${pr.record_unit || "kg"}${improvementStr}`
-                        : pr.record_type === "reps"
-                        ? `${pr.record_value || 0} reps${improvementStr}`
-                        : `${pr.record_value || 0} ${pr.record_unit || ""}${improvementStr}`;
+                    const valueStr = `${cap}${improvementStr}`;
 
                     return (
                       <div
@@ -1879,9 +1895,19 @@ function WorkoutCompleteContent() {
                           <h4 className="text-sm font-semibold fc-text-primary truncate">
                             {exerciseName}
                           </h4>
-                          <p className="text-xs fc-text-dim">
-                            {pr.record_type === "weight" ? "Strength" : pr.record_type === "reps" ? "Volume" : "Record"}
-                          </p>
+                          <Eyebrow tone="dim" density="section" className="!text-xs !font-normal">
+                            {pr.record_type === "weight"
+                              ? "Strength"
+                              : pr.record_type === "reps"
+                                ? "Volume"
+                                : pr.record_type === "time"
+                                  ? "Time"
+                                  : pr.record_type === "distance"
+                                    ? "Distance"
+                                    : pr.record_type === "score"
+                                      ? "Score"
+                                      : "Record"}
+                          </Eyebrow>
                         </div>
                         <div className="font-mono text-sm font-bold flex-shrink-0 text-right" style={{ color: "var(--fc-status-success)" }}>
                           {valueStr}
@@ -1899,9 +1925,9 @@ function WorkoutCompleteContent() {
               <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                 <div className="mb-1 flex items-center gap-2">
                   <LayoutDashboard className="w-4 h-4" style={{ color: "var(--fc-accent-cyan)" }} />
-                  <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">
+                  <Eyebrow tone="dim" density="section" className="!mb-0 !font-bold">
                     Program
-                  </p>
+                  </Eyebrow>
                 </div>
                 <p className="text-sm font-semibold fc-text-primary">
                   Week {programProgression.current_week_number ?? "?"} Day {programProgression.current_day_number ?? "?"}
@@ -1919,9 +1945,9 @@ function WorkoutCompleteContent() {
               <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold mb-1">
+                    <Eyebrow tone="dim" density="section" className="!mb-1 !font-bold">
                       Up Next
-                    </p>
+                    </Eyebrow>
                     <h3 className="text-sm font-semibold fc-text-primary truncate">
                       {nextWorkout.name ||
                         (nextWorkout.template as any)?.name ||
@@ -2039,14 +2065,18 @@ function WorkoutCompleteContent() {
             {/* Floating Bottom Action */}
             <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
               <div className="max-w-lg mx-auto">
-                <PrimaryButton
+                <Button
+                  type="button"
+                  variant="btn-action"
                   onClick={() => router.push("/client")}
                   disabled={completing}
-                  className="h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
+                  className={cn(
+                    "h-14 w-full gap-3 rounded-2xl text-base font-bold uppercase tracking-wider shadow-lg",
+                  )}
                 >
-                  <LayoutDashboard className="w-5 h-5" />
+                  <LayoutDashboard className="h-5 w-5" />
                   Back to Dashboard
-                </PrimaryButton>
+                </Button>
               </div>
             </div>
           </ClientPageShell>
@@ -2074,7 +2104,7 @@ export default function WorkoutComplete() {
   return (
     <Suspense
       fallback={
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="client">
           <AnimatedBackground>
             <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
               <PageSkeleton variant="dashboard" />

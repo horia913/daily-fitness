@@ -9,11 +9,10 @@ import {
   ChevronUp,
   BarChart3,
   Target,
-  Info,
   AlertCircle,
   CheckCircle2,
-  TrendingUp,
   TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 import type { WorkoutBlock } from "@/types/workoutBlocks";
 import {
@@ -23,7 +22,7 @@ import {
   isGuidelineCategory,
   type MuscleGroupVolumeRecommendation,
 } from "@/lib/coachGuidelinesService";
-import VolumeDetailsModal from "./VolumeDetailsModal";
+import css from "@/components/coach/programs/programEditV1.module.css";
 
 interface ProgramSchedule {
   id: string;
@@ -52,8 +51,99 @@ interface ProgramVolumeCalculatorProps {
   className?: string;
 }
 
+function severityBadge(
+  status: MuscleGroupVolumeRecommendation["status"],
+  rec: MuscleGroupVolumeRecommendation,
+  currentSets: number,
+  programCat: string,
+): { label: string; bg: string; fg: string } {
+  if (status === "excessive")
+    return { label: "Excessive", bg: "rgba(255,90,95,0.12)", fg: "#FF5A5F" };
+  if (status === "below")
+    return { label: "Under target", bg: "rgba(245,194,66,0.12)", fg: "#F5C242" };
+  if (status === "high") {
+    const maintOnly =
+      !rec.isPriority &&
+      programCat === "Hypertrophy" &&
+      rec.maintenanceVolume === 0 &&
+      currentSets > 0;
+    return {
+      label: maintOnly ? "Above maint." : "Above target",
+      bg: "rgba(245,194,66,0.12)",
+      fg: "#F5C242",
+    };
+  }
+  return { label: "On target", bg: "rgba(52,211,153,0.12)", fg: "#34D399" };
+}
+
+function VolumeBar({
+  rec,
+  currentSets,
+}: {
+  rec: MuscleGroupVolumeRecommendation;
+  currentSets: number;
+}) {
+  const maxScale = Math.max(rec.recommendedMax, currentSets, 0.0001);
+  const targetPct = Math.min(100, (rec.recommendedMax / maxScale) * 100);
+  const fillPct =
+    rec.status === "excessive"
+      ? 100
+      : Math.min(100, (currentSets / rec.recommendedMax) * 100 || 0);
+  const overflowFrac =
+    rec.status === "excessive" ? Math.min(0.45, (currentSets - rec.recommendedMax) / maxScale) : 0;
+
+  return (
+    <div className="relative w-full h-2 rounded-full overflow-hidden bg-white/[0.04]">
+      {rec.status === "below" ? (
+        <div
+          className="absolute left-0 top-0 h-full rounded-full"
+          style={{
+            width: `${fillPct}%`,
+            background: "linear-gradient(90deg, #F5C242, #C5FF4A)",
+            opacity: 0.85,
+          }}
+        />
+      ) : rec.status === "high" ? (
+        <div
+          className="absolute left-0 top-0 h-full rounded-full"
+          style={{
+            width: `${Math.min(100, fillPct)}%`,
+            background: "linear-gradient(90deg, #F5C242, #C5FF4A)",
+            opacity: 0.9,
+          }}
+        />
+      ) : (
+        <div
+          className="absolute left-0 top-0 h-full rounded-full"
+          style={{
+            width: `${Math.min(100, fillPct)}%`,
+            background: "linear-gradient(90deg, #7FE89A, #C5FF4A)",
+          }}
+        />
+      )}
+      {rec.status === "excessive" && overflowFrac > 0 ? (
+        <div
+          className="absolute top-0 h-full border-l border-[#0E1F2E]"
+          style={{
+            left: `${100 - overflowFrac * 100}%`,
+            width: `${overflowFrac * 100}%`,
+            background:
+              "repeating-linear-gradient(-45deg, #b91c1c, #b91c1c 4px, #7f1d1d 4px, #7f1d1d 8px)",
+          }}
+        />
+      ) : null}
+      {rec.status !== "excessive" ? (
+        <div
+          className="absolute top-0 bottom-0 w-[1.5px] bg-white/40 pointer-events-none"
+          style={{ left: `${targetPct}%` }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export default function ProgramVolumeCalculator({
-  programId,
+  programId: _programId,
   programCategory,
   programDifficulty,
   schedule,
@@ -62,7 +152,6 @@ export default function ProgramVolumeCalculator({
 }: ProgramVolumeCalculatorProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [daysPerWeek, setDaysPerWeek] = useState(3);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Check if this is a guideline category
   const isGuidelineCat = isGuidelineCategory(programCategory);
@@ -166,51 +255,6 @@ export default function ProgramVolumeCalculator({
     isGuidelineCat,
   ]);
 
-  // Get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "optimal":
-        return "fc-text-success";
-      case "below":
-        return "fc-text-warning";
-      case "high":
-        return "fc-text-warning";
-      case "excessive":
-        return "fc-text-error";
-      default:
-        return "fc-text-dim";
-    }
-  };
-
-  // Get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "optimal":
-        return <CheckCircle2 className="w-4 h-4 fc-text-success" />;
-      case "below":
-        return <TrendingDown className="w-4 h-4 fc-text-warning" />;
-      case "high":
-        return <TrendingUp className="w-4 h-4 fc-text-warning" />;
-      case "excessive":
-        return <AlertCircle className="w-4 h-4 fc-text-error" />;
-      default:
-        return <Info className="w-4 h-4 fc-text-subtle" />;
-    }
-  };
-
-  // Calculate progress percentage
-  const getProgressPercentage = (
-    current: number,
-    min: number,
-    optimal: number,
-    max: number
-  ): number => {
-    if (current < min) return (current / min) * 50;
-    if (current <= optimal) return 50 + ((current - min) / (optimal - min)) * 30;
-    if (current <= max) return 80 + ((current - optimal) / (max - optimal)) * 15;
-    return Math.min(100, 95 + ((current - max) / max) * 5);
-  };
-
   // Get recommendation text
   const getRecommendationText = (rec: MuscleGroupVolumeRecommendation): string => {
     if (programCategory === "Hypertrophy") {
@@ -234,246 +278,294 @@ export default function ProgramVolumeCalculator({
     (a, b) => b[1] - a[1]
   );
 
-  // Aggregate all blocks from all templates for the modal
-  const allBlocks: WorkoutBlock[] = useMemo(() => {
-    const blocks: WorkoutBlock[] = [];
-    templates.forEach((template) => {
-      if (template.blocks && Array.isArray(template.blocks)) {
-        blocks.push(...template.blocks);
-      }
-    });
-    return blocks;
-  }, [templates]);
+  const statusIconSmall = (status: MuscleGroupVolumeRecommendation["status"]) => {
+    const wrap = "w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0";
+    switch (status) {
+      case "optimal":
+        return (
+          <span className={wrap} style={{ background: "rgba(52,211,153,0.12)" }}>
+            <CheckCircle2 className="w-3 h-3 text-[#34D399]" />
+          </span>
+        );
+      case "below":
+        return (
+          <span className={wrap} style={{ background: "rgba(245,194,66,0.12)" }}>
+            <TrendingDown className="w-3 h-3 text-[#F5C242]" />
+          </span>
+        );
+      case "high":
+        return (
+          <span className={wrap} style={{ background: "rgba(245,194,66,0.12)" }}>
+            <TrendingUp className="w-3 h-3 text-[#F5C242]" />
+          </span>
+        );
+      case "excessive":
+        return (
+          <span className={wrap} style={{ background: "rgba(255,90,95,0.12)" }}>
+            <AlertCircle className="w-3 h-3 text-[#FF5A5F]" />
+          </span>
+        );
+      default:
+        return <span className={wrap} style={{ background: "rgba(255,255,255,0.06)" }} />;
+    }
+  };
 
   return (
-    <>
-      <div
-        className={`fc-card-shell ${className || ""}`}
-      >
-        <div className="p-4">
-          <div
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <div className="flex items-center gap-2">
-              <div className="fc-icon-tile fc-icon-workouts">
-                <BarChart3 className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="fc-pill fc-pill-glass fc-text-workouts text-[10px]">
-                  Volume insights
-                </span>
-                <div className="text-sm font-semibold fc-text-primary">
-                  Program Volume Calculator
-                </div>
-              </div>
-              {volumePerMuscleGroup.size > 0 && (
-                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                  {volumePerMuscleGroup.size} muscle groups
-                </span>
-              )}
+    <div
+      className={`rounded-[18px] border border-[rgba(255,255,255,0.08)] ${css.wrap} ${className || ""}`}
+      style={{ background: "var(--pe-card)" }}
+    >
+      <div className="p-[14px]">
+        <div
+          className="flex items-start justify-between gap-3 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(167,139,250,0.12)" }}
+            >
+              <BarChart3 className="w-4 h-4 text-[#A78BFA]" />
             </div>
+            <div className="min-w-0">
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A78BFA]"
+                style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+              >
+                Volume insights
+              </p>
+              <p
+                className="text-sm font-semibold text-[var(--pe-t1)] mt-0.5"
+                style={{ fontFamily: "var(--f-headline, Bricolage Grotesque, sans-serif)" }}
+              >
+                Program Volume Calculator
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {volumePerMuscleGroup.size > 0 ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--pe-cyan)]"
+                style={{ background: "rgba(79,227,232,0.12)" }}
+              >
+                {volumePerMuscleGroup.size} muscle groups
+              </span>
+            ) : null}
             <Button
               variant="ghost"
               size="sm"
-              className="p-1 h-auto fc-btn fc-btn-ghost"
+              className="p-1 h-auto text-[var(--pe-t2)] hover:text-[var(--pe-t1)]"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
               }}
             >
-              {isExpanded ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </Button>
           </div>
         </div>
+      </div>
 
-        {isExpanded && (
-          <div className="p-4 pt-0 space-y-4">
-            {/* Configuration */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Label className="text-xs font-medium fc-text-subtle mb-1 block">
-                    Days/Week
-                  </Label>
-                  <Input
-                    type="number"
-                    min="2"
-                    max="7"
-                    value={daysPerWeek}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 3;
-                      setDaysPerWeek(Math.max(2, Math.min(7, value)));
-                    }}
-                    className="rounded-lg w-20 fc-glass-soft border border-[color:var(--fc-glass-border)]"
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label className="text-xs font-medium fc-text-subtle mb-1 block">
-                    Templates in Schedule
-                  </Label>
-                  <div className="text-sm font-semibold fc-text-primary">
-                    {schedule.length} entries
-                  </div>
-                </div>
-              </div>
-
-              {/* Priority Muscle Indicator */}
-              {priorityMuscleGroup && (
-                <div className="p-3 rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 fc-text-workouts" />
-                    <span className="text-xs font-medium fc-text-primary">
-                      Priority Muscle:{" "}
-                      <span className="font-semibold">{priorityMuscleGroup}</span>
-                      {" "}({volumePerMuscleGroup.get(priorityMuscleGroup)?.toFixed(1)} sets/week avg)
-                    </span>
-                  </div>
-                </div>
-              )}
+      {isExpanded ? (
+        <div className="px-[14px] pb-[14px] space-y-4">
+          <div
+            className="rounded-[11px] border border-[var(--pe-line-2)] grid grid-cols-2 gap-3 p-3"
+            style={{ background: "var(--pe-card-2)" }}
+          >
+            <div>
+              <Label
+                className="mb-1 block text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-t3)]"
+                style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+              >
+                Days/wk
+              </Label>
+              <Input
+                type="number"
+                min={2}
+                max={7}
+                value={daysPerWeek}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10) || 3;
+                  setDaysPerWeek(Math.max(2, Math.min(7, value)));
+                }}
+                className="h-9 w-[60px] text-center rounded-lg border text-base font-bold"
+                style={{
+                  fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)",
+                  background: "var(--pe-card)",
+                  borderColor: "rgba(255,255,255,0.08)",
+                  color: "var(--pe-t1)",
+                }}
+              />
             </div>
+            <div className="flex flex-col items-end justify-end text-right">
+              <Label
+                className="mb-1 block text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-t3)]"
+                style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+              >
+                Templates in schedule
+              </Label>
+              <div
+                className="text-base font-bold text-[var(--pe-t1)]"
+                style={{ fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)" }}
+              >
+                {schedule.length} entries
+              </div>
+            </div>
+          </div>
 
-            {/* Muscle Group Breakdown */}
-            {sortedMuscleGroups.length > 0 ? (
-              <div className="space-y-3">
-                <Label className="text-xs font-semibold fc-text-primary block">
-                  Average Weekly Volume (across all weeks)
-                </Label>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {sortedMuscleGroups.map(([muscleGroup, currentSets]) => {
-                    const rec = recommendations.get(muscleGroup);
-                    const isPriority = muscleGroup === priorityMuscleGroup;
+          {priorityMuscleGroup ? (
+            <div
+              className="rounded-[11px] border px-3 py-3 flex items-center gap-2"
+              style={{
+                borderColor: "rgba(79,227,232,0.18)",
+                background: "linear-gradient(90deg, rgba(79,227,232,0.12), transparent)",
+                boxShadow: "inset 3px 0 0 #4FE3E8",
+              }}
+            >
+              <Target className="w-4 h-4 text-[var(--pe-cyan)] shrink-0" />
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--pe-cyan)] leading-snug"
+                style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+              >
+                Priority muscle: {priorityMuscleGroup} ·{" "}
+                {volumePerMuscleGroup.get(priorityMuscleGroup)?.toFixed(1)} sets/wk avg
+              </p>
+            </div>
+          ) : null}
 
-                    if (!rec) {
-                      return (
-                        <div
-                          key={muscleGroup}
-                          className="p-3 rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium fc-text-primary">
-                                {muscleGroup}
-                              </span>
-                              {isPriority && (
-                                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                                  Priority
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-sm font-semibold fc-text-primary">
-                              {currentSets.toFixed(1)} sets/week
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const progressPercent = getProgressPercentage(
-                      currentSets,
-                      rec.recommendedMin,
-                      rec.recommendedOptimal,
-                      rec.recommendedMax
-                    );
-
+          {sortedMuscleGroups.length > 0 ? (
+            <div className="space-y-3">
+              <p
+                className="text-[12.5px] font-semibold text-[var(--pe-t1)]"
+                style={{ fontFamily: "var(--f-headline, Bricolage Grotesque, sans-serif)" }}
+              >
+                Average weekly volume
+              </p>
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-0.5">
+                {sortedMuscleGroups.map(([muscleGroup, currentSets]) => {
+                  const rec = recommendations.get(muscleGroup);
+                  const isPriority = muscleGroup === priorityMuscleGroup;
+                  if (!rec) {
                     return (
                       <div
                         key={muscleGroup}
-                        className="p-3 rounded-2xl border border-[color:var(--fc-glass-border)] fc-glass-soft"
+                        className="rounded-xl border border-[rgba(255,255,255,0.08)] p-3"
+                        style={{ background: "var(--pe-card-2)" }}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(rec.status)}
-                            <span className="text-sm font-medium fc-text-primary">
-                              {muscleGroup}
-                            </span>
-                            {isPriority && (
-                              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
-                                Priority
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-sm font-semibold ${getStatusColor(rec.status)}`}
-                            >
-                              {currentSets.toFixed(1)} sets
-                            </span>
-                            <span className={`fc-pill fc-pill-glass text-xs ${getStatusColor(rec.status)}`}>
-                              {rec.status}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="h-2 mb-2 fc-progress-track">
-                          <div
-                            className="h-full fc-progress-fill"
-                            style={{ width: `${Math.min(100, progressPercent)}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs fc-text-subtle">
-                            Target: {getRecommendationText(rec)}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[12.5px] font-semibold text-[var(--pe-t1)]">{muscleGroup}</span>
+                          <span
+                            className="text-sm font-bold text-[var(--pe-t1)]"
+                            style={{ fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)" }}
+                          >
+                            {currentSets.toFixed(1)}
                           </span>
-                          {rec.status !== "optimal" && (
-                            <span
-                              className={`text-xs ${getStatusColor(rec.status)}`}
-                            >
-                              {rec.status === "below" &&
-                                `+${Math.max(0, rec.recommendedMin - currentSets).toFixed(1)} sets needed`}
-                              {rec.status === "high" &&
-                                `Consider reducing by ${(currentSets - rec.recommendedMax).toFixed(1)} sets`}
-                              {rec.status === "excessive" &&
-                                `Reduce by ${(currentSets - rec.recommendedMax).toFixed(1)}+ sets`}
-                            </span>
-                          )}
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl border border-[color:var(--fc-glass-border)] text-center fc-glass-soft">
-                <p className="text-sm fc-text-dim">
-                  {schedule.length === 0
-                    ? "Add templates to program schedule to see volume calculations"
-                    : "No exercises found in templates"}
-                </p>
-              </div>
-            )}
+                  }
+                  const badge = severityBadge(rec.status, rec, currentSets, programCategory);
+                  const targetRange =
+                    programCategory === "Hypertrophy" && !rec.isPriority
+                      ? `${rec.maintenanceVolume} maint.`
+                      : `${rec.recommendedMin}–${rec.recommendedMax}`;
 
-            {/* View Details Button */}
-            {sortedMuscleGroups.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDetailsModal(true)}
-                className="w-full fc-btn fc-btn-secondary"
-              >
-                <Info className="w-4 h-4 mr-2" />
-                View Detailed Breakdown
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+                  let footRight: { text: string; color: string } | null = null;
+                  if (rec.status === "optimal")
+                    footRight = { text: "Within range ✓", color: "#34D399" };
+                  else if (rec.status === "below")
+                    footRight = {
+                      text: `+${Math.max(0, rec.recommendedMin - currentSets).toFixed(1)} below target`,
+                      color: "#F5C242",
+                    };
+                  else if (rec.status === "high")
+                    footRight = {
+                      text: `+${(currentSets - rec.recommendedMax).toFixed(1)} above target`,
+                      color: "#F5C242",
+                    };
+                  else if (rec.status === "excessive")
+                    footRight = {
+                      text: `Reduce by ${(currentSets - rec.recommendedMax).toFixed(1)}+ sets`,
+                      color: "#FF5A5F",
+                    };
 
-      {/* Details Modal */}
-      <VolumeDetailsModal
-        isOpen={showDetailsModal}
-        onClose={() => setShowDetailsModal(false)}
-        blocks={allBlocks}
-        category={programCategory}
-        difficulty={programDifficulty}
-        daysPerWeek={daysPerWeek}
-        excludeFromRecommendations={false}
-      />
-    </>
+                  return (
+                    <div key={muscleGroup} className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        {statusIconSmall(rec.status)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[12.5px] font-semibold text-[var(--pe-t1)]">{muscleGroup}</span>
+                            {isPriority ? (
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]"
+                                style={{
+                                  fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                                  background: "rgba(245,194,66,0.12)",
+                                  color: "#F5C242",
+                                }}
+                              >
+                                Priority
+                              </span>
+                            ) : null}
+                            <span className="flex-1" />
+                            <span
+                              className="text-sm font-bold tabular-nums"
+                              style={{
+                                fontFamily: "var(--f-display, Big Shoulders Display, sans-serif)",
+                                color: "var(--pe-t1)",
+                              }}
+                            >
+                              {currentSets.toFixed(1)}
+                            </span>
+                            <span
+                              className="rounded px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]"
+                              style={{
+                                fontFamily: "var(--f-mono, Geist Mono, monospace)",
+                                background: badge.bg,
+                                color: badge.fg,
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <VolumeBar rec={rec} currentSets={currentSets} />
+                          </div>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span
+                              className="text-[9.5px] text-[var(--pe-t3)]"
+                              style={{ fontFamily: "var(--f-mono, Geist Mono, monospace)" }}
+                            >
+                              Target: {targetRange} sets/wk
+                            </span>
+                            {footRight ? (
+                              <span className="text-[9.5px] font-medium" style={{ color: footRight.color }}>
+                                {footRight.text}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-xl border border-[rgba(255,255,255,0.08)] p-4 text-center"
+              style={{ background: "var(--pe-card-2)" }}
+            >
+              <p className="text-sm text-[var(--pe-t3)]">
+                {schedule.length === 0
+                  ? "Add templates to program schedule to see volume calculations"
+                  : "No exercises found in templates"}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -166,7 +166,7 @@ function PerformancePageContent() {
 
   if (loadError) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -182,7 +182,7 @@ function PerformancePageContent() {
 
   if (authLoading || loading) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
@@ -208,7 +208,7 @@ function PerformancePageContent() {
               <ArrowLeft className="w-4 h-4 text-[color:var(--fc-text-primary)]" />
             </button>
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
                 <Timer className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -291,7 +291,7 @@ function PerformancePageContent() {
             <div className="flex flex-col gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] text-[10px] font-bold uppercase tracking-widest">
+                  <span className="px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] border border-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] text-[10px] font-bold uppercase tracking-widest">
                     Selected test
                   </span>
                   {latest && (
@@ -364,7 +364,7 @@ function PerformancePageContent() {
                       style={{
                         height: `${(isLast ? 1 : h) * 100}%`,
                         background: isLast
-                          ? "linear-gradient(to top, var(--fc-accent), var(--fc-accent-cyan))"
+                          ? "linear-gradient(to top, var(--fc-accent-cyan), var(--fc-accent-cyan))"
                           : "var(--fc-glass-highlight)",
                         borderTop: isLast ? "2px solid var(--fc-accent-cyan)" : undefined,
                       }}
@@ -456,14 +456,19 @@ function PerformancePageContent() {
           </section>
         </main>
 
-        {/* FAB */}
+        {/*
+          Phase 0b 6-FAB extension — performance FAB migration.
+          Spec ref: design-system-v4 §6.21. Was: fixed bottom-24 right-4,
+          fc-btn fc-btn-primary, w-12 h-12 rounded-xl, Plus w-6 h-6.
+          Now: fab-action (standard FAB slot).
+        */}
         <button
           type="button"
           onClick={() => setShowLogModal(true)}
-          className="fixed bottom-24 right-4 z-40 w-12 h-12 rounded-xl fc-btn fc-btn-primary flex items-center justify-center shadow-lg"
+          className="fab-action"
           aria-label="Log new test result"
         >
-          <Plus className="w-6 h-6" />
+          <Plus />
         </button>
       </ClientPageShell>
 
@@ -482,7 +487,7 @@ function PerformancePageContent() {
 
 export default function PerformancePage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <PerformancePageContent />
     </ProtectedRoute>
   );

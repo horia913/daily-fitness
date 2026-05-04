@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   Target,
@@ -18,6 +19,9 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { SectionHeader } from '@/components/client-ui'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 interface ProgressMetric {
   id: string
@@ -105,6 +109,7 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 }
 
 export default function ProgressCircles() {
+  const router = useRouter()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [progressMetrics, setProgressMetrics] = useState<ProgressMetric[]>([])
@@ -269,9 +274,9 @@ export default function ProgressCircles() {
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <span className="fc-pill fc-pill-glass fc-text-workouts">
+              <Badge variant="fc-glass" className="fc-text-workouts">
                 Progress
-              </span>
+              </Badge>
               <h2 className="text-lg sm:text-xl font-bold mt-2">
                 Weekly Progress
               </h2>
@@ -280,9 +285,9 @@ export default function ProgressCircles() {
           </div>
           
           <div className="flex items-center gap-2">
-            <span className="fc-pill fc-pill-glass fc-text-workouts px-3 py-1">
+            <Badge variant="fc-glass" className="fc-text-workouts px-3 py-1">
               {overallProgress}% overall
-            </span>
+            </Badge>
             <Button
               variant="ghost"
               size="sm"
@@ -306,8 +311,13 @@ export default function ProgressCircles() {
                   <div className="fc-icon-tile fc-icon-workouts">
                     <Trophy className="w-6 h-6" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold fc-text-primary">Overall Progress</h3>
+                  <div className="min-w-0">
+                    <SectionHeader
+                      title="Overall Progress"
+                      titleTone="plain"
+                      titleClassName="text-lg font-bold fc-text-primary"
+                      className="!mb-1"
+                    />
                     <p className="text-sm fc-text-dim">Your weekly achievements</p>
                   </div>
                 </div>
@@ -348,10 +358,15 @@ export default function ProgressCircles() {
 
             {/* Individual Progress Circles */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold fc-text-primary flex items-center gap-2">
-                <Target className="w-5 h-5 fc-text-workouts" />
-                Category Breakdown
-              </h3>
+              <SectionHeader
+                title="Category Breakdown"
+                titleTone="plain"
+                titleClassName="text-lg font-semibold fc-text-primary"
+                startAdornment={
+                  <Target className="w-5 h-5 fc-text-workouts" aria-hidden />
+                }
+                className="!mb-4"
+              />
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {progressMetrics.map((metric) => {
@@ -399,9 +414,12 @@ export default function ProgressCircles() {
                           
                           <div className="flex items-center justify-center gap-2">
                             {getTrendIcon(metric.trend)}
-                    <span className={`fc-pill fc-pill-glass text-xs ${metric.textColor}`}>
+                    <Badge
+                              variant="fc-glass"
+                              className={cn('text-xs', metric.textColor)}
+                            >
                               {metric.trend === 'up' ? 'Improving' : metric.trend === 'down' ? 'Declining' : 'Stable'}
-                    </span>
+                    </Badge>
                           </div>
 
                           {/* Expanded details */}
@@ -506,18 +524,30 @@ export default function ProgressCircles() {
             <div className="p-6 fc-icon-tile fc-icon-workouts rounded-2xl w-fit mx-auto mb-6">
               <BarChart3 className="w-12 h-12 fc-text-workouts" />
             </div>
-            <h3 className="text-xl font-bold fc-text-primary mb-2">
-              No progress data available
-            </h3>
+            <SectionHeader
+              title="No progress data available"
+              titleTone="plain"
+              titleClassName="text-xl font-bold fc-text-primary"
+              className="!mb-2"
+            />
             <p className="text-sm fc-text-dim mb-4">
               Start tracking your workouts, nutrition, and habits to see your progress here
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button className="fc-btn fc-btn-primary fc-press rounded-xl">
+              <Button
+                type="button"
+                className="fc-btn fc-btn-primary fc-press rounded-xl"
+                onClick={() => router.push('/client/progress')}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Start Tracking
               </Button>
-              <Button variant="outline" className="rounded-xl fc-btn fc-btn-secondary">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl fc-btn fc-btn-secondary"
+                onClick={() => void loadProgressData()}
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Data
               </Button>

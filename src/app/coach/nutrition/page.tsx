@@ -53,7 +53,7 @@ export default function CoachNutritionPage() {
           <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)]">
                   <Apple className="w-7 h-7" />
                 </div>
                 <div>
@@ -82,7 +82,7 @@ export default function CoachNutritionPage() {
                       className="fc-card-shell p-5 h-full transition-all hover:scale-[1.02] hover:shadow-xl"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent)]">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[color:var(--fc-aurora)]/15 text-[color:var(--fc-accent-cyan)]">
                           <Icon className="w-5 h-5" />
                         </div>
                         <div className="min-w-0 flex-1">

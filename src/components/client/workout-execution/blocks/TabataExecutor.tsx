@@ -267,7 +267,6 @@ export function TabataExecutor({
         progressLabel="Round"
         loggingInputs={loggingInputs}
         logButton={completeButton}
-        logSectionTitle="LOG BLOCK RESULT"
         showNavigation={true}
         currentExercise={currentExercise}
         showRestTimer={false}

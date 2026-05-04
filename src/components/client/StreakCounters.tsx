@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { Flame, Trophy, Target, TrendingUp, TrendingDown, Activity, Eye, RefreshCw, Plus } from 'lucide-react'
 
 interface StreakMetric {
@@ -13,26 +16,28 @@ interface StreakMetric {
 }
 
 export default function StreakCounters() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [streaks, setStreaks] = useState<StreakMetric[]>([])
   const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact')
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      try {
-        // Mock data; replace with real fetch when backend ready
-        setStreaks([
-          { id: 'workout', name: 'Workout Streak', days: 7, trend: 'up', subtitle: 'consecutive days' },
-          { id: 'hydration', name: 'Hydration Streak', days: 12, trend: 'stable', subtitle: 'days hydrated' },
-          { id: 'habits', name: 'Habit Streak', days: 5, trend: 'up', subtitle: 'daily habits' }
-        ])
-      } finally {
-        setLoading(false)
-      }
+  /** Mock fetch; replace with real API when backend ready. Used on mount and empty-state Refresh. */
+  const loadStreaks = useCallback(async () => {
+    setLoading(true)
+    try {
+      setStreaks([
+        { id: 'workout', name: 'Workout Streak', days: 7, trend: 'up', subtitle: 'consecutive days' },
+        { id: 'hydration', name: 'Hydration Streak', days: 12, trend: 'stable', subtitle: 'days hydrated' },
+        { id: 'habits', name: 'Habit Streak', days: 5, trend: 'up', subtitle: 'daily habits' },
+      ])
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [])
+
+  useEffect(() => {
+    void loadStreaks()
+  }, [loadStreaks])
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     if (trend === 'up') return <TrendingUp className="w-3 h-3 fc-text-success" />
@@ -79,9 +84,9 @@ export default function StreakCounters() {
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <span className="fc-pill fc-pill-glass fc-text-habits">
+              <Badge variant="fc-glass" className="fc-text-habits">
                 Consistency
-              </span>
+              </Badge>
               <h2 className="text-lg sm:text-xl font-bold mt-2">Your Streaks</h2>
               <p className="text-sm fc-text-dim">Consistency rewards</p>
             </div>
@@ -126,9 +131,12 @@ export default function StreakCounters() {
                       <div className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {getTrendIcon(s.trend)}
-                          <span className={`fc-pill fc-pill-glass text-xs ${getStreakBadge(s.days)} px-2 py-1`}>
+                          <Badge
+                            variant="fc-glass"
+                            className={cn('text-xs px-2 py-1', getStreakBadge(s.days))}
+                          >
                             {s.days} days
-                          </span>
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -185,11 +193,20 @@ export default function StreakCounters() {
               Start a new streak today and watch it grow
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button className="fc-btn fc-btn-primary fc-press rounded-xl">
+              <Button
+                type="button"
+                className="fc-btn fc-btn-primary fc-press rounded-xl"
+                onClick={() => router.push('/client/habits')}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Start Streak
               </Button>
-              <Button variant="outline" className="rounded-xl fc-btn fc-btn-secondary">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl fc-btn fc-btn-secondary"
+                onClick={() => void loadStreaks()}
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>

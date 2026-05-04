@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils";
 /**
  * PageSkeleton — structural first-load skeleton.
  *
+ * Skeleton usage guide:
+ * - `Skeleton` / `SkeletonCard` (`components/ui/Skeleton.tsx`): generic inline pulse primitives for ad-hoc loading states inside components.
+ * - `LoadingSkeleton` (`components/ui/LoadingSkeleton.tsx`): list-row skeleton tuned for coach dashboard list rows.
+ * - `PageSkeleton` (this file): full-page placeholder with structural variants for route-level loading states.
+ *
  * Variants ratified 2026-04-16 (see `docs/ui/95-STANDARD.md` §12 and
  * `docs/ui/UI-UPLIFT-WORKFLOW.md`). Three shapes cover ~90% of the 22
  * pages that still show a full-page spinner:

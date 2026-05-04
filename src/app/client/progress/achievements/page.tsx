@@ -7,43 +7,44 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { AchievementCard } from "@/components/ui/AchievementCard";
 import { ClientPageShell } from "@/components/client-ui";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Award } from "lucide-react";
+import { Award } from "lucide-react";
 import { AchievementService } from "@/lib/achievementService";
-import type { AchievementProgress } from "@/lib/achievementService";
+import type { UserAchievement } from "@/lib/achievementService";
+import { PsHero, PsSegmented, progressSuiteV1Styles } from "@/components/client/progress-suite";
+import {
+  TrophyCelebrationHero,
+  TrophyStatsHero,
+  TrophySectionHeader,
+} from "@/components/client/achievements/TrophyRoomBlocks";
+import { TrophyAchievementTile } from "@/components/client/achievements/TrophyAchievementTile";
+import {
+  buildLastUnlockByTemplate,
+  collectionCounts,
+  filterRowsForSegment,
+  mapProgressToTrophyRow,
+  pickCelebrationHero,
+  sectionAlmostThere,
+  sectionInProgressLow,
+  sectionLocked,
+  sectionRecentlyUnlocked,
+  type FilterStatus,
+  type TrophyRow,
+} from "@/components/client/achievements/trophyRoomUtils";
 
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
-  unlocked: boolean;
-  progress?: number;
-  requirement?: string;
-  unlockedAt?: Date;
-  unlockedTiers?: string[];
-  isMastered?: boolean;
-  nearMiss?: boolean;
-}
+const CYAN = "#4FE3E8";
 
 function AchievementsPageContent() {
   const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
 
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-
+  const [rows, setRows] = useState<TrophyRow[]>([]);
+  const [unlockedSnapshot, setUnlockedSnapshot] = useState<UserAchievement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterRarity, setFilterRarity] = useState<
-    "all" | "common" | "uncommon" | "rare" | "epic" | "legendary"
-  >("all");
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "unlocked" | "progress" | "locked"
-  >("all");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [loadError, setLoadError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,255 +72,80 @@ function AchievementsPageContent() {
 
   const loadAchievementsData = async () => {
     if (!user) {
-      setAchievements([]);
+      setRows([]);
+      setUnlockedSnapshot([]);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      
-      // Get achievement progress (templates with progress)
-      const achievementProgress = await AchievementService.getAchievementProgress(user.id);
-      
-      // Map to UI format
-      const mappedAchievements: Achievement[] = achievementProgress.map((progress: AchievementProgress) => {
-        const { template, currentValue, progress: progressPercent, unlockedTiers, status, nextTier } = progress;
-        
-        const rarityMap: Record<string, "common" | "uncommon" | "rare" | "epic" | "legendary"> = {
-          'workout': 'common',
-          'milestone': 'common',
-          'consistency': 'uncommon',
-          'activity': 'uncommon',
-          'wellness': 'uncommon',
-          'performance': 'rare',
-          'challenges': 'rare',
-          'volume': 'epic',
-          'program': 'epic',
-          'transformation': 'legendary',
-          'strength': 'legendary',
-        };
-        const rarity = rarityMap[template.category] || 'common';
-        const icon = template.icon || '🏅';
-        const isUnlocked = status === 'unlocked' || status === 'partially_unlocked';
-        const isMastered = status === 'unlocked' && template.is_tiered;
-        
-        let description = template.description || '';
-        if (template.is_tiered && nextTier) {
-          description += ` (Next: ${nextTier.label} at ${nextTier.threshold})`;
-        } else if (!template.is_tiered && template.single_threshold) {
-          description += ` (Target: ${template.single_threshold})`;
-        }
-        
-        let requirement: string | undefined;
-        if (template.is_tiered) {
-          if (nextTier) {
-            requirement = `${currentValue}/${nextTier.threshold} for ${nextTier.label}`;
-          } else if (isMastered) {
-            requirement = `All tiers complete!`;
-          } else {
-            const tiers = [
-              { threshold: template.tier_bronze_threshold },
-              { threshold: template.tier_silver_threshold },
-              { threshold: template.tier_gold_threshold },
-              { threshold: template.tier_platinum_threshold }
-            ].filter(t => t.threshold !== null && t.threshold !== undefined);
-            requirement = `${currentValue}/${tiers[tiers.length - 1]?.threshold || 0}`;
-          }
-        } else {
-          requirement = `${currentValue}/${template.single_threshold || 0}`;
-        }
-
-        // Near-miss: within 20% of next tier threshold
-        let nearMiss = false;
-        if (nextTier && nextTier.threshold > 0) {
-          const ratio = currentValue / nextTier.threshold;
-          nearMiss = ratio >= 0.8 && ratio < 1;
-        }
-        
-        return {
-          id: template.id,
-          name: template.name,
-          description,
-          icon,
-          rarity,
-          unlocked: isUnlocked,
-          progress: status === 'locked' ? undefined : progressPercent,
-          requirement,
-          unlockedAt: undefined,
-          unlockedTiers: template.is_tiered ? unlockedTiers : undefined,
-          isMastered,
-          nearMiss,
-        };
-      });
-      
-      setAchievements(mappedAchievements);
+      setLoadError(null);
+      const [achievementProgress, unlockedRows] = await Promise.all([
+        AchievementService.getAchievementProgress(user.id),
+        AchievementService.getUnlockedAchievements(user.id),
+      ]);
+      const lastByTemplate = buildLastUnlockByTemplate(unlockedRows);
+      const mapped = achievementProgress.map((p) => mapProgressToTrophyRow(p, lastByTemplate));
+      setUnlockedSnapshot(unlockedRows);
+      setRows(mapped);
     } catch (error) {
       console.error("Error loading achievements data:", error);
-      setAchievements([]); // Return empty array on error, no fallback data
+      setRows([]);
+      setUnlockedSnapshot([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredAchievements = achievements.filter((achievement) => {
-    // Filter by rarity
-    if (filterRarity !== "all" && achievement.rarity !== filterRarity) {
-      return false;
-    }
+  const filtered = filterRowsForSegment(rows, filterStatus);
+  const { total, unlocked, inProgress, locked } = collectionCounts(rows);
 
-    // Filter by status
-    if (filterStatus === "unlocked" && !achievement.unlocked) {
-      return false;
-    }
-    if (
-      filterStatus === "progress" &&
-      (!achievement.progress || achievement.unlocked)
-    ) {
-      return false;
-    }
-    if (
-      filterStatus === "locked" &&
-      (achievement.unlocked || achievement.progress !== undefined)
-    ) {
-      return false;
-    }
+  const recently = sectionRecentlyUnlocked(filtered);
+  const almost = sectionAlmostThere(filtered);
+  const inProgLow = sectionInProgressLow(filtered);
+  const lockedSec = sectionLocked(filtered);
 
-    return true;
-  });
+  const celebration = pickCelebrationHero(rows, unlockedSnapshot);
 
-  const unlockedCount = achievements.filter((a) => a.unlocked).length;
-  const inProgressCount = achievements.filter(
-    (a) => !a.unlocked && a.progress !== undefined
-  ).length;
-  const lockedCount = achievements.filter(
-    (a) => !a.unlocked && a.progress === undefined
-  ).length;
+  const showCelebration = celebration != null && filterStatus === "all";
 
-  const tabChipBase =
-    "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const tabChipActive =
-    "bg-[color-mix(in_srgb,var(--fc-accent)_20%,transparent)] text-[color:var(--fc-accent)] border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)]";
-  const tabChipInactive =
-    "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)] hover:fc-text-primary";
+  const anySection =
+    recently.length > 0 || almost.length > 0 || inProgLow.length > 0 || lockedSec.length > 0;
 
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
       <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
-        <div className="space-y-6">
-          {/* Flat header */}
-          <div className="flex items-start gap-3 mb-4">
-            <button
-              type="button"
-              onClick={() => router.push("/client/progress")}
-              className="w-10 h-10 shrink-0 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft flex items-center justify-center fc-text-dim hover:fc-text-primary transition-colors"
-              aria-label="Back to Progress"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <h1 className="text-xl font-bold fc-text-primary tracking-tight">Achievements</h1>
-              <p className="text-xs fc-text-dim mt-1 leading-relaxed">
-                Milestones and progress across your training.
-              </p>
-            </div>
-          </div>
-
-          {/* Stat strip */}
-          <div className="rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft p-3 flex items-stretch">
-            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums fc-text-primary">{unlockedCount}</span>
-              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
-                Unlocked
-              </span>
-            </div>
-            <div className="w-px self-stretch min-h-8 bg-[color:var(--fc-glass-border)]" />
-            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums fc-text-primary">{inProgressCount}</span>
-              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
-                In progress
-              </span>
-            </div>
-            <div className="w-px self-stretch min-h-8 bg-[color:var(--fc-glass-border)]" />
-            <div className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 py-1">
-              <span className="text-base font-semibold tabular-nums fc-text-primary">{lockedCount}</span>
-              <span className="text-[10px] uppercase tracking-wider fc-text-dim text-center leading-tight">
-                Locked
-              </span>
-            </div>
-          </div>
-
-          {/* Filters — reference chips, stacked sections (no lg: grid) */}
-          <div className="space-y-4">
-            <p id="achievements-status-label" className="text-[10px] font-bold uppercase tracking-wider fc-text-dim">Status</p>
-            <div className="-mx-4 px-4 mb-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex flex-wrap gap-2 min-w-min" role="tablist" aria-labelledby="achievements-status-label">
-                {(
-                  [
-                    ["all", "All"],
-                    ["unlocked", "Unlocked"],
-                    ["progress", "In progress"],
-                    ["locked", "Locked"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={filterStatus === key}
-                    onClick={() => setFilterStatus(key)}
-                    className={cn(
-                      tabChipBase,
-                      filterStatus === key ? tabChipActive : tabChipInactive
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p id="achievements-rarity-label" className="text-[10px] font-bold uppercase tracking-wider fc-text-dim">Rarity</p>
-            <div className="-mx-4 px-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex flex-wrap gap-2 min-w-min" role="tablist" aria-labelledby="achievements-rarity-label">
-                {(
-                  [
-                    "all",
-                    "common",
-                    "uncommon",
-                    "rare",
-                    "epic",
-                    "legendary",
-                  ] as const
-                ).map((rarity) => (
-                  <button
-                    key={rarity}
-                    type="button"
-                    role="tab"
-                    aria-selected={filterRarity === rarity}
-                    onClick={() => setFilterRarity(rarity)}
-                    className={cn(
-                      tabChipBase,
-                      filterRarity === rarity ? tabChipActive : tabChipInactive
-                    )}
-                  >
-                    {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className={cn(progressSuiteV1Styles.psV1, "space-y-4")}>
+          <PsHero
+            glow="cyan"
+            onBack={() => router.push("/client/progress")}
+            backAriaLabel="Back to Progress"
+            eyebrow="Progress · achievements"
+            eyebrowColor={CYAN}
+            title="Trophy room"
+            subtitle="Milestones and progress across your training"
+          />
 
           {loadError ? (
             <div className="py-8 px-4 text-center">
-              <p className="text-sm fc-text-dim mb-1">{loadError}</p>
-              <p className="text-xs fc-text-subtle mb-4">Refresh the page or try again in a moment.</p>
+              <p className="text-sm" style={{ color: "var(--ps-t3)" }}>
+                {loadError}
+              </p>
+              <p className="text-xs mt-1 mb-4" style={{ color: "var(--ps-t4)" }}>
+                Refresh the page or try again in a moment.
+              </p>
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)] fc-glass-soft px-6 text-sm font-medium fc-text-dim hover:fc-text-primary transition-colors"
+                className="inline-flex h-10 items-center justify-center rounded-lg border px-6 text-sm font-medium transition-colors"
+                style={{
+                  borderColor: "var(--ps-line)",
+                  background: "var(--ps-card-2)",
+                  color: "var(--ps-t2)",
+                }}
               >
                 Retry
               </button>
@@ -328,27 +154,101 @@ function AchievementsPageContent() {
             <PageSkeleton variant="list" />
           ) : (
             <>
-              {/* Single column at all widths — avoids tight 2-col at ~375px; AchievementCard unchanged */}
-              <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-                {filteredAchievements.map((achievement) => (
-                  <AchievementCard key={achievement.id} achievement={achievement} dense />
-                ))}
+              {showCelebration && celebration ? (
+                <TrophyCelebrationHero pick={celebration} />
+              ) : null}
+
+              <TrophyStatsHero
+                total={total}
+                unlocked={unlocked}
+                inProgress={inProgress}
+                locked={locked}
+              />
+
+              <PsSegmented<FilterStatus>
+                value={filterStatus}
+                onChange={setFilterStatus}
+                options={[
+                  { value: "all", label: "All", count: total },
+                  { value: "unlocked", label: "Unlocked", count: unlocked },
+                  { value: "progress", label: "In progress", count: inProgress },
+                  { value: "locked", label: "Locked", count: locked },
+                ]}
+                ariaLabel="Filter achievements by status"
+              />
+
+              <div className="space-y-5 pt-1">
+                {recently.length > 0 ? (
+                  <section className="space-y-2">
+                    <TrophySectionHeader
+                      eyebrow="Recently unlocked"
+                      accent="lime"
+                      count={recently.length}
+                      unlockedFilterLabel={filterStatus === "unlocked"}
+                    />
+                    <div className="flex flex-col gap-2">
+                      {recently.map((r) => (
+                        <TrophyAchievementTile key={r.id} row={r} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {almost.length > 0 ? (
+                  <section className="space-y-2">
+                    <TrophySectionHeader eyebrow="Almost there" accent="cyan" count={almost.length} />
+                    <div className="flex flex-col gap-2">
+                      {almost.map((r) => (
+                        <TrophyAchievementTile key={r.id} row={r} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {inProgLow.length > 0 ? (
+                  <section className="space-y-2">
+                    <TrophySectionHeader eyebrow="In progress" accent="cyan" count={inProgLow.length} />
+                    <div className="flex flex-col gap-2">
+                      {inProgLow.map((r) => (
+                        <TrophyAchievementTile key={r.id} row={r} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {lockedSec.length > 0 ? (
+                  <section className="space-y-2">
+                    <TrophySectionHeader eyebrow="Locked" accent="muted" count={lockedSec.length} />
+                    <div className="flex flex-col gap-2">
+                      {lockedSec.map((r) => (
+                        <TrophyAchievementTile key={r.id} row={r} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
               </div>
 
-              {filteredAchievements.length === 0 && (
+              {!anySection && (
                 <div className="py-8 px-4 text-center">
-                  <Award className="mx-auto mb-3 h-12 w-12 fc-text-subtle" aria-hidden />
-                  <p className="text-sm fc-text-dim mb-1">No achievements match these filters</p>
-                  <p className="text-xs fc-text-subtle mb-4">Try widening status or rarity.</p>
+                  <Award
+                    className="mx-auto mb-3 h-12 w-12"
+                    style={{ color: "var(--ps-t4)" }}
+                    aria-hidden
+                  />
+                  <p className="text-sm mb-1" style={{ color: "var(--ps-t3)" }}>
+                    No achievements match this filter
+                  </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setFilterRarity("all");
-                      setFilterStatus("all");
+                    onClick={() => setFilterStatus("all")}
+                    className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border px-5 text-sm font-semibold transition-colors"
+                    style={{
+                      borderColor: "var(--ps-cyan-dim)",
+                      background: "var(--ps-cyan-soft)",
+                      color: "var(--ps-cyan)",
                     }}
-                    className="inline-flex h-10 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] px-5 text-sm font-semibold text-[color:var(--fc-accent)]"
                   >
-                    Reset filters
+                    Show all
                   </button>
                 </div>
               )}
@@ -362,7 +262,7 @@ function AchievementsPageContent() {
 
 export default function AchievementsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <AchievementsPageContent />
     </ProtectedRoute>
   );

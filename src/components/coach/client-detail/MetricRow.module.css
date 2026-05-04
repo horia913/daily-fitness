@@ -1,0 +1,110 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.tile {
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-divider);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.headIcon {
+  width: 11px;
+  height: 11px;
+}
+
+.headCyan {
+  color: var(--fc-set-type-straight);
+}
+
+.headGood {
+  color: var(--fc-effort-easy);
+}
+
+.headWarn {
+  color: var(--fc-effort-medium);
+}
+
+.headPurple {
+  color: var(--fc-meal-dinner);
+}
+
+.value {
+  font-family: var(--f-display, var(--font-geist-sans));
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.valMuted {
+  color: var(--fc-text-quaternary);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.valCrit {
+  color: var(--fc-effort-max);
+}
+
+.valWarn {
+  color: var(--fc-effort-medium);
+}
+
+.valGood {
+  color: var(--fc-effort-easy);
+}
+
+.valLime {
+  color: var(--fc-accent-lime-2);
+}
+
+.barTrack {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 6%;
+  transition: width 0.2s ease;
+}
+
+.barMuted {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.barCrit {
+  background: var(--fc-effort-max);
+}
+
+.barWarn {
+  background: var(--fc-effort-medium);
+}
+
+.barGood {
+  background: var(--fc-effort-easy);
+}
+
+.barLime {
+  background: var(--fc-accent-lime-2);
+}

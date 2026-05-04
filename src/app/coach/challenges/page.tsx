@@ -221,15 +221,20 @@ function CoachChallengesPageContent() {
         )}
         </section>
 
-        <Button
+        {/*
+          Phase 0b 6-FAB extension — coach challenges FAB migration.
+          Spec ref: design-system-v4 §6.21. Was: Button fixed bottom-8 right-8 z-50,
+          h-14 w-14 rounded-2xl fc-btn-primary, Plus w-6 h-6. Header "Create Challenge"
+          CTA unchanged (Phase 1+ duplicate-CTA demotion). Now: native fab-action.
+        */}
+        <button
           type="button"
           onClick={() => setCreateModalOpen(true)}
-          className="fixed bottom-8 right-8 z-50 h-14 w-14 rounded-2xl fc-btn-primary shadow-lg"
-          size="icon"
+          className="fab-action"
           aria-label="Create challenge"
         >
-          <Plus className="w-6 h-6" />
-        </Button>
+          <Plus />
+        </button>
 
         <CreateChallengeModal
           open={createModalOpen}

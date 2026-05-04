@@ -66,7 +66,8 @@ export async function getProgramMetrics(
 
     // 3. Find next uncompleted slot to determine current position
     const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
-    const nextSlot = slots.find(slot => !completedScheduleIds.has(slot.id)) ?? null
+    const nextSlot =
+      slots.find((slot) => slot.id != null && !completedScheduleIds.has(slot.id)) ?? null
     const isCompleted = nextSlot === null && completed_workouts > 0
 
     // 4. Calculate current position (1-based for display)

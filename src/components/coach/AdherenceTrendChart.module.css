@@ -1,0 +1,82 @@
+.v6Wrap {
+  position: relative;
+  height: 130px;
+  padding: 8px;
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.v6Outer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v6Legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10.5px;
+  color: var(--fc-text-subtle);
+}
+
+.v6LegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.v6LegendSwatch {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.v6SwDash {
+  height: 2px;
+  width: 10px;
+  border-radius: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--fc-set-type-straight),
+    var(--fc-set-type-straight) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.v6Axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9px;
+  color: var(--fc-text-quaternary);
+  padding: 0 4px 2px;
+}
+
+.v6Tooltip {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  z-index: 2;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--fc-glass-border);
+  background: color-mix(in srgb, var(--fc-surface-card) 94%, transparent);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.v6Empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fc-text-subtle);
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: 11px;
+}

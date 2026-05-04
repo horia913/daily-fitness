@@ -22,8 +22,6 @@ import {
   Edit,
   Trash2,
   Settings,
-  Bell,
-  BellOff,
   BarChart3,
   Flame,
   Trophy,
@@ -380,9 +378,6 @@ export default function HabitTrackerComponent({ userId, coachId }: HabitTrackerP
                     <Badge variant="outline" className="text-xs">
                       {habit.frequency_type}
                     </Badge>
-                    {habit.reminder_enabled && (
-                      <Bell className="w-4 h-4 text-blue-500" />
-                    )}
                   </div>
                 </div>
               </CardHeader>

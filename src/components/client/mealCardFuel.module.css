@@ -1,0 +1,261 @@
+/* Fuel nutrition meal cards — v6 chrome */
+
+.shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--fc-surface-card-border);
+  background: var(--fc-surface-card);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  width: 100%;
+}
+
+.headRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px;
+}
+
+.mealIconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.headInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.mealTitle {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--fc-text-primary);
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.mealMeta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.statusPill {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--fc-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.statusPillLogged {
+  background: rgba(197, 255, 74, 0.1);
+  border-color: rgba(197, 255, 74, 0.25);
+  color: var(--fc-accent-lime);
+}
+
+.carousel {
+  padding: 12px 16px;
+}
+
+.carouselInner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.carouselCenter {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.optionTitle {
+  font-family: var(--f-headline, var(--font-sans, ui-sans-serif));
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fc-text-primary);
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dotActive {
+  background: var(--fc-accent-cyan);
+  box-shadow: 0 0 8px rgba(79, 227, 232, 0.45);
+}
+
+.ingredients {
+  padding: 6px 16px 0;
+}
+
+.ingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ingRow:last-child {
+  border-bottom: none;
+}
+
+.ingName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fc-text-primary);
+  min-width: 0;
+  text-align: left;
+}
+
+.ingQty {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fc-text-dim);
+  flex-shrink: 0;
+}
+
+.ingQtyUnit {
+  font-family: var(--font-sans, ui-sans-serif);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.42);
+  margin-left: 2px;
+}
+
+.macroLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 14px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statVal {
+  font-family: var(--f-display, var(--font-display, var(--font-number, ui-sans-serif)));
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statLbl {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.dotSep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  align-self: center;
+  margin-top: 8px;
+}
+
+.actions {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.photoDashed {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.photoDashed:hover {
+  border-color: rgba(79, 227, 232, 0.35);
+  background: rgba(79, 227, 232, 0.06);
+  color: var(--fc-accent-cyan);
+}
+
+.photoThumbWrap {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--fc-glass-border);
+}
+
+.photoThumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.photoReplaceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.loggedPhotoHero {
+  position: relative;
+  width: 100%;
+}
+
+.loggedPhotoHero .photoThumb {
+  height: 160px;
+}

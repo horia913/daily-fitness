@@ -543,7 +543,7 @@ export default function ClientProfilePage() {
 
   const inputClass = 'h-11 rounded-lg fc-input'
   const labelClass = 'text-xs uppercase tracking-wider fc-text-dim mb-1 block'
-  const sectionTitleClass = 'text-sm uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-2'
+  const sectionTitleClass = 'text-sm uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2'
 
   return (
     <ProtectedRoute requiredRole="client">

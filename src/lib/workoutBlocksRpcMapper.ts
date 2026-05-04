@@ -56,6 +56,7 @@ type RpcExercise = {
   sets?: number | null;
   reps?: string | null;
   weight_kg?: number | null;
+  rir?: number | null;
   rest_seconds?: number | null;
   notes?: string | null;
   load_percentage?: number | null;
@@ -181,6 +182,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
         const restPause = filterByExercise(restPauseSets, ex.exercise_id, ex.exercise_order);
         return {
           ...ex,
+          rir: ex.rir ?? null,
           drop_sets: drop,
           cluster_sets: cluster,
           rest_pause_sets: restPause,
@@ -204,6 +206,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
           );
           return {
             ...ex,
+            rir: ex.rir ?? null,
             sets: ex.sets ?? b.total_sets,
             reps: ex.reps ?? b.reps_per_set,
             weight_kg: ex.weight_kg ?? drop[0]?.weight_kg,
@@ -286,6 +289,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
             );
             return {
               ...ex,
+              rir: ex.rir ?? null,
               exercise: (ex as any).exercise ?? null,
               sets: ex.sets ?? match?.intervals ?? b.total_sets,
               rest_seconds: ex.rest_seconds ?? match?.rest_seconds ?? b.rest_seconds,
@@ -307,6 +311,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
       } else if (fromRpcExercises.length > 0) {
         block.exercises = fromRpcExercises.map((ex) => ({
           ...ex,
+          rir: ex.rir ?? null,
           exercise: (ex as any).exercise ?? null,
           speed_sets: [],
         })) as any;
@@ -327,6 +332,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
             );
             return {
               ...ex,
+              rir: ex.rir ?? null,
               exercise: (ex as any).exercise ?? null,
               sets: ex.sets ?? b.total_sets,
               endurance_sets: match ? [match] : [],
@@ -346,6 +352,7 @@ export function mapWorkoutBlocksRpcToSetEntries(rpcBlocks: unknown): WorkoutSetE
       } else if (fromRpcExercises.length > 0) {
         block.exercises = fromRpcExercises.map((ex) => ({
           ...ex,
+          rir: ex.rir ?? null,
           exercise: (ex as any).exercise ?? null,
           endurance_sets: [],
         })) as any;

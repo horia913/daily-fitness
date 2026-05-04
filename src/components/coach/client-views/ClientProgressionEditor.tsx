@@ -26,8 +26,14 @@ type ClientRuleRow = {
   block_type: string | null
 }
 
-function masterKey(r: { block_id?: string | null; exercise_order?: number | null; exercise_id?: string | null }) {
-  return `${r.block_id ?? ''}:${r.exercise_order ?? 0}:${r.exercise_id ?? ''}`
+function masterKey(r: {
+  block_id?: string | null
+  set_entry_id?: string | null
+  exercise_order?: number | null
+  exercise_id?: string | null
+}) {
+  const slotId = r.set_entry_id ?? r.block_id
+  return `${slotId ?? ''}:${r.exercise_order ?? 0}:${r.exercise_id ?? ''}`
 }
 
 export interface ClientProgressionEditorProps {
@@ -199,7 +205,14 @@ export default function ClientProgressionEditor({
       setDraft({})
       const map: Record<string, Record<string, unknown>> = {}
       for (const r of masterRes.rules || []) {
-        const k = masterKey(r as { block_id?: string | null; exercise_order?: number | null; exercise_id?: string | null })
+        const k = masterKey(
+          r as {
+            block_id?: string | null
+            set_entry_id?: string | null
+            exercise_order?: number | null
+            exercise_id?: string | null
+          },
+        )
         map[k] = r as unknown as Record<string, unknown>
       }
       setMasterByKey(map)

@@ -20,10 +20,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 export default function EditWorkoutTemplatePage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
   const templateId = useMemo(() => String(params?.id || ""), [params]);
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -34,6 +35,7 @@ export default function EditWorkoutTemplatePage() {
   useEffect(() => {
     setLoading(true);
     setTemplate(null);
+    setLoadError(null);
     setInitialBlocks(null);
     setIsOpen(false);
     setIsDirty(false);
@@ -42,7 +44,7 @@ export default function EditWorkoutTemplatePage() {
   const editTemplateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (templateId && user?.id) {
+    if (!authLoading && templateId && user?.id) {
       if (editTemplateTimeoutRef.current) clearTimeout(editTemplateTimeoutRef.current);
       editTemplateTimeoutRef.current = setTimeout(() => {
         editTemplateTimeoutRef.current = null;
@@ -61,10 +63,7 @@ export default function EditWorkoutTemplatePage() {
         }
       };
     }
-    if (!user) {
-      setLoading(false);
-    }
-  }, [templateId, user]);
+  }, [templateId, user, authLoading]);
 
   const loadTemplate = async () => {
     try {
@@ -86,13 +85,20 @@ export default function EditWorkoutTemplatePage() {
       if (found) {
         setTemplate(found);
         setInitialBlocks(blocks || []);
+        setLoadError(null);
         setIsOpen(true);
       } else {
-        router.push("/coach/workouts/templates");
+        setTemplate(null);
+        setInitialBlocks([]);
+        setIsOpen(false);
+        setLoadError("Template not found");
       }
     } catch (error) {
       console.error("Error loading template:", error);
-      router.push("/coach/workouts/templates");
+      setTemplate(null);
+      setInitialBlocks([]);
+      setIsOpen(false);
+      setLoadError("Failed to load template");
     } finally {
       setLoading(false);
     }
@@ -106,7 +112,7 @@ export default function EditWorkoutTemplatePage() {
     router.push(`/coach/workouts/templates/${templateId}`);
   };
 
-  if (!user) {
+  if (!user && !authLoading) {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
@@ -117,7 +123,7 @@ export default function EditWorkoutTemplatePage() {
     );
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
@@ -142,7 +148,11 @@ export default function EditWorkoutTemplatePage() {
               <EmptyState
                 icon={FileQuestion}
                 title="Template not found"
-                description="This template may have been deleted or moved."
+                description={
+                  loadError === "Failed to load template"
+                    ? "There was an error loading this template. Please try again."
+                    : "This template may have been deleted or moved."
+                }
                 action={{
                   label: "Back to templates",
                   onClick: () => router.push("/coach/workouts/templates"),
@@ -166,11 +176,6 @@ export default function EditWorkoutTemplatePage() {
                 Edit template
               </h1>
               <div className="flex items-center gap-2 shrink-0">
-                <span
-                  className={`text-[10px] font-semibold uppercase tracking-wide ${isDirty ? "text-amber-600 dark:text-amber-400" : "text-[color:var(--fc-text-dim)]"}`}
-                >
-                  {isDirty ? "Unsaved" : "Saved"}
-                </span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -197,6 +202,7 @@ export default function EditWorkoutTemplatePage() {
                 initialBlocks={initialBlocks ?? undefined}
                 renderMode="page"
                 onDirtyChange={setIsDirty}
+                pageIsDirty={isDirty}
               />
             )}
           </div>

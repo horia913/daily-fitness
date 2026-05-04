@@ -107,7 +107,7 @@ async function getPrescribedForWeek(
   // Fill gaps with master program rules
   const { data: masterRules } = await supabase
     .from('program_progression_rules')
-    .select('id, exercise_id, sets, reps, weight_kg, rir, block_type')
+    .select('id, exercise_id, sets, reps, weight_kg, rir, set_type')
     .eq('program_id', programId)
     .eq('week_number', weekNumber)
 
@@ -117,7 +117,7 @@ async function getPrescribedForWeek(
         result.set(r.exercise_id, {
           ruleId: null,
           prescribed: { sets: r.sets, reps: r.reps, weightKg: r.weight_kg != null ? Number(r.weight_kg) : null, rir: r.rir },
-          blockType: r.block_type,
+          blockType: r.set_type ?? null,
         })
       }
     }

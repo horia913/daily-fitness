@@ -30,6 +30,7 @@ import {
   type FoodRecord,
   type MacroTargets,
 } from "@/lib/mealPlanGeneratorService";
+import { fetchApi } from "@/lib/apiClient";
 import {
   ArrowLeft,
   ArrowRight,
@@ -145,7 +146,7 @@ function StepIndicator({ current, step }: { current: Step; step: number }) {
           done
             ? "bg-[color:var(--fc-status-success)] text-white"
             : active
-            ? "bg-[color:var(--fc-accent)] text-white"
+            ? "bg-[color:var(--fc-accent-cyan)] text-white"
             : "bg-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)]"
         }`}
       >
@@ -288,7 +289,7 @@ function FoodSearchBox({
         onBlur={handleBlur}
         disabled={!sessionReady}
         placeholder={sessionReady ? placeholder : "Loading…"}
-        className={`w-full pl-9 pr-9 py-2.5 rounded-xl text-sm fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-dim)] focus:outline-none focus:border-[color:var(--fc-accent)] transition-colors ${!sessionReady ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`w-full pl-9 pr-9 py-2.5 rounded-xl text-sm fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] placeholder:text-[color:var(--fc-text-dim)] focus:outline-none focus:border-[color:var(--fc-accent-cyan)] transition-colors ${!sessionReady ? "opacity-50 cursor-not-allowed" : ""}`}
       />
       {loading && (
         <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[color:var(--fc-text-dim)]" />
@@ -341,7 +342,7 @@ function FoodRow({
       <td className="py-2 pl-2 text-right">
         <button
           onClick={onSwap}
-          className="p-1.5 rounded-lg text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-accent)] hover:bg-[color:var(--fc-aurora)]/10 transition-colors"
+          className="p-1.5 rounded-lg text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-accent-cyan)] hover:bg-[color:var(--fc-aurora)]/10 transition-colors"
           title="Swap this food"
         >
           <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -487,7 +488,7 @@ export default function GeneratorPage() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
-      const res = await fetch("/api/coach/nutrition/generate", {
+      const res = await fetchApi("/api/coach/nutrition/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -673,7 +674,7 @@ export default function GeneratorPage() {
                       onClick={() => setMacroMode(mode)}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${
                         macroMode === mode
-                          ? "bg-[color:var(--fc-accent)] text-white"
+                          ? "bg-[color:var(--fc-accent-cyan)] text-white"
                           : "fc-surface border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)]"
                       }`}
                     >
@@ -804,11 +805,11 @@ export default function GeneratorPage() {
                             }}
                             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-all border ${
                               checked
-                                ? "bg-[color:var(--fc-accent)]/15 border-[color:var(--fc-accent)] text-[color:var(--fc-text-primary)]"
+                                ? "bg-[color:var(--fc-accent-cyan)]/15 border-[color:var(--fc-accent-cyan)] text-[color:var(--fc-text-primary)]"
                                 : "fc-surface border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
                             }`}
                           >
-                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${checked ? "bg-[color:var(--fc-accent)] border-[color:var(--fc-accent)]" : "border-[color:var(--fc-glass-border)]"}`}>
+                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${checked ? "bg-[color:var(--fc-accent-cyan)] border-[color:var(--fc-accent-cyan)]" : "border-[color:var(--fc-glass-border)]"}`}>
                               {checked && <Check className="w-3 h-3 text-white" />}
                             </div>
                             {p.display_name}
@@ -975,7 +976,7 @@ export default function GeneratorPage() {
               {generating && (
                 <GlassCard elevation={2} className="fc-card-shell p-12 flex flex-col items-center justify-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-[color:var(--fc-aurora)]/20 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-[color:var(--fc-accent)] animate-spin" />
+                    <Loader2 className="w-8 h-8 text-[color:var(--fc-accent-cyan)] animate-spin" />
                   </div>
                   <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">Generating your meal plan…</p>
                   <p className="text-sm text-[color:var(--fc-text-dim)]">Selecting templates, filling slots, and balancing macros</p>
@@ -1102,7 +1103,7 @@ export default function GeneratorPage() {
                           className="w-full flex items-center justify-between p-5 text-left hover:bg-[color:var(--fc-aurora)]/5 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-[color:var(--fc-aurora)]/15 flex items-center justify-center text-[color:var(--fc-accent)]">
+                            <div className="w-9 h-9 rounded-xl bg-[color:var(--fc-aurora)]/15 flex items-center justify-center text-[color:var(--fc-accent-cyan)]">
                               <span className="text-xs font-bold">{mealIdx + 1}</span>
                             </div>
                             <div>
@@ -1134,7 +1135,7 @@ export default function GeneratorPage() {
                                     onClick={() => setActiveTabPerMeal((prev) => ({ ...prev, [mealIdx]: optIdx }))}
                                     className={`flex-1 py-3 text-sm font-medium transition-colors ${
                                       activeTab === optIdx
-                                        ? "text-[color:var(--fc-accent)] border-b-2 border-[color:var(--fc-accent)]"
+                                        ? "text-[color:var(--fc-accent-cyan)] border-b-2 border-[color:var(--fc-accent-cyan)]"
                                         : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
                                     }`}
                                   >
@@ -1247,7 +1248,7 @@ export default function GeneratorPage() {
                   <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Swap Food</h3>
                   <p className="text-xs text-[color:var(--fc-text-dim)] mt-0.5">
                     Replacing: <span className="text-[color:var(--fc-text-primary)]">{swapModal.currentFood.foodName}</span>
-                    {" · "}slot type: <span className="text-[color:var(--fc-accent)]">{swapModal.slotType}</span>
+                    {" · "}slot type: <span className="text-[color:var(--fc-accent-cyan)]">{swapModal.slotType}</span>
                   </p>
                 </div>
                 <button
@@ -1264,13 +1265,13 @@ export default function GeneratorPage() {
                     <button
                       key={alt.id}
                       onClick={() => handleSwapConfirm(alt)}
-                      className="w-full text-left p-3 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-accent)] hover:bg-[color:var(--fc-aurora)]/5 transition-all"
+                      className="w-full text-left p-3 rounded-xl fc-surface border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-accent-cyan)] hover:bg-[color:var(--fc-aurora)]/5 transition-all"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">{alt.name}</p>
                           {alt.is_common && (
-                            <span className="text-xs text-[color:var(--fc-accent)] font-medium">★ Common</span>
+                            <span className="text-xs text-[color:var(--fc-accent-cyan)] font-medium">★ Common</span>
                           )}
                         </div>
                         <div className="text-right text-xs text-[color:var(--fc-text-dim)] shrink-0">

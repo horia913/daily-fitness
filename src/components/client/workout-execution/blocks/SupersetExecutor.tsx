@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,25 +11,25 @@ import {
   Target,
   Repeat2,
   Timer,
-  Weight,
   Gauge,
   Flame,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
-  formatLoadPercentage,
   formatRestSeconds,
 } from "../BaseBlockExecutor";
 import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
-import { formatPrescribedRpeLabel } from "@/lib/workoutTargetIntensity";
 import { LargeInput } from "../ui/LargeInput";
+import logPairStyles from "../ui/logWeightRepsPair.module.css";
 import { BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { InlineRPERow } from "../ui/InlineRPERow";
+import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
+import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
+import { appendTargetEffortItem } from "../appendTargetEffortItem";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
@@ -59,7 +60,6 @@ export function SupersetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
-  onPlateCalculatorClick,
   onRestTimerClick,
   onWorkoutBack,
   onSetComplete,
@@ -91,10 +91,7 @@ export function SupersetExecutor({
   const [isWeightAPristine, setIsWeightAPristine] = useState(true);
   const [isWeightBPristine, setIsWeightBPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
-  /** Collapsible set history: show all sets or only last 2 */
-  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     weightA: string;
@@ -291,44 +288,18 @@ export function SupersetExecutor({
       value: exerciseB.reps,
     });
   }
-  if (
-    exerciseA?.load_percentage != null &&
-    exerciseA.load_percentage !== undefined &&
-    exerciseA.exercise_id
-  ) {
-    const suggestedForDisplay =
-      resultA.source === "percent_e1rm" ? resultA.suggested_weight : null;
-    const loadDisplay = formatLoadPercentage(
-      exerciseA.load_percentage,
-      suggestedForDisplay,
-    );
-    if (loadDisplay) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load (A)",
-        value: loadDisplay,
-      });
-    }
-  }
-  if (
-    exerciseB?.load_percentage != null &&
-    exerciseB.load_percentage !== undefined &&
-    exerciseB.exercise_id
-  ) {
-    const suggestedForDisplay =
-      resultB.source === "percent_e1rm" ? resultB.suggested_weight : null;
-    const loadDisplay = formatLoadPercentage(
-      exerciseB.load_percentage,
-      suggestedForDisplay,
-    );
-    if (loadDisplay) {
-      prescriptionItems.push({
-        icon: Weight,
-        label: "Load (B)",
-        value: loadDisplay,
-      });
-    }
-  }
+  appendTargetEffortItem(
+    prescriptionItems,
+    exerciseA ? (exerciseA as { rir?: unknown }).rir : undefined,
+    Flame,
+    "Target effort (A)",
+  );
+  appendTargetEffortItem(
+    prescriptionItems,
+    exerciseB ? (exerciseB as { rir?: unknown }).rir : undefined,
+    Flame,
+    "Target effort (B)",
+  );
   if (exerciseA?.tempo) {
     prescriptionItems.push({
       icon: Gauge,
@@ -341,24 +312,6 @@ export function SupersetExecutor({
       icon: Gauge,
       label: "Tempo (B)",
       value: exerciseB.tempo,
-    });
-  }
-  if (exerciseA?.rir != null && exerciseA?.rir !== undefined) {
-    prescriptionItems.push({
-      icon: Flame,
-      label: "RPE (A)",
-      value:
-        formatPrescribedRpeLabel(exerciseA.rir) ??
-        String(exerciseA.rir).trim(),
-    });
-  }
-  if (exerciseB?.rir != null && exerciseB?.rir !== undefined) {
-    prescriptionItems.push({
-      icon: Flame,
-      label: "RPE (B)",
-      value:
-        formatPrescribedRpeLabel(exerciseB.rir) ??
-        String(exerciseB.rir).trim(),
     });
   }
 
@@ -387,7 +340,6 @@ export function SupersetExecutor({
       repsB: String(entryB?.reps_completed ?? ""),
       set_number: setEntry.set_number ?? 1,
     });
-    setMenuOpenSetId(null);
   };
 
   const handleSaveEdit = async () => {
@@ -625,147 +577,45 @@ export function SupersetExecutor({
     ...new Set(loggedSetsList.map((s) => s.set_number)),
   ].sort((a, b) => a - b);
 
+  const updateSetRpe = useUpdateSetRpe({
+    blockId: block.block.id,
+    onSetLogUpsert,
+  });
+  const loggedSetRows: LoggedSetRow[] = setNumbersLogged.map((setNum) => {
+    const forSet = loggedSetsList.filter((s) => s.set_number === setNum);
+    const entryA =
+      forSet.find((s) => s.exercise_id === exerciseA?.exercise_id) || forSet[0];
+    const entryB =
+      forSet.find((s) => s.exercise_id === exerciseB?.exercise_id) || forSet[1];
+    const label = `Set ${setNum}: A ${entryA?.weight_kg ?? "—"}×${entryA?.reps_completed ?? "—"}${entryB ? `, B ${entryB.weight_kg ?? "—"}×${entryB.reps_completed ?? "—"}` : ""}`;
+    const representative = entryA ?? forSet[0];
+    return {
+      id: `set-${setNum}`,
+      title: label,
+      rpe: representative?.rpe ?? null,
+      onEffortChange: (rpe) => {
+        if (representative) updateSetRpe(representative, rpe);
+      },
+      disabled: !representative || representative.id.startsWith("temp-"),
+      menu: allowSetEditDelete && forSet[0] ? (
+        <button
+          type="button"
+          onClick={() => handleEditSet(forSet[0])}
+          className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--fc-text-dim)] hover:bg-white/5 hover:text-[color:var(--fc-text-primary)]"
+          aria-label="Edit"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      ) : null,
+    };
+  });
+  const aboveStickyContent =
+    loggedSetRows.length > 0 ? (
+      <LoggedSetsList rows={loggedSetRows} />
+    ) : null;
+
   const loggingInputs = (
     <div className="space-y-4">
-      {allowSetEditDelete && setNumbersLogged.length > 0 && (
-        <div className="border-t border-white/10 pt-3">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
-              Logged sets
-            </div>
-            {setNumbersLogged.length > 2 && (
-              <button
-                type="button"
-                onClick={() => setShowAllSets(!showAllSets)}
-                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
-              >
-                {showAllSets ? (
-                  <>Show less ▲</>
-                ) : (
-                  <>Show all {setNumbersLogged.length} sets ▼</>
-                )}
-              </button>
-            )}
-          </div>
-          <ul className="flex flex-col border-y border-white/5">
-            {(showAllSets ? setNumbersLogged : setNumbersLogged.slice(-2)).map(
-              (setNum) => {
-                // Calculate the actual index in the full list for isLatestSet
-                const actualIndex = showAllSets
-                  ? setNumbersLogged.indexOf(setNum)
-                  : setNumbersLogged.length -
-                    2 +
-                    setNumbersLogged.slice(-2).indexOf(setNum);
-                const isLatestSet = actualIndex === setNumbersLogged.length - 1;
-                const forSet = loggedSetsList.filter(
-                  (s) => s.set_number === setNum,
-                );
-                const entryA =
-                  forSet.find(
-                    (s) => s.exercise_id === exerciseA?.exercise_id,
-                  ) || forSet[0];
-                const entryB =
-                  forSet.find(
-                    (s) => s.exercise_id === exerciseB?.exercise_id,
-                  ) || forSet[1];
-                const label = `Set ${setNum}: A ${entryA?.weight_kg ?? "—"}×${entryA?.reps_completed ?? "—"}${entryB ? `, B ${entryB.weight_kg ?? "—"}×${entryB.reps_completed ?? "—"}` : ""}`;
-                const firstId = forSet[0]?.id ?? "";
-                const rpeForSet = entryA?.rpe ?? entryB?.rpe ?? null;
-                return (
-                  <li
-                    key={`set-${setNum}`}
-                    className="flex flex-col gap-1.5 border-b border-white/5 py-3 px-1 last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm fc-text-primary">{label}</span>
-                      <div className="relative flex items-center">
-                        <button
-                          type="button"
-                          className="p-1.5 rounded-md hover:bg-black/10"
-                          onClick={() =>
-                            setMenuOpenSetId(
-                              menuOpenSetId === firstId ? null : firstId,
-                            )
-                          }
-                          aria-label="Options"
-                        >
-                          <MoreVertical className="w-4 h-4 fc-text-dim" />
-                        </button>
-                        {menuOpenSetId === firstId && (
-                          <div
-                            className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                            style={{
-                              background: "var(--fc-surface-elevated)",
-                              border: "1px solid var(--fc-surface-card-border)",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                              onClick={() => handleEditSet(forSet[0])}
-                            >
-                              <Pencil className="w-4 h-4" /> Edit
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <InlineRPERow
-                      setLogId={firstId.startsWith("temp-") ? null : firstId}
-                      currentRPE={rpeForSet}
-                      onRPESelect={async (rpe) => {
-                        // Update RPE for the first entry (entryA represents the set)
-                        const updatedEntry: LoggedSet = {
-                          ...entryA!,
-                          rpe,
-                        };
-                        onSetLogUpsert?.(block.block.id, updatedEntry, {
-                          replaceId: entryA!.id,
-                        });
-
-                        // If set is synced, update via API
-                        if (!firstId.startsWith("temp-")) {
-                          try {
-                            const res = await fetch(`/api/sets/${firstId}`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ rpe }),
-                              credentials: "include",
-                            });
-                            if (!res.ok) {
-                              console.error(
-                                "Failed to update RPE:",
-                                await res.text(),
-                              );
-                              const revertedEntry: LoggedSet = {
-                                ...entryA!,
-                                rpe: entryA!.rpe ?? undefined,
-                              };
-                              onSetLogUpsert?.(block.block.id, revertedEntry, {
-                                replaceId: entryA!.id,
-                              });
-                            }
-                          } catch (err) {
-                            console.error("Error updating RPE:", err);
-                            const revertedEntry: LoggedSet = {
-                              ...entryA!,
-                              rpe: entryA!.rpe ?? undefined,
-                            };
-                            onSetLogUpsert?.(block.block.id, revertedEntry, {
-                              replaceId: entryA!.id,
-                            });
-                          }
-                        }
-                      }}
-                      isLatestSet={isLatestSet}
-                    />
-                  </li>
-                );
-              },
-            )}
-          </ul>
-        </div>
-      )}
       {allowSetEditDelete && totalSets > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
@@ -833,7 +683,7 @@ export function SupersetExecutor({
               }}
             />
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
             <div className="space-y-2">
               <LargeInput
                 label="Weight"
@@ -851,8 +701,7 @@ export function SupersetExecutor({
                 unit="kg"
                 showStepper
                 stepAmount={2.5}
-                plateCalculatorEnabled
-              />
+                  />
               {!editDraft && coachSuggestedA != null && coachSuggestedA > 0 && (
                 <ApplySuggestedWeightButton
                   suggestedKg={coachSuggestedA}
@@ -876,7 +725,7 @@ export function SupersetExecutor({
               step="1"
               showStepper
               stepAmount={1}
-            />
+              />
           </div>
         </div>
 
@@ -915,7 +764,7 @@ export function SupersetExecutor({
               }}
             />
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`${logPairStyles.pair} ${logPairStyles.pairGapLg}`}>
             <div className="space-y-2">
               <LargeInput
                 label="Weight"
@@ -933,8 +782,7 @@ export function SupersetExecutor({
                 unit="kg"
                 showStepper
                 stepAmount={2.5}
-                plateCalculatorEnabled
-              />
+                  />
               {!editDraft && coachSuggestedB != null && coachSuggestedB > 0 && (
                 <ApplySuggestedWeightButton
                   suggestedKg={coachSuggestedB}
@@ -958,7 +806,7 @@ export function SupersetExecutor({
               step="1"
               showStepper
               stepAmount={1}
-            />
+              />
           </div>
         </div>
       </div>
@@ -1063,8 +911,7 @@ export function SupersetExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
-        onPlateCalculatorClick,
-        onRestTimerClick,
+              onRestTimerClick,
         onWorkoutBack,
         previousPerformanceMap,
       }}
@@ -1076,10 +923,10 @@ export function SupersetExecutor({
       progressLabel="Set"
       loggingInputs={loggingInputs}
       logButton={logButton}
-      logSectionTitle={`LOG ROUND ${displaySetNumber}`}
       showNavigation={true}
       currentExercise={titleExercise}
       showRestTimer={!!(block.block.rest_seconds || exerciseA?.rest_seconds)}
+      aboveStickyContent={aboveStickyContent}
     />
   );
 }

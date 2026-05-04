@@ -22,6 +22,8 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
   try {
     const { user, supabaseAdmin } = await validateApiAuth(request)
     const { id: assignmentId } = await ctx.params
+    const forcePause =
+      new URL(request.url).searchParams.get('force') === 'true'
     let reason: string | null = null
     try {
       const body = await request.json()
@@ -44,6 +46,29 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
     }
     if (row.pause_status === 'paused') {
       return NextResponse.json({ error: 'Program is already paused' }, { status: 400 })
+    }
+
+    if (!forcePause) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: wipLogs } = await supabaseAdmin
+        .from('workout_logs')
+        .select('id')
+        .eq('program_assignment_id', assignmentId)
+        .is('completed_at', null)
+        .gte('created_at', since)
+        .limit(1)
+      const logId = wipLogs?.[0]?.id as string | undefined
+      if (logId) {
+        return NextResponse.json(
+          {
+            error: 'in_progress_workout',
+            message:
+              'Client has an in-progress workout. Resolve or force-pause.',
+            logId,
+          },
+          { status: 409 },
+        )
+      }
     }
 
     const { error: upErr } = await supabaseAdmin
@@ -72,6 +97,12 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
 }
 
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {
+  // Pause math operates on whole calendar days in the client's timezone.
+  // A pause and resume within the same client-local calendar day adds 0 days
+  // to pause_accumulated_days. This is intentional — the calendar-week unlock
+  // model is day-aligned and sub-day arithmetic would create off-by-one drift
+  // at week boundaries. To represent "skip a day," the coach must pause for
+  // at least 24 hours of wall-clock time spanning a client-local midnight.
   try {
     const { user, supabaseAdmin } = await validateApiAuth(request)
     const { id: assignmentId } = await ctx.params
@@ -118,6 +149,7 @@ export async function DELETE(request: NextRequest, ctx: RouteCtx) {
     return NextResponse.json({
       success: true,
       pause_status: 'active',
+      daysPaused,
       daysAddedToAccumulated: daysPaused,
       pause_accumulated_days: prevAccum + daysPaused,
     })

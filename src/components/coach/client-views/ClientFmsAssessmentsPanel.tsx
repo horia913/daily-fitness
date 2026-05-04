@@ -283,13 +283,13 @@ export function ClientFmsAssessmentsPanel({
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Link
                   href={`/coach/clients/${clientId}`}
-                  className="fc-card-shell inline-flex p-2.5 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)] shrink-0"
+                  className="fc-card-shell inline-flex p-2.5 rounded-xl border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:bg-[color:var(--fc-glass-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)] shrink-0"
                   aria-label="Back to client hub"
                 >
                   <ArrowLeft className="w-5 h-5 shrink-0" aria-hidden />
                 </Link>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
                     <Activity className="w-6 h-6" />
                   </div>
                   <div>

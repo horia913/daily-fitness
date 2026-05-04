@@ -15,6 +15,12 @@ import {
   type ProgramScheduleSlot,
 } from './programStateService'
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar'
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+  weekdayMon0Sun6InTimezone,
+  zonedDayInclusiveUtcBounds,
+} from '@/lib/clientZonedCalendar'
 
 export interface TrainPageRpcScheduleRow {
   id: string
@@ -93,19 +99,76 @@ const emptyState: ProgramWeekState = {
   pauseReason: null,
 }
 
-/**
- * Start of the given program week (Monday 00:00) in local time.
- * assignmentStartDate = program_assignments.created_at (ISO string).
- * weekNumber = 1-based program week.
- */
-function getWeekStartDate(assignmentStartDate: string, weekNumber: number): Date {
-  const start = new Date(assignmentStartDate)
-  const dayOfWeek = start.getDay() // 0 = Sunday, 1 = Monday, ...
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  start.setDate(start.getDate() + mondayOffset)
-  start.setDate(start.getDate() + (weekNumber - 1) * 7)
-  start.setHours(0, 0, 0, 0)
-  return start
+/** Priority: RPC timezone_snapshot → profile timezone → UTC + warn (calendar boundaries). */
+function resolveEffectiveTimezone(
+  data: TrainPageRpcResponse,
+  profileTimezone: string | null | undefined
+): string {
+  const snap = data.timezoneSnapshot?.trim()
+  if (snap) return snap
+  const prof = profileTimezone?.trim()
+  if (prof) return prof
+  console.warn(
+    '[trainPageDataMapper] No timezone_snapshot or profile.timezone; using UTC for calendar boundaries',
+  )
+  return 'UTC'
+}
+
+/** For `get_train_page_data.p_today_weekday` before RPC returns (profile-only). */
+export function computeTrainRpcWeekday(profileTimezone: string | null | undefined): number {
+  const tz = profileTimezone?.trim()
+  if (!tz) {
+    console.warn('[train] No profile.timezone; using device timezone for RPC p_today_weekday')
+    const device = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    return weekdayMon0Sun6InTimezone(new Date(), device)
+  }
+  return weekdayMon0Sun6InTimezone(new Date(), tz)
+}
+
+/** Monday = 0 … Sunday = 6 in client-coalesced timezone (snapshot → profile → browser + warn). */
+export function resolveTrainPageTodayWeekday(
+  data: TrainPageRpcResponse | null,
+  profileTimezone: string | null | undefined
+): number {
+  if (!data?.hasProgram) {
+    return computeTrainRpcWeekday(profileTimezone)
+  }
+  const snap = data.timezoneSnapshot?.trim()
+  const prof = profileTimezone?.trim()
+  const tz = snap || prof || null
+  if (!tz) {
+    console.warn(
+      '[trainPageDataMapper] No timezone for today strip; using device timezone for weekday',
+    )
+    const device = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    return weekdayMon0Sun6InTimezone(new Date(), device)
+  }
+  return weekdayMon0Sun6InTimezone(new Date(), tz)
+}
+
+function computeTodayWeekdayForMapper(
+  data: TrainPageRpcResponse,
+  profileTimezone: string | null | undefined
+): number {
+  return resolveTrainPageTodayWeekday(data, profileTimezone)
+}
+
+/** UTC inclusive bounds for Mon–Sun program week `derivedWeek` in `tz` (matches summary-route style week math). */
+function zonedUtcBoundsForProgramWeek(
+  assignmentStartDate: string,
+  derivedWeek: number,
+  tz: string
+): { startIso: string; endIso: string } {
+  const startYmd = assignmentStartDate.slice(0, 10)
+  const monContaining = mondayYmdOfZonedWeekContaining(
+    new Date(`${startYmd}T12:00:00.000Z`),
+    tz
+  )
+  const weekStartYmd = addCalendarDaysYmd(monContaining, (derivedWeek - 1) * 7)
+  const weekEndYmd = addCalendarDaysYmd(weekStartYmd, 6)
+  const { startIso } = zonedDayInclusiveUtcBounds(weekStartYmd, tz)
+  const { endIso } = zonedDayInclusiveUtcBounds(weekEndYmd, tz)
+  return { startIso, endIso }
 }
 
 /**
@@ -115,7 +178,7 @@ function getWeekStartDate(assignmentStartDate: string, weekNumber: number): Date
 export async function rpcResponseToProgramWeekState(
   supabase: SupabaseClient,
   data: TrainPageRpcResponse,
-  todayWeekday: number
+  profileTimezone?: string | null
 ): Promise<ProgramWeekState> {
   if (!data.hasProgram || !data.assignmentId || !data.programId) {
     return emptyState
@@ -132,6 +195,9 @@ export async function rpcResponseToProgramWeekState(
   if (slots.length === 0) {
     return emptyState
   }
+
+  const tz = resolveEffectiveTimezone(data, profileTimezone ?? null)
+  const todayWeekday = computeTodayWeekdayForMapper(data, profileTimezone ?? null)
 
   const templateIds = [...new Set(slots.map((s) => s.template_id).filter(Boolean))]
   const templateMap = new Map<string, { name: string; estimated_duration: number }>()
@@ -156,13 +222,13 @@ export async function rpcResponseToProgramWeekState(
       data.pauseAccumulatedDays ?? 0,
     pause_status: data.pauseStatus ?? data.pause_status ?? 'active',
     paused_at: data.pausedAt ?? null,
-    timezone_snapshot: data.timezoneSnapshot ?? 'UTC',
+    timezone_snapshot: tz,
     duration_weeks: data.durationWeeks ?? null,
   }
   const unlockedWeekMax =
     (typeof data.currentProgramWeek === 'number' && data.currentProgramWeek >= 1)
       ? data.currentProgramWeek
-      : computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock, assignmentForUnlock.timezone_snapshot)
+      : computeUnlockedWeekMax(slots, completedSlots, assignmentForUnlock, tz)
   const todaySlotRaw = getTodaySlot(slots, unlockedWeekMax, todayWeekday)
   const isRestDay = todaySlotRaw === null
 
@@ -184,23 +250,22 @@ export async function rpcResponseToProgramWeekState(
       pause_accumulated_days: data.pauseAccumulatedDays ?? 0,
       pause_status: data.pauseStatus ?? data.pause_status ?? null,
       paused_at: data.pausedAt ?? null,
-      timezone_snapshot: data.timezoneSnapshot ?? 'UTC',
+      timezone_snapshot: data.timezoneSnapshot ?? null,
       duration_weeks: data.durationWeeks ?? null,
     },
-    data.timezoneSnapshot ?? 'UTC'
+    tz
   ).week
   if (progressionModeRaw === 'coach_managed') {
     completedScheduleIdsCurrentWeek = completedScheduleIdsAllTime
   } else if (data.assignmentStartDate) {
-    const currentWeekStart = getWeekStartDate(data.assignmentStartDate, derivedWeek)
-    const currentWeekEnd = new Date(currentWeekStart)
-    currentWeekEnd.setDate(currentWeekEnd.getDate() + 7)
+    const { startIso, endIso } = zonedUtcBoundsForProgramWeek(
+      data.assignmentStartDate,
+      derivedWeek,
+      tz
+    )
     completedScheduleIdsCurrentWeek = new Set(
       completedSlots
-        .filter((c) => {
-          const completedAt = new Date(c.completed_at)
-          return completedAt >= currentWeekStart && completedAt < currentWeekEnd
-        })
+        .filter((c) => c.completed_at >= startIso && c.completed_at <= endIso)
         .map((c) => c.program_schedule_id)
     )
   } else {
@@ -212,14 +277,14 @@ export async function rpcResponseToProgramWeekState(
   const toDayCard = (slot: ProgramScheduleSlot): ProgramWeekDayCard => {
     const template = templateMap.get(slot.template_id)
     return {
-      scheduleId: slot.id,
+      scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
       dayLabel: `Day ${slot.day_number}`,
       dayOfWeek: slot.day_of_week,
       templateId: slot.template_id,
       workoutName: template?.name ?? 'Workout',
       estimatedDuration: template?.estimated_duration ?? 0,
-      isCompleted: completedScheduleIds.has(slot.id),
+      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
       isOptional: slot.is_optional ?? false,
     }
   }
@@ -238,7 +303,7 @@ export async function rpcResponseToProgramWeekState(
   const overdueSlots: OverdueSlotCard[] = overdueRaw.map((slot) => {
     const template = templateMap.get(slot.template_id)
     return {
-      scheduleId: slot.id,
+      scheduleId: slot.id ?? null,
       dayNumber: slot.day_number,
       dayOfWeek: slot.day_of_week,
       dayLabel: `Day ${slot.day_number}`,
@@ -246,14 +311,15 @@ export async function rpcResponseToProgramWeekState(
       workoutId: slot.template_id,
       workoutName: template?.name ?? 'Workout',
       estimatedDuration: template?.estimated_duration ?? 0,
-      isCompleted: completedScheduleIds.has(slot.id),
+      isCompleted: slot.id != null && completedScheduleIds.has(slot.id),
       isOptional: slot.is_optional ?? false,
     }
   })
 
   const totalSlots = slots.length
   const completedCount = completedSlots.length
-  const nextSlot = slots.find((s) => !completedScheduleIdsAllTime.has(s.id)) ?? null
+  const nextSlot =
+    slots.find((s) => s.id != null && !completedScheduleIdsAllTime.has(s.id)) ?? null
   const isCompleted = nextSlot === null && completedCount > 0
 
   const progressionMode = (data.progressionMode === 'coach_managed' ? 'coach_managed' : 'auto') as 'auto' | 'coach_managed'
@@ -261,7 +327,9 @@ export async function rpcResponseToProgramWeekState(
   // In coach_managed mode, check if all required slots in the current week are done
   const requiredCurrentWeekSlots = currentWeekSlots.filter(s => !s.is_optional)
   const allRequiredCurrentWeekComplete = requiredCurrentWeekSlots.length > 0 &&
-    requiredCurrentWeekSlots.every(s => completedScheduleIdsAllTime.has(s.id))
+    requiredCurrentWeekSlots.every(
+      (s) => s.id != null && completedScheduleIdsAllTime.has(s.id),
+    )
   const isWeekCompleteAwaitingReview =
     progressionMode === 'coach_managed' && allRequiredCurrentWeekComplete && !isCompleted
 

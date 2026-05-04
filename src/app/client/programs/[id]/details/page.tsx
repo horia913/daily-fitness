@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import type { TrainingBlock } from "@/types/trainingBlock";
 import { TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
 import type { WorkoutSetEntry } from "@/types/workoutSetEntries";
+import { fetchApi } from "@/lib/apiClient";
 
 interface Program {
   id: string;
@@ -613,7 +614,7 @@ function ProgramDetailsContent() {
     setScrollNavBlockKey(null);
     (async () => {
       try {
-        const res = await fetch("/api/client/program-week", { credentials: "include" });
+        const res = await fetchApi("/api/client/program-week", { credentials: "include" });
         if (!res.ok) throw new Error("program-week");
         const data = await res.json();
         if (cancelled) return;
@@ -881,7 +882,7 @@ function ProgramDetailsContent() {
                     className={cn(
                       "shrink-0 appearance-none rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wider shadow-none ring-0 outline-none transition-colors",
                       active
-                        ? "border-[color-mix(in_srgb,var(--fc-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent)_10%,transparent)] text-[color:var(--fc-accent)]"
+                        ? "border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)]"
                         : "border-[color:var(--fc-glass-border)] fc-glass-soft fc-text-dim",
                     )}
                   >
@@ -916,7 +917,7 @@ function ProgramDetailsContent() {
                   data-block-nav-key={navKey}
                   className={cn(secIdx === 0 ? "mt-0" : "mt-6", "mb-2 scroll-mt-16")}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/80">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/80">
                     BLOCK {section.displayBlockOrder} · {goalLine}
                   </p>
                   {section.block?.name ? (
@@ -949,7 +950,7 @@ function ProgramDetailsContent() {
                           className="flex w-full items-center justify-between gap-2 text-left"
                           aria-expanded={weekOpen}
                         >
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fc-accent)]/80 mb-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-0">
                             WEEK {weekNumber}
                           </span>
                           <ChevronDown
@@ -1010,7 +1011,7 @@ function ProgramDetailsContent() {
                                     role="button"
                                     tabIndex={0}
                                     aria-expanded={expanded}
-                                    className="flex w-full cursor-pointer items-start gap-4 py-3.5 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent)]/35 focus-visible:ring-offset-0"
+                                    className="flex w-full cursor-pointer items-start gap-4 py-3.5 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--fc-accent-cyan)]/35 focus-visible:ring-offset-0"
                                     onClick={activateDayRow}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" || e.key === " ") {
@@ -1068,7 +1069,7 @@ function ProgramDetailsContent() {
                                             .map((blk, bi) => (
                                               <div key={blk.id} className={cn(bi > 0 && "mt-3")}>
                                                 <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent)]/70">
+                                                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[color:var(--fc-accent-cyan)]/70">
                                                     {blk.set_name?.trim() ||
                                                       `Block ${blk.set_order ?? bi + 1}`}
                                                   </span>

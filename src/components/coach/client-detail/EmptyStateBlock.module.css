@@ -1,0 +1,108 @@
+.wrap {
+  padding: 20px 14px;
+  border-radius: 14px;
+  background: var(--fc-glass-soft);
+  border: 1px dashed var(--fc-glass-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.wrapCompact {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--fc-glass-soft);
+  border: 1px dashed var(--fc-glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.iconBox {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--fc-glass-highlight);
+  color: var(--fc-text-subtle);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--f-headline, var(--font-geist-sans));
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fc-text-primary);
+}
+
+.desc {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--fc-text-subtle);
+  max-width: 240px;
+}
+
+.actions {
+  margin-top: 4px;
+  width: 100%;
+  max-width: 320px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btnPrimary {
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--fc-ink);
+  background: linear-gradient(135deg, var(--fc-accent-lime), var(--fc-accent-lime-2));
+}
+
+.btnOutline {
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid var(--fc-glass-border);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--fc-text-primary);
+}
+
+.wrapCompact .title {
+  font-size: 12.5px;
+  font-family: var(--font-geist-sans, ui-sans-serif);
+  font-weight: 500;
+}
+
+.wrapCompact .desc {
+  max-width: none;
+  font-size: 12px;
+}
+
+.linkCyan {
+  margin-top: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fc-set-type-straight);
+}

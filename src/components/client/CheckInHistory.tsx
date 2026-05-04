@@ -1,14 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ClientGlassCard } from "@/components/client-ui";
+import { ClientGlassCard, SectionHeader } from "@/components/client-ui";
+import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
+import { cn } from "@/lib/utils";
 import {
   DailyWellnessLog,
   MonthlyStats,
   dbToUiScale,
 } from "@/lib/wellnessService";
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 function getSleepQualityLabel(value: number | null | undefined): string {
@@ -83,7 +85,14 @@ export function CheckInHistory({
     const monthLogs = initialLogRange.filter(
       (log) => log.log_date >= startDateStr && log.log_date <= endDateStr
     );
-    setCalendarLogs(new Set(monthLogs.map((log) => log.log_date)));
+    const completeInMonth = monthLogs.filter(
+      (l) =>
+        l.sleep_hours != null &&
+        l.sleep_quality != null &&
+        l.stress_level != null &&
+        l.soreness_level != null
+    );
+    setCalendarLogs(new Set(completeInMonth.map((log) => log.log_date)));
     
     // Filter recent logs (last 7 days)
     const today = now.toISOString().split("T")[0];
@@ -184,20 +193,42 @@ export function CheckInHistory({
       days.push(
         <button
           key={day}
+          type="button"
           onClick={() => !isFuture && handleDateClick(dateStr)}
           disabled={isFuture}
-          className={`
-            aspect-square rounded-lg text-xs font-medium transition-all
-            ${isFuture
-              ? "fc-text-subtle opacity-30 cursor-not-allowed"
+          className={cn(
+            checkinSuiteStyles.fontDisplay,
+            "aspect-square rounded-[9px] flex flex-col items-center justify-center gap-0.5 text-sm font-bold transition-all border",
+          )}
+          style={
+            isFuture
+              ? {
+                  opacity: 0.25,
+                  cursor: "not-allowed",
+                  color: "var(--cs-t4)",
+                  borderColor: "transparent",
+                  background: "transparent",
+                }
               : isLogged
-              ? "bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)] border border-[color:var(--fc-status-success)]/40 hover:bg-[color:var(--fc-status-success)]/30"
-              : "fc-glass-soft border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)]"}
-            ${isToday ? "ring-2 ring-[color:var(--fc-accent-cyan)]" : ""}
-            ${isSelected ? "ring-2 ring-[color:var(--fc-accent-purple)]" : ""}
-          `}
+                ? {
+                    color: "var(--cs-good)",
+                    borderColor: "var(--cs-good-dim)",
+                    background: "var(--cs-good-soft)",
+                  }
+                : {
+                    color: isToday ? "var(--cs-cyan)" : "var(--cs-t4)",
+                    borderColor: isToday ? "var(--cs-cyan)" : "var(--cs-line-2)",
+                    background: "var(--cs-card-2)",
+                    boxShadow: isToday ? "0 0 0 2px var(--cs-cyan-soft), inset 0 0 0 1px var(--cs-cyan-dim)" : undefined,
+                  }
+          }
         >
-          {day}
+          <span>{day}</span>
+          {isLogged && !isFuture ? (
+            <Check className="h-2.5 w-2.5" strokeWidth={3} style={{ color: "var(--cs-good)" }} aria-hidden />
+          ) : (
+            <span className="h-1 w-1 rounded-full opacity-0" aria-hidden />
+          )}
         </button>
       );
     }
@@ -217,82 +248,137 @@ export function CheckInHistory({
   return (
     <div className="space-y-6">
       {/* Streak & Stats Header */}
-      <ClientGlassCard className="p-6">
-        <h2 className="text-xl font-bold fc-text-primary mb-4">History & Stats</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="fc-glass-soft p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
-            <p className="text-xs fc-text-subtle mb-1">Current Streak</p>
-            <p className="text-2xl font-bold fc-text-primary">
-              🔥 {currentStreak} {currentStreak === 1 ? "day" : "days"}
-            </p>
-          </div>
-          <div className="fc-glass-soft p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
-            <p className="text-xs fc-text-subtle mb-1">Personal Best</p>
-            <p className="text-2xl font-bold fc-text-primary">
-              {bestStreak} {bestStreak === 1 ? "day" : "days"}
-            </p>
-          </div>
-          <div className="fc-glass-soft p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
-            <p className="text-xs fc-text-subtle mb-1">This Month</p>
-            <p className="text-2xl font-bold fc-text-primary">
-              {monthlyStats?.loggedDays || 0} / {monthlyStats?.totalDays || 0}
-            </p>
-            <p className="text-xs fc-text-subtle mt-1">
-              ({monthlyStats?.completionRate || 0}%)
-            </p>
+      <div className={checkinSuiteStyles.statsHero}>
+        <div className="relative z-[1]">
+          <p
+            className={cn(checkinSuiteStyles.fontMono, "text-[10px] font-semibold uppercase tracking-[0.16em] mb-2")}
+            style={{ color: "var(--cs-cyan)" }}
+          >
+            History & stats
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div
+              className="flex flex-col gap-1 rounded-[11px] border p-2.5"
+              style={{
+                background: "rgba(0,0,0,0.18)",
+                borderColor: "var(--cs-line-2)",
+              }}
+            >
+              <span className={cn(checkinSuiteStyles.fontMono, "text-[9px] uppercase tracking-[0.1em]")} style={{ color: "var(--cs-t3)" }}>
+                Current streak
+              </span>
+              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold flex flex-wrap items-baseline gap-1")} style={{ color: "var(--cs-warning)" }}>
+                <span aria-hidden>🔥</span>
+                {currentStreak}
+                <span className={cn(checkinSuiteStyles.fontBody, "text-[10px] font-normal")} style={{ color: "var(--cs-t3)" }}>
+                  {currentStreak === 1 ? "day" : "days"}
+                </span>
+              </p>
+            </div>
+            <div
+              className="flex flex-col gap-1 rounded-[11px] border p-2.5"
+              style={{
+                background: "rgba(0,0,0,0.18)",
+                borderColor: "var(--cs-line-2)",
+              }}
+            >
+              <span className={cn(checkinSuiteStyles.fontMono, "text-[9px] uppercase tracking-[0.1em]")} style={{ color: "var(--cs-t3)" }}>
+                Personal best
+              </span>
+              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--cs-lime)" }}>
+                {bestStreak}{" "}
+                <span className={cn(checkinSuiteStyles.fontBody, "text-[10px] font-normal")} style={{ color: "var(--cs-t3)" }}>
+                  {bestStreak === 1 ? "day" : "days"}
+                </span>
+              </p>
+            </div>
+            <div
+              className="flex flex-col gap-1 rounded-[11px] border p-2.5"
+              style={{
+                background: "rgba(0,0,0,0.18)",
+                borderColor: "var(--cs-line-2)",
+              }}
+            >
+              <span className={cn(checkinSuiteStyles.fontMono, "text-[9px] uppercase tracking-[0.1em]")} style={{ color: "var(--cs-t3)" }}>
+                This month
+              </span>
+              <p className={cn(checkinSuiteStyles.fontDisplay, "text-xl font-bold")} style={{ color: "var(--cs-cyan)" }}>
+                {monthlyStats?.loggedDays || 0}
+                <span className={cn(checkinSuiteStyles.fontBody, "text-[13px] font-normal")} style={{ color: "var(--cs-t3)" }}>
+                  {" "}
+                  /{monthlyStats?.totalDays || 0}
+                </span>
+              </p>
+              <p className={cn(checkinSuiteStyles.fontMono, "text-[9.5px] tracking-[0.04em]")} style={{ color: "var(--cs-t3)" }}>
+                {monthlyStats?.completionRate || 0}%
+              </p>
+            </div>
           </div>
         </div>
-      </ClientGlassCard>
+      </div>
 
       {/* Calendar Heat Map */}
-      <ClientGlassCard className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold fc-text-primary">
+      <div className={checkinSuiteStyles.sectionCard}>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h3 className={cn(checkinSuiteStyles.fontHeadline, "text-[15px] font-semibold")} style={{ color: "var(--cs-t1)" }}>
             {new Date(currentYear, currentMonth - 1, 1).toLocaleDateString("en-US", {
               month: "long",
               year: "numeric",
             })}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
+              type="button"
               onClick={() => navigateMonth("prev")}
-              className="fc-glass-soft p-2 rounded-lg border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border transition-colors"
+              style={{ background: "var(--cs-card-2)", borderColor: "var(--cs-line)", color: "var(--cs-t2)" }}
             >
-              <ChevronLeft className="w-4 h-4 fc-text-primary" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
             <button
+              type="button"
               onClick={() => {
                 const now = new Date();
                 setCurrentMonth(now.getMonth() + 1);
                 setCurrentYear(now.getFullYear());
               }}
-              className="fc-glass-soft px-3 py-2 rounded-lg border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors text-xs font-medium fc-text-primary"
+              className={cn(checkinSuiteStyles.fontMono, "px-2.5 py-1 rounded-lg border text-[9.5px] font-semibold uppercase tracking-[0.08em]")}
+              style={{
+                background: "var(--cs-cyan-soft)",
+                borderColor: "var(--cs-cyan-dim)",
+                color: "var(--cs-cyan)",
+              }}
             >
               Today
             </button>
             <button
+              type="button"
               onClick={() => navigateMonth("next")}
               disabled={
                 currentMonth === new Date().getMonth() + 1 &&
                 currentYear === new Date().getFullYear()
               }
-              className="fc-glass-soft p-2 rounded-lg border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ background: "var(--cs-card-2)", borderColor: "var(--cs-line)", color: "var(--cs-t2)" }}
             >
-              <ChevronRight className="w-4 h-4 fc-text-primary" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="mb-4">
-          <div className="grid grid-cols-7 gap-1 mb-2">
+        <div className="mb-1">
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div key={day} className="text-center text-xs font-medium fc-text-subtle py-1">
+              <div
+                key={day}
+                className={cn(checkinSuiteStyles.fontMono, "text-center text-[9px] font-medium uppercase tracking-[0.1em] py-1")}
+                style={{ color: "var(--cs-t3)" }}
+              >
                 {day}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
+          <div className="grid grid-cols-7 gap-[3px]">{renderCalendar()}</div>
         </div>
 
         {/* Selected Date Details */}
@@ -354,12 +440,17 @@ export function CheckInHistory({
             )}
           </div>
         )}
-      </ClientGlassCard>
+      </div>
 
       {/* Recent Entries */}
       {recentLogs.length > 0 && (
         <ClientGlassCard className="p-6">
-          <h3 className="text-lg font-semibold fc-text-primary mb-4">Recent Entries</h3>
+          <SectionHeader
+            title="Recent Entries"
+            titleTone="plain"
+            titleClassName="text-lg font-semibold fc-text-primary"
+            className="!mb-4"
+          />
           <div className="flex flex-col border-y border-[color:var(--fc-glass-border)] -mx-2">
             {recentLogs.map((log) => (
               <div

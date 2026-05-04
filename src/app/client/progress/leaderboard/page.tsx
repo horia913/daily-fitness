@@ -217,7 +217,7 @@ function LeaderboardPageContent() {
 
 export default function LeaderboardPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="client">
       <LeaderboardPageContent />
     </ProtectedRoute>
   );

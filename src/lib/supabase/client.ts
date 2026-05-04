@@ -18,6 +18,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * Middleware refreshes session cookies on navigation for SSR consistency.
  */
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
   global: {
     fetch: getTrackedFetch(),
   },

@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { getTierColor, getTierIcon, type AchievementTier } from '@/lib/achievements'
 import { AchievementService, type AchievementProgress } from '@/lib/achievementService'
+import { formatPersonalRecordCaption } from '@/lib/personalRecordDisplay'
 
 interface WorkoutAnalyticsProps {
   loading?: boolean
@@ -410,19 +411,15 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       const dateStr = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`
       const recordType = (pr as any).record_type as string | undefined
       const recordValue = Number((pr as any).record_value) || 0
-      const recordUnit = (pr as any).record_unit || (recordType === 'weight' ? 'kg' : 'reps')
+      const recordUnit = (pr as any).record_unit as string | null | undefined
       const improvementPercent = (pr as any).improvement_percentage != null ? Number((pr as any).improvement_percentage) : null
-      let displayValue: string
+      const displayValue = formatPersonalRecordCaption(recordType, recordValue, recordUnit ?? null)
       let weight = 0
       let reps = 0
       if (recordType === 'weight') {
         weight = recordValue
-        displayValue = `${recordValue} ${recordUnit}`
       } else if (recordType === 'reps') {
         reps = recordValue
-        displayValue = `${recordValue} reps`
-      } else {
-        displayValue = `${recordValue} ${recordUnit}`
       }
       return {
         exercise: exerciseName,
