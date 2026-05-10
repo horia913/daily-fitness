@@ -146,6 +146,15 @@
   --mastered-soft: rgba(197, 255, 74, 0.16);
   --mastered-dim: rgba(197, 255, 74, 0.35);
   --mastered-glow: rgba(197, 255, 74, 0.32);
+
+  /* Clears floating bottom nav on mobile; tighter on desktop (matches Tailwind lg) */
+  --fc-bottom-safe-area: 8rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --fc-bottom-safe-area: 2rem;
+  }
 }
 
 .dark {

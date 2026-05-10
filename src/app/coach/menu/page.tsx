@@ -103,7 +103,7 @@ export default function CoachMenu() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="px-4 sm:px-6 py-6 pb-32 space-y-8">
+        <CoachPageShell widthVariant="data-7xl" className="px-4 sm:px-6 py-6 pb-[var(--fc-bottom-safe-area)] space-y-8">
           <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">

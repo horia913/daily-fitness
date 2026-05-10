@@ -79,7 +79,7 @@ export default function CreateMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="form-2xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="form-2xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2 mb-4">
             <h1 className="text-lg font-semibold fc-text-primary truncate">
               Create meal plan

@@ -9,6 +9,7 @@ import { getClientCheckInConfig } from "@/lib/checkInConfigService";
 import type { AthleteScore } from "@/types/athleteScore";
 import { ATHLETE_TIERS } from "@/types/athleteScore";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
+import { weekdayMon0Sun6InTimezone } from "@/lib/clientZonedCalendar";
 
 export interface DashboardData {
   avatarUrl: string | null;
@@ -64,6 +65,80 @@ export interface DashboardPageData {
   checkinStreak: number;
   hasScheduledCheckInThisPeriod: boolean;
   scoreError: string | null;
+}
+
+type TrainRpcScheduleRow = {
+  id: string;
+  week_number: number;
+  day_number: number;
+  day_of_week: number;
+  template_id: string | null;
+  template_name?: string | null;
+  estimated_duration?: number | null;
+  exercise_count?: number | null;
+};
+
+type TrainRpcCompletionRow = {
+  program_schedule_id: string;
+};
+
+type TrainRpcDashboardOverlay = {
+  hasProgram?: boolean;
+  currentProgramWeek?: number | null;
+  timezoneSnapshot?: string | null;
+  schedule?: TrainRpcScheduleRow[] | null;
+  completions?: TrainRpcCompletionRow[] | null;
+};
+
+function buildDashboardOverlayFromTrainRpc(
+  rpc: TrainRpcDashboardOverlay | null,
+): Pick<DashboardData, "weeklyProgress" | "todaysWorkout"> | null {
+  if (!rpc?.hasProgram) return null;
+  const schedule = Array.isArray(rpc.schedule) ? rpc.schedule : [];
+  const completions = Array.isArray(rpc.completions) ? rpc.completions : [];
+  const completedIds = new Set(
+    completions
+      .map((c) => c.program_schedule_id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0),
+  );
+  const currentWeek =
+    typeof rpc.currentProgramWeek === "number" && rpc.currentProgramWeek >= 1
+      ? rpc.currentProgramWeek
+      : 1;
+
+  const currentWeekSlots = schedule.filter(
+    (s) => s.week_number === currentWeek && !!s.template_id,
+  );
+  const weeklyGoal = currentWeekSlots.length;
+  const weeklyCurrent = currentWeekSlots.filter((s) => completedIds.has(s.id)).length;
+
+  const tz = rpc.timezoneSnapshot?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const todayWeekday = weekdayMon0Sun6InTimezone(new Date(), tz);
+  const sortedUncompleted = currentWeekSlots
+    .filter((s) => !completedIds.has(s.id))
+    .sort((a, b) => {
+      const byDay = a.day_of_week - b.day_of_week;
+      return byDay !== 0 ? byDay : a.day_number - b.day_number;
+    });
+  const upcomingTodayOrLater = sortedUncompleted.find((s) => s.day_of_week >= todayWeekday);
+  const nextSlot = upcomingTodayOrLater ?? sortedUncompleted[0] ?? null;
+
+  return {
+    weeklyProgress: { current: weeklyCurrent, goal: weeklyGoal },
+    todaysWorkout: nextSlot
+      ? {
+          hasWorkout: true,
+          type: "program",
+          name: nextSlot.template_name ?? "Workout",
+          weekNumber: nextSlot.week_number,
+          dayNumber: nextSlot.day_number,
+          templateId: nextSlot.template_id ?? undefined,
+          scheduleId: nextSlot.id,
+          estimatedDuration: nextSlot.estimated_duration ?? null,
+          totalSets: nextSlot.exercise_count ?? null,
+        }
+      : { hasWorkout: false },
+  };
 }
 
 /** Tier from API when valid; otherwise infer from score so the ring matches ATHLETE_TIERS bands. */
@@ -124,8 +199,15 @@ export function mapDashboardRpcResponse(
 
 /** Single source: one RPC returns everything the dashboard UI needs. */
 export async function fetchDashboardPageData(userId: string): Promise<DashboardPageData> {
-  const [{ data, error }, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
+  const [{ data, error }, trainOverlayRes, latestMeasurement, checkInConfig, activePaRes] = await Promise.all([
     supabase.rpc("get_client_dashboard"),
+    supabase.rpc("get_train_page_data", {
+      p_client_id: userId,
+      p_today_weekday: weekdayMon0Sun6InTimezone(
+        new Date(),
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      ),
+    }),
     getLatestMeasurement(userId),
     getClientCheckInConfig(userId),
     supabase
@@ -158,6 +240,13 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     hasScheduledCheckInThisPeriod,
   );
   if (pageData.dashboard) {
+    const overlay = buildDashboardOverlayFromTrainRpc(
+      (trainOverlayRes.data ?? null) as TrainRpcDashboardOverlay | null,
+    );
+    if (overlay) {
+      pageData.dashboard.weeklyProgress = overlay.weeklyProgress;
+      pageData.dashboard.todaysWorkout = overlay.todaysWorkout;
+    }
     pageData.dashboard.activeProgramPauseStatus = activePaRes.data?.pause_status ?? null;
   }
   return pageData;

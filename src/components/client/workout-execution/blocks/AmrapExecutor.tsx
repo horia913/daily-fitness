@@ -27,6 +27,7 @@ import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 import type {
   PrescriptionItem,
   PrescriptionItemTone,
@@ -57,6 +58,7 @@ export function AmrapExecutor({
   onRestTimerClick,
   onWorkoutBack,
   previousPerformanceMap,
+  progressionSuggestion,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -293,7 +295,7 @@ export function AmrapExecutor({
       });
       return;
     }
-    const weightNum = parseFloat(editDraft.weight);
+    const weightNum = parseWeightKgInput(editDraft.weight);
     const repsNum = parseInt(editDraft.reps, 10);
     if (isNaN(repsNum) || repsNum <= 0) return;
     setIsSavingEdit(true);
@@ -362,7 +364,7 @@ export function AmrapExecutor({
       return;
     }
 
-    const weightNum = parseFloat(weight);
+    const weightNum = parseWeightKgInput(weight);
     const repsNum = parseInt(reps, 10);
 
     if (
@@ -647,7 +649,7 @@ export function AmrapExecutor({
   const repsStr = String(reps || "").trim();
 
   // Parse the values
-  const weightNum = weightStr ? parseFloat(weightStr) : NaN;
+  const weightNum = weightStr ? parseWeightKgInput(weightStr) : NaN;
   const repsNum = repsStr ? parseInt(repsStr, 10) : NaN;
 
   // Both must be valid numbers AND greater than 0
@@ -740,6 +742,7 @@ export function AmrapExecutor({
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}
+      progressionSuggestion={progressionSuggestion}
       aboveStickyContent={aboveStickyContent}
     />
   );

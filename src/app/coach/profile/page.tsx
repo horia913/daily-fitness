@@ -411,7 +411,7 @@ export default function CoachProfilePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="form-2xl" className="px-4 sm:px-6 pt-10 pb-32 flex flex-col gap-8">
+        <CoachPageShell widthVariant="form-2xl" className="px-4 sm:px-6 pt-10 pb-[var(--fc-bottom-safe-area)] flex flex-col gap-8">
           <nav className="flex items-center justify-between">
               <Button
                 variant="ghost"

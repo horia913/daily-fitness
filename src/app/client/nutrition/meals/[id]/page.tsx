@@ -208,7 +208,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <div className="fc-card-shell p-4 text-center text-sm">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
@@ -234,7 +234,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -247,7 +247,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 text-center">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 text-center">
             <div className="fc-card-shell p-4 text-sm">
               <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                 Meal not found
@@ -295,7 +295,7 @@ export default function MealDetailPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto pb-32 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg mx-auto pb-[var(--fc-bottom-safe-area)] overflow-x-hidden">
           <nav className="mb-2">
             <button
               type="button"

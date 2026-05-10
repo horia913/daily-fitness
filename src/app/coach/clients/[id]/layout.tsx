@@ -24,7 +24,7 @@ export default function CoachClientLayout({
       <CoachClientProvider>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="data-7xl" className="px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:px-10">
+          <CoachPageShell widthVariant="data-7xl" className="px-4 pb-[var(--fc-bottom-safe-area)] pt-4 sm:px-6 sm:pt-6 lg:px-10">
             <CoachClientTabBar clientId={clientId} />
             {children}
           </CoachPageShell>

@@ -591,7 +591,8 @@ export async function updateProgressCache(
 /**
  * Get the slot in unlocked week that matches todayWeekday (0=Monday .. 6=Sunday).
  * `todayWeekday` MUST come from the same timezone-aware chain as train/program-week callers
- * (see trainPageDataMapper.resolveTrainPageTodayWeekday and GET /api/client/program-week), not from naive server Date.
+ * (trainPageDataMapper.resolveTrainPageTodayWeekday, GET /api/client/program-week, coach weekly volume via
+ * volumeAnalytics.getWeeklyVolume / clientTimezoneForCharts), not from naive server Date.
  * If multiple slots match (should not happen in well-formed schedule), returns first by day_number order.
  */
 export function getTodaySlot(

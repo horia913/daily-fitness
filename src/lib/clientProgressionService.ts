@@ -5,24 +5,17 @@
  */
 
 import { supabase } from './supabase';
+import { calculateE1RM } from '@/lib/e1rmUtils';
 
 // ============================================================================
 // INTERFACES
 // ============================================================================
 
 export interface ProgressionSuggestion {
-  // Existing fields (unchanged)
   exerciseId: string;
   exerciseName: string;
   message: string;
-  suggestedWeightIncrease?: number;
-  suggestedWeightIncreaseKg?: number;
-  currentWeight?: number;
-  previousReps?: number;
-  targetRepsMin?: number;
-  targetRepsMax?: number;
-  // New fields
-  type?: 'progress' | 'repeat' | 'match' | 'plateau' | 'deload' | 'first_time';
+  type?: 'progress' | 'rpe_correction_up' | 'rpe_correction_down';
   suggestedWeight?: number | null;
   suggestedReps?: number | null;
   confidence?: 'high' | 'medium' | 'low';
@@ -61,31 +54,194 @@ export interface ExercisePreviousPerformance {
   } | null;
 }
 
-interface PreviousWeekData {
+function toDateKey(value: string): string | null {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return null;
+  return new Date(time).toISOString().slice(0, 10);
+}
+
+export interface PreviousWeekData {
   averageReps: number;
   averageWeight: number;
   setsCompleted: number;
   maxReps: number;
   minReps: number;
-  // New fields
   averageRpe: number | null;
   rpeCount: number;
   weeksAtSameWeight: number;
+  /** Per-set rows from the previous calendar week (golden `workout_set_logs`), same window as aggregates. */
+  sets: Array<{
+    weight: number | null;
+    reps: number | null;
+    rpe: number | null;
+  }>;
 }
 
-interface CurrentWeekRules {
-  targetRepsMin: number;
-  targetRepsMax: number;
-  targetSets: number;
-  targetWeight?: number;
+/** Row shape from `client_program_progression_rules` (snake_case from PostgREST). */
+type ProgressionRulesRow = {
+  reps: string | null;
+  sets: number | null;
+  weight_kg: number | string | null;
+  load_percentage: number | string | null;
+  rir: number | null;
+  tempo: string | null;
+  rest_seconds: number | null;
+  notes: string | null;
+  block_type: string | null;
+  reps_per_cluster: number | null;
+  clusters_per_set: number | null;
+  intra_cluster_rest: number | null;
+  drop_set_reps: string | null;
+  weight_reduction_percentage: number | null;
+  rest_pause_duration: number | null;
+  max_rest_pauses: number | null;
+  compound_reps: string | null;
+  isolation_reps: string | null;
+  first_exercise_reps: string | null;
+  second_exercise_reps: string | null;
+  rest_between_pairs: number | null;
+  rounds: number | null;
+  work_seconds: number | null;
+  duration_minutes: number | null;
+  time_cap_minutes: number | null;
+  target_reps: number | null;
+  emom_mode: string | null;
+  exercise_reps: string | null;
+  rest_after_set: number | null;
+  exercise_letter: string | null;
+};
+
+export interface CurrentWeekRules {
+  // Tier 1
+  targetSets: number | null;
+  targetRepsMin: number | null;
+  targetRepsMax: number | null;
+  targetWeightKg: number | null;
+  targetLoadPercentage: number | null;
+  /** DB `reps` varchar when not parsed into min/max (e.g. "max", "AMRAP"). */
+  repsVarchar: string | null;
+
+  // Tier 2
+  targetRir: number | null;
+  tempo: string | null;
+  restSeconds: number | null;
+
+  // Tier 3
+  notes: string | null;
+
+  // Tier 4
+  blockType: string | null;
+  repsPerCluster: number | null;
+  clustersPerSet: number | null;
+  intraClusterRest: number | null;
+  dropSetReps: string | null;
+  weightReductionPercentage: number | null;
+  restPauseDuration: number | null;
+  maxRestPauses: number | null;
+  compoundReps: string | null;
+  isolationReps: string | null;
+  firstExerciseReps: string | null;
+  secondExerciseReps: string | null;
+  restBetweenPairs: number | null;
+  rounds: number | null;
+  workSeconds: number | null;
+  durationMinutes: number | null;
+  timeCapMinutes: number | null;
+  targetReps: number | null;
+  emomMode: string | null;
+  /** Drop-set main reps when not carried in `reps`. */
+  exerciseReps: string | null;
+  /** Tabata / protocol trailing rest after full set. */
+  restAfterSet: number | null;
+  /** Superset / giant station label (reserved for future display). */
+  exerciseLetter: string | null;
 }
 
-// ============================================================================
-// HELPER — round weight to nearest plate increment (2.5 kg)
-// ============================================================================
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
-function roundToPlate(weight: number): number {
-  return Math.round(weight / 2.5) * 2.5;
+function strOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t === "" ? null : t;
+}
+
+function mapProgressionRulesRow(rules: ProgressionRulesRow): CurrentWeekRules {
+  const repsRange = parseRepsRange(rules.reps);
+  const repsTrim = strOrNull(rules.reps);
+  return {
+    targetSets: numOrNull(rules.sets),
+    targetRepsMin: repsRange?.min ?? null,
+    targetRepsMax: repsRange?.max ?? null,
+    targetWeightKg: numOrNull(rules.weight_kg),
+    targetLoadPercentage: numOrNull(rules.load_percentage),
+    repsVarchar: repsTrim,
+    targetRir: numOrNull(rules.rir),
+    tempo: strOrNull(rules.tempo),
+    restSeconds: numOrNull(rules.rest_seconds),
+    notes: strOrNull(rules.notes),
+    blockType: strOrNull(rules.block_type),
+    repsPerCluster: numOrNull(rules.reps_per_cluster),
+    clustersPerSet: numOrNull(rules.clusters_per_set),
+    intraClusterRest: numOrNull(rules.intra_cluster_rest),
+    dropSetReps: strOrNull(rules.drop_set_reps),
+    weightReductionPercentage: numOrNull(rules.weight_reduction_percentage),
+    restPauseDuration: numOrNull(rules.rest_pause_duration),
+    maxRestPauses: numOrNull(rules.max_rest_pauses),
+    compoundReps: strOrNull(rules.compound_reps),
+    isolationReps: strOrNull(rules.isolation_reps),
+    firstExerciseReps: strOrNull(rules.first_exercise_reps),
+    secondExerciseReps: strOrNull(rules.second_exercise_reps),
+    restBetweenPairs: numOrNull(rules.rest_between_pairs),
+    rounds: numOrNull(rules.rounds),
+    workSeconds: numOrNull(rules.work_seconds),
+    durationMinutes: numOrNull(rules.duration_minutes),
+    timeCapMinutes: numOrNull(rules.time_cap_minutes),
+    targetReps: numOrNull(rules.target_reps),
+    emomMode: strOrNull(rules.emom_mode),
+    exerciseReps: strOrNull(rules.exercise_reps),
+    restAfterSet: numOrNull(rules.rest_after_set),
+    exerciseLetter: strOrNull(rules.exercise_letter),
+  };
+}
+
+export function isRuleEffectivelyEmpty(rule: CurrentWeekRules | null): boolean {
+  if (!rule) return true;
+  const nz = (s: string | null) => s != null && s.trim() !== "";
+  const hasAnyValue =
+    rule.targetSets != null ||
+    rule.targetRepsMin != null ||
+    rule.targetRepsMax != null ||
+    rule.targetWeightKg != null ||
+    rule.targetLoadPercentage != null ||
+    nz(rule.repsVarchar) ||
+    nz(rule.exerciseReps) ||
+    rule.targetRir != null ||
+    nz(rule.tempo) ||
+    rule.restSeconds != null ||
+    nz(rule.notes) ||
+    rule.repsPerCluster != null ||
+    rule.clustersPerSet != null ||
+    rule.intraClusterRest != null ||
+    nz(rule.dropSetReps) ||
+    rule.weightReductionPercentage != null ||
+    rule.restPauseDuration != null ||
+    rule.maxRestPauses != null ||
+    nz(rule.compoundReps) ||
+    nz(rule.isolationReps) ||
+    nz(rule.firstExerciseReps) ||
+    nz(rule.secondExerciseReps) ||
+    rule.restBetweenPairs != null ||
+    rule.rounds != null ||
+    rule.workSeconds != null ||
+    rule.durationMinutes != null ||
+    rule.timeCapMinutes != null ||
+    rule.targetReps != null ||
+    nz(rule.emomMode);
+  return !hasAnyValue;
 }
 
 type WorkoutLogRow = {
@@ -437,14 +593,52 @@ export async function getExercisePreviousPerformance(
   }
 }
 
+/**
+ * Canonical last-session PR signal:
+ * checkAndStorePR writes rows to personal_records with achieved_date.
+ * This helper returns achieved_date keys by exercise for weight/reps records.
+ */
+export async function getPrDateKeysByExercise(
+  clientId: string,
+  exerciseIds: string[],
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  const uniqueExerciseIds = [...new Set(exerciseIds.filter(Boolean))];
+  if (uniqueExerciseIds.length === 0) return out;
+
+  const { data, error } = await supabase
+    .from('personal_records')
+    .select('exercise_id, achieved_date, record_type')
+    .eq('client_id', clientId)
+    .in('exercise_id', uniqueExerciseIds)
+    .in('record_type', ['weight', 'reps']);
+
+  if (error || !data) return out;
+
+  for (const row of data as Array<{
+    exercise_id: string | null;
+    achieved_date: string | null;
+  }>) {
+    if (!row.exercise_id || !row.achieved_date) continue;
+    const key = toDateKey(row.achieved_date);
+    if (!key) continue;
+    if (!out.has(row.exercise_id)) out.set(row.exercise_id, new Set<string>());
+    out.get(row.exercise_id)!.add(key);
+  }
+
+  return out;
+}
+
 // ============================================================================
 // MAIN FUNCTIONS
 // ============================================================================
 
 /**
  * Get previous week's workout data for an exercise.
- * Extended to also fetch RPE (via workout_exercise_logs → workout_set_details)
- * and compute weeksAtSameWeight by querying a 4-week lookback window.
+ * Fetches per-set golden `workout_set_logs` (weight, reps, rpe) for the previous
+ * calendar week; RPE average prefers those rows, with legacy
+ * `workout_exercise_logs` → `workout_set_details` only when no golden RPE exists.
+ * Also computes weeksAtSameWeight via a 4-week lookback window.
  */
 export async function getPreviousWeekWorkoutData(
   assignmentId: string,
@@ -511,7 +705,7 @@ export async function getPreviousWeekWorkoutData(
     // All set logs for the lookback window
     const { data: allSetLogs, error: setsError } = await supabase
       .from('workout_set_logs')
-      .select('reps, weight, workout_log_id')
+      .select('reps, weight, rpe, set_number, workout_log_id')
       .in('workout_log_id', allLogIds)
       .eq('exercise_id', exerciseId)
       .eq('client_id', user.id)
@@ -553,6 +747,31 @@ export async function getPreviousWeekWorkoutData(
       (set) => set.reps !== null && set.weight !== null
     );
     if (validSets.length === 0) return null;
+
+    const sortedValidSets = [...validSets].sort((a, b) => {
+      const sa =
+        (a as { set_number?: number | null }).set_number != null
+          ? Number((a as { set_number?: number | null }).set_number)
+          : 0;
+      const sb =
+        (b as { set_number?: number | null }).set_number != null
+          ? Number((b as { set_number?: number | null }).set_number)
+          : 0;
+      return sa - sb;
+    });
+
+    const sets: PreviousWeekData['sets'] = sortedValidSets.map((set) => {
+      const r =
+        (set as { rpe?: number | string | null }).rpe != null &&
+        (set as { rpe?: number | string | null }).rpe !== ''
+          ? Number((set as { rpe?: number | string | null }).rpe)
+          : null;
+      return {
+        weight: set.weight != null ? Number(set.weight) : null,
+        reps: set.reps != null ? Number(set.reps) : null,
+        rpe: r != null && Number.isFinite(r) ? r : null,
+      };
+    });
 
     const totalReps = validSets.reduce(
       (sum, set) => sum + (set.reps as number),
@@ -601,11 +820,18 @@ export async function getPreviousWeekWorkoutData(
       }
     }
 
-    // RPE: query workout_exercise_logs → workout_set_details for previous week
+    const goldenRpeVals = sets
+      .map((s) => s.rpe)
+      .filter((r): r is number => r != null && Number.isFinite(r));
     let averageRpe: number | null = null;
     let rpeCount = 0;
 
-    if (previousWeekLogIds.length > 0) {
+    if (goldenRpeVals.length > 0) {
+      rpeCount = goldenRpeVals.length;
+      averageRpe =
+        goldenRpeVals.reduce((sum, r) => sum + r, 0) / goldenRpeVals.length;
+    } else if (previousWeekLogIds.length > 0) {
+      // Legacy: workout_exercise_logs → workout_set_details (only when no golden RPE)
       const { data: exerciseLogData } = await supabase
         .from('workout_exercise_logs')
         .select('id')
@@ -640,6 +866,7 @@ export async function getPreviousWeekWorkoutData(
       averageRpe,
       rpeCount,
       weeksAtSameWeight,
+      sets,
     };
   } catch (error) {
     console.error('Error fetching previous week data:', error);
@@ -663,25 +890,52 @@ export async function getCurrentWeekProgressionRules(
 
     const { data: rules, error } = await supabase
       .from('client_program_progression_rules')
-      .select('reps, sets, weight_kg')
+      .select(
+        [
+          'reps',
+          'sets',
+          'weight_kg',
+          'load_percentage',
+          'rir',
+          'tempo',
+          'rest_seconds',
+          'notes',
+          'block_type',
+          'reps_per_cluster',
+          'clusters_per_set',
+          'intra_cluster_rest',
+          'drop_set_reps',
+          'weight_reduction_percentage',
+          'rest_pause_duration',
+          'max_rest_pauses',
+          'compound_reps',
+          'isolation_reps',
+          'first_exercise_reps',
+          'second_exercise_reps',
+          'rest_between_pairs',
+          'rounds',
+          'work_seconds',
+          'duration_minutes',
+          'time_cap_minutes',
+          'target_reps',
+          'emom_mode',
+          'exercise_reps',
+          'rest_after_set',
+          'exercise_letter',
+        ].join(', ')
+      )
       .eq('program_assignment_id', assignmentId)
       .eq('week_number', currentWeek)
       .or(
         `exercise_id.eq.${exerciseId},override_exercise_id.eq.${exerciseId}`
       )
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .limit(1)
       .maybeSingle();
 
     if (error || !rules) return null;
 
-    const repsRange = parseRepsRange(rules.reps);
-    if (!repsRange) return null;
-
-    return {
-      targetRepsMin: repsRange.min,
-      targetRepsMax: repsRange.max,
-      targetSets: rules.sets || 0,
-      targetWeight: rules.weight_kg || undefined,
-    };
+    return mapProgressionRulesRow(rules as unknown as ProgressionRulesRow);
   } catch (error) {
     console.error('Error fetching current week rules:', error);
     return null;
@@ -718,158 +972,189 @@ export function parseRepsRange(repsString: string | null | undefined): {
   return null;
 }
 
+/** Rows index 0 = 1 rep … 9 = 10 reps. Columns RPE 6 … 10. */
+const RPE_PERCENT_1RM_GRID: readonly (readonly number[])[] = [
+  [0.78, 0.86, 0.92, 0.96, 1.0],
+  [0.76, 0.84, 0.9, 0.94, 0.96],
+  [0.74, 0.81, 0.87, 0.91, 0.93],
+  [0.72, 0.79, 0.84, 0.88, 0.9],
+  [0.69, 0.76, 0.81, 0.86, 0.87],
+  [0.67, 0.73, 0.79, 0.83, 0.85],
+  [0.65, 0.71, 0.76, 0.81, 0.83],
+  [0.62, 0.69, 0.74, 0.78, 0.81],
+  [0.6, 0.67, 0.71, 0.76, 0.79],
+  [0.58, 0.65, 0.69, 0.73, 0.77],
+] as const;
+
+function percentAtIntegerRpe(repIndex0: number, integerRpe: number): number {
+  const row = RPE_PERCENT_1RM_GRID[repIndex0];
+  const col = Math.min(4, Math.max(0, integerRpe - 6));
+  return row[col]!;
+}
+
 /**
- * Calculate progression suggestion using a priority-based decision tree.
- * Compares previous week's performance to current week targets.
- * Now synchronous — no external guideline lookup needed.
+ * RPE-to-%1RM at rep count. RPE clamped [6,10]; reps rounded; reps > 10 uses
+ * row 10 then −0.015 per extra rep. Non-integer RPE interpolates between columns.
+ */
+function rpeToPercent(rpe: number, reps: number): number {
+  const rpeClamped = Math.min(10, Math.max(6, rpe));
+  let repN = Math.round(reps);
+  let extraReps = 0;
+  if (repN > 10) {
+    extraReps = repN - 10;
+    repN = 10;
+  }
+  if (repN < 1) repN = 1;
+  const rowIdx = repN - 1;
+
+  const rLow = Math.floor(rpeClamped);
+  const rHigh = Math.ceil(rpeClamped);
+  const rLo = Math.min(10, Math.max(6, rLow));
+  const rHi = Math.min(10, Math.max(6, rHigh));
+  const baseLow = percentAtIntegerRpe(rowIdx, rLo);
+  let base: number;
+  if (rLow === rHigh) {
+    base = baseLow;
+  } else {
+    const baseHigh = percentAtIntegerRpe(rowIdx, rHi);
+    base = baseLow + (baseHigh - baseLow) * (rpeClamped - rLow);
+  }
+  return Math.max(0.01, base - 0.015 * extraReps);
+}
+
+/** %1RM at RPE 8 for the given rep count (Case B overload path). */
+function repsToPercent(reps: number): number {
+  return rpeToPercent(8, reps);
+}
+
+function roundToNearest(value: number, increment: number): number {
+  return Math.round(value / increment) * increment;
+}
+
+/**
+ * Compares previous week's logged sets to current week progression rules.
+ * Returns `null` when there is no actionable suggestion.
  */
 export function calculateProgressionSuggestion(
   previousData: PreviousWeekData | null,
   currentRules: CurrentWeekRules | null,
-  previousWeekRules: CurrentWeekRules | null,
+  _previousWeekRules: CurrentWeekRules | null,
   exerciseId: string,
   exerciseName: string
-): ProgressionSuggestion {
-  // 1. First-time exercise (no previous data)
-  if (!previousData) {
-    return {
-      exerciseId,
-      exerciseName,
-      message: 'First time — start with the prescribed weight',
-      type: 'first_time',
-      suggestedWeight: currentRules?.targetWeight ?? null,
-      suggestedReps: currentRules?.targetRepsMin ?? null,
-      confidence: 'medium',
-    };
+): ProgressionSuggestion | null {
+  if (!previousData?.sets?.length) {
+    return null;
+  }
+  if (!currentRules) {
+    return null;
   }
 
-  const { averageWeight, averageReps, averageRpe, weeksAtSameWeight, minReps } =
-    previousData;
-
-  // allTargetsMet: true if the worst set still met the previous week's minimum target reps
-  const allTargetsMet =
-    previousWeekRules !== null
-      ? minReps >= previousWeekRules.targetRepsMin
+  const rpedSets = previousData.sets.filter(
+    (s) => s.rpe != null && Number.isFinite(Number(s.rpe))
+  );
+  const avgLoggedRpe =
+    rpedSets.length > 0
+      ? rpedSets.reduce((sum, s) => sum + Number(s.rpe), 0) / rpedSets.length
       : null;
 
-  // 2. Deload week: current prescribed weight < 70% of previous week's average
+  const e1RMs = previousData.sets
+    .filter(
+      (s) =>
+        s.weight != null &&
+        s.reps != null &&
+        s.weight > 0 &&
+        s.reps > 0 &&
+        Number.isFinite(s.weight) &&
+        Number.isFinite(s.reps)
+    )
+    .map((s) => calculateE1RM(s.weight!, s.reps!));
+  if (e1RMs.length === 0) return null;
+  const e1RM = Math.max(...e1RMs);
+
+  const loggedWeights = previousData.sets
+    .map((s) => s.weight)
+    .filter((w): w is number => w != null && Number.isFinite(w) && w > 0);
+  if (loggedWeights.length === 0) return null;
+  const maxLoggedWeight = Math.max(...loggedWeights);
+
+  let completion = false;
   if (
-    currentRules?.targetWeight !== undefined &&
-    currentRules.targetWeight < averageWeight * 0.7
+    currentRules.targetSets != null &&
+    currentRules.targetRepsMin != null &&
+    currentRules.targetWeightKg != null
   ) {
-    return {
-      exerciseId,
-      exerciseName,
-      message: 'Recovery week — lighter today',
-      type: 'deload',
-      suggestedWeight: currentRules.targetWeight,
-      suggestedReps: currentRules.targetRepsMin,
-      confidence: 'high',
-    };
+    const enoughSets = previousData.sets.length >= currentRules.targetSets;
+    const tw = currentRules.targetWeightKg;
+    const tr = currentRules.targetRepsMin;
+    const everySetMet = previousData.sets.every(
+      (s) =>
+        s.reps != null &&
+        s.weight != null &&
+        s.reps >= tr &&
+        s.weight >= tw
+    );
+    completion = enoughSets && everySetMet;
   }
 
-  // 3. Plateau: same weight for ≥ 2 consecutive weeks AND all targets were met
-  if (weeksAtSameWeight >= 2 && allTargetsMet === true) {
-    const plateauSuggestedWeight =
-      averageWeight > 0
-        ? roundToPlate(averageWeight * 1.025)
-        : null;
-    return {
-      exerciseId,
-      exerciseName,
-      message: `Same weight for ${weeksAtSameWeight} week${weeksAtSameWeight > 1 ? 's' : ''} — try ${plateauSuggestedWeight !== null ? `${plateauSuggestedWeight}kg` : 'adding a rep'}`,
-      type: 'plateau',
-      suggestedWeight: plateauSuggestedWeight,
-      suggestedReps: Math.round(averageReps),
-      confidence: 'medium',
-      currentWeight: averageWeight,
-      previousReps: Math.round(averageReps),
-    };
+  const prescribedRpe = currentRules.targetRir;
+  const targetReps = currentRules.targetRepsMin ?? 8;
+
+  let suggestedWeight: number | null = null;
+  let type: ProgressionSuggestion['type'];
+  let message = '';
+
+  if (prescribedRpe != null && avgLoggedRpe != null) {
+    const gap = avgLoggedRpe - prescribedRpe;
+    if (gap >= 2) {
+      const pct = rpeToPercent(prescribedRpe, targetReps);
+      suggestedWeight = e1RM * pct;
+      type = 'rpe_correction_down';
+      message = 'You logged harder than prescribed — try a lighter weight';
+    } else if (gap <= -2) {
+      const pct = rpeToPercent(prescribedRpe, targetReps);
+      suggestedWeight = e1RM * pct;
+      type = 'rpe_correction_up';
+      message = 'You logged easier than prescribed — try a heavier weight';
+    } else {
+      return null;
+    }
+  } else {
+    if (!completion) return null;
+    const pct = repsToPercent(targetReps);
+    suggestedWeight = e1RM * pct;
+    type = 'progress';
+    message = 'You hit every set — ready for a small bump';
   }
 
-  // 4. All targets met + RPE ≤ 8 → ready to progress
-  if (allTargetsMet === true && averageRpe !== null && averageRpe <= 8) {
-    const w = currentRules?.targetWeight ?? null;
-    const r = currentRules?.targetRepsMin ?? Math.round(averageReps);
-    return {
-      exerciseId,
-      exerciseName,
-      message: `Strong last week — ready for ${w !== null ? `${w}kg × ` : ''}${r} reps`,
-      type: 'progress',
-      suggestedWeight: w,
-      suggestedReps: r,
-      confidence: 'high',
-      currentWeight: averageWeight,
-      previousReps: Math.round(averageReps),
-      targetRepsMin: currentRules?.targetRepsMin,
-      targetRepsMax: currentRules?.targetRepsMax,
-    };
-  }
+  if (suggestedWeight == null || !Number.isFinite(suggestedWeight)) return null;
+  const rounded = roundToNearest(suggestedWeight, 2.5);
+  if (rounded === maxLoggedWeight) return null;
 
-  // 5. All targets met + RPE 9-10 → repeat same weight
-  if (allTargetsMet === true && averageRpe !== null && averageRpe >= 9) {
-    return {
-      exerciseId,
-      exerciseName,
-      message: 'Hit your targets but it was tough — same weight, focus on form',
-      type: 'repeat',
-      suggestedWeight: averageWeight > 0 ? averageWeight : null,
-      suggestedReps:
-        previousWeekRules?.targetRepsMin ?? Math.round(averageReps),
-      confidence: 'medium',
-      currentWeight: averageWeight,
-      previousReps: Math.round(averageReps),
-    };
-  }
-
-  // 6. Targets not met (missed reps on any set)
-  if (allTargetsMet === false) {
-    return {
-      exerciseId,
-      exerciseName,
-      message: "Didn't hit all reps last week — try same weight again",
-      type: 'match',
-      suggestedWeight: averageWeight > 0 ? averageWeight : null,
-      suggestedReps:
-        previousWeekRules?.targetRepsMin ?? Math.round(averageReps),
-      confidence: 'medium',
-      currentWeight: averageWeight,
-      previousReps: Math.round(averageReps),
-      targetRepsMin: previousWeekRules?.targetRepsMin,
-      targetRepsMax: previousWeekRules?.targetRepsMax,
-    };
-  }
-
-  // 7. Fallback: RPE not logged or no program context
-  const fallbackWeight = currentRules?.targetWeight ?? (averageWeight > 0 ? averageWeight : null);
-  const fallbackReps = currentRules?.targetRepsMin ?? Math.round(averageReps);
   return {
     exerciseId,
     exerciseName,
-    message: `Last time: ${averageWeight > 0 ? `${averageWeight.toFixed(1)}kg × ` : ''}${Math.round(averageReps)} reps`,
-    type: 'progress',
-    suggestedWeight: fallbackWeight,
-    suggestedReps: fallbackReps,
-    confidence: 'low',
-    currentWeight: averageWeight,
-    previousReps: Math.round(averageReps),
-    targetRepsMin: currentRules?.targetRepsMin,
-    targetRepsMax: currentRules?.targetRepsMax,
+    message,
+    suggestedWeight: rounded,
+    suggestedReps: currentRules.targetRepsMin ?? null,
+    type,
+    confidence: 'medium',
   };
 }
 
 /**
  * Get progression suggestions for all exercises in a workout.
  * This is the main function called from the workout executor.
- * Always populates the map — including first-time exercises (type: 'first_time').
+ *
+ * The returned Map only contains entries for exercises that produced a
+ * suggestion. Exercises with no previous performance data (first-time) are
+ * intentionally absent — consumers must look up via `.get()` and handle
+ * `undefined` gracefully (no nudge is rendered for missing entries).
  */
 export async function getProgressionSuggestionsForWorkout(
   assignmentId: string,
   currentWeek: number,
   exerciseIds: string[],
-  exerciseNames: Map<string, string>,
-  category?: string,
-  difficulty?: string
+  exerciseNames: Map<string, string>
 ): Promise<Map<string, ProgressionSuggestion>> {
   const suggestions = new Map<string, ProgressionSuggestion>();
 
@@ -890,21 +1175,11 @@ export async function getProgressionSuggestionsForWorkout(
       exerciseId
     );
 
-    // Fetch previous week targets (needed for allTargetsMet check)
-    const previousWeekRules =
-      currentWeek > 1
-        ? await getCurrentWeekProgressionRules(
-            assignmentId,
-            currentWeek - 1,
-            exerciseId
-          )
-        : null;
-
-    // calculateProgressionSuggestion is now synchronous
+    // calculateProgressionSuggestion may return null (no actionable nudge).
     const suggestion = calculateProgressionSuggestion(
       previousData,
       currentRules,
-      previousWeekRules,
+      null,
       exerciseId,
       exerciseName
     );
@@ -915,7 +1190,7 @@ export async function getProgressionSuggestionsForWorkout(
   const results = await Promise.all(promises);
 
   results.forEach((result) => {
-    if (result) {
+    if (result && result.suggestion) {
       suggestions.set(result.exerciseId, result.suggestion);
     }
   });

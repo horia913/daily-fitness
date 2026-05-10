@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -18,27 +19,41 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   User,
-  Calendar,
-  Edit,
-  Save,
-  Camera,
   Lock,
   LogOut,
   CheckCircle,
-  ChevronRight,
   CreditCard,
-  Award,
+  Dumbbell,
+  Star,
+  Heart,
   Target,
+  Shield,
+  Trophy,
+  Crosshair,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
 import { ClientPageShell } from '@/components/client-ui'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
-import { LogSetButton } from '@/components/client/workout-execution/ui/LogSetButton'
 import { cn } from '@/lib/utils'
+import styles from '@/components/client-profile/clientProfileV1.module.css'
+import {
+  ProfileHero,
+  ProfileSection,
+  SectionHead,
+  ProfileField,
+  FieldGroup2,
+  ProfileTextInput,
+  ProfileTextarea,
+  ProfileSelect,
+  UnitInput,
+  InfoCallout,
+  ProfileHubRow,
+  AccountRow,
+  StickySaveBar,
+} from '@/components/client-profile'
 
 const FITNESS_LEVELS = ['beginner', 'intermediate', 'advanced'] as const
 type FitnessLevel = (typeof FITNESS_LEVELS)[number]
@@ -47,6 +62,34 @@ const SEX_OPTIONS: { value: string; label: string }[] = [
   { value: 'M', label: 'Male' },
   { value: 'F', label: 'Female' },
 ]
+
+const PROFILE_FIELD_LABELS: Record<keyof ProfileForm, string> = {
+  first_name: 'First name',
+  last_name: 'Last name',
+  phone: 'Phone',
+  sex: 'Sex',
+  height_cm: 'Height',
+  date_of_birth: 'Date of birth',
+  fitness_level: 'Fitness level',
+  bio: 'Bio',
+  medical_conditions: 'Medical conditions',
+  injuries: 'Injuries',
+  bodyweight: 'Bodyweight',
+}
+
+function dirtyKeys(form: ProfileForm, snap: ProfileForm): (keyof ProfileForm)[] {
+  return (Object.keys(form) as (keyof ProfileForm)[]).filter((k) => form[k] !== snap[k])
+}
+
+function dirtySummaryLine(keys: (keyof ProfileForm)[]): string {
+  if (keys.length === 0) return ''
+  const names = keys.map((k) => PROFILE_FIELD_LABELS[k])
+  const shown = names.slice(0, 3)
+  const rest = names.length - 3
+  let s = shown.join(' · ')
+  if (rest > 0) s += ` + ${rest} more`
+  return s
+}
 
 function normalizeFitnessLevelFromDb(raw: string): string {
   const v = raw.trim().toLowerCase()
@@ -178,6 +221,7 @@ export default function ClientProfilePage() {
   const [formData, setFormData] = useState<ProfileForm>(emptyForm())
   /** Last saved baseline; dirty when formData differs (client-only; viewAs ignores). */
   const [savedSnapshot, setSavedSnapshot] = useState<ProfileForm>(emptyForm())
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ProfileForm, string>>>({})
 
   const [subscriptionLine, setSubscriptionLine] = useState<string | null>(null)
 
@@ -210,6 +254,7 @@ export default function ClientProfilePage() {
         const next = profileRowToForm(row)
         setFormData(next)
         setSavedSnapshot(next)
+        setFieldErrors({})
       }
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -308,6 +353,24 @@ export default function ClientProfilePage() {
     [canEdit, formData, savedSnapshot]
   )
 
+  const dirtyKeyList = useMemo(
+    () => (canEdit ? dirtyKeys(formData, savedSnapshot) : []),
+    [canEdit, formData, savedSnapshot]
+  )
+
+  const dirtySummary = useMemo(() => dirtySummaryLine(dirtyKeyList), [dirtyKeyList])
+
+  const patchForm = useCallback((patch: Partial<ProfileForm>) => {
+    setFormData((p) => ({ ...p, ...patch }))
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      for (const k of Object.keys(patch) as (keyof ProfileForm)[]) {
+        delete next[k]
+      }
+      return next
+    })
+  }, [])
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !user?.id) return
@@ -385,6 +448,19 @@ export default function ClientProfilePage() {
   const handleSave = async () => {
     if (!effectiveUserId || !canEdit) return
 
+    const nextErrors: Partial<Record<keyof ProfileForm, string>> = {}
+    if (!formData.first_name.trim()) {
+      nextErrors.first_name = 'First name is required'
+    }
+    if (!formData.last_name.trim()) {
+      nextErrors.last_name = 'Last name is required'
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      return
+    }
+    setFieldErrors({})
+
     const fl = formData.fitness_level.trim()
     if (fl && !FITNESS_LEVELS.includes(fl as FitnessLevel)) {
       addToast({
@@ -445,6 +521,17 @@ export default function ClientProfilePage() {
     }
   }
 
+  const handleDiscard = () => {
+    if (!canEdit) return
+    const keys = dirtyKeys(formData, savedSnapshot)
+    if (keys.length >= 3) {
+      const ok = window.confirm(`Discard changes to ${keys.length} fields?`)
+      if (!ok) return
+    }
+    setFormData(savedSnapshot)
+    setFieldErrors({})
+  }
+
   const handleSignOut = async () => {
     try {
       await signOut()
@@ -502,7 +589,7 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 flex items-center justify-center min-h-[50vh]">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 flex items-center justify-center min-h-[50vh]">
             <div className="p-4 max-w-md w-full text-center space-y-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
               <p className="text-sm fc-text-dim">{loadError}</p>
               <Button
@@ -526,7 +613,7 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="form" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -538,12 +625,10 @@ export default function ClientProfilePage() {
   const createdAt = profile?.created_at
   const memberSince =
     typeof createdAt === 'string'
-      ? new Date(createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      ? new Date(createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
       : null
 
-  const inputClass = 'h-11 rounded-lg fc-input'
-  const labelClass = 'text-xs uppercase tracking-wider fc-text-dim mb-1 block'
-  const sectionTitleClass = 'text-sm uppercase tracking-wider text-[color:var(--fc-accent-cyan)]/80 mb-2'
+  const fieldDirty = (k: keyof ProfileForm) => formData[k] !== savedSnapshot[k]
 
   return (
     <ProtectedRoute requiredRole="client">
@@ -552,315 +637,278 @@ export default function ClientProfilePage() {
         <ClientPageShell
           className={cn(
             'max-w-lg mx-auto px-4 pt-6 overflow-x-hidden',
-            isDirty && canEdit ? 'pb-48' : 'pb-32'
+            canEdit
+              ? 'pb-[calc(var(--fc-bottom-safe-area)+3rem)]'
+              : 'pb-[var(--fc-bottom-safe-area)]',
           )}
         >
-          {/* 1. Header */}
-          <header className="flex items-start gap-3 mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <div className="relative shrink-0">
-              <div className="w-16 h-16 rounded-full border border-[color:var(--fc-glass-border)] overflow-hidden bg-[color:var(--fc-glass-highlight)]">
-                {avatarUrl ? (
-                  <img
-                    key={`${avatarUrl}-${avatarUrlKey}`}
-                    src={`${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${avatarUrlKey || 0}`}
-                    alt=""
-                    className="w-full h-full object-cover"
+          <div className={styles.root}>
+            <div className={styles.sectionStack}>
+              <ProfileHero
+                avatarUrl={avatarUrl}
+                avatarUrlKey={avatarUrlKey}
+                firstName={formData.first_name}
+                lastName={formData.last_name}
+                displayEmail={displayEmail}
+                memberSinceLabel={memberSince}
+                coachingState={null}
+                canEdit={canEdit}
+                uploadingImage={uploadingImage}
+                onPhotoChange={handleImageUpload}
+              />
+
+              {subscriptionLine && (
+                <div className={styles.subscriptionNote}>
+                  <CreditCard className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-80" aria-hidden />
+                  <span>{subscriptionLine}</span>
+                </div>
+              )}
+
+              <ProfileSection>
+                <SectionHead
+                  tone="cyan"
+                  title="Personal info"
+                  description="Identity and contact details"
+                  icon={<User size={14} strokeWidth={2} aria-hidden />}
+                />
+                <FieldGroup2>
+                  <ProfileField label="First name" required error={fieldErrors.first_name}>
+                    <ProfileTextInput
+                      value={formData.first_name}
+                      onChange={(v) => patchForm({ first_name: v })}
+                      disabled={!canEdit}
+                      dirty={fieldDirty('first_name')}
+                      error={fieldErrors.first_name}
+                    />
+                  </ProfileField>
+                  <ProfileField label="Last name" required error={fieldErrors.last_name}>
+                    <ProfileTextInput
+                      value={formData.last_name}
+                      onChange={(v) => patchForm({ last_name: v })}
+                      disabled={!canEdit}
+                      dirty={fieldDirty('last_name')}
+                      error={fieldErrors.last_name}
+                    />
+                  </ProfileField>
+                </FieldGroup2>
+                <ProfileField label="Phone" optional>
+                  <ProfileTextInput
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(v) => patchForm({ phone: v })}
+                    disabled={!canEdit}
+                    dirty={fieldDirty('phone')}
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <User className="w-8 h-8 fc-text-dim" />
-                  </div>
-                )}
-              </div>
+                </ProfileField>
+                <FieldGroup2>
+                  <ProfileField label="Date of birth">
+                    <ProfileTextInput
+                      type="date"
+                      value={formData.date_of_birth}
+                      onChange={(v) => patchForm({ date_of_birth: v })}
+                      disabled={!canEdit}
+                      dirty={fieldDirty('date_of_birth')}
+                    />
+                  </ProfileField>
+                  <ProfileField label="Sex">
+                    <ProfileSelect
+                      value={formData.sex}
+                      onChange={(v) => patchForm({ sex: v })}
+                      disabled={!canEdit}
+                      ariaLabel="Sex"
+                      dirty={fieldDirty('sex')}
+                    >
+                      <option value="">Select</option>
+                      {SEX_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </ProfileSelect>
+                  </ProfileField>
+                </FieldGroup2>
+              </ProfileSection>
+
+              <ProfileSection>
+                <SectionHead
+                  tone="purple"
+                  title="Body stats"
+                  description={
+                    <>
+                      Profile baseline · history under{' '}
+                      <Link href="/client/progress" className={styles.cyanLink}>
+                        Progress
+                      </Link>
+                    </>
+                  }
+                  icon={<Dumbbell size={14} strokeWidth={2} aria-hidden />}
+                />
+                <InfoCallout>
+                  <>
+                    Updates your profile weight for your coach. Body metrics history lives under{' '}
+                    <Link href="/client/progress" className={styles.cyanLink}>
+                      Progress
+                    </Link>
+                    .
+                  </>
+                </InfoCallout>
+                <FieldGroup2>
+                  <ProfileField label="Height">
+                    <UnitInput
+                      value={formData.height_cm}
+                      onChange={(v) => patchForm({ height_cm: v })}
+                      disabled={!canEdit}
+                      unit="cm"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.1"
+                      dirty={fieldDirty('height_cm')}
+                    />
+                  </ProfileField>
+                  <ProfileField label="Bodyweight">
+                    <UnitInput
+                      value={formData.bodyweight}
+                      onChange={(v) => patchForm({ bodyweight: v })}
+                      disabled={!canEdit}
+                      unit="kg"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.1"
+                      dirty={fieldDirty('bodyweight')}
+                    />
+                  </ProfileField>
+                </FieldGroup2>
+              </ProfileSection>
+
+              <ProfileSection>
+                <SectionHead
+                  tone="warn"
+                  title="Training"
+                  description="How you train and what your coach should know"
+                  icon={<Star size={14} strokeWidth={2} aria-hidden />}
+                />
+                <ProfileField label="Fitness level">
+                  <ProfileSelect
+                    value={formData.fitness_level}
+                    onChange={(v) => patchForm({ fitness_level: v })}
+                    disabled={!canEdit}
+                    ariaLabel="Fitness level"
+                    dirty={fieldDirty('fitness_level')}
+                  >
+                    <option value="">Select</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </ProfileSelect>
+                </ProfileField>
+                <ProfileField label="Bio" optional>
+                  <ProfileTextarea
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Tell your coach a bit about yourself (optional)"
+                    value={formData.bio}
+                    onChange={(v) => patchForm({ bio: v })}
+                    disabled={!canEdit}
+                    dirty={fieldDirty('bio')}
+                  />
+                </ProfileField>
+              </ProfileSection>
+
+              <ProfileSection>
+                <SectionHead
+                  tone="rose"
+                  title="Health"
+                  description="Safety context for programming and check-ins"
+                  icon={<Heart size={14} strokeWidth={2} aria-hidden />}
+                />
+                <ProfileField label="Medical conditions" optional>
+                  <ProfileTextarea
+                    rows={3}
+                    placeholder="Anything your coach should know about your health"
+                    value={formData.medical_conditions}
+                    onChange={(v) => patchForm({ medical_conditions: v })}
+                    disabled={!canEdit}
+                    dirty={fieldDirty('medical_conditions')}
+                  />
+                </ProfileField>
+                <ProfileField label="Injuries" optional>
+                  <ProfileTextarea
+                    rows={3}
+                    placeholder="Past or current injuries"
+                    value={formData.injuries}
+                    onChange={(v) => patchForm({ injuries: v })}
+                    disabled={!canEdit}
+                    dirty={fieldDirty('injuries')}
+                  />
+                </ProfileField>
+              </ProfileSection>
+
+              <ProfileSection>
+                <SectionHead
+                  tone="lime"
+                  title="Profile hub"
+                  description="Achievements and goals live on their own screens"
+                  icon={<Target size={14} strokeWidth={2} aria-hidden />}
+                />
+                <div className={styles.hubStack}>
+                  <ProfileHubRow
+                    icon={<Trophy size={15} strokeWidth={2} aria-hidden />}
+                    iconClassName={styles.hubIconWarn}
+                    title="Achievements"
+                    subtitle="Milestones and badges earned"
+                    onClick={() => router.push('/client/progress/achievements')}
+                  />
+                  <ProfileHubRow
+                    icon={<Crosshair size={15} strokeWidth={2} aria-hidden />}
+                    iconClassName={styles.hubIconGood}
+                    title="Goal history"
+                    subtitle="Active targets and completed goals"
+                    onClick={() => router.push('/client/goals/history')}
+                  />
+                </div>
+              </ProfileSection>
+
               {canEdit && (
-                <label className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-[color:var(--fc-domain-workouts)] flex items-center justify-center border-2 border-[color:var(--fc-bg-deep)] shadow cursor-pointer">
-                  <Camera className="w-3.5 h-3.5 text-[color:var(--fc-bg-base)]" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={uploadingImage}
+                <ProfileSection>
+                  <SectionHead
+                    tone="cyan"
+                    title="Account"
+                    description="Security and session"
+                    icon={<Shield size={14} strokeWidth={2} aria-hidden />}
                   />
-                </label>
+                  <div className={styles.accountStack}>
+                    <AccountRow
+                      variant="neutral"
+                      icon={<Lock size={14} strokeWidth={2} aria-hidden />}
+                      label="Change password"
+                      onClick={() => setShowPasswordModal(true)}
+                    />
+                    <AccountRow
+                      variant="danger"
+                      icon={<LogOut size={14} strokeWidth={2} aria-hidden />}
+                      label="Sign out"
+                      onClick={() => void handleSignOut()}
+                    />
+                  </div>
+                </ProfileSection>
               )}
             </div>
-            <div className="flex-1 min-w-0 pt-0.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h1 className="text-lg font-semibold fc-text-primary truncate">
-                    {[formData.first_name, formData.last_name].filter(Boolean).join(' ') ||
-                      displayEmail.split('@')[0] ||
-                      'Profile'}
-                  </h1>
-                  <p className="text-xs fc-text-dim mt-0.5 truncate">{displayEmail}</p>
-                  {memberSince && (
-                    <p className="text-xs fc-text-dim mt-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 shrink-0" />
-                      Member since {memberSince}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </header>
 
-          {/* 2. Subscription */}
-          {subscriptionLine && (
-            <div className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)] flex items-center gap-2 text-xs fc-text-dim">
-              <CreditCard className="w-3.5 h-3.5 shrink-0 fc-text-dim" />
-              <span className="leading-snug">{subscriptionLine}</span>
-            </div>
-          )}
-
-          {/* 3. Personal Info */}
-          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <h2 className={sectionTitleClass}>Personal Info</h2>
-            <div className="space-y-3">
-              <div>
-                <Label className={labelClass}>First name</Label>
-                <Input
-                  className={inputClass}
-                  value={formData.first_name}
-                  onChange={(e) => setFormData((p) => ({ ...p, first_name: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Last name</Label>
-                <Input
-                  className={inputClass}
-                  value={formData.last_name}
-                  onChange={(e) => setFormData((p) => ({ ...p, last_name: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Phone</Label>
-                <Input
-                  type="tel"
-                  className={inputClass}
-                  value={formData.phone}
-                  onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Date of birth</Label>
-                <Input
-                  type="date"
-                  className={inputClass}
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData((p) => ({ ...p, date_of_birth: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Sex</Label>
-                <select
-                  value={formData.sex}
-                  onChange={(e) => setFormData((p) => ({ ...p, sex: e.target.value }))}
-                  disabled={!canEdit}
-                  className={cn(
-                    inputClass,
-                    'w-full min-h-11 px-3 py-2 text-sm text-[color:var(--fc-text-primary)]',
-                    canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
-                  )}
-                  aria-label="Sex"
-                >
-                  <option value="">Select</option>
-                  {SEX_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* 4. Body stats */}
-          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <h2 className={sectionTitleClass}>Body stats</h2>
-            <p className="text-xs fc-text-dim mb-3">
-              Updates your profile weight for your coach. Body metrics history lives under Progress.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <Label className={labelClass}>Height (cm)</Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.1"
-                  className={inputClass}
-                  value={formData.height_cm}
-                  onChange={(e) => setFormData((p) => ({ ...p, height_cm: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Bodyweight (kg)</Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.1"
-                  className={inputClass}
-                  value={formData.bodyweight}
-                  onChange={(e) => setFormData((p) => ({ ...p, bodyweight: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* 5. Training */}
-          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <h2 className={sectionTitleClass}>Training</h2>
-            <div className="space-y-3">
-              <div>
-                <Label className={labelClass}>Fitness level</Label>
-                <select
-                  value={formData.fitness_level}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, fitness_level: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                  className={cn(
-                    inputClass,
-                    'w-full min-h-11 px-3 py-2 text-sm text-[color:var(--fc-text-primary)]',
-                    canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
-                  )}
-                  aria-label="Fitness level"
-                >
-                  <option value="">Select</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-              <div>
-                <Label className={labelClass}>Bio</Label>
-                <Textarea
-                  rows={3}
-                  maxLength={2000}
-                  placeholder="Tell your coach a bit about yourself (optional)"
-                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
-                  value={formData.bio}
-                  onChange={(e) => setFormData((p) => ({ ...p, bio: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* 6. Health */}
-          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <h2 className={sectionTitleClass}>Health</h2>
-            <div className="space-y-3">
-              <div>
-                <Label className={labelClass}>Medical conditions</Label>
-                <Textarea
-                  rows={3}
-                  placeholder="Anything your coach should know about your health"
-                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
-                  value={formData.medical_conditions}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, medical_conditions: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <Label className={labelClass}>Injuries</Label>
-                <Textarea
-                  rows={3}
-                  placeholder="Past or current injuries"
-                  className="rounded-lg min-h-[4.5rem] fc-textarea resize-none"
-                  value={formData.injuries}
-                  onChange={(e) => setFormData((p) => ({ ...p, injuries: e.target.value }))}
-                  disabled={!canEdit}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* 7. Profile Hub */}
-          <section className="mb-6 pb-6 border-b border-[color:var(--fc-glass-border)]">
-            <h2 className={sectionTitleClass}>Profile Hub</h2>
-            <div className="divide-y divide-[color:var(--fc-glass-border)] rounded-lg border border-[color:var(--fc-glass-border)] overflow-hidden">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-                onClick={() => router.push('/client/progress/achievements')}
-              >
-                <span className="flex items-center gap-2 text-sm font-medium fc-text-primary">
-                  <Award className="w-4 h-4 shrink-0 text-[color:var(--fc-status-warning)] opacity-90" />
-                  Achievements
-                </span>
-                <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
-              </button>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-                onClick={() => router.push('/client/goals/history')}
-              >
-                <span className="flex items-center gap-2 text-sm font-medium fc-text-primary">
-                  <Target className="w-4 h-4 shrink-0 fc-text-success opacity-90" />
-                  Goal History
-                </span>
-                <ChevronRight className="w-4 h-4 fc-text-dim shrink-0" />
-              </button>
-            </div>
-          </section>
-
-          {/* 8. Account */}
-          {canEdit && (
-            <section className="mb-6">
-              <h2 className={sectionTitleClass}>Account</h2>
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 justify-start rounded-lg border-[color:var(--fc-glass-border)] text-sm"
-                  onClick={() => setShowPasswordModal(true)}
-                >
-                  <Lock className="w-4 h-4 mr-2 shrink-0" />
-                  Change password
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 justify-start rounded-lg border-[color:var(--fc-glass-border)] text-sm"
-                  onClick={() => void handleSignOut()}
-                >
-                  <LogOut className="w-4 h-4 mr-2 shrink-0" />
-                  Sign out
-                </Button>
-              </div>
-            </section>
-          )}
-        </ClientPageShell>
-
-        {isDirty && canEdit && (
-          <div
-            className="fixed left-0 right-0 z-[10060] p-3 sm:px-4 pointer-events-none bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]"
-            style={{ bottom: '76px' }}
-          >
-            <div className="max-w-lg mx-auto w-full pointer-events-auto">
-              <LogSetButton
-                ready={!saving}
-                loading={saving}
-                label="Save profile"
-                onClick={() => {
-                  if (saving) return
-                  void handleSave()
-                }}
-              />
-            </div>
+            <StickySaveBar
+              visible={canEdit}
+              isDirty={isDirty}
+              dirtyCount={dirtyKeyList.length}
+              dirtySummaryLine={dirtySummary}
+              saving={saving}
+              onSave={() => {
+                if (saving) return
+                void handleSave()
+              }}
+              onDiscard={handleDiscard}
+              discardDisabled={saving}
+            />
           </div>
-        )}
+        </ClientPageShell>
 
         <Dialog
           open={showPasswordModal}

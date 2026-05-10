@@ -877,6 +877,13 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     router.push(`/coach/clients/${clientId}/programs/${program.workout_programs.id}`)
   }
 
+  const standaloneGroups = useMemo(
+    () => buildStandaloneGroups(workouts),
+    [workouts]
+  )
+
+  const todayDowMonday = useMemo(() => mondayFirstDow(), [])
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -930,13 +937,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       year: 'numeric',
     })
   }
-
-  const standaloneGroups = useMemo(
-    () => buildStandaloneGroups(workouts),
-    [workouts]
-  )
-
-  const todayDowMonday = useMemo(() => mondayFirstDow(), [])
 
   const weekSlots = activeProgramSummary?.weekScheduleSlots ?? []
 

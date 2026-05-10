@@ -41,6 +41,7 @@ import {
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function RestPauseExecutor({
   block,
@@ -280,7 +281,7 @@ export function RestPauseExecutor({
       });
       return;
     }
-    const w = parseFloat(editDraft.weight);
+    const w = parseWeightKgInput(editDraft.weight);
     const r = parseInt(editDraft.initialReps, 10);
     if (isNaN(w) || w < 0 || isNaN(r) || r <= 0) {
       addToast({
@@ -364,7 +365,7 @@ export function RestPauseExecutor({
   const handleLog = async () => {
     if (!currentExercise || isLoggingSet) return;
 
-    const weightNum = parseFloat(weight);
+    const weightNum = parseWeightKgInput(weight);
     const initialRepsNum = parseInt(initialReps);
 
     if (
@@ -730,7 +731,7 @@ export function RestPauseExecutor({
   );
 
   const initialRepsNumPreview = parseInt(initialReps, 10);
-  const weightNumPreviewRp = parseFloat(weight);
+  const weightNumPreviewRp = parseWeightKgInput(weight);
   const restPauseLogReady =
     !isLoggingSet &&
     completedSets < totalSets &&
@@ -758,8 +759,8 @@ export function RestPauseExecutor({
           !editDraft ||
           editDraft.weight.trim() === "" ||
           editDraft.initialReps.trim() === "" ||
-          isNaN(parseFloat(editDraft.weight)) ||
-          parseFloat(editDraft.weight) < 0 ||
+          isNaN(parseWeightKgInput(editDraft.weight)) ||
+          parseWeightKgInput(editDraft.weight) < 0 ||
           isNaN(parseInt(editDraft.initialReps, 10)) ||
           parseInt(editDraft.initialReps, 10) <= 0
         }

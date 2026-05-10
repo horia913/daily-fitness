@@ -463,7 +463,7 @@ function CoachGoalsContent() {
     return (
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
-          <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+          <CoachPageShell widthVariant="data-7xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
             <PageSkeleton variant="dashboard" />
           </CoachPageShell>
         </AnimatedBackground>
@@ -475,7 +475,7 @@ function CoachGoalsContent() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <div className="space-y-6">
               <GlassCard elevation={2} className="fc-card-shell p-6 md:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -1051,7 +1051,7 @@ function GoalsHabitsHubFallback() {
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
-        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <PageSkeleton variant="dashboard" />
         </CoachPageShell>
       </AnimatedBackground>

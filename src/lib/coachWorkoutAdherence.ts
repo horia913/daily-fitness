@@ -10,8 +10,24 @@
  * DB note: `rir` on prescriptions is the literal prescribed RPE to display/compare (see workoutTargetIntensity).
  */
 
-import { parseRepsRange } from "@/lib/clientProgressionService";
 import { formatPaceMinSecPerKm } from "@/lib/enduranceFormUtils";
+import type { PrescribedExerciseRow } from "@/lib/workoutLog/prescribedExerciseHelpers";
+import {
+  buildPrescriptionMaps,
+  hasAnyPrescription,
+  prescribedRpe,
+  prescribedWeightKg,
+  repsTargetMin,
+} from "@/lib/workoutLog/prescribedExerciseHelpers";
+
+export type { PrescribedExerciseRow } from "@/lib/workoutLog/prescribedExerciseHelpers";
+export {
+  buildPrescriptionMaps,
+  hasAnyPrescription,
+  prescribedRpe,
+  prescribedWeightKg,
+  repsTargetMin,
+} from "@/lib/workoutLog/prescribedExerciseHelpers";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,8 +38,6 @@ export type AdherenceTier = "green" | "amber" | "red";
 /** Minimal row from workout_set_logs (straight_set / superset focused). */
 export type CoachSetLogRow = {
   set_entry_id?: string | null;
-  block_id?: string | null;
-  block_type?: string | null;
   set_type?: string | null;
   exercise_id?: string | null;
   set_number?: number | null;
@@ -39,16 +53,8 @@ export type CoachSetLogRow = {
   actual_time_seconds?: number | null;
   actual_distance_meters?: number | null;
   actual_hr_avg?: number | null;
-  actual_speed_kmh?: number | null;
-};
-
-export type PrescribedExerciseRow = {
-  exercise_id: string;
-  reps?: string | null;
-  weight_kg?: number | string | null;
-  load_percentage?: number | string | null;
-  /** Prescribed RPE — stored in `rir` column in DB. */
-  rir?: number | string | null;
+  /** Logged speed (speed_work). */
+  actual_speed_kmh?: number | string | null;
 };
 
 export type WorkoutLogTotals = {
@@ -116,7 +122,7 @@ export type WorkoutAdherenceResult = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function getSetEntryId(row: CoachSetLogRow): string | null {
-  const id = row.set_entry_id ?? row.block_id;
+  const id = row.set_entry_id;
   return id && String(id).length > 0 ? String(id) : null;
 }
 
@@ -148,26 +154,6 @@ function intervalTimeConsistencyPct(times: number[]): number | null {
   return Math.max(0, Math.min(100, Math.round(100 * (1 - Math.min(1, cv)))));
 }
 
-function prescribedRpe(pe: PrescribedExerciseRow): number | null {
-  return numInt(pe.rir);
-}
-
-function repsTargetMin(pe: PrescribedExerciseRow): number | null {
-  const raw = pe.reps;
-  if (raw === null || raw === undefined) return null;
-  const r = parseRepsRange(typeof raw === "string" ? raw : String(raw));
-  return r ? r.min : null;
-}
-
-/** Prescribed weight in kg when comparable; null if only % or nothing. */
-function prescribedWeightKg(pe: PrescribedExerciseRow): number | null {
-  const w = num(pe.weight_kg);
-  if (w !== null && w > 0) return w;
-  const lp = num(pe.load_percentage);
-  if (lp !== null) return null;
-  return null;
-}
-
 function compareReps(
   actual: number | null,
   prescribedMin: number | null
@@ -189,17 +175,7 @@ function compareRpe(actual: number | null, prescribed: number | null): CellOutco
   return actual <= prescribed ? "green" : "red";
 }
 
-function hasAnyPrescription(pe: PrescribedExerciseRow): boolean {
-  const r = repsTargetMin(pe);
-  const w = prescribedWeightKg(pe);
-  const p = prescribedRpe(pe);
-  return r !== null || w !== null || p !== null;
-}
-
-function setMeetsAllPrescribed(
-  e: SetEvaluation,
-  pe: PrescribedExerciseRow
-): boolean {
+function setMeetsAllPrescribed(e: SetEvaluation, pe: PrescribedExerciseRow): boolean {
   const needReps = repsTargetMin(pe) !== null;
   const needW = prescribedWeightKg(pe) !== null;
   const needRpe = prescribedRpe(pe) !== null;
@@ -245,28 +221,6 @@ export function setsDelta(
   const p = previous?.total_sets_completed;
   if (c === null || c === undefined || p === null || p === undefined) return null;
   return c - p;
-}
-
-// ─── Template index ──────────────────────────────────────────────────────────
-
-export function buildPrescriptionMaps(
-  setEntries: Array<{ id: string; set_type: string }>,
-  exercises: Array<PrescribedExerciseRow & { set_entry_id: string }>
-): {
-  bySetEntry: Map<string, Map<string, PrescribedExerciseRow>>;
-  setTypeByEntry: Map<string, string>;
-} {
-  const setTypeByEntry = new Map<string, string>();
-  for (const e of setEntries) {
-    setTypeByEntry.set(e.id, String(e.set_type || "").toLowerCase());
-  }
-  const bySetEntry = new Map<string, Map<string, PrescribedExerciseRow>>();
-  for (const row of exercises) {
-    const sid = row.set_entry_id;
-    if (!bySetEntry.has(sid)) bySetEntry.set(sid, new Map());
-    bySetEntry.get(sid)!.set(row.exercise_id, row);
-  }
-  return { bySetEntry, setTypeByEntry };
 }
 
 // ─── Straight set row ────────────────────────────────────────────────────────
@@ -351,7 +305,7 @@ function evaluateSuperset(
     },
     rpe: {
       outcome: "neutral",
-      actual: null,
+      actual: numInt(log.rpe),
       prescribed: peA ? prescribedRpe(peA) : null,
     },
   };
@@ -364,7 +318,7 @@ function evaluateSuperset(
       num(log.superset_weight_a),
       prescribedWeightKg(peA)
     );
-    evalA.rpe.outcome = "neutral";
+    evalA.rpe.outcome = compareRpe(numInt(log.rpe), prescribedRpe(peA));
   }
 
   const evalB: SetEvaluation = {
@@ -381,7 +335,7 @@ function evaluateSuperset(
     },
     rpe: {
       outcome: "neutral",
-      actual: null,
+      actual: numInt(log.rpe),
       prescribed: peB ? prescribedRpe(peB) : null,
     },
   };
@@ -394,6 +348,7 @@ function evaluateSuperset(
       num(log.superset_weight_b),
       prescribedWeightKg(peB)
     );
+    evalB.rpe.outcome = compareRpe(numInt(log.rpe), prescribedRpe(peB));
   }
 
   const okA =
@@ -465,7 +420,6 @@ export function computeWorkoutAdherence(
 
     const st = String(
       setTypeByEntry.get(entryId) ||
-        log.block_type ||
         log.set_type ||
         ""
     ).toLowerCase();
@@ -489,6 +443,38 @@ export function computeWorkoutAdherence(
           setEntryId: entryId,
           exerciseId: exId,
           blockType: "straight_set",
+          sets: [],
+        });
+      }
+      blockMap.get(bk)!.sets.push(ev);
+      continue;
+    }
+
+    const timeLike = new Set(["amrap", "emom", "tabata", "for_time"]);
+    const straightLike =
+      Boolean(prescMap && log.exercise_id) &&
+      !timeLike.has(st) &&
+      st !== "superset" &&
+      st !== "speed_work" &&
+      st !== "endurance";
+    if (straightLike) {
+      const map = prescMap!;
+      const exId = log.exercise_id as string;
+      const pe = map.get(exId);
+      const ev = evaluateStraightSet(log, pe);
+      if (!ev) continue;
+
+      if (pe && hasAnyPrescription(pe)) {
+        totalPrescribedSets += 1;
+        if (setMeetsAllPrescribed(ev, pe)) setsOnTarget += 1;
+      }
+
+      const bk = blockKey(entryId, exId);
+      if (!blockMap.has(bk)) {
+        blockMap.set(bk, {
+          setEntryId: entryId,
+          exerciseId: exId,
+          blockType: st,
           sets: [],
         });
       }
@@ -556,7 +542,6 @@ export function computeWorkoutAdherence(
     if (!entryId) continue;
     const st = String(
       setTypeByEntry.get(entryId) ||
-        log.block_type ||
         log.set_type ||
         ""
     ).toLowerCase();
@@ -765,7 +750,7 @@ export function averageStraightSetPerformanceByExercise(
     { wSum: number; rSum: number; n: number }
   >();
   for (const log of logs) {
-    const st = String(log.block_type || log.set_type || "").toLowerCase();
+    const st = String(log.set_type || "").toLowerCase();
     if (st !== "straight_set") continue;
     const ex = log.exercise_id;
     if (!ex) continue;

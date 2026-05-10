@@ -12,17 +12,15 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell, Eyebrow, IconButton, SectionHeader } from "@/components/client-ui";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { HeroWorkoutCard } from "@/components/client/HeroWorkoutCard";
-import { AthleteScoreSummary } from "@/components/client/AthleteScoreSummary";
+import { AthleteScoreChip } from "@/components/client/AthleteScoreChip";
+import { DailyCheckInHeroCard } from "@/components/client/DailyCheckInHeroCard";
 import {
-  CheckCircle,
   Trophy,
   BarChart3,
   AlertTriangle,
   Flame,
   Bell,
   CircleCheck,
-  Clock,
-  Calendar,
 } from "lucide-react";
 import { tierBackdropVariant } from "@/lib/tierBackdrop";
 import { TierBadge, type Tier } from "@/components/ui/TierBadge";
@@ -97,9 +95,11 @@ export default function ClientDashboard() {
   const dashboardData = pageData?.dashboard ?? null;
   const athleteScore = pageData?.athleteScore ?? null;
   const hasCheckInToday = pageData?.hasCheckInToday ?? null;
-  const hasScheduledCheckInThisPeriod =
-    pageData?.hasScheduledCheckInThisPeriod ?? false;
+  const hasScheduledCheckInThisPeriod = pageData?.hasScheduledCheckInThisPeriod ?? false;
   const scoreError = pageData?.scoreError ?? null;
+  const dailyDoneToday = hasCheckInToday === true;
+  const monthlyDoneThisCycle = hasScheduledCheckInThisPeriod;
+  const monthlyDue = !monthlyDoneThisCycle;
 
   const userName = dashboardData?.firstName || profile?.first_name || "there";
   const streak = dashboardData?.streak ?? 0;
@@ -179,7 +179,7 @@ export default function ClientDashboard() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         <ClientPageShell
-          className="max-w-lg px-0 pb-32 pt-6 overflow-x-visible"
+          className="max-w-lg px-0 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-visible"
           backdrop={tierBackdropVariant(athleteScore?.tier)}
         >
           {loading ? (
@@ -196,11 +196,14 @@ export default function ClientDashboard() {
                 <Skeleton variant="text" className="h-8 w-56" />
                 <Skeleton variant="text" className="h-4 w-48" />
               </div>
+              <div className="mb-5 flex justify-end px-5">
+                <Skeleton variant="circular" className="h-[60px] w-[60px]" />
+              </div>
               <div className="mx-4 mb-5">
                 <SkeletonCard />
               </div>
               <div className="mx-5 mb-5">
-                <Skeleton variant="text" className="mx-auto h-32 w-32 rounded-full" />
+                <SkeletonCard />
               </div>
               <div className="mx-5 mb-5 grid grid-cols-3 gap-2">
                 <SkeletonCard />
@@ -268,21 +271,28 @@ export default function ClientDashboard() {
                     {eyebrowText}
                   </Eyebrow>
                 ) : null}
-                <h1
-                  className="mb-2 font-semibold leading-[1.05] tracking-[-0.025em] fc-text-primary"
-                  style={{
-                    fontFamily: "var(--f-headline, var(--font-body))",
-                    fontSize: "30px",
-                  }}
-                >
-                  Hey, <em className="fc-greeting-name">{userName}</em>.
-                </h1>
-                <p
-                  className="fc-text-dim"
-                  style={{ fontSize: "13px", marginTop: "8px" }}
-                >
-                  {formatClientDashboardDate()}
-                </p>
+                <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+                  <div className="min-w-0 flex-1 max-[360px]:basis-full">
+                    <h1
+                      className="mb-2 font-semibold leading-[1.05] tracking-[-0.025em] fc-text-primary"
+                      style={{
+                        fontFamily: "var(--f-headline, var(--font-body))",
+                        fontSize: "30px",
+                      }}
+                    >
+                      Hey, <em className="fc-greeting-name">{userName}</em>.
+                    </h1>
+                    <p
+                      className="fc-text-dim"
+                      style={{ fontSize: "13px", marginTop: "8px" }}
+                    >
+                      {formatClientDashboardDate()}
+                    </p>
+                  </div>
+                  <div className="max-[360px]:ml-auto">
+                    <AthleteScoreChip athleteScore={scoreError ? null : athleteScore} />
+                  </div>
+                </div>
               </div>
 
               <HeroWorkoutCard
@@ -291,9 +301,10 @@ export default function ClientDashboard() {
                 activeProgramPauseStatus={dashboardData?.activeProgramPauseStatus ?? null}
               />
 
-              <AthleteScoreSummary
-                athleteScore={athleteScore}
-                scoreError={scoreError}
+              <DailyCheckInHeroCard
+                dailyDoneToday={dailyDoneToday}
+                monthlyDue={monthlyDue}
+                monthlyDoneThisCycle={monthlyDoneThisCycle}
               />
 
               {/* Stat strip — mockup .strip / .strip-card lines 376–417, 1302–1322 */}
@@ -372,75 +383,6 @@ export default function ClientDashboard() {
                   </div>
                 </section>
               ) : null}
-
-              {/* Duo — mockup .duo / .duo-card lines 420–459, 1325–1340 */}
-              <section className="mb-[22px] px-5">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins";
-                    }}
-                    className="rounded-2xl border border-[var(--fc-glass-border)] bg-[var(--fc-surface-card)] p-3.5 text-left transition-colors hover:bg-[var(--fc-surface-elevated)]"
-                  >
-                    <div
-                      className="mb-3 grid h-7 w-7 place-items-center rounded-lg"
-                      style={{
-                        background: "color-mix(in srgb, var(--fc-text-primary) 6%, transparent)",
-                        color: "var(--fc-text-subtle)",
-                      }}
-                    >
-                      {hasCheckInToday === true ? (
-                        <CheckCircle className="h-3.5 w-3.5" strokeWidth={2} />
-                      ) : (
-                        <Clock className="h-3.5 w-3.5" strokeWidth={2} />
-                      )}
-                    </div>
-                    <Eyebrow tone="subtle" density="statStrip" className="!mb-1">
-                      Daily
-                    </Eyebrow>
-                    <p className="text-sm font-semibold fc-text-primary">
-                      {hasCheckInToday === true ? "Done" : "Not done"}
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins/weekly";
-                    }}
-                    className="rounded-2xl border border-[var(--fc-glass-border)] bg-[var(--fc-surface-card)] p-3.5 text-left transition-colors hover:bg-[var(--fc-surface-elevated)]"
-                  >
-                    <div
-                      className="mb-3 grid h-7 w-7 place-items-center rounded-lg"
-                      style={
-                        hasScheduledCheckInThisPeriod
-                          ? {
-                              background:
-                                "color-mix(in srgb, var(--fc-accent-lime) 10%, transparent)",
-                              color: "var(--fc-accent-lime)",
-                            }
-                          : {
-                              background:
-                                "color-mix(in srgb, var(--fc-text-primary) 6%, transparent)",
-                              color: "var(--fc-text-subtle)",
-                            }
-                      }
-                    >
-                      {hasScheduledCheckInThisPeriod ? (
-                        <CheckCircle className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      ) : (
-                        <Calendar className="h-3.5 w-3.5" strokeWidth={2} />
-                      )}
-                    </div>
-                    <Eyebrow tone="subtle" density="statStrip" className="!mb-1">
-                      Check-in
-                    </Eyebrow>
-                    <p className="text-sm font-semibold fc-text-primary">
-                      {hasScheduledCheckInThisPeriod ? "Done" : "Not done"}
-                    </p>
-                  </button>
-                </div>
-              </section>
 
               {/* Recent wins — mockup .section-head + .achievements lines 244–504, 1342–1367 */}
               {dashboardData?.highlights &&

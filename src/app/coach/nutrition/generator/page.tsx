@@ -602,7 +602,7 @@ export default function GeneratorPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="default-5xl" className="px-4 py-4 pb-32 sm:px-6 space-y-4">
+        <CoachPageShell widthVariant="default-5xl" className="px-4 py-4 pb-[var(--fc-bottom-safe-area)] sm:px-6 space-y-4">
 
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
             <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">

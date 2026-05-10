@@ -2389,12 +2389,11 @@ select.fc-pr-series-select option {
 
 /* §6.21 — Floating Action Button (lime, NOT red).
    Phase 0b Task 6: replaces .fc-fab on create CTAs.
-   Bottom value `calc(64px + 32px) = 96px` matches the proven-working
-   position used by the previous .fc-fab caller wrapper (Tailwind
-   `bottom-24`). Formula: 64px (bottom-nav height) + 32px (clearance). */
+   Offset tracks `--fc-bottom-safe-area` (see `globals.css`): ~96px on mobile
+   (0.75 × 8rem), tighter on desktop when bottom nav is absent. */
 .fab-action {
   position: fixed;
-  bottom: calc(64px + 32px);
+  bottom: calc(0.75 * var(--fc-bottom-safe-area, 8rem));
   right: 16px;
   width: 56px;
   height: 56px;

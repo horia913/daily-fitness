@@ -359,7 +359,7 @@ export default function WorkoutTemplateDetailsPage() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <PageSkeleton variant="list" />
         </CoachPageShell>
       </AnimatedBackground>
@@ -370,7 +370,7 @@ export default function WorkoutTemplateDetailsPage() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <EmptyState
             icon={FileQuestion}
             title={error || "Template not found"}
@@ -393,7 +393,7 @@ export default function WorkoutTemplateDetailsPage() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6">
+      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
         <div className="space-y-4">
           <nav className="flex min-h-12 flex-wrap items-center justify-between gap-2">
             <Link

@@ -135,7 +135,7 @@ function ChallengesPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -148,7 +148,7 @@ function ChallengesPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <GlassCard elevation={2} className="fc-card-shell p-4 text-center">
               <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary h-10 text-sm">
@@ -165,7 +165,7 @@ function ChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ClientPageShell className="max-w-lg px-4 pb-32 pt-6 space-y-4">
+      <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <nav className="flex items-center gap-2 text-xs fc-text-subtle mb-1 font-mono">

@@ -236,7 +236,7 @@ export default function GoalTemplatesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-32">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-[var(--fc-bottom-safe-area)]">
       {/* Header */}
       <GlassCard elevation={2} className="fc-card-shell p-6 sm:p-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

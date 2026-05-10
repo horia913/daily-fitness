@@ -1,0 +1,121 @@
+.root {
+  display: flex;
+  width: 240px;
+  flex-shrink: 0;
+  flex-direction: column;
+  min-height: 100vh;
+  border-right: 1px solid var(--fc-glass-border);
+  background: var(--fc-glass-base);
+  backdrop-filter: blur(var(--fc-blur-nav));
+  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
+}
+
+.brand {
+  padding: 1rem 1rem 0.75rem;
+  font-family: var(--f-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--fc-text-primary);
+}
+
+.navPrimary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.5rem 0.75rem;
+}
+
+.row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: var(--fc-radius-lg);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fc-text-dim);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.row:hover:not(.rowActive) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fc-text-primary);
+}
+
+.rowActive {
+  background: var(--fc-set-type-straight-soft);
+  border-color: var(--fc-set-type-straight-border);
+  color: var(--fc-set-type-straight);
+}
+
+.rowActive .icon {
+  color: var(--fc-set-type-straight);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  color: var(--fc-text-dim);
+}
+
+.spacer {
+  flex: 1;
+  min-height: 1rem;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--fc-glass-border);
+}
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.avatarLink {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--fc-radius-lg);
+  padding: 0.25rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.avatarLink:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.avatar {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.avatarLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fc-text-dim);
+}

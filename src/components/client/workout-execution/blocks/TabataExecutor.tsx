@@ -31,6 +31,7 @@ export function TabataExecutor({
   onRestTimerClick,
   onWorkoutBack,
   previousPerformanceMap,
+  progressionSuggestion,
 }: BaseBlockExecutorProps) {
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
   const [showTimerModal, setShowTimerModal] = useState(false);
@@ -270,6 +271,7 @@ export function TabataExecutor({
         showNavigation={true}
         currentExercise={currentExercise}
         showRestTimer={false}
+        progressionSuggestion={progressionSuggestion}
       />
 
       {/* Timer Modal */}

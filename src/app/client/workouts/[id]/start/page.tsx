@@ -52,7 +52,11 @@ import {
   PRCelebrationModal,
   type PRDetectedPayload,
 } from "@/components/client/workout-execution/ui/PRCelebrationModal";
-import { ExecProgressSegments } from "@/components/client/workout-execution/ui/ExecProgressSegments";
+import {
+  ExecProgressSegments,
+  countWorkoutExercises,
+  getGlobalExerciseIndex,
+} from "@/components/client/workout-execution/ui/ExecProgressSegments";
 import { enrichWorkoutBlocksPrescribedRir } from "@/lib/enrichWorkoutBlocksPrescribedRir";
 import { WorkoutExecutionChromeProvider } from "@/components/client/workout-execution/WorkoutExecutionChromeContext";
 import {
@@ -1748,6 +1752,22 @@ export default function LiveWorkout() {
         }
       }
 
+      // Block re-starting a completed or skipped workout_assignment (direct URL / any resolved row).
+      if (resolvedAssignment) {
+        const rowStatus = (resolvedAssignment as { status?: string | null })
+          .status;
+        if (rowStatus === "completed" || rowStatus === "skipped") {
+          addToast({
+            title: "Workout Already Completed",
+            description:
+              "This workout is already completed. View your log from the Train tab.",
+            variant: "default",
+          });
+          window.location.href = "/client/train";
+          return;
+        }
+      }
+
       // Train hub often opens /start with workout_assignments.id. Program-day URL sets
       // program_assignment_id above; this bridge covers the assignment-id path when
       // program_day_assignments.workout_assignment_id points at this assignment.
@@ -2575,13 +2595,19 @@ export default function LiveWorkout() {
       }
     >,
   ) => {
+    let programAssignmentId: string | null = null;
+    let currentWeekNumber: number | null = null;
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let programAssignmentId: string | null = null;
+      if (!user) {
+        console.warn(
+          "[loadProgressionSuggestions] skipped: no authenticated user",
+          { workoutAssignmentId },
+        );
+        return;
+      }
 
       // program_day_assignments bridges workout_assignment_id → program_assignment_id
       const { data: dayAssignment } = await supabase
@@ -2597,9 +2623,9 @@ export default function LiveWorkout() {
           programAssignmentId,
         );
       } else {
-        // This workout_assignment is not linked to any program (standalone assignment)
-        console.log(
-          "[loadProgressionSuggestions] standalone workout — no program_assignment_id found, skipping suggestions",
+        console.warn(
+          "[loadProgressionSuggestions] skipped: no program_assignment_id",
+          { workoutAssignmentId },
         );
         return;
       }
@@ -2613,20 +2639,14 @@ export default function LiveWorkout() {
         programState.isCompleted ||
         !programState.currentWeekNumber
       ) {
+        console.warn(
+          "[loadProgressionSuggestions] skipped: program state missing currentWeekNumber",
+          { state: programState, workoutAssignmentId },
+        );
         return;
       }
 
-      const currentWeekForProgression = programState.currentWeekNumber;
-
-      // Get program category
-      const { data: program } = await supabase
-        .from("workout_programs")
-        .select("category")
-        .eq("id", programState.assignment.program_id)
-        .maybeSingle();
-
-      const category = program?.category || undefined;
-      const difficulty = "intermediate"; // Default, could be fetched from user profile
+      currentWeekNumber = programState.currentWeekNumber;
 
       // Collect all exercise IDs and names
       const exerciseIds: string[] = [];
@@ -2643,6 +2663,10 @@ export default function LiveWorkout() {
       });
 
       if (exerciseIds.length === 0) {
+        console.warn(
+          "[loadProgressionSuggestions] skipped: exerciseIds is empty",
+          { blockCount: blocks.length, workoutAssignmentId },
+        );
         return;
       }
 
@@ -2652,17 +2676,19 @@ export default function LiveWorkout() {
 
       const suggestions = await getProgressionSuggestionsForWorkout(
         programAssignmentId,
-        currentWeekForProgression,
+        currentWeekNumber,
         exerciseIds,
         exerciseNames,
-        category,
-        difficulty,
       );
 
       setProgressionSuggestions(suggestions);
     } catch (error) {
-      console.error("Error loading progression suggestions:", error);
-      // Silently fail - progression suggestions are optional
+      console.error("[loadProgressionSuggestions] failed", {
+        error,
+        workoutAssignmentId,
+        currentWeekNumber,
+      });
+      // Silently fail to user — progression suggestions are optional UX.
     }
   };
 
@@ -4293,7 +4319,7 @@ export default function LiveWorkout() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen pb-32">
+        <div className="relative z-10 min-h-screen pb-[var(--fc-bottom-safe-area)]">
           {/* Rest Timer Overlay */}
           <RestTimerOverlay
             isActive={showRestTimer}
@@ -4308,8 +4334,8 @@ export default function LiveWorkout() {
           <ClientPageShell
             className={
               useBlockSystem && workoutBlocks.length > 0
-                ? "max-w-2xl mx-auto flex min-h-screen flex-col gap-3 pb-32 pt-[calc(env(safe-area-inset-top,0px)+12px)] sm:gap-4"
-                : "max-w-2xl mx-auto flex min-h-screen flex-col gap-5 pb-32"
+                ? "max-w-2xl mx-auto flex min-h-screen flex-col gap-3 pb-[var(--fc-bottom-safe-area)] pt-[calc(env(safe-area-inset-top,0px)+12px)] sm:gap-4"
+                : "max-w-2xl mx-auto flex min-h-screen flex-col gap-5 pb-[var(--fc-bottom-safe-area)]"
             }
             style={{ gap: "var(--fc-gap-sections)" }}
           >
@@ -4369,17 +4395,12 @@ export default function LiveWorkout() {
             ) : useBlockSystem && workoutBlocks.length > 0 ? (
               <>
                 {(() => {
-                  const currentBlock = workoutBlocks[currentBlockIndex];
-                  const currentExercise =
-                    currentBlock?.block.exercises?.[
-                      currentBlock.currentExerciseIndex ?? 0
-                    ];
-                  const totalSetsInBlock =
-                    currentExercise?.sets ||
-                    currentBlock?.block.total_sets ||
-                    currentBlock?.totalSets ||
-                    1;
-                  const completedInBlock = currentBlock?.completedSets ?? 0;
+                  const totalExercises = countWorkoutExercises(workoutBlocks);
+                  const globalExerciseIndex = getGlobalExerciseIndex(
+                    workoutBlocks,
+                    currentBlockIndex,
+                    workoutBlocks[currentBlockIndex]?.currentExerciseIndex ?? 0,
+                  );
 
                   return (
                     <div className="flex items-center justify-between px-5 pb-1 pt-3.5">
@@ -4399,8 +4420,9 @@ export default function LiveWorkout() {
                         Back
                       </button>
                       <ExecProgressSegments
-                        completedSets={completedInBlock}
-                        totalSets={Math.max(1, totalSetsInBlock)}
+                        variant="exercises"
+                        totalExercises={Math.max(1, totalExercises)}
+                        currentExerciseIndex={globalExerciseIndex}
                       />
                     </div>
                   );

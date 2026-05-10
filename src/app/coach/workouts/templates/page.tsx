@@ -352,7 +352,7 @@ export default function WorkoutTemplatesPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
 
-        <div className="relative z-10 min-h-screen pb-32">
+        <div className="relative z-10 min-h-screen pb-[var(--fc-bottom-safe-area)]">
           <div className="max-w-6xl mx-auto px-4 pt-3 sm:px-6 sm:pt-4">
             <Link
               href="/coach/training"

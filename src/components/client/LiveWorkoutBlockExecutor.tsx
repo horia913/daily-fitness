@@ -31,6 +31,7 @@ import {
 import { fetchApi } from "@/lib/apiClient";
 import { useSetLoggingOrchestrator } from "@/hooks/useSetLoggingOrchestrator";
 import { RPEModal } from "@/components/client/RPEModal";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 // Import type-specific components
 import { StraightSetExecutor } from "./workout-execution/blocks/StraightSetExecutor";
@@ -46,6 +47,55 @@ import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
 import { SpeedWorkExecutor } from "./workout-execution/blocks/SpeedWorkExecutor";
 import { EnduranceExecutor } from "./workout-execution/blocks/EnduranceExecutor";
+
+/** Accepts kg from DB/JSON or typed input; supports comma decimals (e.g. 16,25). */
+function coerceLoggedWeightKg(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = parseWeightKgInput(raw as string | number);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/**
+ * Session sticky weights: update immediately when a set is accepted so the next set's
+ * autofill sees lastPerformedWeightByExerciseId before background sync completes.
+ * Mirrors which fields the legacy log-set path used for onWeightLogged.
+ */
+function applyStickyWeightsFromLogPayload(
+  payload: Record<string, unknown>,
+  onWeightLogged?: (exerciseId: string, weight: number) => void,
+): void {
+  if (!onWeightLogged) return;
+
+  const apply = (exerciseId: unknown, weightRaw: unknown) => {
+    if (typeof exerciseId !== "string" || exerciseId.length === 0) return;
+    const w = coerceLoggedWeightKg(weightRaw);
+    if (w === null) return;
+    onWeightLogged(exerciseId, w);
+  };
+
+  apply(payload.exercise_id, payload.weight);
+  apply(payload.exercise_id, payload.dropset_initial_weight);
+  apply(payload.exercise_id, payload.rest_pause_initial_weight);
+  apply(payload.superset_exercise_a_id, payload.superset_weight_a);
+  apply(payload.superset_exercise_b_id, payload.superset_weight_b);
+  apply(
+    payload.preexhaust_isolation_exercise_id,
+    payload.preexhaust_isolation_weight,
+  );
+  apply(
+    payload.preexhaust_compound_exercise_id,
+    payload.preexhaust_compound_weight,
+  );
+
+  const giant = payload.giant_set_exercises;
+  if (!Array.isArray(giant)) return;
+  for (const row of giant) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as Record<string, unknown>;
+    apply(o.exercise_id, o.weight);
+  }
+}
 
 interface LiveWorkoutBlockExecutorProps {
   block: LiveWorkoutBlock;
@@ -283,13 +333,10 @@ export default function LiveWorkoutBlockExecutor({
       if (result.e1rm && onE1rmUpdate && result.entry.exerciseId) {
         onE1rmUpdate(result.entry.exerciseId, result.e1rm);
       }
-      // Sticky weight update
-      if (onWeightLogged && result.entry.exerciseId) {
-        const w = result.entry.payload.weight;
-        if (w != null && typeof w === "number") {
-          onWeightLogged(result.entry.exerciseId, w);
-        }
-      }
+      applyStickyWeightsFromLogPayload(
+        result.entry.payload as Record<string, unknown>,
+        onWeightLogged,
+      );
 
       const prShownThisSync = !!(result.pr_detected && onPRDetected);
       if (prShownThisSync && result.pr_detected) {
@@ -385,7 +432,10 @@ export default function LiveWorkoutBlockExecutor({
       const { isLastSet: _omit, ...dataWithoutLastSet } = data;
 
       // Build the enriched payload (same fields the old function built)
+      // Executor fields first; routing/session fields last so they cannot be
+      // overwritten by a stray key from block executors.
       const enrichedPayload: Record<string, unknown> = {
+        ...dataWithoutLastSet,
         set_entry_id: block.block.id,
         set_type:
           data.set_type || (block.block as any).type || block.block.set_type,
@@ -393,7 +443,6 @@ export default function LiveWorkoutBlockExecutor({
         workout_assignment_id: assignmentId || undefined,
         session_id: String(sessionId).trim(),
         template_exercise_id: currentExercise?.id || null,
-        ...dataWithoutLastSet,
       };
 
       // Route through golden flow orchestrator (giant_set uses round_number, others use set_number)
@@ -417,6 +466,8 @@ export default function LiveWorkoutBlockExecutor({
         return { success: false, error: result.reason };
       }
 
+      applyStickyWeightsFromLogPayload(enrichedPayload, onWeightLogged);
+
       return { success: true, set_log_id: undefined, isNewPR: false };
     },
     [
@@ -426,6 +477,7 @@ export default function LiveWorkoutBlockExecutor({
       authUser?.id,
       assignmentId,
       orchestrator,
+      onWeightLogged,
     ],
   );
 

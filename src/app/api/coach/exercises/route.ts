@@ -44,11 +44,27 @@ export async function GET() {
       console.error('[coach/exercises] Error fetching categories:', catError)
     }
 
-    console.log('[Coach exercises] network calls done')
+    const exerciseRows = exercisesData ?? []
+    const exerciseIds = exerciseRows.map((e: { id: string }) => e.id).filter(Boolean)
+
+    let usedLast7d = 0
+    if (exerciseIds.length > 0) {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const { count, error: usageErr } = await supabase
+        .from('workout_set_logs')
+        .select('id', { count: 'exact', head: true })
+        .in('exercise_id', exerciseIds)
+        .gte('completed_at', since)
+
+      if (!usageErr && typeof count === 'number') {
+        usedLast7d = count
+      }
+    }
 
     return NextResponse.json({
-      exercises: exercisesData ?? [],
+      exercises: exerciseRows,
       categories: categoriesData ?? [],
+      meta: { used_last_7d: usedLast7d },
     })
   } catch (err: unknown) {
     console.error('[coach/exercises] Unexpected error:', err)

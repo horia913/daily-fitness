@@ -131,7 +131,7 @@ export default function MealPlansPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-32 sm:p-6 space-y-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6 space-y-6">
             <Link
               href="/coach/nutrition"
               className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium"

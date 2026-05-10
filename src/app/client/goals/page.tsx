@@ -383,7 +383,7 @@ export default function ClientGoals() {
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
           <div className="p-4">
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 space-y-3 overflow-x-hidden">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-3 overflow-x-hidden">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </div>
@@ -396,7 +396,7 @@ export default function ClientGoals() {
     return (
       <ProtectedRoute requiredRole="client">
         <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
-          <ClientPageShell className="max-w-lg mx-auto w-full px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto w-full px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
               <p className="text-sm fc-text-dim mb-3">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary h-10 text-sm">
@@ -436,7 +436,7 @@ export default function ClientGoals() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden space-y-4">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden space-y-4">
             {/* Header */}
             <header>
               <h1 className="text-xl font-bold fc-text-primary tracking-tight mb-4">My Goals</h1>

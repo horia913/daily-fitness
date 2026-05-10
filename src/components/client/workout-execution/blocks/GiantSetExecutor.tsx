@@ -37,6 +37,7 @@ import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function GiantSetExecutor({
   block,
@@ -288,7 +289,7 @@ export function GiantSetExecutor({
     if (!firstId || firstId.startsWith("temp-")) return;
     const giantSetExercises = exercises
       .map((ex, idx) => {
-        const w = parseFloat(weights[idx] || "0");
+        const w = parseWeightKgInput(weights[idx] || "0");
         const r = parseInt(reps[idx] || "0", 10);
         if (!ex?.exercise_id || isNaN(w) || isNaN(r)) return null;
         return {
@@ -317,7 +318,7 @@ export function GiantSetExecutor({
             (e) => e.exercise_id === s.exercise_id,
           );
           if (idx < 0) return s;
-          const w = parseFloat(weights[idx] || "0");
+          const w = parseWeightKgInput(weights[idx] || "0");
           const r = parseInt(reps[idx] || "0", 10);
           return { ...s, weight_kg: w, reps_completed: r };
         });
@@ -397,7 +398,7 @@ export function GiantSetExecutor({
     }
     const giantSetExercises = exercises
       .map((ex, idx) => {
-        const w = parseFloat(editDraft.weights[idx] || "0");
+        const w = parseWeightKgInput(editDraft.weights[idx] || "0");
         const r = parseInt(editDraft.reps[idx] || "0", 10);
         if (!ex?.exercise_id || isNaN(w) || isNaN(r)) return null;
         return {
@@ -433,7 +434,7 @@ export function GiantSetExecutor({
           const idx = exercises.findIndex(
             (e) => e.exercise_id === s.exercise_id,
           );
-          const w = parseFloat(editDraft.weights[idx] || "0");
+          const w = parseWeightKgInput(editDraft.weights[idx] || "0");
           const r = parseInt(editDraft.reps[idx] || "0", 10);
           return { ...s, weight_kg: w, reps_completed: r };
         });
@@ -483,7 +484,7 @@ export function GiantSetExecutor({
         console.log(`GiantSet: Exercise ${idx} weight invalid:`, weightStr);
         return false;
       }
-      const weight = parseFloat(String(weightStr));
+      const weight = parseWeightKgInput(String(weightStr));
       if (isNaN(weight) || weight < 0) {
         console.log(
           `GiantSet: Exercise ${idx} weight parse failed:`,
@@ -537,7 +538,7 @@ export function GiantSetExecutor({
       // Build giant_set_exercises array - only include valid exercises
       const giantSetExercises = exercises
         .map((exercise, idx) => {
-          const weightNum = parseFloat(weights[idx] || "0");
+          const weightNum = parseWeightKgInput(weights[idx] || "0");
           const repsNum = parseInt(reps[idx] || "0");
           if (!exercise?.exercise_id || isNaN(weightNum) || isNaN(repsNum)) {
             return null;
@@ -574,7 +575,7 @@ export function GiantSetExecutor({
             exercise_id: exercise.exercise_id,
             set_entry_id: block.block.id,
             set_number: roundNumber,
-            weight_kg: parseFloat(weights[idx] || "0"),
+            weight_kg: parseWeightKgInput(weights[idx] || "0"),
             reps_completed: parseInt(reps[idx] || "0"),
             completed_at: new Date(),
           }) as LoggedSet,
@@ -594,7 +595,7 @@ export function GiantSetExecutor({
         const newCompletedSets = completedSets + 1;
         const updatedLoggedSets = [...loggedSetsList, ...newEntries];
         if (newCompletedSets < totalSets) {
-          const firstWeight = parseFloat(weights[0] || "0");
+          const firstWeight = parseWeightKgInput(weights[0] || "0");
           const firstReps = parseInt(reps[0] || "0", 10);
           onLastSetLoggedForRest?.({
             weight: firstWeight,
@@ -860,7 +861,7 @@ export function GiantSetExecutor({
     exercises.every((_, idx) => {
       const ws = weights[idx];
       const rs = reps[idx];
-      const w = parseFloat(String(ws ?? ""));
+      const w = parseWeightKgInput(String(ws ?? ""));
       const r = parseInt(String(rs ?? ""), 10);
       return (
         String(ws ?? "").trim() !== "" &&
@@ -890,7 +891,9 @@ export function GiantSetExecutor({
               !editDraft ||
               editDraft.weights.some(
                 (w, i) =>
-                  !w?.trim() || isNaN(parseFloat(w)) || parseFloat(w) < 0,
+                  !w?.trim() ||
+                    isNaN(parseWeightKgInput(w)) ||
+                    parseWeightKgInput(w) < 0,
               ) ||
               editDraft.reps.some(
                 (r, i) =>

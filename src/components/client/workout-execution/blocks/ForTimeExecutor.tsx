@@ -31,6 +31,7 @@ import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import type { PrescriptionItem } from "../ui/PrescriptionCard";
 import { LogSetButton } from "../ui/LogSetButton";
 import { parseRepsTarget } from "@/lib/workout/parseRepsTarget";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function ForTimeExecutor({
   block,
@@ -55,6 +56,7 @@ export function ForTimeExecutor({
   onRestTimerClick,
   onWorkoutBack,
   previousPerformanceMap,
+  progressionSuggestion,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -307,7 +309,7 @@ export function ForTimeExecutor({
       return;
     }
     const weightNum =
-      editDraft.weight.trim() !== "" ? parseFloat(editDraft.weight) : 0;
+      editDraft.weight.trim() !== "" ? parseWeightKgInput(editDraft.weight) : 0;
     const repsNum = parseInt(editDraft.reps, 10);
     if (isNaN(repsNum) || repsNum <= 0) return;
     setIsSavingEdit(true);
@@ -372,7 +374,8 @@ export function ForTimeExecutor({
       exerciseIdToUse = exerciseWithId?.exercise_id || undefined;
     }
 
-    const weightNum = weight && weight.trim() !== "" ? parseFloat(weight) : 0;
+    const weightNum =
+      weight && weight.trim() !== "" ? parseWeightKgInput(weight) : 0;
     const repsNum = parseInt(reps, 10);
 
     if (isNaN(repsNum) || repsNum <= 0) {
@@ -671,7 +674,7 @@ export function ForTimeExecutor({
   // For "for time" blocks: reps is required, weight is optional
   const weightStr = String(weight || "").trim();
   const repsStr = String(reps || "").trim();
-  const weightNum = weightStr ? parseFloat(weightStr) : NaN;
+  const weightNum = weightStr ? parseWeightKgInput(weightStr) : NaN;
   const repsNum = repsStr ? parseInt(repsStr, 10) : NaN;
 
   // For "for time" blocks, we need at least reps (weight is optional but recommended)
@@ -790,6 +793,7 @@ export function ForTimeExecutor({
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}
+      progressionSuggestion={progressionSuggestion}
       aboveStickyContent={aboveStickyContent}
     />
   );

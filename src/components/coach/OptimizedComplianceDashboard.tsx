@@ -1,73 +1,39 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { withTimeout } from '@/lib/withTimeout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
-import { 
-  Users, 
-  TrendingUp, 
-  TrendingDown, 
-  Minus,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Target,
-  Award,
-  MessageSquare,
-  Calendar,
-  BarChart3,
-  Eye,
-  Filter,
-  Search,
-  RefreshCw,
-  Bell,
-  BellOff,
-  Settings,
-  Plus,
-  Edit,
-  Trash2,
-  Star,
-  Zap,
-  Heart,
-  Dumbbell,
-  Apple,
-  Activity,
-  ArrowRight,
-  Trophy,
-  Flame,
-  Shield,
-  Sparkles
-} from 'lucide-react'
-import { 
-  ClientComplianceTracker,
-  ComplianceDashboardData,
-  ClientComplianceMetrics,
-  ClientEngagement,
-  ClientMilestone,
-  ClientComplianceAlert,
-  ClientProfile
-} from '@/lib/clientCompliance'
-import ComplianceSummaryWidget from './ComplianceSummaryWidget'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { RefreshCw, Search } from 'lucide-react'
+import { ComplianceDashboardData, ClientComplianceTracker } from '@/lib/clientCompliance'
 import { supabase } from '@/lib/supabase'
+import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import { AnalyticsHero } from '@/components/coach-analytics/AnalyticsHero'
+import { DistributionViz } from '@/components/coach-analytics/DistributionViz'
+import { QuickActions } from '@/components/coach-analytics/QuickActions'
+import { ComplianceClientCard } from '@/components/coach-analytics/ComplianceClientCard'
 
 interface OptimizedComplianceDashboardProps {
   coachId: string
 }
 
 export default function OptimizedComplianceDashboard({ coachId }: OptimizedComplianceDashboardProps) {
-  const [clients, setClients] = useState<ComplianceDashboardData[]>([])
+  const [rows, setRows] = useState<ComplianceDashboardData[]>([])
+  const [flags, setFlags] = useState<Map<string, { hasNutritionPlan: boolean; hasHabitsConfigured: boolean }>>(
+    new Map()
+  )
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
-  const [selectedClient, setSelectedClient] = useState<string>('all')
-  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter'>('week')
-  const [sortBy, setSortBy] = useState<'compliance' | 'engagement' | 'name'>('compliance')
+  const [selectedPeriod] = useState<'week' | 'month' | 'quarter'>('week')
+  const [sortBy, setSortBy] = useState<'compliance' | 'engagement' | 'name' | 'last_activity'>('compliance')
   const [filterLevel, setFilterLevel] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'cards' | 'compact'>('cards')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     loadClientData()
@@ -90,589 +56,369 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
           const clientIds = await getCoachClientIds(coachId, true)
           if (clientIds.length === 0) {
-            setClients([])
+            setRows([])
+            setFlags(new Map())
             return
           }
 
           const { data: clientsRows, error: clientsError } = await supabase
-        .from('clients')
-        .select('id, client_id, status, created_at, updated_at')
-        .eq('coach_id', coachId)
-        .in('client_id', clientIds)
-      if (clientsError) throw clientsError
+            .from('clients')
+            .select('id, client_id, status, created_at, updated_at')
+            .eq('coach_id', coachId)
+            .in('client_id', clientIds)
+          if (clientsError) throw clientsError
 
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', clientIds)
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', clientIds)
 
-      const [workoutLogsRes, mealCompletionsRes, habitLogsRes, assignmentsRes, workoutDurationsRes] = await Promise.all([
-        supabase.from('workout_logs').select('client_id, completed_at').in('client_id', clientIds).not('completed_at', 'is', null).gte('completed_at', periodStart).lt('completed_at', periodEnd),
-        supabase.from('meal_completions').select('client_id, completed_at').in('client_id', clientIds).gte('completed_at', periodStart).lt('completed_at', periodEnd),
-        supabase.from('habit_logs').select('client_id, log_date').in('client_id', clientIds).gte('log_date', periodStartDate).lt('log_date', periodEndDate),
-        supabase.from('workout_assignments').select('client_id, scheduled_date, assigned_date').in('client_id', clientIds),
-        supabase.from('workout_logs').select('client_id, total_duration_minutes').in('client_id', clientIds).not('completed_at', 'is', null).not('total_duration_minutes', 'is', null).gte('completed_at', periodStart).lt('completed_at', periodEnd)
-      ])
+          const [
+            workoutLogsRes,
+            mealCompletionsRes,
+            habitLogsRes,
+            assignmentsRes,
+            workoutDurationsRes,
+            mealAssignRes,
+            habitsRes,
+          ] = await Promise.all([
+            supabase
+              .from('workout_logs')
+              .select('client_id, completed_at')
+              .in('client_id', clientIds)
+              .not('completed_at', 'is', null)
+              .gte('completed_at', periodStart)
+              .lt('completed_at', periodEnd),
+            supabase
+              .from('meal_completions')
+              .select('client_id, completed_at')
+              .in('client_id', clientIds)
+              .gte('completed_at', periodStart)
+              .lt('completed_at', periodEnd),
+            supabase
+              .from('habit_logs')
+              .select('client_id, log_date')
+              .in('client_id', clientIds)
+              .gte('log_date', periodStartDate)
+              .lt('log_date', periodEndDate),
+            supabase.from('workout_assignments').select('client_id, scheduled_date, assigned_date').in('client_id', clientIds),
+            supabase
+              .from('workout_logs')
+              .select('client_id, total_duration_minutes')
+              .in('client_id', clientIds)
+              .not('completed_at', 'is', null)
+              .not('total_duration_minutes', 'is', null)
+              .gte('completed_at', periodStart)
+              .lt('completed_at', periodEnd),
+            supabase.from('meal_plan_assignments').select('client_id').in('client_id', clientIds).eq('is_active', true),
+            supabase.from('habits').select('client_id').in('client_id', clientIds).eq('is_active', true),
+          ])
 
-      const workoutLogs = workoutLogsRes.data || []
-      const nutritionRows = mealCompletionsRes.data || []
-      const habitRows = habitLogsRes.data || []
-      const assignments = assignmentsRes.data || []
-      const durations = workoutDurationsRes.data || []
+          const nutritionSet = new Set((mealAssignRes.data || []).map((r: { client_id: string }) => r.client_id))
+          const habitConfiguredSet = new Set((habitsRes.data || []).map((r: { client_id: string }) => r.client_id))
 
-      const daysInPeriod = Math.ceil((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (24 * 60 * 60 * 1000)) || 30
-      const assignedByClient: Record<string, number> = {}
-      clientIds.forEach(id => (assignedByClient[id] = 0))
-      assignments.forEach((r: { client_id: string; scheduled_date?: string; assigned_date?: string }) => {
-        const d = (r.scheduled_date || r.assigned_date) ?? ''
-        if (d >= periodStartDate && d < periodEndDate) assignedByClient[r.client_id] = (assignedByClient[r.client_id] || 0) + 1
-      })
+          const flagMap = new Map<string, { hasNutritionPlan: boolean; hasHabitsConfigured: boolean }>()
+          clientIds.forEach((id) => {
+            flagMap.set(id, {
+              hasNutritionPlan: nutritionSet.has(id),
+              hasHabitsConfigured: habitConfiguredSet.has(id),
+            })
+          })
+          setFlags(flagMap)
 
-      const profileMap = new Map((profiles || []).map((p: { id: string }) => [p.id, p]))
-      const today = new Date().toISOString().split('T')[0]
+          const workoutLogs = workoutLogsRes.data || []
+          const nutritionRows = mealCompletionsRes.data || []
+          const habitRows = habitLogsRes.data || []
+          const assignments = assignmentsRes.data || []
+          const durations = workoutDurationsRes.data || []
 
-      const clientsWithData: ComplianceDashboardData[] = (clientsRows || []).map((row: { id: string; client_id: string; created_at?: string; updated_at?: string }) => {
-        const clientId = row.client_id
-        const profile = profileMap.get(clientId) as { first_name?: string; last_name?: string; email?: string } | undefined
-        const wCount = workoutLogs.filter((w: { client_id: string }) => w.client_id === clientId).length
-        const nDays = new Set(nutritionRows.filter((n: { client_id: string }) => n.client_id === clientId).map((n: { completed_at: string }) => new Date(n.completed_at).toISOString().slice(0, 10))).size
-        const hDays = new Set(habitRows.filter((h: { client_id: string }) => h.client_id === clientId).map((h: { log_date: string }) => h.log_date)).size
-        const assigned = assignedByClient[clientId] || 0
-        const workoutCompliance = assigned > 0 ? Math.min(100, Math.round((wCount / assigned) * 100)) : 0
-        const nutritionCompliance = daysInPeriod > 0 ? Math.min(100, Math.round((nDays / daysInPeriod) * 100)) : 0
-        const habitCompliance = daysInPeriod > 0 ? Math.min(100, Math.round((hDays / daysInPeriod) * 100)) : 0
-        const overallCompliance = Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3)
-        const sessionDurations = durations.filter((d: { client_id: string }) => d.client_id === clientId).map((d: { total_duration_minutes: number | null }) => d.total_duration_minutes ?? 0)
-        const avgDuration = sessionDurations.length > 0 ? Math.round(sessionDurations.reduce((a: number, b: number) => a + b, 0) / sessionDurations.length) : 0
+          const daysInPeriod =
+            Math.ceil((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (24 * 60 * 60 * 1000)) || 30
+          const assignedByClient: Record<string, number> = {}
+          clientIds.forEach((id) => (assignedByClient[id] = 0))
+          assignments.forEach((r: { client_id: string; scheduled_date?: string; assigned_date?: string }) => {
+            const d = (r.scheduled_date || r.assigned_date) ?? ''
+            if (d >= periodStartDate && d < periodEndDate) assignedByClient[r.client_id] = (assignedByClient[r.client_id] || 0) + 1
+          })
 
-        const compliance: ClientComplianceMetrics = {
-          id: '',
-          client_id: clientId,
-          coach_id: coachId,
-          metric_date: today,
-          workout_compliance: workoutCompliance,
-          nutrition_compliance: nutritionCompliance,
-          habit_compliance: habitCompliance,
-          session_attendance: workoutCompliance,
-          overall_compliance: overallCompliance,
-          engagement_score: Math.min(100, Math.round((wCount * 10 + nDays * 5 + hDays * 3) / 2)),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        const engagement: ClientEngagement = {
-          id: '',
-          client_id: clientId,
-          coach_id: coachId,
-          engagement_date: today,
-          app_logins: 0,
-          workout_sessions: wCount,
-          nutrition_logs: nutritionRows.filter((n: { client_id: string }) => n.client_id === clientId).length,
-          habit_completions: habitRows.filter((h: { client_id: string }) => h.client_id === clientId).length,
-          messages_sent: 0,
-          progress_updates: 0,
-          feature_usage: {},
-          session_duration: avgDuration,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        const milestones: ClientMilestone[] = []
-        const alerts: ClientComplianceAlert[] = []
-        const insights = ClientComplianceTracker.generateInsights(compliance, engagement, milestones)
-        const recommendations = ClientComplianceTracker.generateRecommendations(compliance, engagement, alerts)
-        const trends = { compliance_trend: 'stable' as const, engagement_trend: 'stable' as const, workout_trend: 'stable' as const, nutrition_trend: 'stable' as const }
+          const profileMap = new Map((profiles || []).map((p: { id: string }) => [p.id, p]))
+          const today = new Date().toISOString().split('T')[0]
 
-        return {
-          client: {
-            id: clientId,
-            first_name: profile?.first_name,
-            last_name: profile?.last_name,
-            email: profile?.email ?? '',
-            fitness_level: undefined,
-            goals: [],
-            join_date: row.created_at?.split('T')[0] ?? '',
-            last_active: row.updated_at?.split('T')[0] ?? ''
-          },
-          compliance,
-          engagement,
-          milestones,
-          alerts,
-          trends,
-          insights,
-          recommendations
-        }
-      })
+          const clientsWithData: ComplianceDashboardData[] = (clientsRows || []).map(
+            (row: { id: string; client_id: string; created_at?: string; updated_at?: string }) => {
+              const clientId = row.client_id
+              const profile = profileMap.get(clientId) as { first_name?: string; last_name?: string; email?: string } | undefined
+              const hasNutritionPlan = nutritionSet.has(clientId)
+              const hasHabitsConfigured = habitConfiguredSet.has(clientId)
 
-          setClients(clientsWithData)
+              const wCount = workoutLogs.filter((w: { client_id: string }) => w.client_id === clientId).length
+              const nDays = new Set(
+                nutritionRows
+                  .filter((n: { client_id: string }) => n.client_id === clientId)
+                  .map((n: { completed_at: string }) => new Date(n.completed_at).toISOString().slice(0, 10))
+              ).size
+              const hDays = new Set(
+                habitRows.filter((h: { client_id: string }) => h.client_id === clientId).map((h: { log_date: string }) => h.log_date)
+              ).size
+              const assigned = assignedByClient[clientId] || 0
+              const workoutCompliance = assigned > 0 ? Math.min(100, Math.round((wCount / assigned) * 100)) : 0
+              const nutritionCompliance =
+                hasNutritionPlan && daysInPeriod > 0 ? Math.min(100, Math.round((nDays / daysInPeriod) * 100)) : 0
+              const habitCompliance =
+                hasHabitsConfigured && daysInPeriod > 0 ? Math.min(100, Math.round((hDays / daysInPeriod) * 100)) : 0
+
+              const parts: number[] = [workoutCompliance]
+              if (hasNutritionPlan) parts.push(nutritionCompliance)
+              if (hasHabitsConfigured) parts.push(habitCompliance)
+              const overallCompliance = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : 0
+
+              const sessionDurations = durations
+                .filter((d: { client_id: string }) => d.client_id === clientId)
+                .map((d: { total_duration_minutes: number | null }) => d.total_duration_minutes ?? 0)
+              const avgDuration =
+                sessionDurations.length > 0 ? Math.round(sessionDurations.reduce((a: number, b: number) => a + b, 0) / sessionDurations.length) : 0
+
+              const compliance = {
+                id: '',
+                client_id: clientId,
+                coach_id: coachId,
+                metric_date: today,
+                workout_compliance: workoutCompliance,
+                nutrition_compliance: nutritionCompliance,
+                habit_compliance: habitCompliance,
+                session_attendance: workoutCompliance,
+                overall_compliance: overallCompliance,
+                engagement_score: Math.min(100, Math.round((wCount * 10 + nDays * 5 + hDays * 3) / 2)),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }
+              const engagement = {
+                id: '',
+                client_id: clientId,
+                coach_id: coachId,
+                engagement_date: today,
+                app_logins: 0,
+                workout_sessions: wCount,
+                nutrition_logs: nutritionRows.filter((n: { client_id: string }) => n.client_id === clientId).length,
+                habit_completions: habitRows.filter((h: { client_id: string }) => h.client_id === clientId).length,
+                messages_sent: 0,
+                progress_updates: 0,
+                feature_usage: {},
+                session_duration: avgDuration,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }
+              const milestones: ComplianceDashboardData['milestones'] = []
+              const alerts: ComplianceDashboardData['alerts'] = []
+              const insights = ClientComplianceTracker.generateInsights(compliance, engagement, milestones)
+              const recommendations = ClientComplianceTracker.generateRecommendations(compliance, engagement, alerts)
+              const trends = {
+                compliance_trend: 'stable' as const,
+                engagement_trend: 'stable' as const,
+                workout_trend: 'stable' as const,
+                nutrition_trend: 'stable' as const,
+              }
+
+              return {
+                client: {
+                  id: clientId,
+                  first_name: profile?.first_name,
+                  last_name: profile?.last_name,
+                  email: profile?.email ?? '',
+                  fitness_level: undefined,
+                  goals: [],
+                  join_date: row.created_at?.split('T')[0] ?? '',
+                  last_active: row.updated_at?.split('T')[0] ?? '',
+                },
+                compliance,
+                engagement,
+                milestones,
+                alerts,
+                trends,
+                insights,
+                recommendations,
+              }
+            }
+          )
+
+          setRows(clientsWithData)
         })(),
         45000,
         'loadClientData'
       )
     } catch (error) {
       console.error('Error loading client compliance data:', error)
-      setClients([])
+      setRows([])
     } finally {
       setLoading(false)
       loadingRef.current = false
     }
   }
 
-  const getComplianceLevel = (score: number) => {
-    return ClientComplianceTracker.getComplianceLevel(score)
-  }
+  const getComplianceLevel = (score: number) => ClientComplianceTracker.getComplianceLevel(score)
 
-  const getEngagementLevel = (score: number) => {
-    return ClientComplianceTracker.getEngagementLevel(score)
-  }
+  const distribution = useMemo(() => {
+    const excellent = rows.filter((c) => c.compliance.overall_compliance >= 90).length
+    const good = rows.filter((c) => c.compliance.overall_compliance >= 75 && c.compliance.overall_compliance < 90).length
+    const fair = rows.filter((c) => c.compliance.overall_compliance >= 60 && c.compliance.overall_compliance < 75).length
+    const poor = rows.filter((c) => c.compliance.overall_compliance >= 50 && c.compliance.overall_compliance < 60).length
+    const critical = rows.filter((c) => c.compliance.overall_compliance < 50).length
+    return { excellent, good, fair, poor, critical }
+  }, [rows])
 
-  const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
-    switch (trend) {
-      case 'up': return <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-success)]" />
-      case 'down': return <TrendingDown className="w-4 h-4 text-[color:var(--fc-status-error)]" />
-      default: return <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-    }
-  }
-
-  const filteredAndSortedClients = clients
-    .filter(client => {
-      if (selectedClient !== 'all' && client.client.id !== selectedClient) return false
-      if (filterLevel !== 'all') {
-        const complianceLevel = getComplianceLevel(client.compliance.overall_compliance)
-        if (complianceLevel.level !== filterLevel) return false
-      }
-      return true
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'compliance':
-          return b.compliance.overall_compliance - a.compliance.overall_compliance
-        case 'engagement':
-          return b.compliance.engagement_score - a.compliance.engagement_score
-        case 'name':
-          return (a.client.first_name || '').localeCompare(b.client.first_name || '')
-        default:
-          return 0
-      }
-    })
-
-  const getOverallStats = () => {
-    const totalClients = clients.length
-    const avgCompliance = clients.length > 0 
-      ? clients.reduce((sum, c) => sum + c.compliance.overall_compliance, 0) / clients.length
-      : 0
-    const avgEngagement = clients.length > 0
-      ? clients.reduce((sum, c) => sum + c.compliance.engagement_score, 0) / clients.length
-      : 0
-    const totalAlerts = clients.reduce((sum, c) => sum + c.alerts.length, 0)
-    const criticalAlerts = clients.reduce((sum, c) => 
-      sum + c.alerts.filter((a: any) => a.alert_level === 'critical').length, 0
+  const stats = useMemo(() => {
+    const totalClients = rows.length
+    const avgCompliance = rows.length > 0 ? rows.reduce((sum, c) => sum + c.compliance.overall_compliance, 0) / rows.length : 0
+    const criticalAlerts = rows.reduce(
+      (sum, c) => sum + c.alerts.filter((a) => a.alert_level === 'critical').length,
+      0
     )
+    return { totalClients, avgCompliance, criticalAlerts }
+  }, [rows])
 
-    return {
-      totalClients,
-      avgCompliance,
-      avgEngagement,
-      totalAlerts,
-      criticalAlerts
-    }
-  }
-
-  const getComplianceColor = (score: number) => {
-    if (score >= 90) return 'text-[color:var(--fc-status-success)]'
-    if (score >= 75) return 'text-[color:var(--fc-accent-cyan)]'
-    if (score >= 60) return 'text-[color:var(--fc-status-warning)]'
-    if (score >= 50) return 'text-[color:var(--fc-status-error)]'
-    return 'text-[color:var(--fc-status-error)]'
-  }
-
-  const getComplianceBgColor = (score: number) => {
-    if (score >= 90) return 'bg-[color:var(--fc-glass-soft)]'
-    if (score >= 75) return 'bg-[color:var(--fc-glass-soft)]'
-    if (score >= 60) return 'bg-[color:var(--fc-glass-soft)]'
-    if (score >= 50) return 'bg-[color:var(--fc-glass-soft)]'
-    return 'bg-[color:var(--fc-glass-soft)]'
-  }
+  const filteredAndSorted = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return rows
+      .filter((r) => {
+        if (filterLevel !== 'all') {
+          const complianceLevel = getComplianceLevel(r.compliance.overall_compliance)
+          if (complianceLevel.level !== filterLevel) return false
+        }
+        if (!q) return true
+        const name = `${r.client.first_name ?? ''} ${r.client.last_name ?? ''}`.toLowerCase()
+        const email = (r.client.email ?? '').toLowerCase()
+        return name.includes(q) || email.includes(q)
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'compliance':
+            return b.compliance.overall_compliance - a.compliance.overall_compliance
+          case 'engagement':
+            return b.compliance.engagement_score - a.compliance.engagement_score
+          case 'name':
+            return (a.client.first_name || '').localeCompare(b.client.first_name || '')
+          case 'last_activity': {
+            const da = a.client.last_active ? new Date(a.client.last_active).getTime() : 0
+            const db = b.client.last_active ? new Date(b.client.last_active).getTime() : 0
+            return db - da
+          }
+          default:
+            return 0
+        }
+      })
+  }, [rows, filterLevel, sortBy, searchQuery])
 
   if (loading) {
     return <PageSkeleton variant="dashboard" />
   }
 
-  const stats = getOverallStats()
+  const avgPct = Math.round(stats.avgCompliance ?? 0)
+  const avgColor =
+    avgPct <= 0 ? 'var(--critical)' : avgPct < 50 ? 'var(--critical)' : avgPct < 75 ? 'var(--warning)' : 'var(--good)'
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Control bar: Refresh */}
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
+    <div className="space-y-4">
+      <AnalyticsHero
+        accent="warning"
+        eyebrow="Compliance dashboard"
+        title="At-risk pulse"
+        subtitle="Follow-through, missed sessions, and at-risk clients"
+        stats={[
+          { num: stats.totalClients, label: 'Active clients', color: 'var(--cyan)' },
+          { num: `${avgPct}%`, label: 'Avg compliance', color: avgColor },
+          { num: stats.criticalAlerts, label: 'Critical alerts', color: 'var(--warning)' },
+        ]}
+      />
+
+      <div
+        className="flex items-center gap-2 rounded-[13px] border px-3 py-2"
+        style={{ background: 'var(--card)', borderColor: 'var(--line)' }}
+      >
+        <Search className="size-3 shrink-0" style={{ color: 'var(--t3)' }} aria-hidden />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search clients..."
+          className="min-w-0 flex-1 border-0 bg-transparent text-[12.5px] outline-none"
+          style={{ color: 'var(--t1)' }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid flex-1 grid-cols-2 gap-2">
+        <Select value={filterLevel} onValueChange={setFilterLevel}>
+          <SelectTrigger
+            className="h-auto min-h-0 w-full justify-between rounded-[11px] border py-2 px-2.5 text-[11.5px] shadow-none"
+            style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t2)' }}
+          >
+            <SelectValue placeholder="All levels" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All levels</SelectItem>
+            <SelectItem value="excellent">Excellent</SelectItem>
+            <SelectItem value="good">Good</SelectItem>
+            <SelectItem value="fair">Fair</SelectItem>
+            <SelectItem value="poor">Poor</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <SelectTrigger
+            className="h-auto min-h-0 w-full justify-between rounded-[11px] border py-2 px-2.5 text-[11.5px] shadow-none"
+            style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t2)' }}
+          >
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="compliance">Sort: Compliance</SelectItem>
+            <SelectItem value="engagement">Sort: Engagement</SelectItem>
+            <SelectItem value="last_activity">Sort: Last activity</SelectItem>
+            <SelectItem value="name">Sort: Name</SelectItem>
+          </SelectContent>
+        </Select>
+        </div>
+        <button
+          type="button"
           onClick={loadClientData}
-          className="fc-btn fc-btn-ghost flex items-center gap-2"
-          size="sm"
+          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-[10px] border px-2.5 py-2 text-[11px] transition-colors hover:bg-white/[0.04] sm:self-auto"
+          style={{
+            borderColor: 'var(--line)',
+            color: 'var(--t2)',
+            fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+            background: 'transparent',
+          }}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="size-[11px] shrink-0" aria-hidden />
           Refresh
-        </Button>
+        </button>
       </div>
 
-      {/* KPI strip - preserved from hero */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        <Card className="fc-card-shell">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <DistributionViz totalClients={stats.totalClients} distribution={distribution} />
+      <QuickActions />
 
-        <Card className="fc-card-shell">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgCompliance ?? 0).toFixed(1)}%</p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Compliance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="fc-card-shell">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgEngagement ?? 0).toFixed(1)}%</p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Engagement</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="fc-card-shell">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
-                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">Critical Alerts</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-3">
+        {filteredAndSorted.map((row) => {
+          const f = flags.get(row.client.id) ?? { hasNutritionPlan: false, hasHabitsConfigured: false }
+          return (
+            <ComplianceClientCard
+              key={row.client.id}
+              row={row}
+              hasNutritionPlan={f.hasNutritionPlan}
+              hasHabitsConfigured={f.hasHabitsConfigured}
+            />
+          )
+        })}
       </div>
 
-      {/* Main content */}
-      <div className="space-y-4 sm:space-y-8">
-          {/* Filters */}
-          <Card className="fc-card-shell">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1fr] gap-4">
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                  <Select value={selectedClient} onValueChange={setSelectedClient}>
-                    <SelectTrigger className="fc-select w-full h-11">
-                      <SelectValue placeholder="All Clients" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Clients</SelectItem>
-                      {clients.map(client => (
-                        <SelectItem key={client.client.id} value={client.client.id}>
-                          {client.client.first_name} {client.client.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                  <Select value={filterLevel} onValueChange={setFilterLevel}>
-                    <SelectTrigger className="fc-select w-full h-11">
-                      <SelectValue placeholder="All Levels" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Levels</SelectItem>
-                      <SelectItem value="excellent">Excellent</SelectItem>
-                      <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="fair">Fair</SelectItem>
-                      <SelectItem value="poor">Poor</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                  <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                    <SelectTrigger className="fc-select w-full h-11">
-                      <SelectValue placeholder="Sort By" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="compliance">Compliance</SelectItem>
-                      <SelectItem value="engagement">Engagement</SelectItem>
-                      <SelectItem value="name">Name</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary Widgets */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3">
-              {/* Client Cards */}
-              <div className="space-y-6">
-            {filteredAndSortedClients.map(client => {
-              const complianceLevel = getComplianceLevel(client.compliance.overall_compliance)
-              const engagementLevel = getEngagementLevel(client.compliance.engagement_score)
-              
-              return (
-                <Card key={client.client.id} className="fc-card-shell hover:shadow-lg transition-all duration-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        {/* Client Avatar */}
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
-                            {client.client.first_name?.[0]}{client.client.last_name?.[0]}
-                          </div>
-                          {/* Status indicator */}
-                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[color:var(--fc-glass-border)] ${
-                            complianceLevel.level === 'excellent' ? 'bg-[color:var(--fc-status-success)]' :
-                            complianceLevel.level === 'good' ? 'bg-[color:var(--fc-accent-cyan)]' :
-                            complianceLevel.level === 'fair' ? 'bg-[color:var(--fc-status-warning)]' :
-                            complianceLevel.level === 'poor' ? 'bg-[color:var(--fc-status-error)]' : 'bg-[color:var(--fc-status-error)]'
-                          }`}></div>
-                        </div>
-
-                        <div className="flex-1">
-                          <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">
-                            {client.client.first_name} {client.client.last_name}
-                          </CardTitle>
-                          <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{client.client.email}</p>
-                          
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge 
-                              className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border border-[color:var(--fc-glass-border)]`}
-                            >
-                              {complianceLevel.level} compliance
-                            </Badge>
-                            <Badge 
-                              className={`${getComplianceBgColor(client.compliance.engagement_score)} ${getComplianceColor(client.compliance.engagement_score)} border border-[color:var(--fc-glass-border)]`}
-                            >
-                              {engagementLevel.level} engagement
-                            </Badge>
-                            {client.alerts.length > 0 && (
-                              <Badge className="bg-[color:var(--fc-status-error)] text-white border-0">
-                                {client.alerts.length} alert{client.alerts.length > 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
-                          <MessageSquare className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-6">
-                    {/* Compliance Metrics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Dumbbell className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Workouts</span>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-lg font-bold ${getComplianceColor(client.compliance.workout_compliance)}`}>
-                              {(client.compliance?.workout_compliance ?? 0).toFixed(1)}%
-                            </span>
-                            {getTrendIcon(client.trends.workout_trend)}
-                          </div>
-                          <Progress value={client.compliance.workout_compliance} className="h-2" />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Apple className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Nutrition</span>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-lg font-bold ${getComplianceColor(client.compliance.nutrition_compliance)}`}>
-                              {(client.compliance?.nutrition_compliance ?? 0).toFixed(1)}%
-                            </span>
-                            {getTrendIcon(client.trends.nutrition_trend)}
-                          </div>
-                          <Progress value={client.compliance.nutrition_compliance} className="h-2" />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-[color:var(--fc-domain-habits)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Habits</span>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-lg font-bold ${getComplianceColor(client.compliance.habit_compliance)}`}>
-                              {(client.compliance?.habit_compliance ?? 0).toFixed(1)}%
-                            </span>
-                          <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                          </div>
-                          <Progress value={client.compliance.habit_compliance} className="h-2" />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions</span>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-lg font-bold ${getComplianceColor(client.compliance.session_attendance)}`}>
-                              {(client.compliance?.session_attendance ?? 0).toFixed(1)}%
-                            </span>
-                            <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                          </div>
-                          <Progress value={client.compliance.session_attendance} className="h-2" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Engagement Metrics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Dumbbell className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Workouts</span>
-                        </div>
-                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.workout_sessions}</p>
-                        <p className="text-xs text-[color:var(--fc-text-dim)]">This week</p>
-                      </div>
-                      
-                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Apple className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Nutrition</span>
-                        </div>
-                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.nutrition_logs}</p>
-                        <p className="text-xs text-[color:var(--fc-text-dim)]">Logs this week</p>
-                      </div>
-                      
-                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Zap className="w-4 h-4 text-[color:var(--fc-domain-habits)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Habits</span>
-                        </div>
-                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.habit_completions}</p>
-                        <p className="text-xs text-[color:var(--fc-text-dim)]">Completed</p>
-                      </div>
-                      
-                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
-                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Messages</span>
-                        </div>
-                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.messages_sent}</p>
-                        <p className="text-xs text-[color:var(--fc-text-dim)]">This week</p>
-                      </div>
-                    </div>
-
-                    {/* Insights and Alerts */}
-                    {(client.insights.length > 0 || client.alerts.length > 0) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Insights */}
-                        {client.insights.length > 0 && (
-                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Sparkles className="w-4 h-4 text-[color:var(--fc-status-success)]" />
-                              <span className="font-medium text-[color:var(--fc-text-primary)]">Insights</span>
-                            </div>
-                            <div className="space-y-2">
-                              {client.insights.slice(0, 2).map((insight, index) => (
-                                <div key={index} className="flex items-start gap-2 text-sm">
-                                  <Star className="w-3 h-3 text-[color:var(--fc-status-warning)] mt-1 flex-shrink-0" />
-                                  <span className="text-[color:var(--fc-text-dim)]">{insight}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Alerts */}
-                        {client.alerts.length > 0 && (
-                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                            <div className="flex items-center gap-2 mb-3">
-                              <AlertTriangle className="w-4 h-4 text-[color:var(--fc-status-error)]" />
-                              <span className="font-medium text-[color:var(--fc-text-primary)]">Alerts</span>
-                            </div>
-                            <div className="space-y-2">
-                              {client.alerts.slice(0, 2).map((alert, index) => (
-                                <div key={index} className="flex items-start gap-2 text-sm">
-                                  <AlertTriangle className={`w-3 h-3 mt-1 flex-shrink-0 ${
-                                    alert.alert_level === 'critical' ? 'text-[color:var(--fc-status-error)]' : 
-                                    alert.alert_level === 'warning' ? 'text-[color:var(--fc-status-warning)]' : 'text-[color:var(--fc-accent-cyan)]'
-                                  }`} />
-                                  <span className="text-[color:var(--fc-text-dim)]">{alert.alert_message}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
-              </div>
-
-              {filteredAndSortedClients.length === 0 && (
-                <Card className="fc-card-shell">
-                  <CardContent className="text-center py-12">
-                    <Users className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-[color:var(--fc-text-primary)] mb-2">No clients found</h3>
-                    <p className="text-[color:var(--fc-text-dim)] mb-4">
-                      {selectedClient !== 'all' || filterLevel !== 'all'
-                        ? 'Try adjusting your filters to see more clients'
-                        : 'No clients are currently assigned to you'
-                      }
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            <div className="lg:col-span-1">
-              <ComplianceSummaryWidget clients={clients} selectedPeriod={selectedPeriod} />
-            </div>
-          </div>
-      </div>
+      {filteredAndSorted.length === 0 ? (
+        <div
+          className="rounded-[18px] border p-8 text-center text-sm"
+          style={{ background: 'var(--card)', borderColor: 'var(--line)', color: 'var(--t3)' }}
+        >
+          No clients found
+        </div>
+      ) : null}
     </div>
   )
 }

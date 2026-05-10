@@ -130,7 +130,7 @@ function ActivityHubContent() {
     <>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex flex-col gap-4">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex flex-col gap-4">
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             <button

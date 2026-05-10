@@ -242,7 +242,7 @@ function CategoriesHubContent() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 md:p-8">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-8">
           <div className="space-y-6">
             <button
               type="button"
@@ -445,7 +445,7 @@ function CategoriesHubFallback() {
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
-        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 md:p-8">
+        <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-8">
           <PageSkeleton variant="dashboard" />
         </CoachPageShell>
       </AnimatedBackground>

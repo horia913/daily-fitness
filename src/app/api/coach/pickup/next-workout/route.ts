@@ -17,6 +17,124 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
+import { getProgramState } from '@/lib/programStateService'
+
+type PickupBlock = {
+  id: string
+  set_type: string
+  set_order: number
+  block_name?: string
+  exercises: Array<{
+    id: string
+    exercise_id: string
+    exercise_name: string
+    sets?: number
+    reps?: string
+    weight_kg?: number
+  }>
+}
+
+async function buildPickupFallbackFromProgramState(clientId: string) {
+  const supabase = await createSupabaseServerClient()
+  const state = await getProgramState(supabase, clientId)
+  if (!state.assignment || !state.nextSlot || !state.nextSlot.template_id) {
+    return {
+      status: 'no_program',
+      workout_name: 'No workout configured',
+      blocks: [],
+    }
+  }
+
+  const templateId = state.nextSlot.template_id
+  const { data: templateRow } = await supabase
+    .from('workout_templates')
+    .select('name')
+    .eq('id', templateId)
+    .maybeSingle()
+
+  const { data: rpcBlocks, error: rpcBlocksError } = await supabase.rpc('get_workout_blocks', {
+    p_template_id: templateId,
+  })
+
+  if (rpcBlocksError) {
+    console.error('[pickup/next-workout] fallback get_workout_blocks error:', rpcBlocksError)
+    return {
+      status: 'active',
+      workout_name: templateRow?.name ?? 'Workout',
+      template_id: templateId,
+      current_week: state.currentWeekNumber,
+      current_day: state.currentDayNumber,
+      program_assignment_id: state.assignment.id,
+      blocks: [],
+    }
+  }
+
+  const rawBlocks = Array.isArray(rpcBlocks) ? (rpcBlocks as Array<Record<string, unknown>>) : []
+  const allExerciseIds = new Set<string>()
+  for (const block of rawBlocks) {
+    const exercises = Array.isArray(block.exercises) ? (block.exercises as Array<Record<string, unknown>>) : []
+    for (const ex of exercises) {
+      const id = typeof ex.exercise_id === 'string' ? ex.exercise_id : null
+      if (id) allExerciseIds.add(id)
+    }
+  }
+
+  const exerciseNameById = new Map<string, string>()
+  if (allExerciseIds.size > 0) {
+    const { data: exerciseRows } = await supabase
+      .from('exercises')
+      .select('id, name')
+      .in('id', [...allExerciseIds])
+    for (const row of exerciseRows ?? []) {
+      if (row?.id && row?.name) exerciseNameById.set(row.id, row.name)
+    }
+  }
+
+  const blocks: PickupBlock[] = rawBlocks.map((block) => {
+    const exercises = Array.isArray(block.exercises) ? (block.exercises as Array<Record<string, unknown>>) : []
+    const mappedExercises: PickupBlock['exercises'] = []
+    for (const ex of exercises) {
+      const exerciseId = typeof ex.exercise_id === 'string' ? ex.exercise_id : null
+      if (!exerciseId) continue
+      const nestedName =
+        ex.exercise && typeof ex.exercise === 'object' && ex.exercise != null && 'name' in ex.exercise
+          ? (ex.exercise as { name?: unknown }).name
+          : null
+      const exerciseName =
+        (typeof ex.exercise_name === 'string' && ex.exercise_name) ||
+        (typeof nestedName === 'string' && nestedName) ||
+        exerciseNameById.get(exerciseId) ||
+        'Exercise'
+      mappedExercises.push({
+        id: typeof ex.id === 'string' ? ex.id : `${String(block.id ?? 'block')}-${exerciseId}`,
+        exercise_id: exerciseId,
+        exercise_name: exerciseName,
+        sets: typeof ex.sets === 'number' ? ex.sets : undefined,
+        reps: typeof ex.reps === 'string' ? ex.reps : undefined,
+        weight_kg: typeof ex.weight_kg === 'number' ? ex.weight_kg : undefined,
+      })
+    }
+
+    return {
+      id: String(block.id ?? `block-${Math.random().toString(36).slice(2)}`),
+      set_type: String(block.set_type ?? block.block_type ?? 'straight_set'),
+      set_order: Number(block.set_order ?? block.block_order ?? 0),
+      block_name: typeof block.set_name === 'string' ? block.set_name : typeof block.block_name === 'string' ? block.block_name : undefined,
+      exercises: mappedExercises,
+    }
+  })
+
+  return {
+    status: 'active',
+    workout_name: templateRow?.name ?? 'Workout',
+    position_label: state.positionLabel,
+    template_id: templateId,
+    current_week: state.currentWeekNumber,
+    current_day: state.currentDayNumber,
+    program_assignment_id: state.assignment.id,
+    blocks,
+  }
+}
 
 export async function GET(request: NextRequest) {
   const perf = new PerfCollector('/api/coach/pickup/next-workout')
@@ -103,9 +221,22 @@ export async function GET(request: NextRequest) {
     
     // 5. Check for error responses from RPC (returned as data, not thrown)
     if (data?.error) {
-      const statusCode = data.error.includes('not configured') ? 422 : 
-                        data.error.includes('Invalid progress') ? 422 : 500
-      return NextResponse.json(data, { status: statusCode })
+      const message = String(data.error)
+      const isConfigurationGap =
+        message.includes('not configured') || message.includes('Invalid progress')
+
+      // Program progress cache can drift out of sync. Recover by deriving next slot
+      // from canonical ledger state instead of returning a hard failure.
+      if (isConfigurationGap) {
+        const fallback = await buildPickupFallbackFromProgramState(clientId)
+        return NextResponse.json({
+          ...fallback,
+          warning: message,
+          details: data?.message ?? null,
+        })
+      }
+
+      return NextResponse.json(data, { status: 500 })
     }
     
     // 6. Log performance summary

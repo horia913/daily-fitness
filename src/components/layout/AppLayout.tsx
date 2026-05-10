@@ -1,8 +1,10 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import Header from "./Header";
 import BottomNav from "./BottomNav";
+import DesktopShell from "./DesktopShell";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,10 +12,14 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
-  // Don't show layout on auth page
-  if (pathname === "/") {
+  if (pathname === "/" || pathname.startsWith("/admin")) {
     return <>{children}</>;
+  }
+
+  if (isDesktop) {
+    return <DesktopShell>{children}</DesktopShell>;
   }
 
   return (

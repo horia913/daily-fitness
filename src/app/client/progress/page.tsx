@@ -236,7 +236,7 @@ function ProgressHubContent() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <div className="py-6 px-4 text-center">
             <AlertTriangle
               className="w-7 h-7 mx-auto mb-3 fc-text-dim"
@@ -263,7 +263,7 @@ function ProgressHubContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
         <div className={ps.psV1}>
           <PsHero
             glow="cyan"

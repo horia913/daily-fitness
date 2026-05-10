@@ -1,0 +1,205 @@
+/* Create exercise modal — extends habit sheet geometry; lime coach accent */
+.portalRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 10055;
+  pointer-events: none;
+}
+
+.portalRoot * {
+  pointer-events: auto;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 8, 18, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: coachExBackdropIn 200ms ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes coachExBackdropIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.root {
+  --bg: #07101a;
+  --card: #0e1f2e;
+  --card-2: #0b1824;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.05);
+  --t1: #fff;
+  --t2: rgba(255, 255, 255, 0.65);
+  --t3: rgba(255, 255, 255, 0.42);
+  --t4: rgba(255, 255, 255, 0.26);
+  --cyan: #4fe3e8;
+  --cyan-soft: rgba(79, 227, 232, 0.12);
+  --cyan-dim: rgba(79, 227, 232, 0.18);
+  --lime: #c5ff4a;
+  --lime-2: #7fe89a;
+  --lime-soft: rgba(197, 255, 74, 0.14);
+  --lime-text: #0a1a18;
+  --critical: #ff5a5f;
+  --critical-soft: rgba(255, 90, 95, 0.12);
+  --warning: #f5c242;
+  --warning-soft: rgba(245, 194, 66, 0.12);
+  --warning-dim: rgba(245, 194, 66, 0.28);
+  --purple: #a78bfa;
+  --purple-soft: rgba(167, 139, 250, 0.12);
+  --purple-dim: rgba(167, 139, 250, 0.22);
+  --rose: #f472b6;
+  --rose-soft: rgba(244, 114, 182, 0.12);
+  --rose-dim: rgba(244, 114, 182, 0.22);
+  --f-head: "Bricolage Grotesque", var(--font-geist-sans, system-ui, sans-serif);
+  --f-body: var(--font-geist-sans, "Geist", system-ui, sans-serif);
+  --f-mono: var(--font-geist-mono, "Geist Mono", ui-monospace, monospace);
+  color: var(--t1);
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 90vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+  transform: translateY(100%);
+  animation: coachExSheetIn 200ms ease-out forwards;
+}
+
+@media (min-width: 768px) {
+  .sheet {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    width: 100%;
+    max-width: 520px;
+    max-height: 85vh;
+    height: auto;
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    transform: translate(-50%, calc(50% + 24px));
+    animation: coachExSheetInDesktop 200ms ease-out forwards;
+  }
+}
+
+@keyframes coachExSheetIn {
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes coachExSheetInDesktop {
+  to {
+    transform: translate(-50%, -50%);
+  }
+}
+
+.grabber {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 8px auto 0;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .grabber {
+    display: none;
+  }
+}
+
+.bodyScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+}
+
+.eyebrowLime {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lime);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.eyebrowDotLime {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 6px var(--lime);
+  flex-shrink: 0;
+}
+
+.modalFoot {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line-2);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btnGhost {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--f-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnGhost:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t1);
+}
+
+.btnPrimaryLime {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  border: 1px solid rgba(197, 255, 74, 0.35);
+  background: linear-gradient(135deg, var(--lime) 0%, var(--lime-2) 100%);
+  color: var(--lime-text);
+  font-family: var(--f-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnPrimaryLime:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnPrimaryLime:hover:not(:disabled) {
+  filter: brightness(1.05);
+}

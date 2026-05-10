@@ -65,9 +65,11 @@ function buildTabs(clientId: string): TabDef[] {
     {
       label: "Check-ins",
       shortLabel: "Checks",
-      href: `${base}/progress`,
+      href: `${base}/check-ins`,
       icon: CalendarCheck,
-      isActive: (pathname) => pathname.startsWith(`${base}/progress`),
+      // Keep `/progress` active too while legacy route remains mounted.
+      isActive: (pathname) =>
+        pathname.startsWith(`${base}/check-ins`) || pathname.startsWith(`${base}/progress`),
       activeAccent: "purple",
     },
     {

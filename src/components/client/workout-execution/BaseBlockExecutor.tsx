@@ -184,9 +184,7 @@ export function BaseBlockExecutorLayout({
       ? (previousPerformanceMap.get(currentExercise.exercise_id) ?? null)
       : null;
   const showLastSessionSlot = Boolean(
-    previousPerfForExercise?.lastWorkout != null ||
-      (progressionSuggestion &&
-        progressionSuggestion.type !== "first_time"),
+    previousPerfForExercise?.lastWorkout != null || progressionSuggestion,
   );
   const lastSessionSlot = showLastSessionSlot ? (
     <ProgressionNudge

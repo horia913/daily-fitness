@@ -19,7 +19,6 @@ import {
   Pause,
   CheckCircle,
   AlertCircle,
-  SkipForward,
   X,
   Info,
 } from 'lucide-react'
@@ -90,16 +89,12 @@ function ClientProgramDetailsContent() {
   const [assignment, setAssignment] = useState<ProgramAssignment | null>(null)
   /** Per-client snapshot rows (canonical schedule). */
   const [snapshotRows, setSnapshotRows] = useState<AssignmentScheduleSlot[]>([])
-  /** program_day_assignments.id → program_schedule.id (for completions + skip-day). */
+  /** program_day_assignments.id → program_schedule.id (for completions). */
   const [scheduleIdByPdaId, setScheduleIdByPdaId] = useState<Record<string, string>>({})
   const [snapshotTemplateNames, setSnapshotTemplateNames] = useState<Record<string, string>>({})
   const [progress, setProgress] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  // Skip-day state
   const [completedScheduleIds, setCompletedScheduleIds] = useState<Set<string>>(new Set())
-  const [skippedScheduleIds, setSkippedScheduleIds] = useState<Set<string>>(new Set())
-  const [skipReason, setSkipReason] = useState('')
-  const [skipLoading, setSkipLoading] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [clientTz, setClientTz] = useState('UTC')
   const [pauseModalOpen, setPauseModalOpen] = useState(false)
@@ -183,7 +178,7 @@ function ClientProgramDetailsContent() {
       setClientTz(normalizeClientTimezone((profTz as { timezone?: string | null } | null)?.timezone))
 
       if (assignmentData?.id) {
-        const [snaps, slots, completedList, progressData, completionsData, psOptional] =
+        const [snaps, slots, completedList, progressData, psOptional] =
           await Promise.all([
             getAssignmentSchedule(supabase, assignmentData.id),
             getProgramScheduleSlotsForAssignment(supabase, programId, assignmentData.id),
@@ -194,11 +189,6 @@ function ClientProgramDetailsContent() {
               .eq('program_assignment_id', assignmentData.id)
               .maybeSingle()
               .then((r) => r.data),
-            supabase
-              .from('program_day_completions')
-              .select('program_schedule_id, notes')
-              .eq('program_assignment_id', assignmentData.id)
-              .then((r) => r.data ?? []),
             supabase
               .from('program_schedule')
               .select('is_optional')
@@ -221,14 +211,6 @@ function ClientProgramDetailsContent() {
           completedList.map((c) => c.program_schedule_id).filter(Boolean)
         )
         setCompletedScheduleIds(completedFromLogs)
-
-        const skippedIds = new Set<string>()
-        completionsData.forEach((c: { program_schedule_id: string; notes?: string | null }) => {
-          if (c.notes?.startsWith('Skipped by coach')) {
-            skippedIds.add(c.program_schedule_id)
-          }
-        })
-        setSkippedScheduleIds(skippedIds)
 
         if (progressData) setProgress(progressData)
 
@@ -264,7 +246,6 @@ function ClientProgramDetailsContent() {
         setSnapshotRows([])
         setScheduleIdByPdaId({})
         setCompletedScheduleIds(new Set())
-        setSkippedScheduleIds(new Set())
         setSnapshotTemplateNames({})
         setCoachTemplates([])
         setMasterHasOptionalDays(false)
@@ -293,36 +274,6 @@ function ClientProgramDetailsContent() {
     } catch (error) {
       console.error('Error updating status:', error)
       addToast({ title: 'Failed to update program status', variant: 'destructive' })
-    }
-  }
-
-  const handleSkipDay = async (scheduleId: string) => {
-    if (!assignment) return
-    setSkipLoading(true)
-    try {
-      const res = await fetchApi('/api/coach/program-assignments/skip-day', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          programAssignmentId: assignment.id,
-          programScheduleId: scheduleId,
-          reason: skipReason.trim() || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        addToast({ title: data.error || 'Failed to skip day', variant: 'destructive' })
-        return
-      }
-      setSkippedScheduleIds((prev) => new Set([...prev, scheduleId]))
-      setSkipReason('')
-      await loadData()
-    } catch (err) {
-      console.error('Error skipping day:', err)
-      addToast({ title: 'Unexpected error — please try again', variant: 'destructive' })
-    } finally {
-      setSkipLoading(false)
     }
   }
 
@@ -765,7 +716,6 @@ function ClientProgramDetailsContent() {
                       }
                       const schedId = scheduleIdByPdaId[snap.id] ?? ''
                       const isCompleted = Boolean(schedId && completedScheduleIds.has(schedId))
-                      const isSkipped = Boolean(schedId && skippedScheduleIds.has(schedId))
                       const tplLabel =
                         snap.workout_template_id && snapshotTemplateNames[snap.workout_template_id]
                           ? snapshotTemplateNames[snap.workout_template_id]
@@ -795,11 +745,6 @@ function ClientProgramDetailsContent() {
                           {isCompleted && (
                             <span className="absolute top-1 left-1 z-[1]" title="Completed (client)">
                               <CheckCircle className="w-3.5 h-3.5 fc-text-success" aria-hidden />
-                            </span>
-                          )}
-                          {isSkipped && !isCompleted && (
-                            <span className="absolute bottom-1 right-1 z-[1]" title="Skipped">
-                              <SkipForward className="w-3 h-3 fc-text-warning" aria-hidden />
                             </span>
                           )}
                           <div
@@ -919,31 +864,6 @@ function ClientProgramDetailsContent() {
                           <p className="text-xs fc-text-subtle py-2">No templates match.</p>
                         )}
                       </div>
-                      {sid &&
-                        !completedLock &&
-                        assignment?.status !== 'completed' &&
-                        assignment?.status !== 'cancelled' && (
-                          <div className="pt-2 border-t border-[color:var(--fc-glass-border)]">
-                            <button
-                              type="button"
-                              className="text-xs fc-text-subtle hover:fc-text-warning flex items-center gap-1"
-                              onClick={async () => {
-                                setSnapshotSaveBusy(true)
-                                try {
-                                  await handleSkipDay(sid)
-                                  setSnapshotEditorOpen(false)
-                                  setEditingSnapshot(null)
-                                } finally {
-                                  setSnapshotSaveBusy(false)
-                                }
-                              }}
-                              disabled={skipLoading || snapshotSaveBusy}
-                            >
-                              <SkipForward className="w-3 h-3" />
-                              Mark this day as skipped (client ledger)
-                            </button>
-                          </div>
-                        )}
                     </>
                   )}
                   <div className="flex justify-end pt-2">

@@ -33,6 +33,8 @@ NINETY_DAYS_AGO.setDate(NINETY_DAYS_AGO.getDate() - 89);
 const NINETY_DAYS_AGO_STR = NINETY_DAYS_AGO.toISOString().split("T")[0];
 
 export interface ClientAnalyticsData {
+  /** IANA zone passed into getWeeklyVolume / chart week strips (snapshot → profile → UTC via caller). */
+  clientTimezoneForCharts: string;
   overview: {
     overallAdherencePct: number | null;
     overallAdherenceTrend: "up" | "down" | "same";
@@ -392,6 +394,7 @@ export async function getClientAnalytics(
   }
 
   return {
+    clientTimezoneForCharts: tzCanonical,
     overview: {
       overallAdherencePct,
       overallAdherenceTrend,

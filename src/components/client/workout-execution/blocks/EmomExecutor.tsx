@@ -33,6 +33,7 @@ import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function EmomExecutor({
   block,
@@ -57,6 +58,7 @@ export function EmomExecutor({
   onRestTimerClick,
   onWorkoutBack,
   previousPerformanceMap,
+  progressionSuggestion,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -305,7 +307,7 @@ export function EmomExecutor({
       });
       return;
     }
-    const weightNum = parseFloat(editDraft.weight);
+    const weightNum = parseWeightKgInput(editDraft.weight);
     const repsNum = parseInt(editDraft.reps, 10);
     if (isNaN(repsNum) || repsNum <= 0) return;
     const entry = loggedSetsList.find((s) => s.id === editingSetId);
@@ -372,7 +374,7 @@ export function EmomExecutor({
   const handleLog = async () => {
     if (!currentExercise || isLoggingSet) return;
 
-    const weightNum = parseFloat(weight);
+    const weightNum = parseWeightKgInput(weight);
     const repsNum = parseInt(reps);
 
     if (
@@ -648,7 +650,7 @@ export function EmomExecutor({
     onBlockComplete(block.block.id, loggedSetsArray);
   };
 
-  const emomWeightNum = parseFloat(weight);
+  const emomWeightNum = parseWeightKgInput(weight);
   const emomRepsNum = parseInt(reps, 10);
   const emomLogWorkReady =
     isActive &&
@@ -757,6 +759,7 @@ export function EmomExecutor({
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={false}
+      progressionSuggestion={progressionSuggestion}
       aboveStickyContent={aboveStickyContent}
     />
   );

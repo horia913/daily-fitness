@@ -250,7 +250,7 @@ function ProgramDetailsContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-32 sm:p-6 space-y-4">
+      <CoachPageShell widthVariant="default-5xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6 space-y-4">
           <nav className="flex min-h-12 items-center justify-between gap-3">
             <Link
               href="/coach/programs"

@@ -253,7 +253,7 @@ export default function ClientCheckInsPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <EmptyState
               icon={AlertTriangle}
               title="Couldn't load this page"

@@ -1,56 +1,48 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  FileText, 
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  FileText,
   Download,
   Calendar,
   User,
   TrendingUp,
   BarChart3,
-  Printer,
-  Mail,
-  Filter,
-  Search,
-  Plus,
-  ArrowRight,
-  Eye,
-  Share2,
-  Settings,
   Target,
   Dumbbell,
-  Apple,
-  Zap,
-  Heart,
   Activity,
   Award,
-  Clock,
   MessageSquare,
-  Sparkles,
   RefreshCw,
-  Maximize2,
-  Minimize2,
   Edit,
-  Trash2,
-  Copy,
-  Send,
-  CheckCircle
+  Eye,
+  List,
+  Utensils,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
-import { fetchApi } from "@/lib/apiClient";
+import { fetchApi } from '@/lib/apiClient'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select'
+import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import { AnalyticsHero } from '@/components/coach-analytics/AnalyticsHero'
+import { ReportTemplateCard } from '@/components/coach-analytics/ReportTemplateCard'
+import { DateRangeSeg } from '@/components/coach-analytics/DateRangeSeg'
+import { ReportSectionRow } from '@/components/coach-analytics/ReportSectionRow'
+import { StickyGenBar } from '@/components/coach-analytics/StickyGenBar'
+import { cn } from '@/lib/utils'
 
 interface ReportTemplate {
   id: string
   name: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
+  icon: LucideIcon
+  accent: 'cyan' | 'purple' | 'lime' | 'good'
   sections: string[]
   isPopular?: boolean
 }
@@ -59,7 +51,7 @@ interface ReportSection {
   id: string
   name: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: LucideIcon
   required: boolean
   category: 'metrics' | 'charts' | 'insights' | 'goals'
 }
@@ -80,22 +72,172 @@ interface ClientData {
   }
 }
 
+const REPORT_TEMPLATES: ReportTemplate[] = [
+  {
+    id: 'progress',
+    name: 'Progress Report',
+    description: 'Comprehensive overview of client achievements and goals',
+    icon: TrendingUp,
+    accent: 'cyan',
+    sections: ['executive-summary', 'metrics-overview', 'goal-progress', 'achievements', 'recommendations'],
+    isPopular: true,
+  },
+  {
+    id: 'analytics',
+    name: 'Analytics Report',
+    description: 'Data-driven insights with charts and KPIs',
+    icon: BarChart3,
+    accent: 'purple',
+    sections: ['metrics-overview', 'workout-analytics', 'nutrition-tracking', 'engagement-metrics', 'trend-analysis'],
+  },
+  {
+    id: 'summary',
+    name: 'Client Summary',
+    description: 'Personal summary including goals, progress, recommendations',
+    icon: User,
+    accent: 'lime',
+    sections: ['executive-summary', 'goal-progress', 'achievements', 'coach-notes'],
+  },
+  {
+    id: 'comprehensive',
+    name: 'Comprehensive',
+    description: 'Complete analysis with all available metrics and insights',
+    icon: FileText,
+    accent: 'good',
+    sections: [
+      'executive-summary',
+      'metrics-overview',
+      'workout-analytics',
+      'nutrition-tracking',
+      'engagement-metrics',
+      'goal-progress',
+      'achievements',
+      'trend-analysis',
+      'recommendations',
+      'coach-notes',
+    ],
+  },
+]
+
+const REPORT_SECTIONS: ReportSection[] = [
+  {
+    id: 'executive-summary',
+    name: 'Executive summary',
+    description: 'High-level overview of key metrics and performance',
+    icon: List,
+    required: true,
+    category: 'insights',
+  },
+  {
+    id: 'metrics-overview',
+    name: 'Metrics overview',
+    description: 'Comprehensive breakdown of all key performance indicators',
+    icon: Activity,
+    required: false,
+    category: 'metrics',
+  },
+  {
+    id: 'workout-analytics',
+    name: 'Workout analytics',
+    description: 'Detailed analysis of workout completion and performance',
+    icon: Dumbbell,
+    required: false,
+    category: 'charts',
+  },
+  {
+    id: 'nutrition-tracking',
+    name: 'Nutrition tracking',
+    description: 'Meal logging statistics and dietary adherence',
+    icon: Utensils,
+    required: false,
+    category: 'charts',
+  },
+  {
+    id: 'engagement-metrics',
+    name: 'Engagement',
+    description: 'Session attendance, app usage, and interaction data',
+    icon: Activity,
+    required: false,
+    category: 'metrics',
+  },
+  {
+    id: 'goal-progress',
+    name: 'Goal progress',
+    description: 'Current progress towards established goals',
+    icon: Target,
+    required: false,
+    category: 'goals',
+  },
+  {
+    id: 'achievements',
+    name: 'Achievements',
+    description: 'Milestones reached and personal bests achieved',
+    icon: Award,
+    required: false,
+    category: 'insights',
+  },
+  {
+    id: 'trend-analysis',
+    name: 'Trend analysis',
+    description: 'Historical trends and performance patterns',
+    icon: TrendingUp,
+    required: false,
+    category: 'charts',
+  },
+  {
+    id: 'recommendations',
+    name: 'Recommendations',
+    description: 'Actionable insights and suggestions for improvement',
+    icon: MessageSquare,
+    required: false,
+    category: 'insights',
+  },
+  {
+    id: 'coach-notes',
+    name: 'Coach notes',
+    description: 'Personalized comments and insights from the coach',
+    icon: Edit,
+    required: false,
+    category: 'insights',
+  },
+]
+
+function withRequired(sections: string[]): string[] {
+  const s = new Set(sections)
+  s.add('executive-summary')
+  return Array.from(s)
+}
+
+function initialsFromName(name: string): string {
+  const p = name.trim().split(/\s+/).filter(Boolean)
+  if (p.length === 0) return '?'
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase()
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase()
+}
+
 interface OptimizedDetailedReportsProps {
   coachId?: string
 }
 
 export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedReportsProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlHydrated = useRef(false)
+
   const [loading, setLoading] = useState(true)
   const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('')
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const [selectedSections, setSelectedSections] = useState<string[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('progress')
+  const [selectedSections, setSelectedSections] = useState<string[]>(() =>
+    withRequired(REPORT_TEMPLATES[0].sections),
+  )
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'custom'>('month')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [coachNotes, setCoachNotes] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [requiredTooltipFlash, setRequiredTooltipFlash] = useState(false)
 
   const [clients, setClients] = useState<ClientData[]>([])
   const didLoadRef = useRef(false)
@@ -135,7 +277,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
         loadingRef.current = false
       }
     },
-    [coachId]
+    [coachId],
   )
 
   useEffect(() => {
@@ -153,150 +295,116 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     }
   }, [coachId, loadData])
 
-  const reportTemplates: ReportTemplate[] = [
-    {
-      id: 'progress',
-      name: 'Progress Report',
-      description: 'Comprehensive overview of client achievements and goals',
-      icon: TrendingUp,
-      color: 'blue',
-      sections: ['executive-summary', 'metrics-overview', 'goal-progress', 'achievements', 'recommendations'],
-      isPopular: true
-    },
-    {
-      id: 'analytics',
-      name: 'Analytics Report',
-      description: 'Data-driven insights with charts and performance indicators',
-      icon: BarChart3,
-      color: 'green',
-      sections: ['metrics-overview', 'workout-analytics', 'nutrition-tracking', 'engagement-metrics', 'trend-analysis']
-    },
-    {
-      id: 'summary',
-      name: 'Client Summary',
-      description: 'Personal summary including goals, progress, and recommendations',
-      icon: User,
-      color: 'purple',
-      sections: ['executive-summary', 'goal-progress', 'achievements', 'coach-notes']
-    },
-    {
-      id: 'comprehensive',
-      name: 'Comprehensive Report',
-      description: 'Complete analysis with all available metrics and insights',
-      icon: FileText,
-      color: 'orange',
-      sections: ['executive-summary', 'metrics-overview', 'workout-analytics', 'nutrition-tracking', 'engagement-metrics', 'goal-progress', 'achievements', 'trend-analysis', 'recommendations', 'coach-notes']
-    }
-  ]
+  /** Hydrate form from URL once loading finishes */
+  useEffect(() => {
+    if (loading || urlHydrated.current) return
 
-  const reportSections: ReportSection[] = [
-    {
-      id: 'executive-summary',
-      name: 'Executive Summary',
-      description: 'High-level overview of key metrics and performance',
-      icon: Target,
-      required: true,
-      category: 'insights'
-    },
-    {
-      id: 'metrics-overview',
-      name: 'Metrics Overview',
-      description: 'Comprehensive breakdown of all key performance indicators',
-      icon: Activity,
-      required: false,
-      category: 'metrics'
-    },
-    {
-      id: 'workout-analytics',
-      name: 'Workout Analytics',
-      description: 'Detailed analysis of workout completion and performance',
-      icon: Dumbbell,
-      required: false,
-      category: 'charts'
-    },
-    {
-      id: 'nutrition-tracking',
-      name: 'Nutrition Tracking',
-      description: 'Meal logging statistics and dietary adherence',
-      icon: Apple,
-      required: false,
-      category: 'charts'
-    },
-    {
-      id: 'engagement-metrics',
-      name: 'Engagement Metrics',
-      description: 'Session attendance, app usage, and interaction data',
-      icon: Heart,
-      required: false,
-      category: 'metrics'
-    },
-    {
-      id: 'goal-progress',
-      name: 'Goal Progress',
-      description: 'Current progress towards established goals',
-      icon: Target,
-      required: false,
-      category: 'goals'
-    },
-    {
-      id: 'achievements',
-      name: 'Achievements',
-      description: 'Milestones reached and personal bests achieved',
-      icon: Award,
-      required: false,
-      category: 'insights'
-    },
-    {
-      id: 'trend-analysis',
-      name: 'Trend Analysis',
-      description: 'Historical trends and performance patterns',
-      icon: TrendingUp,
-      required: false,
-      category: 'charts'
-    },
-    {
-      id: 'recommendations',
-      name: 'Recommendations',
-      description: 'Actionable insights and suggestions for improvement',
-      icon: MessageSquare,
-      required: false,
-      category: 'insights'
-    },
-    {
-      id: 'coach-notes',
-      name: 'Coach Notes',
-      description: 'Personalized comments and insights from the coach',
-      icon: Edit,
-      required: false,
-      category: 'insights'
+    const clientParam = searchParams.get('client')
+    if (clientParam && clients.length > 0 && clients.some((c) => c.id === clientParam)) {
+      setSelectedClient(clientParam)
     }
-  ]
+    const tpl = searchParams.get('template')
+    if (tpl && REPORT_TEMPLATES.some((t) => t.id === tpl)) {
+      const t = REPORT_TEMPLATES.find((x) => x.id === tpl)!
+      setSelectedTemplate(tpl)
+      setSelectedSections(withRequired(t.sections))
+    }
+    const range = searchParams.get('range') as 'month' | 'quarter' | 'year' | 'custom' | null
+    if (range && ['month', 'quarter', 'year', 'custom'].includes(range)) {
+      setDateRange(range)
+    }
+    const start = searchParams.get('start')
+    const end = searchParams.get('end')
+    if (start) setCustomStartDate(start)
+    if (end) setCustomEndDate(end)
+    const sec = searchParams.get('sections')
+    if (sec) {
+      const parsed = sec
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (parsed.length) setSelectedSections(withRequired(parsed))
+    }
+    const notes = searchParams.get('notes')
+    if (notes) {
+      try {
+        setCoachNotes(decodeURIComponent(notes))
+      } catch {
+        setCoachNotes(notes)
+      }
+    }
+    urlHydrated.current = true
+  }, [loading, clients, searchParams])
 
+  /** Apply ?client= after clients list arrives */
+  useEffect(() => {
+    if (loading || clients.length === 0) return
+    const clientParam = searchParams.get('client')
+    if (clientParam && clients.some((c) => c.id === clientParam)) {
+      setSelectedClient(clientParam)
+    }
+  }, [loading, clients, searchParams])
+
+  /** Push form state to URL (debounced — coach notes typing) */
+  useEffect(() => {
+    if (!urlHydrated.current) return
+    const id = window.setTimeout(() => {
+      const p = new URLSearchParams()
+      if (selectedClient) p.set('client', selectedClient)
+      if (selectedTemplate) p.set('template', selectedTemplate)
+      p.set('range', dateRange)
+      if (dateRange === 'custom') {
+        if (customStartDate) p.set('start', customStartDate)
+        if (customEndDate) p.set('end', customEndDate)
+      }
+      if (selectedSections.length) p.set('sections', selectedSections.join(','))
+      if (coachNotes.trim()) p.set('notes', encodeURIComponent(coachNotes.trim()))
+      const qs = p.toString()
+      router.replace(qs ? `/coach/reports?${qs}` : '/coach/reports', { scroll: false })
+    }, 320)
+    return () => window.clearTimeout(id)
+  }, [
+    router,
+    selectedClient,
+    selectedTemplate,
+    dateRange,
+    customStartDate,
+    customEndDate,
+    selectedSections,
+    coachNotes,
+  ])
+
+  useEffect(() => {
+    const t = coachNotes.trim()
+    if (t.length === 0) return
+    setSelectedSections((prev) => (prev.includes('coach-notes') ? prev : [...prev, 'coach-notes']))
+  }, [coachNotes])
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = reportTemplates.find(t => t.id === templateId)
+    const template = REPORT_TEMPLATES.find((x) => x.id === templateId)
     if (template) {
       setSelectedTemplate(templateId)
-      setSelectedSections(template.sections)
+      setSelectedSections(withRequired(template.sections))
     }
   }
 
   const handleSectionToggle = (sectionId: string) => {
-    const section = reportSections.find(s => s.id === sectionId)
+    const section = REPORT_SECTIONS.find((s) => s.id === sectionId)
     if (section?.required) return
-
-    setSelectedSections(prev => 
-      prev.includes(sectionId) 
-        ? prev.filter(id => id !== sectionId)
-        : [...prev, sectionId]
+    setSelectedSections((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
     )
+  }
+
+  const flashRequiredHint = () => {
+    setRequiredTooltipFlash(true)
+    window.setTimeout(() => setRequiredTooltipFlash(false), 1600)
   }
 
   const generateReport = async () => {
     setIsGenerating(true)
     try {
-      // Simulate report generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
       setShowPreview(true)
     } finally {
       setIsGenerating(false)
@@ -316,7 +424,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
       String(c.metrics.bodyFat),
       String(c.metrics.strength),
       String(c.metrics.endurance),
-      String(c.metrics.adherence)
+      String(c.metrics.adherence),
     ])
     if (format === 'pdf') {
       try {
@@ -337,7 +445,10 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
         y += 7
         doc.setFontSize(9)
         rows.forEach((row) => {
-          if (y > 270) { doc.addPage(); y = 20 }
+          if (y > 270) {
+            doc.addPage()
+            y = 20
+          }
           row.forEach((cell, i) => doc.text(String(cell).slice(0, 18), margin + i * colW, y))
           y += 6
         })
@@ -364,439 +475,294 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     URL.revokeObjectURL(a.href)
   }
 
-  const shareReport = () => {
-    const list = selectedClient ? clients.filter((c) => c.id === selectedClient) : clients
-    if (list.length === 0) return
-    const lines = list.map((c) => `${c.name}: Weight ${c.metrics.weight}kg, Body Fat ${c.metrics.bodyFat}%, Adherence ${c.metrics.adherence}%`)
-    const text = `Client Report (${new Date().toISOString().slice(0, 10)})\n${lines.join('\n')}`
-    navigator.clipboard.writeText(text).then(() => {
-      if (typeof window !== 'undefined' && (window as any).toast) (window as any).toast.success('Report summary copied to clipboard')
-    }).catch(() => {})
-  }
+  const selectedClientData = clients.find((c) => c.id === selectedClient)
+  const selectedTemplateData = REPORT_TEMPLATES.find((t) => t.id === selectedTemplate)
 
-  const selectedClientData = clients.find(c => c.id === selectedClient)
-  const selectedTemplateData = reportTemplates.find(t => t.id === selectedTemplate)
+  const rangeLabel = useMemo(() => {
+    if (dateRange === 'custom') {
+      if (customStartDate && customEndDate) return `${customStartDate} → ${customEndDate}`
+      if (customStartDate || customEndDate) return 'Custom (incomplete)'
+      return 'Custom'
+    }
+    return dateRange.charAt(0).toUpperCase() + dateRange.slice(1)
+  }, [dateRange, customStartDate, customEndDate])
+
+  const sectionsSummary = `${selectedSections.length} / ${REPORT_SECTIONS.length} selected`
+
+  const canGenerate = Boolean(selectedClient && selectedTemplate && selectedSections.length > 0)
+
+  const exportReady =
+    showPreview || (Boolean(selectedClient) && Boolean(selectedTemplate) && selectedSections.length > 0)
+
+  const sectionIconBtn = (variant: 'cyan' | 'good' | 'warn' | 'purple' | 'lime', Icon: LucideIcon) => {
+    const map = {
+      cyan: { bg: 'var(--cyan-soft)', fg: 'var(--cyan)' },
+      good: { bg: 'var(--good-soft)', fg: 'var(--good)' },
+      warn: { bg: 'var(--warning-soft)', fg: 'var(--warning)' },
+      purple: { bg: 'var(--purple-soft)', fg: 'var(--purple)' },
+      lime: { bg: 'var(--lime-soft)', fg: 'var(--lime)' },
+    }[variant]
+    return (
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-lg" style={{ background: map.bg }}>
+        <Icon className="size-3.5" style={{ color: map.fg }} aria-hidden />
+      </div>
+    )
+  }
 
   if (loading) {
     return <PageSkeleton variant="dashboard" />
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Control bar: Preview toggle + Refresh */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
-        <Button
-          variant="outline"
-          onClick={() => setShowPreview(!showPreview)}
-          className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto"
-          size="sm"
+    <div className="space-y-4 pb-[var(--fc-bottom-safe-area)] sm:space-y-5">
+      <AnalyticsHero
+        accent="good"
+        heroBackground="goodTint"
+        eyebrow="Coaching reports"
+        title="Build a report"
+        subtitle="Client-ready summaries and performance narratives"
+        controls={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-[11px] transition-colors hover:bg-white/[0.04]"
+              style={{
+                borderColor: 'var(--line)',
+                color: 'var(--t2)',
+                fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                background: 'transparent',
+              }}
+            >
+              <Eye className="size-[11px] shrink-0" aria-hidden />
+              {showPreview ? 'Hide preview' : 'Show preview'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (coachId) {
+                  didLoadRef.current = false
+                  loadData()
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-[11px] transition-colors hover:bg-white/[0.04]"
+              style={{
+                borderColor: 'var(--line)',
+                color: 'var(--t2)',
+                fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                background: 'transparent',
+              }}
+            >
+              <RefreshCw className="size-[11px] shrink-0" aria-hidden />
+              Refresh
+            </button>
+          </div>
+        }
+      />
+
+      {showPreview ? (
+        <div
+          className="rounded-[18px] border p-4 text-sm"
+          style={{ background: 'var(--card)', borderColor: 'var(--line)', color: 'var(--t2)' }}
         >
-          <Eye className="w-4 h-4" />
-          {showPreview ? 'Hide Preview' : 'Show Preview'}
-        </Button>
-        <Button
-          variant="outline"
-          className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto"
-          size="sm"
-          onClick={() => {
-            if (coachId) {
-              didLoadRef.current = false
-              loadData()
-            }
-          }}
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </Button>
+          Preview is on — configure the report below, then generate.
+        </div>
+      ) : null}
+
+      {requiredTooltipFlash ? (
+        <p className="text-center text-[11px]" style={{ color: 'var(--warning)' }}>
+          Executive summary is required for this template.
+        </p>
+      ) : null}
+
+      {/* Client */}
+      <div className={hub.sectionCard}>
+        <div className={hub.sectionHead}>
+          <div className={hub.sectionHeadLeft}>
+            {sectionIconBtn('cyan', User)}
+            <h2 className={hub.sectionTitle}>Client</h2>
+          </div>
+        </div>
+        <Select value={selectedClient || undefined} onValueChange={setSelectedClient}>
+          <SelectTrigger
+            className={cn(
+              'h-auto min-h-0 w-full justify-between rounded-[11px] border px-3 py-2.5 text-left text-[12.5px] shadow-none',
+              !selectedClientData && 'text-[color:var(--t4)]',
+            )}
+            style={{
+              background: 'var(--card-2)',
+              borderColor: 'var(--line)',
+              color: selectedClientData ? 'var(--t1)' : 'var(--t2)',
+            }}
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              {selectedClientData ? (
+                <span
+                  className="flex size-[18px] shrink-0 items-center justify-center rounded-md text-[8px] font-bold text-white"
+                  style={{
+                    background: 'linear-gradient(135deg, hsl(190 55% 42%), hsl(260 50% 38%))',
+                  }}
+                >
+                  {initialsFromName(selectedClientData.name)}
+                </span>
+              ) : null}
+              <span className={cn('min-w-0 truncate', !selectedClientData && 'italic')}>
+                {selectedClientData ? selectedClientData.name : 'Select a client for the report'}
+              </span>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {clients.map((client) => (
+              <SelectItem key={client.id} value={client.id}>
+                <div className="flex items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-full bg-[color:var(--cyan-soft)] text-xs font-bold text-[color:var(--cyan)]">
+                    {client.avatar}
+                  </div>
+                  <div>
+                    <p className="font-medium">{client.name}</p>
+                    <p className="text-xs opacity-70">{client.program}</p>
+                  </div>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-            {/* Report Configuration — reduced nesting: Card padding only on content */}
-            <div className="lg:col-span-2 space-y-4 sm:space-y-6 md:space-y-8">
-              {/* Client Selection */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
-                    </div>
-                    Client Selection
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                  <div className="space-y-3 sm:space-y-4">
-                    <Select value={selectedClient} onValueChange={setSelectedClient}>
-                      <SelectTrigger className="fc-select w-full min-h-[44px]">
-                        <SelectValue placeholder="Select a client for the report" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-sm">
-                                {client.avatar}
-                              </div>
-                              <div>
-                                <p className="font-medium text-[color:var(--fc-text-primary)]">{client.name}</p>
-                                <p className="text-sm text-[color:var(--fc-text-dim)]">{client.program}</p>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+      {/* Template */}
+      <div className={hub.sectionCard}>
+        <div className={hub.sectionHead}>
+          <div className={hub.sectionHeadLeft}>
+            {sectionIconBtn('good', FileText)}
+            <h2 className={hub.sectionTitle}>Template</h2>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {REPORT_TEMPLATES.map((template) => (
+            <ReportTemplateCard
+              key={template.id}
+              name={template.name}
+              description={template.description}
+              meta={`${template.sections.length} sections`}
+              icon={template.icon}
+              accent={template.accent}
+              selected={selectedTemplate === template.id}
+              popular={template.isPopular}
+              onClick={() => handleTemplateSelect(template.id)}
+            />
+          ))}
+        </div>
+      </div>
 
-                    {selectedClientData && (
-                      <div className="fc-glass rounded-xl p-3 sm:p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-                          <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
-                            {selectedClientData.avatar}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-[color:var(--fc-text-primary)]">{selectedClientData.name}</h3>
-                            <p className="text-sm text-[color:var(--fc-text-dim)]">{selectedClientData.program}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-[color:var(--fc-text-subtle)]">
-                              <span>Started: {new Date(selectedClientData.startDate).toLocaleDateString()}</span>
-                              <span>Last Active: {new Date(selectedClientData.lastActive).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">{selectedClientData.metrics.adherence}%</p>
-                            <p className="text-xs text-[color:var(--fc-text-dim)]">Adherence</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Report Templates */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-meals)]" />
-                    </div>
-                    Report Templates
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {reportTemplates.map(template => {
-                      const Icon = template.icon
-                      const isSelected = selectedTemplate === template.id
-                      
-                      return (
-                        <div
-                          key={template.id}
-                          className={`fc-glass rounded-xl p-3 sm:p-4 border cursor-pointer transition-all duration-300 ${
-                            isSelected 
-                              ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' 
-                              : 'border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)]'
-                          }`}
-                          onClick={() => handleTemplateSelect(template.id)}
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`p-2 rounded-lg ${
-                              isSelected ? 'bg-[color:var(--fc-glass-soft)]' : 'bg-[color:var(--fc-glass-soft)]'
-                            }`}>
-                              <Icon className={`w-5 h-5 ${
-                                isSelected ? 'text-[color:var(--fc-accent-cyan)]' : 'text-[color:var(--fc-text-subtle)]'
-                              }`} />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-[color:var(--fc-text-primary)]">{template.name}</h3>
-                                {template.isPopular && (
-                                  <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-warning)] border border-[color:var(--fc-glass-border)] text-xs">
-                                    Popular
-                                  </Badge>
-                                )}
-                                {isSelected && (
-                                  <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-glass-border)] text-xs">
-                                    Selected
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-[color:var(--fc-text-dim)]">{template.description}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[color:var(--fc-text-subtle)]">
-                              {template.sections.length} sections included
-                            </span>
-                            {isSelected && (
-                              <Checkbox checked={true} className="data-[state=checked]:bg-[color:var(--fc-accent-cyan)] data-[state=checked]:border-[color:var(--fc-accent-cyan)]" />
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Report Customization */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
-                    </div>
-                    Report Customization
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-4 sm:space-y-6">
-                  {/* Date Range */}
-                  <div>
-                    <h4 className="font-semibold text-sm sm:text-base text-[color:var(--fc-text-primary)] mb-2 sm:mb-3">Date Range</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-                      {(['month', 'quarter', 'year', 'custom'] as const).map(range => (
-                        <Button
-                          key={range}
-                          variant={dateRange === range ? 'default' : 'outline'}
-                          onClick={() => setDateRange(range)}
-                          className={dateRange === range ? 'fc-btn fc-btn-primary min-h-[44px]' : 'fc-btn fc-btn-ghost min-h-[44px]'}
-                        >
-                          {range.charAt(0).toUpperCase() + range.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                    {dateRange === 'custom' && (
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                        <div>
-                          <label className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-1 block">Start Date</label>
-                          <input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => setCustomStartDate(e.target.value)}
-                            className="fc-input w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-1 block">End Date</label>
-                          <input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => setCustomEndDate(e.target.value)}
-                            className="fc-input w-full"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Report Sections */}
-                  <div>
-                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Report Sections</h4>
-                    <div className="space-y-3">
-                      {reportSections.map(section => {
-                        const Icon = section.icon
-                        const isSelected = selectedSections.includes(section.id)
-                        const isRequired = section.required
-                        
-                        return (
-                          <div
-                            key={section.id}
-                            className={`fc-glass rounded-xl p-3 border cursor-pointer transition-all duration-300 ${
-                              isSelected ? 'border-[color:var(--fc-accent-purple)]/50 bg-[color:var(--fc-glass-soft)]' : 'border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)]'
-                            }`}
-                            onClick={() => handleSectionToggle(section.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-[color:var(--fc-glass-soft)]">
-                                <Icon className={`w-4 h-4 ${isSelected ? 'text-[color:var(--fc-accent-purple)]' : 'text-[color:var(--fc-text-subtle)]'}`} />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h5 className="font-medium text-[color:var(--fc-text-primary)]">{section.name}</h5>
-                                  {isRequired && (
-                                    <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-error)] border border-[color:var(--fc-glass-border)] text-xs">
-                                      Required
-                                    </Badge>
-                                  )}
-                                  {isSelected && (
-                                    <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-purple)] border border-[color:var(--fc-glass-border)] text-xs">
-                                      Selected
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-[color:var(--fc-text-dim)]">{section.description}</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isRequired ? (
-                                  <CheckCircle className="w-5 h-5 text-[color:var(--fc-status-success)]" />
-                                ) : (
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onChange={() => handleSectionToggle(section.id)}
-                                    className="data-[state=checked]:bg-[color:var(--fc-accent-purple)] data-[state=checked]:border-[color:var(--fc-accent-purple)]"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Coach Notes */}
-                  <div>
-                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Coach Notes</h4>
-                    <Textarea
-                      placeholder="Add personalized comments, insights, or recommendations for this client..."
-                      value={coachNotes}
-                      onChange={(e) => setCoachNotes(e.target.value)}
-                      className="fc-textarea min-h-24"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Date range */}
+      <div className={hub.sectionCard}>
+        <div className={hub.sectionHead}>
+          <div className={hub.sectionHeadLeft}>
+            {sectionIconBtn('warn', Calendar)}
+            <h2 className={hub.sectionTitle}>Date range</h2>
+          </div>
+        </div>
+        <DateRangeSeg value={dateRange} onChange={setDateRange} />
+        {dateRange === 'custom' ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
+                Start
+              </label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
+                style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
+              />
             </div>
-
-            {/* Report Preview & Actions */}
-            <div className="space-y-4 sm:space-y-6 md:space-y-8">
-              {/* Report Summary */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
-                    </div>
-                    Report Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-3 sm:space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[color:var(--fc-text-dim)]">Client:</span>
-                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
-                        {selectedClientData?.name || 'Not selected'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[color:var(--fc-text-dim)]">Template:</span>
-                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
-                        {selectedTemplateData?.name || 'Not selected'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[color:var(--fc-text-dim)]">Sections:</span>
-                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
-                        {selectedSections.length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[color:var(--fc-text-dim)]">Date Range:</span>
-                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
-                        {dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-3 sm:pt-4 border-t border-[color:var(--fc-glass-border)]">
-                    <Button
-                      onClick={generateReport}
-                      disabled={!selectedClient || !selectedTemplate || selectedSections.length === 0 || isGenerating}
-                      className="fc-btn fc-btn-primary w-full min-h-[44px]"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Clock className="w-4 h-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="w-4 h-4 mr-2" />
-                          Generate Report
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Export Options */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <Download className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-meals)]" />
-                    </div>
-                    Export Options
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                  <div className="space-y-2 sm:space-y-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => exportReport('pdf')}
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Export as PDF
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => exportReport('excel')}
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <BarChart3 className="w-4 h-4 mr-2" />
-                      Export as Excel
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => exportReport('csv')}
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export as CSV
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Share Options */}
-              <Card className="fc-card-shell">
-                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
-                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
-                      <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
-                    </div>
-                    Share Options
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                  <div className="space-y-2 sm:space-y-3">
-                    <Button
-                      variant="outline"
-                      onClick={shareReport}
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <Mail className="w-4 h-4 mr-2" />
-                      Email to Client
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Send via App
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print Report
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+            <div>
+              <label className="mb-1 block text-[11px]" style={{ color: 'var(--t3)' }}>
+                End
+              </label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full cursor-pointer rounded-[11px] border px-3 py-2.5 text-[12.5px] outline-none"
+                style={{ background: 'var(--card-2)', borderColor: 'var(--line)', color: 'var(--t1)' }}
+              />
             </div>
           </div>
+        ) : null}
       </div>
+
+      {/* Sections */}
+      <div className={hub.sectionCard}>
+        <div className={hub.sectionHead}>
+          <div className={hub.sectionHeadLeft}>
+            {sectionIconBtn('purple', List)}
+            <h2 className={hub.sectionTitle}>Report sections</h2>
+          </div>
+          <span
+            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+            style={{
+              fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+              background: 'var(--purple-soft)',
+              color: 'var(--purple)',
+              borderColor: 'var(--purple-dim)',
+            }}
+          >
+            {sectionsSummary}
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {REPORT_SECTIONS.map((section) => (
+            <ReportSectionRow
+              key={section.id}
+              name={section.name}
+              description={section.description}
+              icon={section.icon}
+              required={section.required}
+              checked={selectedSections.includes(section.id)}
+              onToggle={() => handleSectionToggle(section.id)}
+              onRequiredClick={flashRequiredHint}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Coach notes */}
+      <div className={hub.sectionCard}>
+        <div className={hub.sectionHead}>
+          <div className={hub.sectionHeadLeft}>
+            {sectionIconBtn('lime', Edit)}
+            <h2 className={hub.sectionTitle}>Coach notes</h2>
+          </div>
+        </div>
+        <textarea
+          placeholder="Add personalized comments, insights, or recommendations for this client..."
+          value={coachNotes}
+          onChange={(e) => setCoachNotes(e.target.value)}
+          className="min-h-[80px] w-full resize-none rounded-[11px] border p-3 text-[12.5px] outline-none"
+          style={{
+            background: 'var(--card-2)',
+            borderColor: 'var(--line)',
+            color: 'var(--t1)',
+            fontFamily: 'var(--font-geist-sans, Geist, sans-serif)',
+          }}
+        />
+      </div>
+
+      <StickyGenBar
+        clientLabel={selectedClientData?.name ?? ''}
+        templateLabel={selectedTemplateData?.name ?? ''}
+        sectionsLabel={sectionsSummary}
+        rangeLabel={rangeLabel}
+        canGenerate={canGenerate}
+        isGenerating={isGenerating}
+        onGenerate={generateReport}
+        onExportPdf={() => exportReport('pdf')}
+        onExportExcel={() => exportReport('excel')}
+        onExportCsv={() => exportReport('csv')}
+        exportDisabled={!exportReady}
+      />
+    </div>
   )
 }

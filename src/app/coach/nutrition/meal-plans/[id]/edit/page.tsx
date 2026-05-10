@@ -137,7 +137,7 @@ export default function EditMealPlanPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="form-2xl" className="p-4 pb-32 sm:p-6">
+          <CoachPageShell widthVariant="form-2xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
             <PageSkeleton variant="form" />
           </CoachPageShell>
         </AnimatedBackground>
@@ -150,7 +150,7 @@ export default function EditMealPlanPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="form-2xl" className="p-4 pb-32 sm:p-6">
+          <CoachPageShell widthVariant="form-2xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
             <EmptyState
               icon={ChefHat}
               title="Meal plan not found"
@@ -168,7 +168,7 @@ export default function EditMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="form-2xl" className="p-4 pb-32 sm:p-6">
+        <CoachPageShell widthVariant="form-2xl" className="p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6">
           <div className="flex min-h-11 items-center justify-between gap-2">
             <div className="min-w-0 space-y-0.5">
               <h1 className="text-lg font-semibold text-[color:var(--fc-text-primary)] truncate">

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export interface LargeInputProps {
   label: string;
@@ -83,7 +84,12 @@ export function LargeInput({
       onDecrement();
       return;
     }
-    const current = stringValue === "" ? 0 : parseFloat(stringValue);
+    const current =
+      stringValue === ""
+        ? 0
+        : inputType === "decimal"
+          ? parseWeightKgInput(stringValue)
+          : parseFloat(stringValue);
     const safeCurrent = Number.isFinite(current) ? current : 0;
     const delta = Number.isFinite(numericStep) ? numericStep : 1;
     let next = safeCurrent + delta * direction;

@@ -74,7 +74,7 @@ export default function CoachTrainingHubPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-32 pt-6 sm:max-w-2xl sm:px-6">
+        <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6 sm:max-w-2xl sm:px-6">
           <header className="mb-6">
             <h1
               className="font-bold fc-text-primary"

@@ -35,6 +35,7 @@ import {
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function ClusterSetExecutor({
   block,
@@ -269,7 +270,7 @@ export function ClusterSetExecutor({
       });
       return;
     }
-    const w = parseFloat(editDraft.weight);
+    const w = parseWeightKgInput(editDraft.weight);
     if (isNaN(w) || w < 0) {
       addToast({
         title: "Invalid weight",
@@ -347,7 +348,7 @@ export function ClusterSetExecutor({
   const handleClusterDone = async () => {
     if (!currentExercise || isLoggingSet) return;
 
-    const weightNum = parseFloat(weight);
+    const weightNum = parseWeightKgInput(weight);
     if (!weight || weight.trim() === "" || isNaN(weightNum) || weightNum < 0) {
       addToast({
         title: "Invalid Input",
@@ -647,7 +648,7 @@ export function ClusterSetExecutor({
     </div>
   );
 
-  const weightNumPreview = parseFloat(weight);
+  const weightNumPreview = parseWeightKgInput(weight);
   const clusterWeightReady =
     weight.trim() !== "" &&
     !isNaN(weightNumPreview) &&
@@ -674,8 +675,8 @@ export function ClusterSetExecutor({
           isSavingEdit ||
           !editDraft ||
           editDraft.weight.trim() === "" ||
-          isNaN(parseFloat(editDraft.weight)) ||
-          parseFloat(editDraft.weight) < 0
+          isNaN(parseWeightKgInput(editDraft.weight)) ||
+          parseWeightKgInput(editDraft.weight) < 0
         }
         variant="fc-primary"
         className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"

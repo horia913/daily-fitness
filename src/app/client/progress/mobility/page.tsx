@@ -241,7 +241,7 @@ function MobilityMetricsPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <div className="py-6 text-center">
               <p className="mb-3 text-sm text-[color:var(--fc-text-dim)]">{loadError}</p>
               <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
@@ -257,7 +257,7 @@ function MobilityMetricsPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -269,7 +269,7 @@ function MobilityMetricsPageContent() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           <div className="mb-3 flex items-center gap-3">
             <button
               type="button"
@@ -616,7 +616,7 @@ export default function MobilityMetricsPage() {
       fallback={
         <ProtectedRoute requiredRole="client">
           <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>

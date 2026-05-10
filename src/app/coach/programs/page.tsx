@@ -16,7 +16,7 @@ export default function CoachProgramsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="px-4 py-3 pb-32 sm:px-6 sm:py-4">
+        <CoachPageShell widthVariant="data-7xl" className="px-4 py-3 pb-[var(--fc-bottom-safe-area)] sm:px-6 sm:py-4">
             <Link
               href="/coach"
               className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"

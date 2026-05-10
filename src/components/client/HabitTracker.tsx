@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { HabitLibraryModal } from '@/components/client-habits'
 import { supabase } from '@/lib/supabase'
 import {
   addCalendarDaysYmd,
@@ -320,35 +321,36 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
     [allTemplates, ownedTemplateIds]
   )
 
-  const groupedPicker = useMemo(() => {
-    const m = new Map<string, HabitTemplateRow[]>()
-    for (const t of pickableTemplates) {
-      if (!m.has(t.category)) m.set(t.category, [])
-      m.get(t.category)!.push(t)
-    }
-    return m
-  }, [pickableTemplates])
-
-  const onSelectTemplate = async (template: HabitTemplateRow) => {
-    if (template.user_configurable_keys.length === 0) {
-      setSavingHabit(true)
-      try {
-        const { error } = await addHabitFromTemplate(userId, template.id, { ...template.default_target })
-        if (error) throw error
-        addToast({ title: 'Habit added', variant: 'success' })
-        setPickerOpen(false)
-        await loadPageData()
-      } catch (e) {
-        console.error(e)
-        addToast({ title: 'Could not add habit', variant: 'destructive' })
-      } finally {
-        setSavingHabit(false)
-      }
-      return
-    }
+  const onPickConfigurable = (template: HabitTemplateRow) => {
     setConfigureTemplate(template)
     setConfigureForm(initialConfigureForm(template))
     setPickerView('configure')
+  }
+
+  const handleCommitSession = async (templateIds: string[]) => {
+    if (templateIds.length === 0) return
+    setSavingHabit(true)
+    try {
+      for (const id of templateIds) {
+        const t = allTemplates.find((x) => x.id === id)
+        if (!t || t.user_configurable_keys.length > 0) continue
+        const { error } = await addHabitFromTemplate(userId, t.id, { ...t.default_target })
+        if (error) throw error
+      }
+      addToast({
+        title: templateIds.length === 1 ? 'Habit added' : 'Habits added',
+        variant: 'success',
+      })
+      setPickerOpen(false)
+      setPickerView('library')
+      setConfigureTemplate(null)
+      await loadPageData()
+    } catch (e) {
+      console.error(e)
+      addToast({ title: 'Could not add habit', variant: 'destructive' })
+    } finally {
+      setSavingHabit(false)
+    }
   }
 
   const saveConfigure = async () => {
@@ -593,123 +595,33 @@ export default function HabitTracker({ userId }: HabitTrackerProps) {
         </div>
       )}
 
-      <Dialog
+      <HabitLibraryModal
         open={pickerOpen}
-        onOpenChange={(o) => {
-          setPickerOpen(o)
-          if (!o) {
-            setPickerView('library')
-            setConfigureTemplate(null)
-          }
+        view={pickerView}
+        onClose={() => {
+          setPickerOpen(false)
+          setPickerView('library')
+          setConfigureTemplate(null)
         }}
-      >
-        <DialogContent layout="unstyled" showCloseButton className={habitDialogSurfaceClass}>
-          {pickerView === 'library' ? (
-            <>
-              <DialogHeader className="shrink-0 space-y-1 border-b border-[color:var(--fc-glass-border)] px-4 pb-3 pt-4 pr-12 text-left sm:px-6 sm:pr-14 sm:pt-6">
-                <DialogTitle>Habit library</DialogTitle>
-                <DialogDescription>Pick a habit to track. Auto-tracked habits sync from your logs when available.</DialogDescription>
-              </DialogHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-6">
-                {templatesLoading ? (
-                  <p className="py-8 text-center text-sm fc-text-dim">Loading library…</p>
-                ) : null}
-                {!templatesLoading &&
-                  CATEGORY_ORDER.map((cat) => {
-                  const list = groupedPicker.get(cat)
-                  if (!list?.length) return null
-                  return (
-                    <section key={cat} className="mb-6">
-                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide fc-text-dim">
-                        {CATEGORY_LABEL[cat]}
-                      </h4>
-                      <div className="space-y-2">
-                        {list.map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            disabled={savingHabit}
-                            onClick={() => void onSelectTemplate(t)}
-                            className="flex w-full items-start gap-3 rounded-xl border border-[color:var(--fc-glass-border)] p-3 text-left transition hover:bg-[color:var(--fc-glass-soft)]"
-                          >
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--fc-glass-border)]">
-                              <HabitLucideIcon name={t.icon} className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium fc-text-primary">{t.name}</span>
-                                {t.source_type !== 'manual' ? (
-                                  <Badge variant="outline" className="text-[10px]">
-                                    Auto-tracked
-                                  </Badge>
-                                ) : null}
-                              </div>
-                              {t.description ? (
-                                <p className="mt-1 text-xs fc-text-dim">{t.description}</p>
-                              ) : null}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  )
-                })}
-                {!templatesLoading && pickableTemplates.length === 0 ? (
-                  <p className="py-6 text-center text-sm fc-text-dim">You already added every habit from the library.</p>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              <DialogHeader className="shrink-0 space-y-1 border-b border-[color:var(--fc-glass-border)] px-4 pb-3 pt-2 pr-12 text-left sm:px-6 sm:pr-14 sm:pt-6 md:pt-4">
-                <DialogTitle>{configureTemplate?.name}</DialogTitle>
-                <DialogDescription>{configureTemplate?.description ?? 'Set your targets.'}</DialogDescription>
-              </DialogHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-6">
-                <div className="space-y-3">
-                  {configureTemplate?.user_configurable_keys.map((key) => (
-                    <div key={key}>
-                      <label className="mb-1 block text-sm capitalize fc-text-primary">{key.replace(/_/g, ' ')}</label>
-                      <Input
-                        type={inputModeForKey(key)}
-                        inputMode={key === 'bedtime' ? 'text' : 'decimal'}
-                        value={configureForm[key] ?? ''}
-                        onChange={(e) =>
-                          setConfigureForm((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        placeholder={key === 'bedtime' ? '23:00' : ''}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="shrink-0 space-y-2 border-t border-[color:var(--fc-glass-border)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    className="fc-btn fc-btn-primary flex-1"
-                    disabled={savingHabit}
-                    onClick={() => void saveConfigure()}
-                  >
-                    {savingHabit ? 'Saving…' : 'Save habit'}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="fc-btn fc-btn-secondary"
-                    disabled={savingHabit}
-                    onClick={() => {
-                      setPickerView('library')
-                      setConfigureTemplate(null)
-                    }}
-                  >
-                    Back
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+        templatesLoading={templatesLoading}
+        pickableTemplates={pickableTemplates}
+        categoryOrder={CATEGORY_ORDER}
+        categoryLabel={CATEGORY_LABEL as Record<string, string>}
+        isManualLike={isManualLike}
+        isAutoTracked={(t) => !isManualLike(t)}
+        savingHabit={savingHabit}
+        onCommitSession={handleCommitSession}
+        onPickConfigurable={onPickConfigurable}
+        configureTemplate={configureTemplate}
+        configureForm={configureForm}
+        setConfigureForm={setConfigureForm}
+        onSaveConfigure={() => saveConfigure()}
+        onBackConfigure={() => {
+          setPickerView('library')
+          setConfigureTemplate(null)
+        }}
+        inputModeForKey={inputModeForKey}
+      />
 
       <Dialog open={Boolean(editHabit)} onOpenChange={(o) => !o && setEditHabit(null)}>
         <DialogContent layout="unstyled" className={habitDialogSurfaceClass}>

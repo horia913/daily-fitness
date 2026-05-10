@@ -117,7 +117,7 @@ export default function MePage() {
       <div className="relative fc-app-bg isolate min-h-screen">
         <AnimatedBackground>
           <ClientPageShell
-            className="max-w-lg px-4 pb-32 pt-6"
+            className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6"
             backdrop={tierBackdropVariant(pageData?.athleteScore?.tier)}
           >
             {/* Header */}

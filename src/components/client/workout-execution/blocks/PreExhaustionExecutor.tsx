@@ -38,6 +38,7 @@ import {
 } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function PreExhaustionExecutor({
   block,
@@ -416,9 +417,9 @@ export function PreExhaustionExecutor({
       });
       return;
     }
-    const isolationWeightNum = parseFloat(editDraft.isolationWeight);
+    const isolationWeightNum = parseWeightKgInput(editDraft.isolationWeight);
     const isolationRepsNum = parseInt(editDraft.isolationReps, 10);
-    const compoundWeightNum = parseFloat(editDraft.compoundWeight);
+    const compoundWeightNum = parseWeightKgInput(editDraft.compoundWeight);
     const compoundRepsNum = parseInt(editDraft.compoundReps, 10);
     if (
       isNaN(isolationWeightNum) ||
@@ -494,9 +495,9 @@ export function PreExhaustionExecutor({
   const handleLog = async () => {
     if (!isolationExercise || !compoundExercise || isLoggingSet) return;
 
-    const isolationWeightNum = parseFloat(isolationWeight);
+    const isolationWeightNum = parseWeightKgInput(isolationWeight);
     const isolationRepsNum = parseInt(isolationReps);
-    const compoundWeightNum = parseFloat(compoundWeight);
+    const compoundWeightNum = parseWeightKgInput(compoundWeight);
     const compoundRepsNum = parseInt(compoundReps);
 
     if (
@@ -886,8 +887,8 @@ export function PreExhaustionExecutor({
       : [];
   const viewedSetEntry = forViewedSet[0] ?? null;
 
-  const wIso = parseFloat(isolationWeight);
-  const wComp = parseFloat(compoundWeight);
+  const wIso = parseWeightKgInput(isolationWeight);
+  const wComp = parseWeightKgInput(compoundWeight);
   const rIso = parseInt(isolationReps, 10);
   const rComp = parseInt(compoundReps, 10);
   const logInputsReady =
@@ -926,9 +927,9 @@ export function PreExhaustionExecutor({
               editDraft.isolationReps.trim() === "" ||
               editDraft.compoundWeight.trim() === "" ||
               editDraft.compoundReps.trim() === "" ||
-              isNaN(parseFloat(editDraft.isolationWeight)) ||
+              isNaN(parseWeightKgInput(editDraft.isolationWeight)) ||
               isNaN(parseInt(editDraft.isolationReps, 10)) ||
-              isNaN(parseFloat(editDraft.compoundWeight)) ||
+              isNaN(parseWeightKgInput(editDraft.compoundWeight)) ||
               isNaN(parseInt(editDraft.compoundReps, 10))
             }
             variant="fc-primary"

@@ -38,6 +38,7 @@ import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 import { LoggedSetsList, type LoggedSetRow } from "../ui/LoggedSetsList";
 import { useUpdateSetRpe } from "../hooks/useUpdateSetRpe";
 import { appendTargetEffortItem } from "../appendTargetEffortItem";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -234,7 +235,7 @@ export function StraightSetExecutor({
       });
       return;
     }
-    const w = parseFloat(editDraft.weight);
+    const w = parseWeightKgInput(editDraft.weight);
     const r = parseInt(editDraft.reps, 10);
     if (isNaN(w) || w < 0 || isNaN(r) || r <= 0) {
       addToast({
@@ -320,7 +321,7 @@ export function StraightSetExecutor({
   const handleUpdateViewedSet = async () => {
     if (viewingSetIndex < 1 || !loggedSetsList[viewingSetIndex - 1]) return;
     const setEntry = loggedSetsList[viewingSetIndex - 1];
-    const w = parseFloat(weight);
+    const w = parseWeightKgInput(weight);
     const r = parseInt(reps, 10);
     if (isNaN(w) || w < 0 || isNaN(r) || r <= 0) {
       addToast({
@@ -410,7 +411,7 @@ export function StraightSetExecutor({
   const handleLog = async () => {
     if (!currentExercise || isLoggingSet) return;
 
-    const weightNum = parseFloat(weight);
+    const weightNum = parseWeightKgInput(weight);
     const repsNum = parseInt(reps);
 
     // Validate input - weight can be 0, reps must be > 0
@@ -733,8 +734,8 @@ export function StraightSetExecutor({
     !isLoggingSet &&
     completedSets < totalSets &&
     weight.trim() !== "" &&
-    !isNaN(parseFloat(weight)) &&
-    parseFloat(weight) > 0 &&
+    !isNaN(parseWeightKgInput(weight)) &&
+    parseWeightKgInput(weight) > 0 &&
     reps.trim() !== "" &&
     !isNaN(parseInt(reps, 10)) &&
     parseInt(reps, 10) > 0;
@@ -755,8 +756,8 @@ export function StraightSetExecutor({
           !editDraft ||
           editDraft.weight.trim() === "" ||
           editDraft.reps.trim() === "" ||
-          isNaN(parseFloat(editDraft.weight)) ||
-          parseFloat(editDraft.weight) < 0 ||
+          isNaN(parseWeightKgInput(editDraft.weight)) ||
+          parseWeightKgInput(editDraft.weight) < 0 ||
           isNaN(parseInt(editDraft.reps, 10)) ||
           parseInt(editDraft.reps, 10) <= 0
         }

@@ -24,6 +24,11 @@ import {
   resolveStatsTabTimezone,
   type ClientAnalyticsData,
 } from '@/lib/clientAnalyticsService'
+import {
+  addCalendarDaysYmd,
+  mondayYmdOfZonedWeekContaining,
+  normalizeClientTimezone,
+} from '@/lib/clientZonedCalendar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { WellnessTrendsCard } from '@/components/client/WellnessTrendsCard'
 import type { DailyWellnessLog } from '@/lib/wellnessService'
@@ -37,15 +42,6 @@ interface ClientAnalyticsViewProps {
   prefetched?: ClientAnalyticsData | null
   /** Coach client Stats tab layout (v6 sections). */
   coachStatsLayout?: boolean
-}
-
-function getWeekStartMonday(): string {
-  const d = new Date()
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d)
-  monday.setDate(diff)
-  return monday.toISOString().split('T')[0]
 }
 
 export default function ClientAnalyticsView({
@@ -93,28 +89,20 @@ export default function ClientAnalyticsView({
     return () => { cancelled = true }
   }, [clientId, prefetched])
 
-  const weekStart = useMemo(() => getWeekStartMonday(), [])
-  const weekDays = useMemo(() => {
-    const start = new Date(weekStart + 'T12:00:00')
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      return d.toISOString().split('T')[0]
-    })
-  }, [weekStart])
-  const lastWeekStart = useMemo(() => {
-    const d = new Date(weekStart + 'T12:00:00')
-    d.setDate(d.getDate() - 7)
-    return d.toISOString().split('T')[0]
-  }, [weekStart])
-  const lastWeekDays = useMemo(() => {
-    const start = new Date(lastWeekStart + 'T12:00:00')
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      return d.toISOString().split('T')[0]
-    })
-  }, [lastWeekStart])
+  const chartTz = normalizeClientTimezone(data?.clientTimezoneForCharts)
+  const weekStart = useMemo(
+    () => mondayYmdOfZonedWeekContaining(new Date(), chartTz),
+    [chartTz],
+  )
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addCalendarDaysYmd(weekStart, i)),
+    [weekStart],
+  )
+  const lastWeekStart = useMemo(() => addCalendarDaysYmd(weekStart, -7), [weekStart])
+  const lastWeekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addCalendarDaysYmd(lastWeekStart, i)),
+    [lastWeekStart],
+  )
 
   if (loading) {
     return (

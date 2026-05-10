@@ -625,7 +625,7 @@ function BodyMetricsPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <div className="py-6 text-center">
               <p className="mb-3 text-sm fc-text-dim">{loadError}</p>
               <button type="button" onClick={() => { setLoadError(null); loadMetricsData(); }} className="fc-btn fc-btn-secondary fc-press h-10 px-5 text-sm">Retry</button>
@@ -641,7 +641,7 @@ function BodyMetricsPageContent() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <PageSkeleton variant="dashboard" />
           </ClientPageShell>
         </AnimatedBackground>
@@ -657,7 +657,7 @@ function BodyMetricsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <ClientPageShell
-        className={cn("relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden", checkinSuiteStyles.root)}
+        className={cn("relative z-10 max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden", checkinSuiteStyles.root)}
       >
         {/* Header */}
         <div className="mb-4 flex items-center gap-3">
@@ -1938,7 +1938,7 @@ export default function BodyMetricsPage() {
       <Suspense
         fallback={
           <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>

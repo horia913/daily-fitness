@@ -5,17 +5,12 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell, SectionHeader, Eyebrow } from "@/components/client-ui";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import {
+  ArrowDownRight,
   ArrowLeft,
-  CheckCircle,
-  Clock,
-  ChevronDown,
-  Star,
-  Trophy,
+  ArrowUpRight,
   LayoutDashboard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -34,6 +29,106 @@ import {
   formatPersonalRecordCaption,
   formatPersonalRecordImprovementSuffix,
 } from "@/lib/personalRecordDisplay";
+import {
+  CelebrationHero,
+  CoachNoteBlock,
+  CompleteStatsRow,
+  getCompleteAccent,
+  PrBanner,
+  StickyActionBar,
+  titleForAccent,
+  WorkoutSummarySection,
+  type TileStat,
+} from "@/components/client-workout-complete";
+import completeStyles from "@/components/client-workout-complete/clientWorkoutCompleteV1.module.css";
+
+const WORKOUT_LOG_COMPLETION_SELECT =
+  "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted, workout_assignment_id, workout_session_id, notes, workout_sessions ( notes )";
+
+/** Read completion handoff synchronously (effect order: assignment load runs before the effect that clears localStorage). */
+function readCompletionHandoff(searchParams: { get: (key: string) => string | null }) {
+  const logIdFromUrl = searchParams.get("logId");
+  const sessionIdFromUrl = searchParams.get("sessionId");
+  const durationFromUrl = searchParams.get("duration");
+  let log = logIdFromUrl;
+  let session = sessionIdFromUrl;
+  let durationStr = durationFromUrl;
+  if (typeof window !== "undefined") {
+    log = log || localStorage.getItem("workoutLogIdForComplete");
+    session = session || localStorage.getItem("workoutSessionIdForComplete");
+    durationStr = durationStr || localStorage.getItem("workoutDurationMinutes");
+  }
+  const parsed = durationStr ? parseInt(durationStr, 10) : NaN;
+  return {
+    logId: log || null,
+    sessionId: session || null,
+    durationMinutes: Number.isFinite(parsed) ? parsed : undefined,
+  };
+}
+
+async function fetchPersonalRecordsForAssignment(
+  assignmentId: string,
+  clientId: string
+): Promise<any[]> {
+  const { data: prs } = await supabase
+    .from("personal_records")
+    .select(`*, exercises(id, name)`)
+    .eq("client_id", clientId)
+    .eq("workout_assignment_id", assignmentId)
+    .order("achieved_date", { ascending: false });
+  return prs ?? [];
+}
+
+async function fetchPreviousSameTemplateTotals(
+  clientId: string,
+  templateId: string,
+  currentLogId: string
+): Promise<{
+  total_weight_lifted: number;
+  total_sets_completed: number;
+  total_reps_completed: number;
+} | null> {
+  const { data: prev, error } = await supabase
+    .from("workout_logs")
+    .select(
+      "total_weight_lifted, total_sets_completed, total_reps_completed, workout_assignments!inner(workout_template_id)"
+    )
+    .eq("client_id", clientId)
+    .neq("id", currentLogId)
+    .not("completed_at", "is", null)
+    .eq("workout_assignments.workout_template_id", templateId)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !prev) return null;
+  return {
+    total_weight_lifted: Number(prev.total_weight_lifted) || 0,
+    total_sets_completed: Number(prev.total_sets_completed) || 0,
+    total_reps_completed: Number(prev.total_reps_completed) || 0,
+  };
+}
+
+async function fetchCompletedLogCount(clientId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("workout_logs")
+    .select("*", { count: "exact", head: true })
+    .eq("client_id", clientId)
+    .not("completed_at", "is", null);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+function coachNoteFromWorkoutLog(log: Record<string, unknown> | null): string | null {
+  if (!log) return null;
+  const row = log as Record<string, any>;
+  const ws = row.workout_sessions;
+  const sessionNote = (Array.isArray(ws) ? ws[0]?.notes : ws?.notes) ?? null;
+  const logNote = row.notes ?? null;
+  const pick = [sessionNote, logNote]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .find((v) => v.length > 0);
+  return pick ?? null;
+}
 
 interface WorkoutAssignment {
   id: string;
@@ -144,7 +239,6 @@ function WorkoutCompleteContent() {
   const [completing, setCompleting] = useState(false);
   const [workoutLog, setWorkoutLog] = useState<any>(null);
   const [blockGroups, setBlockGroups] = useState<BlockGroup[]>([]);
-  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const [workoutStats, setWorkoutStats] = useState({
     duration: 0,
     totalSets: 0,
@@ -163,6 +257,13 @@ function WorkoutCompleteContent() {
     string | null
   >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
+  const [previousLogTotals, setPreviousLogTotals] = useState<{
+    total_weight_lifted: number;
+    total_sets_completed: number;
+    total_reps_completed: number;
+  } | null>(null);
+  const [isFirstEverWorkout, setIsFirstEverWorkout] = useState(false);
+  const [coachFirstName, setCoachFirstName] = useState<string | null>(null);
   const [programProgression, setProgramProgression] = useState<{
     current_week_number?: number;
     current_day_number?: number;
@@ -181,8 +282,10 @@ function WorkoutCompleteContent() {
   const completeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // DIAGNOSTIC: Tab return loading audit
+  const completionQueryKey = searchParams.toString();
   useEffect(() => {
     if (!assignmentId) return;
+    const handoff = readCompletionHandoff(searchParams);
     if (completeTimeoutRef.current) clearTimeout(completeTimeoutRef.current);
     completeTimeoutRef.current = setTimeout(() => {
       completeTimeoutRef.current = null;
@@ -193,7 +296,10 @@ function WorkoutCompleteContent() {
         if (assignmentData) {
           await updateWorkoutTotals(
             assignmentData.workout_template_id,
-            assignmentData.id
+            assignmentData.id,
+            handoff.logId,
+            handoff.sessionId,
+            handoff.durationMinutes
           );
         }
       })
@@ -205,6 +311,7 @@ function WorkoutCompleteContent() {
           clearTimeout(completeTimeoutRef.current);
           completeTimeoutRef.current = null;
         }
+        setLoading(false);
       });
     return () => {
       if (completeTimeoutRef.current) {
@@ -212,7 +319,7 @@ function WorkoutCompleteContent() {
         completeTimeoutRef.current = null;
       }
     };
-  }, [assignmentId]);
+  }, [assignmentId, completionQueryKey]);
 
   useEffect(() => {
     // Primary: URL params (survives reload, works when navigation used window.location.href).
@@ -246,22 +353,12 @@ function WorkoutCompleteContent() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (workoutLogIdOverride) {
-      updateWorkoutTotals(
-        assignment?.workout_template_id || null,
-        assignment?.id || null,
-        workoutLogIdOverride
-      ).catch((error) => {
-        console.error("Error loading workout totals from workout_log_id:", error);
-      });
-    }
-  }, [workoutLogIdOverride, assignment]);
-
   const updateWorkoutTotals = async (
     templateId: string | null = null,
     assignmentIdOverride: string | null = null,
-    workoutLogIdOverrideParam: string | null = null
+    workoutLogIdOverrideParam: string | null | undefined = undefined,
+    sessionIdOverrideParam: string | null | undefined = undefined,
+    durationMinutesOverrideParam: number | undefined = undefined
   ) => {
     // Guard: only run once per page load to prevent state overwrites
     if (completionDoneRef.current) {
@@ -271,7 +368,17 @@ function WorkoutCompleteContent() {
     const effectiveAssignmentId =
       assignmentIdOverride || resolvedAssignmentId || assignment?.id || null;
     const effectiveWorkoutLogId =
-      workoutLogIdOverrideParam || workoutLogIdOverride || null;
+      workoutLogIdOverrideParam !== undefined
+        ? workoutLogIdOverrideParam || null
+        : workoutLogIdOverride || null;
+    const effectiveSessionId =
+      sessionIdOverrideParam !== undefined
+        ? sessionIdOverrideParam || null
+        : workoutSessionIdOverride;
+    const effectiveDurationMinutes =
+      durationMinutesOverrideParam !== undefined
+        ? durationMinutesOverrideParam
+        : storedDurationMinutes;
     if (!effectiveAssignmentId && !effectiveWorkoutLogId) return;
 
     try {
@@ -288,22 +395,18 @@ function WorkoutCompleteContent() {
       if (effectiveWorkoutLogId) {
         const { data: logById } = await supabase
           .from("workout_logs")
-          .select(
-            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-          )
+          .select(WORKOUT_LOG_COMPLETION_SELECT)
           .eq("id", effectiveWorkoutLogId)
           .eq("client_id", user.id)
           .maybeSingle();
         workoutLog = logById;
       }
 
-      if (!workoutLog && workoutSessionIdOverride) {
+      if (!workoutLog && effectiveSessionId) {
         const { data: logBySession } = await supabase
           .from("workout_logs")
-          .select(
-            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-          )
-          .eq("workout_session_id", workoutSessionIdOverride)
+          .select(WORKOUT_LOG_COMPLETION_SELECT)
+          .eq("workout_session_id", effectiveSessionId)
           .eq("client_id", user.id)
           .maybeSingle();
         workoutLog = logBySession;
@@ -312,9 +415,7 @@ function WorkoutCompleteContent() {
       if (!workoutLog && effectiveAssignmentId) {
         const { data: completedLog } = await supabase
           .from("workout_logs")
-          .select(
-            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-          )
+          .select(WORKOUT_LOG_COMPLETION_SELECT)
           .eq("workout_assignment_id", effectiveAssignmentId)
           .eq("client_id", user.id)
           .not("completed_at", "is", null)
@@ -327,9 +428,7 @@ function WorkoutCompleteContent() {
         } else {
           const { data: activeLog } = await supabase
             .from("workout_logs")
-            .select(
-              "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-            )
+            .select(WORKOUT_LOG_COMPLETION_SELECT)
             .eq("workout_assignment_id", effectiveAssignmentId)
             .eq("client_id", user.id)
             .is("completed_at", null)
@@ -344,9 +443,7 @@ function WorkoutCompleteContent() {
       if (!workoutLog) {
         const { data: recentLog } = await supabase
           .from("workout_logs")
-          .select(
-            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-          )
+          .select(WORKOUT_LOG_COMPLETION_SELECT)
           .eq("client_id", user.id)
           .is("completed_at", null)
           .order("started_at", { ascending: false })
@@ -383,14 +480,40 @@ function WorkoutCompleteContent() {
             notes: (workoutLog as any).notes ?? null,
           });
           setWorkoutLog(workoutLog);
-          await loadBlocksAndSets(workoutLogId, user.id);
+          const tid = templateId;
+          const tasks: Promise<unknown>[] = [];
+          if (tid && workoutLogId) {
+            tasks.push(
+              fetchPreviousSameTemplateTotals(user.id, tid, workoutLogId).then(
+                setPreviousLogTotals
+              )
+            );
+            tasks.push(
+              fetchCompletedLogCount(user.id).then((c) =>
+                setIsFirstEverWorkout(c === 1)
+              )
+            );
+          } else {
+            setPreviousLogTotals(null);
+            setIsFirstEverWorkout(false);
+          }
+          if (effectiveAssignmentId) {
+            tasks.push(
+              fetchPersonalRecordsForAssignment(
+                effectiveAssignmentId,
+                user.id
+              ).then(setPersonalRecords)
+            );
+          }
+          tasks.push(loadBlocksAndSets(workoutLogId, user.id));
+          await Promise.all(tasks);
           completionDoneRef.current = true;
         } else {
           // Complete the workout — duration already captured in state from localStorage
           console.log("[COMPLETE-FLOW] calling /api/complete-workout", {
             workout_log_id: workoutLogId,
-            duration_minutes: storedDurationMinutes,
-            session_id: workoutSessionIdOverride,
+            duration_minutes: effectiveDurationMinutes,
+            session_id: effectiveSessionId,
           });
           const completeResponse = await withTimeout(
             fetchApi("/api/complete-workout", {
@@ -399,8 +522,8 @@ function WorkoutCompleteContent() {
               body: JSON.stringify({
                 workout_log_id: workoutLogId,
                 client_id: user.id,
-                duration_minutes: storedDurationMinutes,
-                session_id: workoutSessionIdOverride,
+                duration_minutes: effectiveDurationMinutes,
+                session_id: effectiveSessionId,
               }),
             }),
             30000,
@@ -474,61 +597,65 @@ function WorkoutCompleteContent() {
 
               setWorkoutLog(updatedLog);
 
-              // Load blocks and sets
-              await loadBlocksAndSets(workoutLogId, user.id);
-
-              // Mark completion as done so duplicate effects don't overwrite state
-              completionDoneRef.current = true;
-
-              // Fetch personal records for this workout (optional)
-              // Note: personal_records uses workout_assignment_id, not workout_log_id
-              try {
-                if (effectiveAssignmentId) {
-                  const { data: prs } = await supabase
-                    .from('personal_records')
-                    .select(`
-                      *,
-                      exercises(id, name)
-                    `)
-                    .eq('client_id', user.id)
-                    .eq('workout_assignment_id', effectiveAssignmentId)
-                    .order('achieved_date', { ascending: false });
-                  
-                  if (prs && prs.length > 0) {
-                    setPersonalRecords(prs);
-                  }
-                }
-              } catch (err) {
-                // Silently fail - this is optional data
-                // Could not fetch personal records
+              const tid = templateId;
+              const tasks: Promise<unknown>[] = [];
+              if (tid && workoutLogId) {
+                tasks.push(
+                  fetchPreviousSameTemplateTotals(user.id, tid, workoutLogId).then(
+                    setPreviousLogTotals
+                  )
+                );
+                tasks.push(
+                  fetchCompletedLogCount(user.id).then((c) =>
+                    setIsFirstEverWorkout(c === 1)
+                  )
+                );
+              } else {
+                setPreviousLogTotals(null);
+                setIsFirstEverWorkout(false);
               }
-
-              // Try to fetch next workout (optional - don't block if it fails)
-              try {
-                const today = new Date().toISOString().split('T')[0];
-                const { data: nextAssignment } = await supabase
-                  .from('workout_assignments')
-                  .select(`
+              if (effectiveAssignmentId) {
+                tasks.push(
+                  fetchPersonalRecordsForAssignment(
+                    effectiveAssignmentId,
+                    user.id
+                  ).then(setPersonalRecords)
+                );
+              }
+              tasks.push(loadBlocksAndSets(workoutLogId, user.id));
+              tasks.push(
+                (async () => {
+                  try {
+                    const today = new Date().toISOString().split("T")[0];
+                    const { data: nextAssignment } = await supabase
+                      .from("workout_assignments")
+                      .select(
+                        `
                     id,
                     name,
                     scheduled_date,
                     workout_template_id,
                     template:workout_templates(name, description)
-                  `)
-                  .eq('client_id', user.id)
-                  .in('status', ['assigned', 'active'])
-                  .gte('scheduled_date', today)
-                  .order('scheduled_date', { ascending: true })
-                  .limit(1)
-                  .maybeSingle();
-                
-                if (nextAssignment) {
-                  setNextWorkout(nextAssignment);
-                }
-              } catch (err) {
-                // Silently fail - this is optional data
-                // Could not fetch next workout
-              }
+                  `
+                      )
+                      .eq("client_id", user.id)
+                      .in("status", ["assigned", "active"])
+                      .gte("scheduled_date", today)
+                      .order("scheduled_date", { ascending: true })
+                      .limit(1)
+                      .maybeSingle();
+
+                    if (nextAssignment) {
+                      setNextWorkout(nextAssignment);
+                    }
+                  } catch {
+                    /* optional */
+                  }
+                })()
+              );
+              await Promise.all(tasks);
+
+              completionDoneRef.current = true;
             }
           } else {
             // API returned non-ok status
@@ -746,10 +873,6 @@ function WorkoutCompleteContent() {
 
       setBlockGroups(blocksArray);
 
-      // Expand first block by default
-      if (blocksArray.length > 0 && expandedBlocks.size === 0) {
-        setExpandedBlocks(new Set([blocksArray[0].set_entry_id]));
-      }
     } catch (error) {
       console.error("❌ Error loading blocks and sets:", error);
     }
@@ -827,15 +950,38 @@ function WorkoutCompleteContent() {
 
           setResolvedAssignmentId(actualAssignmentId);
 
-          const { data: assignmentData, error: assignmentError } = await supabase
+          const withCoach = await supabase
             .from("workout_assignments")
-            .select("*")
+            .select(
+              "*, coach:profiles!workout_assignments_coach_id_fkey(first_name)"
+            )
             .eq("id", actualAssignmentId)
             .eq("client_id", user.id)
             .maybeSingle();
 
+          let assignmentData: any = withCoach.data;
+          let assignmentError = withCoach.error;
+
+          if (assignmentError) {
+            const fb = await supabase
+              .from("workout_assignments")
+              .select("*")
+              .eq("id", actualAssignmentId)
+              .eq("client_id", user.id)
+              .maybeSingle();
+            assignmentData = fb.data;
+            assignmentError = fb.error;
+          }
+
           if (assignmentError) throw assignmentError;
           if (!assignmentData) throw new Error("Workout assignment not found");
+
+          const coachFn = assignmentData.coach?.first_name;
+          setCoachFirstName(
+            typeof coachFn === "string" && coachFn.trim()
+              ? coachFn.trim()
+              : null
+          );
 
           setAssignment(assignmentData as WorkoutAssignment);
           return assignmentData as WorkoutAssignment;
@@ -849,8 +995,6 @@ function WorkoutCompleteContent() {
       const isTimeoutErr = error?.message === "timeout" || error?.message?.includes("Timeout") || error?.message?.includes("took longer than");
       setLoadError(isTimeoutErr ? "Loading took too long. Please try again." : (error?.message || "Failed to load workout"));
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -927,18 +1071,6 @@ function WorkoutCompleteContent() {
     } finally {
       setCompleting(false);
     }
-  };
-
-  const toggleBlock = (blockId: string) => {
-    setExpandedBlocks((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(blockId)) {
-        newSet.delete(blockId);
-      } else {
-        newSet.add(blockId);
-      }
-      return newSet;
-    });
   };
 
   const formatBlockType = (blockType: string) => {
@@ -1492,7 +1624,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
             <div className="space-y-3 animate-pulse">
               <div className="h-20 w-20 rounded-full mx-auto bg-[color:var(--fc-glass-highlight)]" />
               <div className="h-7 max-w-[200px] rounded-lg mx-auto bg-[color:var(--fc-glass-highlight)]" />
@@ -1513,7 +1645,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
               <p className="mb-1 text-sm fc-text-dim">{loadError}</p>
               <p className="mb-4 text-xs fc-text-subtle">Try again or return to your workouts.</p>
@@ -1522,14 +1654,19 @@ function WorkoutCompleteContent() {
                   type="button"
                   variant="btn-action"
                   onClick={() => {
+                    completionDoneRef.current = false;
                     setLoadError(null);
                     setLoading(true);
+                    const handoff = readCompletionHandoff(searchParams);
                     loadAssignment()
                       .then(async (assignmentData: WorkoutAssignment | null) => {
                         if (assignmentData) {
                           await updateWorkoutTotals(
                             assignmentData.workout_template_id,
-                            assignmentData.id
+                            assignmentData.id,
+                            handoff.logId,
+                            handoff.sessionId,
+                            handoff.durationMinutes
                           );
                         }
                       })
@@ -1567,7 +1704,7 @@ function WorkoutCompleteContent() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
+          <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden flex items-center justify-center min-h-[60vh]">
             <div className="w-full py-8 px-4 text-center">
               <h3 className="text-sm fc-text-dim font-medium">Workout not found</h3>
               <p className="mt-1 text-xs fc-text-subtle">
@@ -1615,471 +1752,309 @@ function WorkoutCompleteContent() {
     });
   };
 
-  const totalExercises = blockGroups.reduce((s, g) => s + g.exerciseNames.size, 0);
-
   const allLoggedSets = blockGroups.flatMap((g) => g.sets);
   const isCardioSet = (s: WorkoutSetLog) =>
     s.set_type === "speed_work" || s.set_type === "endurance";
   const cardioLoggedSets = allLoggedSets.filter(isCardioSet);
   const strengthLoggedSets = allLoggedSets.filter((s) => !isCardioSet(s));
 
-  type StatsStripMode = "cardio_only" | "strength_only" | "mixed";
-  let statsStripMode: StatsStripMode = "strength_only";
-  if (allLoggedSets.length > 0) {
-    const hasCardio = cardioLoggedSets.length > 0;
-    const hasStrength = strengthLoggedSets.length > 0;
-    if (hasCardio && hasStrength) statsStripMode = "mixed";
-    else if (hasCardio) statsStripMode = "cardio_only";
-    else statsStripMode = "strength_only";
+  const prCount = personalRecords.length;
+  const skippedExerciseCount = 0;
+  const accent = getCompleteAccent({
+    prCount,
+    isFirstEverWorkout,
+    skippedExerciseCount,
+  });
+  const heroTitle = titleForAccent(accent);
+  const dm = Math.floor(Number(workoutStats.duration) || 0);
+  const ds = Math.round(
+    Math.max(0, (Number(workoutStats.duration) || 0) - dm) * 60
+  );
+
+  const dayLabelShort = (() => {
+    const iso = completedDate as string | undefined;
+    if (!iso) return "Today";
+    const d = new Date(iso);
+    const t0 = new Date();
+    t0.setHours(0, 0, 0, 0);
+    const d0 = new Date(d);
+    d0.setHours(0, 0, 0, 0);
+    const diff = Math.round((t0.getTime() - d0.getTime()) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  })();
+
+  const hasPrev = previousLogTotals != null;
+  const curW = Number(workoutStats.totalWeight) || 0;
+  const prevW = hasPrev
+    ? Number(previousLogTotals!.total_weight_lifted) || 0
+    : 0;
+  const dW = hasPrev ? curW - prevW : null;
+  let volDeltaTier: "up" | "same" | "down" | "baseline" = "baseline";
+  if (!hasPrev) volDeltaTier = "baseline";
+  else if (dW != null) {
+    if (dW > 0) volDeltaTier = "up";
+    else if (dW < 0) volDeltaTier = "down";
+    else volDeltaTier = "same";
   }
 
-  const intervalCount = cardioLoggedSets.filter((s) => s.set_type === "speed_work").length;
-  const cardioTotalDistanceM = cardioLoggedSets.reduce((sum, s) => {
-    const d = s.actual_distance_meters;
-    const n = d == null ? NaN : Number(d);
-    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
-  }, 0);
-  const cardioTotalTimeSec = cardioLoggedSets.reduce((sum, s) => {
-    const t = s.actual_time_seconds;
-    const n = t == null ? NaN : Number(t);
-    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
-  }, 0);
-  const cardioDistKm = cardioTotalDistanceM / 1000;
-  const cardioAvgPaceSecPerKm =
-    cardioDistKm > 0 && cardioTotalTimeSec > 0
-      ? cardioTotalTimeSec / cardioDistKm
+  const volDeltaNode =
+    volDeltaTier === "baseline" ? (
+      "Your first one — baseline set"
+    ) : volDeltaTier === "same" ? (
+      "Same volume as last session"
+    ) : (
+      <>
+        {volDeltaTier === "up" ? (
+          <ArrowUpRight size={12} aria-hidden />
+        ) : (
+          <ArrowDownRight size={12} aria-hidden />
+        )}
+        {dW != null && dW > 0 ? "+" : dW != null && dW < 0 ? "−" : ""}
+        {dW != null ? `${formatVolume(Math.abs(dW))} kg` : ""} vs last session
+      </>
+    );
+
+  const headlineMode =
+    strengthLoggedSets.length > 0 && curW > 0 ? "volume" : "reps";
+  const headlineNumber =
+    headlineMode === "volume"
+      ? formatVolume(curW)
+      : formatVolume(workoutStats.totalReps || 0);
+  const headlineUnit = headlineMode === "volume" ? "kg" : null;
+  const headlineLabel =
+    headlineMode === "volume" ? "Total volume lifted" : "Total reps";
+
+  const confettiLevel =
+    accent === "warning" ? "none" : accent === "lime" ? "full" : "light";
+
+  const heroIcon =
+    accent === "lime" ? "trophy" : accent === "purple" ? "star" : "check";
+
+  const prNames = personalRecords
+    .map((pr: any) => pr.exercises?.name || pr.exercise?.name)
+    .filter(Boolean) as string[];
+  const prBannerTitle =
+    prNames.length <= 2
+      ? prNames.join(" & ")
+      : `${prNames[0]}, ${prNames[1]} + ${prNames.length - 2} more`;
+
+  const dSets =
+    hasPrev && previousLogTotals
+      ? workoutStats.totalSets - (previousLogTotals.total_sets_completed || 0)
+      : null;
+  const dReps =
+    hasPrev && previousLogTotals
+      ? workoutStats.totalReps - (previousLogTotals.total_reps_completed || 0)
       : null;
 
-  const formatDistanceKm = (meters: number): string => {
-    if (!Number.isFinite(meters) || meters <= 0) return "—";
-    return `${(meters / 1000).toFixed(1)} km`;
+  const tierFrom = (d: number | null): "up" | "same" | "down" =>
+    d == null || !hasPrev ? "same" : d > 0 ? "up" : d < 0 ? "down" : "same";
+
+  const fmtSigned = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+  const prTile: TileStat = {
+    value: prCount >= 1 ? prCount : "—",
+    valueTone: prCount >= 1 ? "lime" : "muted",
+    deltaTier: !hasPrev ? "none" : "same",
+    deltaLabel: !hasPrev ? "none" : "same",
   };
 
-  const sessionTotalSeconds = Math.max(
-    0,
-    Math.round(Number(workoutStats.duration || 0) * 60)
-  );
-  const mixedSessionTimeDisplay =
-    sessionTotalSeconds > 0
-      ? formatDurationFromSeconds(sessionTotalSeconds)
-      : "—";
+  const setsTile: TileStat = {
+    value: workoutStats.totalSets,
+    valueTone: "default",
+    deltaTier: !hasPrev ? "none" : tierFrom(dSets),
+    deltaLabel:
+      !hasPrev || dSets == null ? "none" : dSets === 0 ? "same" : fmtSigned(dSets),
+  };
 
-  const statItem = (
-    value: React.ReactNode,
-    label: string,
-    colorVar: string,
-    key: string
-  ) => (
-    <div key={key} className="fc-stats-strip-item">
-      <span className="fc-stats-strip-value" style={{ color: colorVar }}>
-        {value}
-      </span>
-      <span className="fc-stats-strip-label">{label}</span>
-    </div>
+  const repsTile: TileStat = {
+    value: workoutStats.totalReps,
+    valueTone: "default",
+    deltaTier: !hasPrev ? "none" : tierFrom(dReps),
+    deltaLabel:
+      !hasPrev || dReps == null ? "none" : dReps === 0 ? "same" : fmtSigned(dReps),
+  };
+
+  const coachNoteText = coachNoteFromWorkoutLog(
+    workoutLog as Record<string, unknown> | null
   );
 
-  let statsStripItems: React.ReactNode[];
-  if (statsStripMode === "cardio_only") {
-    statsStripItems = [
-      statItem(intervalCount > 0 ? intervalCount : "—", "Intervals", "var(--fc-accent-cyan)", "intervals"),
-      statItem(
-        cardioTotalDistanceM > 0 ? formatDistanceKm(cardioTotalDistanceM) : "—",
-        "Distance",
-        "var(--fc-status-success)",
-        "dist"
-      ),
-      statItem(
-        cardioTotalTimeSec > 0
-          ? formatDurationFromSeconds(Math.floor(cardioTotalTimeSec))
-          : "—",
-        "Total time",
-        "var(--fc-status-warning)",
-        "time"
-      ),
-      statItem(
-        cardioAvgPaceSecPerKm != null
-          ? formatPaceMinSecPerKm(cardioAvgPaceSecPerKm)
-          : "—",
-        "Avg pace",
-        "var(--fc-accent-purple)",
-        "pace"
-      ),
-    ];
-  } else if (statsStripMode === "mixed") {
-    statsStripItems = [
-      statItem(totalExercises > 0 ? totalExercises : "—", "Exercises", "var(--fc-accent-cyan)", "ex"),
-      statItem(
-        workoutStats.totalSets > 0 ? workoutStats.totalSets : "—",
-        "Sets",
-        "var(--fc-status-success)",
-        "sets"
-      ),
-      statItem(mixedSessionTimeDisplay, "Total time", "var(--fc-status-warning)", "time"),
-      statItem(
-        workoutStats.totalWeight > 0 ? formatVolume(workoutStats.totalWeight) : "—",
-        "kg lifted",
-        "var(--fc-status-error)",
-        "kg"
-      ),
-    ];
-  } else {
-    statsStripItems = [
-      statItem(personalRecords.length > 0 ? personalRecords.length : "—", "PRs", "var(--fc-status-error)", "prs"),
-      statItem(
-        workoutStats.totalWeight > 0 ? formatVolume(workoutStats.totalWeight) : "—",
-        "kg lifted",
-        "var(--fc-accent-cyan)",
-        "kg"
-      ),
-      statItem(
-        workoutStats.totalSets > 0 ? workoutStats.totalSets : "—",
-        "Sets",
-        "var(--fc-status-success)",
-        "sets"
-      ),
-      statItem(
-        workoutStats.totalReps > 0 ? workoutStats.totalReps : "—",
-        "Reps",
-        "var(--fc-status-warning)",
-        "reps"
-      ),
-    ];
-  }
+  const onShareSummary = async () => {
+    const title = assignment?.name || "Workout";
+    const prPart =
+      prCount > 0
+        ? `${prCount} new PR${prCount === 1 ? "" : "s"}`
+        : "no new PRs";
+    const body = `${title} · ${formatVolume(curW)} kg lifted · ${prPart} 💪`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: body });
+        return;
+      }
+    } catch {
+      /* user cancelled or share failed */
+    }
+    try {
+      await navigator.clipboard.writeText(body);
+      addToast({
+        title: "Copied",
+        description: "Workout summary copied to clipboard.",
+        variant: "success",
+        duration: 2500,
+      });
+    } catch {
+      addToast({
+        title: "Share",
+        description: body,
+        variant: "default",
+        duration: 4000,
+      });
+    }
+  };
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pb-40 pt-6 overflow-x-hidden flex flex-col gap-6">
-            {/* Celebration Hero */}
-            <header className="text-center pt-2 pb-4">
-              <div className="mb-4 relative inline-block">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: "color-mix(in srgb, var(--fc-status-success) 15%, transparent)" }}>
-                  <Trophy className="w-10 h-10" style={{ color: "var(--fc-status-success)" }} />
-                </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--fc-status-success)" }}>
-                  <CheckCircle className="w-3.5 h-3.5 text-[color:var(--fc-text-primary)]" />
-                </div>
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-white mb-1">Workout Complete</h1>
-              <div className="flex items-center justify-center gap-2 fc-text-dim font-mono text-sm">
-                <Clock className="w-3.5 h-3.5" />
-                <span>{Math.floor(workoutStats.duration || 0)}m {(Math.round(((workoutStats.duration || 0) % 1) * 60))}s</span>
-              </div>
-            </header>
+        <ClientPageShell className="min-h-screen max-w-lg mx-auto px-4 pt-6 overflow-x-hidden">
+          <div className={completeStyles.root}>
+            <div className={completeStyles.pageStack}>
+              <CelebrationHero
+                accent={accent}
+                confetti={confettiLevel}
+                title={heroTitle}
+                durationParts={{ mins: dm, secs: ds }}
+                dayLabel={dayLabelShort}
+                headlineNumber={headlineNumber}
+                headlineUnit={headlineUnit}
+                headlineLabel={headlineLabel}
+                deltaTier={volDeltaTier}
+                deltaNode={volDeltaNode}
+                icon={heroIcon}
+              />
 
-            {/* Stats Strip */}
-            <section>
-              <div className="fc-stats-strip">{statsStripItems}</div>
-            </section>
+              {prCount >= 1 ? (
+                <PrBanner
+                  prCount={prCount}
+                  titleLine={prBannerTitle}
+                  onPress={() =>
+                    router.push("/client/progress/personal-records")
+                  }
+                />
+              ) : null}
 
-            {/* Session Highlights Card */}
-            {(personalRecords.length > 0 || newAchievementsQueue.length > 0) && (
-              <div className="border-y border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3">
-                    <div
-                      className="flex h-10 w-10 items-center justify-center rounded-xl"
-                      style={{ background: "linear-gradient(135deg, var(--fc-accent-purple), var(--fc-accent-cyan))" }}
-                    >
-                      <Star className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-bold fc-text-primary">
-                        Session Highlights
-                      </h2>
-                      <p className="text-xs fc-text-dim">
-                        {[
-                          personalRecords.length > 0 ? `${personalRecords.length} PR${personalRecords.length !== 1 ? "s" : ""}` : null,
-                          newAchievementsQueue.length > 0 ? `${newAchievementsQueue.length} achievement${newAchievementsQueue.length !== 1 ? "s" : ""}` : null,
-                        ].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                  </div>
+              <CompleteStatsRow
+                prTile={prTile}
+                setsTile={setsTile}
+                repsTile={repsTile}
+                prHighlight={prCount >= 1}
+              />
 
-                  <div className="flex flex-col">
-                    {personalRecords.slice(0, 3).map((pr: any) => {
-                      const exerciseName = pr.exercises?.name || pr.exercise?.name || "Exercise";
-                      return (
-                        <div
-                          key={pr.id}
-                          className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3"
-                        >
-                          <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: "var(--fc-status-warning)" }} />
-                          <span className="text-sm font-semibold fc-text-primary truncate">{exerciseName}</span>
-                          <span className="ml-auto text-sm font-bold font-mono flex-shrink-0" style={{ color: "var(--fc-status-success)" }}>
-                            {formatPersonalRecordCaption(
-                              pr.record_type,
-                              pr.record_value,
-                              pr.record_unit
-                            )}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {personalRecords.length > 3 && (
-                      <p className="text-xs fc-text-dim text-center">+{personalRecords.length - 3} more PRs</p>
-                    )}
-                    {newAchievementsQueue.map((ach) => (
-                      <div
-                        key={ach.id}
-                        className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3 last:border-b-0"
-                      >
-                        <span className="text-lg flex-shrink-0">{ach.icon}</span>
-                        <span className="text-sm font-semibold fc-text-primary truncate">{ach.name}</span>
-                        <Badge
-                          variant="outline"
-                          className="ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                          style={{
-                            background:
-                              "color-mix(in srgb, var(--fc-accent-purple) 15%, transparent)",
-                            borderColor:
-                              "color-mix(in srgb, var(--fc-accent-purple) 35%, transparent)",
-                            color: "var(--fc-accent-purple)",
-                          }}
-                        >
-                          {ach.rarity}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-              </div>
-            )}
+              {coachNoteText ? (
+                <CoachNoteBlock
+                  coachFirstName={coachFirstName}
+                  note={coachNoteText}
+                />
+              ) : null}
 
-            {personalRecords.length > 0 && (
-              <div className="border-y border-[color:var(--fc-glass-border)]">
-                <div className="flex items-center gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
-                    <Trophy className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
-                  </div>
-                  <div className="min-w-0">
-                    <SectionHeader
-                      title="PRs This Workout"
-                      titleTone="plain"
-                      titleClassName="text-base font-bold fc-text-primary"
-                      className="!mb-1"
-                    />
-                    <p className="text-xs fc-text-dim">
-                      {personalRecords.length} new {personalRecords.length === 1 ? "PR" : "PRs"} this session
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col">
-                  {personalRecords.slice(0, 5).map((pr: any) => {
-                    const exerciseName =
-                      pr.exercises?.name || pr.exercise?.name || "Exercise";
-                    const improvement =
-                      pr.previous_record_value != null
-                        ? Number(pr.record_value) - Number(pr.previous_record_value)
-                        : null;
-                    const cap = formatPersonalRecordCaption(
-                      pr.record_type,
-                      pr.record_value,
-                      pr.record_unit
-                    );
-                    const improvementStr =
-                      improvement != null && improvement > 0
-                        ? ` (${formatPersonalRecordImprovementSuffix(
-                            pr.record_type,
-                            improvement,
-                            pr.record_unit
-                          )})`
-                        : "";
-                    const valueStr = `${cap}${improvementStr}`;
-
-                    return (
-                      <div
-                        key={pr.id}
-                        className="flex items-center justify-between gap-3 border-b border-[color:var(--fc-glass-border)] px-4 py-3 last:border-b-0"
-                      >
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-semibold fc-text-primary truncate">
-                            {exerciseName}
-                          </h4>
-                          <Eyebrow tone="dim" density="section" className="!text-xs !font-normal">
-                            {pr.record_type === "weight"
-                              ? "Strength"
-                              : pr.record_type === "reps"
-                                ? "Volume"
-                                : pr.record_type === "time"
-                                  ? "Time"
-                                  : pr.record_type === "distance"
-                                    ? "Distance"
-                                    : pr.record_type === "score"
-                                      ? "Score"
-                                      : "Record"}
-                          </Eyebrow>
-                        </div>
-                        <div className="font-mono text-sm font-bold flex-shrink-0 text-right" style={{ color: "var(--fc-status-success)" }}>
-                          {valueStr}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {programProgression &&
-              (programProgression.current_week_number != null ||
-                programProgression.current_day_number != null) && (
-              <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
-                <div className="mb-1 flex items-center gap-2">
-                  <LayoutDashboard className="w-4 h-4" style={{ color: "var(--fc-accent-cyan)" }} />
-                  <Eyebrow tone="dim" density="section" className="!mb-0 !font-bold">
-                    Program
-                  </Eyebrow>
-                </div>
-                <p className="text-sm font-semibold fc-text-primary">
-                  Week {programProgression.current_week_number ?? "?"} Day {programProgression.current_day_number ?? "?"}
-                  {assignment?.name ? ` — ${assignment.name}` : ""} ✓
-                </p>
-                {programProgression.is_completed && (
-                  <p className="text-xs fc-text-dim mt-1">
-                    Week complete! Next week unlocked.
+              {newAchievementsQueue.length > 0 ? (
+                <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2">
+                  <p className="text-xs font-semibold fc-text-primary">
+                    New unlocks
                   </p>
-                )}
-              </div>
-            )}
+                  <ul className="mt-1 space-y-1">
+                    {newAchievementsQueue.map((ach) => (
+                      <li
+                        key={ach.id}
+                        className="flex items-center gap-2 text-xs fc-text-dim"
+                      >
+                        <span>{ach.icon}</span>
+                        <span className="fc-text-primary font-medium">
+                          {ach.name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
-            {nextWorkout && (
-              <div className="border-b border-[color:var(--fc-glass-border)] px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <Eyebrow tone="dim" density="section" className="!mb-1 !font-bold">
-                      Up Next
-                    </Eyebrow>
+              {programProgression &&
+                (programProgression.current_week_number != null ||
+                  programProgression.current_day_number != null) && (
+                  <div className={completeStyles.programCompact}>
+                    <div className="mb-1 flex items-center gap-2">
+                      <LayoutDashboard
+                        className="w-4 h-4"
+                        style={{ color: "var(--fc-accent-cyan)" }}
+                      />
+                      <Eyebrow
+                        tone="dim"
+                        density="section"
+                        className="!mb-0 !font-bold"
+                      >
+                        Program
+                      </Eyebrow>
+                    </div>
+                    <p className="text-sm font-semibold fc-text-primary">
+                      Week {programProgression.current_week_number ?? "?"} Day{" "}
+                      {programProgression.current_day_number ?? "?"}
+                      {assignment?.name ? ` — ${assignment.name}` : ""} ✓
+                    </p>
+                    {programProgression.is_completed ? (
+                      <p className="text-xs fc-text-dim mt-1">
+                        Week complete! Next week unlocked.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
+              {nextWorkout ? (
+                <div className={completeStyles.programCompact}>
+                  <Eyebrow
+                    tone="dim"
+                    density="section"
+                    className="!mb-1 !font-bold"
+                  >
+                    Up next
+                  </Eyebrow>
+                  <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold fc-text-primary truncate">
                       {nextWorkout.name ||
                         (nextWorkout.template as any)?.name ||
                         "Workout"}
                     </h3>
-                  </div>
-                  {nextWorkout.scheduled_date && (
-                    <div className="font-mono text-xs flex-shrink-0" style={{ color: "var(--fc-accent-cyan)" }}>
-                      {formatScheduledDate(nextWorkout.scheduled_date)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {blockGroups.length > 0 && (
-              <section className="space-y-3">
-                <SectionHeader
-                  title="Workout Summary"
-                  action={
-                    <span className="text-xs font-mono fc-text-dim">{totalExercises} exercises</span>
-                  }
-                />
-
-                <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-                  {blockGroups.map((block) => {
-                    const isExpanded = expandedBlocks.has(block.set_entry_id);
-                    const setCount = block.sets.length;
-                    const exerciseNamesList = Array.from(
-                      block.exerciseNames.values()
-                    );
-                    const exerciseNamesDisplay =
-                      exerciseNamesList.length > 0
-                        ? exerciseNamesList.length === 1
-                          ? exerciseNamesList[0]
-                          : exerciseNamesList.join(" + ")
-                        : "Exercise";
-
-                    return (
+                    {nextWorkout.scheduled_date ? (
                       <div
-                        key={block.set_entry_id}
-                        className="overflow-hidden border-b border-[color:var(--fc-glass-border)] last:border-b-0"
+                        className="font-mono text-xs flex-shrink-0"
+                        style={{ color: "var(--fc-accent-cyan)" }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => toggleBlock(block.set_entry_id)}
-                          className="w-full px-4 py-3 text-left transition-colors hover:bg-[color:var(--fc-glass-highlight)]"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-bold fc-text-dim" style={{ background: "var(--fc-surface-sunken)" }}>
-                              {String(block.set_order).padStart(2, "0")}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-semibold fc-text-primary truncate">
-                                  {formatBlockType(block.set_type)}
-                                </h3>
-                                {setCount > 0 && (
-                                  <span className="text-xs fc-text-dim font-mono flex-shrink-0">
-                                    {setCount} {setCount === 1 ? "set" : "sets"}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs fc-text-dim truncate">
-                                {exerciseNamesDisplay}
-                              </p>
-                            </div>
-                            <ChevronDown className={`w-4 h-4 fc-text-dim transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                          </div>
-                        </button>
-                        {isExpanded && (
-                          <div className="border-t border-[color:var(--fc-glass-border)] px-4 pb-3 pt-3">
-                            <div className="flex flex-col">
-                              {block.sets.length === 0 ? (
-                                renderTemplateExercises(block, block.exerciseNames)
-                              ) : (
-                                block.sets
-                                  .sort((a, b) => {
-                                    if (a.set_number && b.set_number) {
-                                      return a.set_number - b.set_number;
-                                    }
-                                    if (a.set_number) return -1;
-                                    if (b.set_number) return 1;
-                                    return (
-                                      new Date(a.completed_at).getTime() -
-                                      new Date(b.completed_at).getTime()
-                                    );
-                                  })
-                                  .map((set) => (
-                                    <div
-                                      key={set.id}
-                                      className="border-b border-[color:var(--fc-glass-border)] py-2 pl-1 last:border-b-0"
-                                    >
-                                      {renderSetDisplay(
-                                        set,
-                                        block.set_type,
-                                        block.exerciseNames
-                                      )}
-                                    </div>
-                                  ))
-                              )}
-                            </div>
-                          </div>
-                        )}
+                        {formatScheduledDate(nextWorkout.scheduled_date)}
                       </div>
-                    );
-                  })}
+                    ) : null}
+                  </div>
                 </div>
-              </section>
-            )}
+              ) : null}
 
-            {/* Spacer for floating button */}
-            <div className="h-20" />
-
-            {/* Floating Bottom Action */}
-            <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
-              <div className="max-w-lg mx-auto">
-                <Button
-                  type="button"
-                  variant="btn-action"
-                  onClick={() => router.push("/client")}
-                  disabled={completing}
-                  className={cn(
-                    "h-14 w-full gap-3 rounded-2xl text-base font-bold uppercase tracking-wider shadow-lg",
-                  )}
-                >
-                  <LayoutDashboard className="h-5 w-5" />
-                  Back to Dashboard
-                </Button>
-              </div>
+              {blockGroups.length > 0 ? (
+                <WorkoutSummarySection
+                  blockGroups={blockGroups}
+                  prs={personalRecords}
+                />
+              ) : null}
             </div>
-          </ClientPageShell>
+          </div>
+
+          <StickyActionBar
+            onShare={onShareSummary}
+            onDashboard={() => router.push("/client")}
+            disabled={completing}
+          />
+        </ClientPageShell>
 
           {newAchievementsQueue.length > 0 && (
             <AchievementUnlockModal
@@ -2106,7 +2081,7 @@ export default function WorkoutComplete() {
       fallback={
         <ProtectedRoute requiredRole="client">
           <AnimatedBackground>
-            <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+            <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>

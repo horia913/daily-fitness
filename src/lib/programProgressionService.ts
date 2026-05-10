@@ -3,6 +3,7 @@
 import { supabase } from './supabase'
 import { WorkoutBlockService } from './workoutBlockService'
 import { WorkoutBlock, WorkoutBlockExercise } from '@/types/workoutBlocks'
+import { mapWorkoutBlocksRpcToSetEntries } from '@/lib/workoutBlocksRpcMapper'
 
 /**
  * Coerce values for INTEGER DB columns. Column `rir` stores prescribed RPE: parse the
@@ -1007,7 +1008,47 @@ export class ProgramProgressionService {
         return []
       }
 
-      return await this.buildBlocksFromRules(rules, blockMetaById)
+      const progressionBlocks = await this.buildBlocksFromRules(
+        rules,
+        blockMetaById,
+      )
+
+      // Progression rules may exist only for a subset of set entries (e.g. newly
+      // added template exercises). Without merging, the client would only see
+      // those blocks ("Exercise 2 of 2" for a five-move workout). Overlay rules
+      // onto the full template from get_workout_blocks; keep base prescription
+      // for set entries that have no rules this week.
+      const { data: rpcBlocks, error: rpcError } = await supabase.rpc(
+        'get_workout_blocks',
+        { p_template_id: templateId },
+      )
+      if (rpcError || rpcBlocks == null || !Array.isArray(rpcBlocks)) {
+        return progressionBlocks
+      }
+
+      const templateFromRpc = mapWorkoutBlocksRpcToSetEntries(rpcBlocks)
+      if (templateFromRpc.length === 0) {
+        return progressionBlocks
+      }
+
+      const overlayBySetEntryId = new Map(
+        progressionBlocks.map((b) => [b.id, b]),
+      )
+
+      const merged: WorkoutBlock[] = templateFromRpc.map(
+        (b) =>
+          (overlayBySetEntryId.get(b.id) as WorkoutBlock | undefined) ??
+          (b as WorkoutBlock),
+      )
+
+      for (const pb of progressionBlocks) {
+        if (!templateFromRpc.some((t) => t.id === pb.id)) {
+          merged.push(pb as WorkoutBlock)
+        }
+      }
+
+      merged.sort((a, b) => (a.set_order ?? 0) - (b.set_order ?? 0))
+      return merged
     } catch (error) {
       console.error('❌ Error converting progression rules to blocks (template):', error)
       return []

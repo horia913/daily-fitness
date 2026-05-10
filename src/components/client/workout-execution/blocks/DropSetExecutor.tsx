@@ -39,6 +39,7 @@ import {
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function DropSetExecutor({
   block,
@@ -282,7 +283,7 @@ export function DropSetExecutor({
     }
     const dropsParsed = editDraft.drops
       .map((d) => ({
-        weight: parseFloat(d.weight),
+        weight: parseWeightKgInput(d.weight),
         reps: parseInt(d.reps, 10),
       }))
       .filter(
@@ -380,7 +381,7 @@ export function DropSetExecutor({
 
     const dropsParsed = drops
       .map((d) => ({
-        weight: parseFloat(d.weight),
+        weight: parseWeightKgInput(d.weight),
         reps: parseInt(d.reps, 10),
       }))
       .filter(
@@ -429,8 +430,10 @@ export function DropSetExecutor({
         dropset_percentage: dropPct,
       };
 
-      if (currentExercise?.exercise_id)
-        logData.exercise_id = currentExercise.exercise_id;
+      const resolvedExerciseId =
+        currentExercise?.exercise_id ||
+        block.block.exercises?.[0]?.exercise_id;
+      if (resolvedExerciseId) logData.exercise_id = resolvedExerciseId;
 
       const result = await logSetToDatabase(logData);
 
@@ -740,7 +743,9 @@ export function DropSetExecutor({
                     prev.length > 0
                       ? String(
                           Math.round(
-                            parseFloat(prev[prev.length - 1].weight || "0") *
+                            parseWeightKgInput(
+                              prev[prev.length - 1].weight || "0",
+                            ) *
                               0.85 *
                               2,
                           ) / 2,
@@ -770,7 +775,7 @@ export function DropSetExecutor({
                             d.drops.length > 0
                               ? String(
                                   Math.round(
-                                    parseFloat(
+                                    parseWeightKgInput(
                                       d.drops[d.drops.length - 1].weight || "0",
                                     ) *
                                       0.85 *
@@ -796,7 +801,7 @@ export function DropSetExecutor({
 
   const dropsParsedPreview = drops
     .map((d) => ({
-      weight: parseFloat(d.weight),
+      weight: parseWeightKgInput(d.weight),
       reps: parseInt(d.reps, 10),
     }))
     .filter(
@@ -826,8 +831,8 @@ export function DropSetExecutor({
           editDraft.drops.length < 2 ||
           editDraft.drops.some(
             (d) =>
-              isNaN(parseFloat(d.weight)) ||
-              parseFloat(d.weight) < 0 ||
+              isNaN(parseWeightKgInput(d.weight)) ||
+              parseWeightKgInput(d.weight) < 0 ||
               isNaN(parseInt(d.reps, 10)) ||
               parseInt(d.reps, 10) <= 0,
           )

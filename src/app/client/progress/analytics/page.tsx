@@ -629,7 +629,7 @@ function AnalyticsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
         <div className={ps.psV1}>
           <PsHero
             glow="purple"
@@ -682,7 +682,7 @@ function AnalyticsPageContent() {
             </Button>
           </div>
         ) : loading ? (
-          <div className="animate-pulse space-y-3 p-2 pb-32">
+          <div className="animate-pulse space-y-3 p-2 pb-[var(--fc-bottom-safe-area)]">
             <div className="h-6 w-32 rounded-full bg-[color:var(--fc-glass-highlight)]" />
             <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
             <div className="grid grid-cols-2 gap-3">
@@ -1469,7 +1469,7 @@ export default function AnalyticsPage() {
       <Suspense
         fallback={
           <AnimatedBackground>
-            <ClientPageShell className="max-w-xl mx-auto px-4 pb-32 pt-6">
+            <ClientPageShell className="max-w-xl mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
               <PageSkeleton variant="dashboard" />
             </ClientPageShell>
           </AnimatedBackground>

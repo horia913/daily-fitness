@@ -86,7 +86,7 @@ function CoachChallengesPageContent() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6">
+          <CoachPageShell widthVariant="data-7xl" className="p-3 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-6">
             <PageSkeleton variant="dashboard" />
           </CoachPageShell>
         </AnimatedBackground>
@@ -100,7 +100,7 @@ function CoachChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-8 sm:space-y-12">
+      <CoachPageShell widthVariant="data-7xl" className="p-3 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-6 space-y-8 sm:space-y-12">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">

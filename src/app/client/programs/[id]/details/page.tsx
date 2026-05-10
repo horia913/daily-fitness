@@ -784,7 +784,7 @@ function ProgramDetailsContent() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <PageSkeleton variant="dashboard" />
         </ClientPageShell>
@@ -796,7 +796,7 @@ function ProgramDetailsContent() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden w-full">
+        <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden w-full">
           <div className="w-full space-y-3">
             <ErrorBanner
               title={error ? "Couldn't load program" : "Program not found"}
@@ -821,7 +821,7 @@ function ProgramDetailsContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell className="max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+      <ClientPageShell className="max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
         <div className="flex items-center gap-3 mb-4">
           <button
             type="button"

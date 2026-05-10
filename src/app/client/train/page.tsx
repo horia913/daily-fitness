@@ -56,7 +56,6 @@ import { supabase } from "@/lib/supabase";
 import { usePageData } from "@/hooks/usePageData";
 import {
   computeTrainRpcWeekday,
-  resolveTrainPageTodayWeekday,
   rpcResponseToProgramWeekState,
   type TrainPageRpcResponse,
   type TrainPageRpcExtraWorkoutRow,
@@ -215,10 +214,17 @@ export default function TrainPage() {
       dashboardPage?.dashboard?.weeklyProgress ?? { current: 0, goal: 0 };
 
     const data = (rpcData ?? null) as TrainPageRpcResponse | null;
-    const programWeek = data
-      ? await rpcResponseToProgramWeekState(supabase, data, profileTimezone)
-      : null;
-    const todayWeekday = resolveTrainPageTodayWeekday(data, profileTimezone);
+    let programWeek: ProgramWeekState | null = null;
+    let todayWeekday = computeTrainRpcWeekday(profileTimezone);
+    if (data) {
+      const bundle = await rpcResponseToProgramWeekState(
+        supabase,
+        data,
+        profileTimezone,
+      );
+      programWeek = bundle.programWeek;
+      todayWeekday = bundle.todayWeekday;
+    }
     const extraFromRpc: TrainPageRpcExtraWorkoutRow[] = Array.isArray(data?.extraWorkouts)
       ? data.extraWorkouts
       : [];
@@ -448,10 +454,14 @@ export default function TrainPage() {
     setWeekActivities(updated);
   };
 
+  const selectedDayStatus = selectedDay
+    ? getDayStatus(selectedDay, todayWeekday)
+    : null;
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <ClientPageShell className="max-w-lg px-0 pb-32 pt-6">
+        <ClientPageShell className="max-w-lg px-0 pb-[var(--fc-bottom-safe-area)] pt-6">
           <header className="mb-2 flex items-center justify-between px-5 pt-0">
             <button
               type="button"
@@ -630,6 +640,11 @@ export default function TrainPage() {
                         selectedOverdueSlot !== null ||
                         selectedRestWeekday !== null) && (
                         <div className="mb-6" data-workout-preview>
+                          {selectedDayStatus === "missed" && (
+                            <div className="mx-5 mb-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                              You are viewing a missed workout from earlier this week.
+                            </div>
+                          )}
                           {selectedOverdueSlot ? (
                             <WorkoutDayPreview
                               key={selectedOverdueSlot.scheduleId}
@@ -673,7 +688,7 @@ export default function TrainPage() {
                             <WorkoutDayPreview
                               key={selectedDay.scheduleId}
                               day={selectedDay}
-                              status={getDayStatus(selectedDay, todayWeekday)}
+                              status={selectedDayStatus ?? "upcoming"}
                               templateId={selectedDay.templateId}
                               workoutName={selectedDay.workoutName}
                               dayLabel={`Day ${selectedDay.dayNumber} — ${WEEKDAY_NAMES[selectedDay.dayOfWeek]}`}

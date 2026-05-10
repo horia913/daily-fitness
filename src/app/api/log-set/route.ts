@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
       let existingLogQuery = supabaseAdmin
         .from('workout_logs')
         .select('id, started_at, completed_at, workout_session_id')
-        .eq('client_id', userId)
+        .eq('client_id', effectiveClientId)
         .eq('workout_assignment_id', actualWorkoutAssignmentId)
         .is('completed_at', null)  // Only active (not completed) logs
         .order('started_at', { ascending: false })
@@ -581,6 +581,17 @@ export async function POST(req: NextRequest) {
           primaryReps = parseIntNumber(insertData.dropset_initial_reps)
           if (body.exercise_id) {
             insertData.exercise_id = body.exercise_id
+          }
+          // Mirror first-segment load into generic columns (templates use dropset_* ;
+          // many readers aggregate weight/reps from these columns only.)
+          if (
+            primaryWeight !== null &&
+            primaryReps !== null &&
+            primaryWeight > 0 &&
+            primaryReps > 0
+          ) {
+            insertData.weight = primaryWeight
+            insertData.reps = primaryReps
           }
           break
         }

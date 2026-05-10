@@ -117,7 +117,7 @@ function AchievementsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-32 pt-6 overflow-x-hidden">
+      <ClientPageShell className="relative z-10 max-w-lg mx-auto px-4 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-hidden">
         <div className={cn(progressSuiteV1Styles.psV1, "space-y-4")}>
           <PsHero
             glow="cyan"

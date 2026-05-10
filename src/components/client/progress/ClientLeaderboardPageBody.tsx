@@ -163,7 +163,7 @@ export function ClientLeaderboardPageBody({
   };
 
   return (
-    <ClientPageShell className="max-w-lg px-4 pb-32 pt-8 space-y-4">
+    <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-8 space-y-4">
       {cornerBadge ? (
         <div className="fixed right-3 top-3 z-[60] sm:right-6 sm:top-4">
           {cornerBadge}

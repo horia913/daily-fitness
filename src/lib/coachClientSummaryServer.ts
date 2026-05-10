@@ -25,6 +25,13 @@ import {
   durationMinutesFromSetCompletedAts,
   MAX_WALL_CLOCK_SESSION_MINUTES,
 } from "@/lib/workoutLogDuration";
+import { groupSetsIntoBlocks } from "@/lib/workoutLog/groupSetsIntoBlocks";
+import {
+  buildPrescribedWorkoutReference,
+  type PrescriptionProtocolBundle,
+  type SetEntryRow,
+} from "@/lib/workoutLog/prescribedWorkoutReference";
+import type { PrescribedWorkoutReference, WorkoutLogFullPayload, WorkoutLogSet } from "@/types/workoutLog";
 
 const DOW_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -119,6 +126,85 @@ async function loadSpeedEndurancePrescriptions(
   return { speedByKey, enduranceByKey };
 }
 
+/** Template prescription rows for workout log viewer (prescribed vs actual). */
+export async function loadPrescriptionProtocolBundle(
+  sb: SupabaseClient,
+  templateId: string
+): Promise<PrescriptionProtocolBundle | null> {
+  const { data: entriesRaw, error: entErr } = await sb
+    .from("workout_set_entries")
+    .select("id, set_type, total_sets, reps_per_set")
+    .eq("template_id", templateId);
+
+  if (entErr || !entriesRaw?.length) return null;
+
+  const setEntries = entriesRaw as SetEntryRow[];
+  const entryIds = setEntries.map((e) => e.id);
+
+  const [
+    exRes,
+    timeRes,
+    dropRes,
+    clusterRes,
+    restRes,
+    speedEndurance,
+  ] = await Promise.all([
+    sb
+      .from("workout_set_entry_exercises")
+      .select("set_entry_id, exercise_id, reps, weight_kg, load_percentage, rir")
+      .in("set_entry_id", entryIds),
+    sb
+      .from("workout_time_protocols")
+      .select(
+        "set_entry_id, protocol_type, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, work_seconds, rest_seconds, rounds"
+      )
+      .in("set_entry_id", entryIds),
+    sb
+      .from("workout_drop_sets")
+      .select("set_entry_id, drop_order, reps, weight_kg")
+      .in("set_entry_id", entryIds),
+    sb
+      .from("workout_cluster_sets")
+      .select("set_entry_id, reps_per_cluster, clusters_per_set, weight_kg")
+      .in("set_entry_id", entryIds),
+    sb
+      .from("workout_rest_pause_sets")
+      .select("set_entry_id, weight_kg, max_rest_pauses, rest_pause_duration")
+      .in("set_entry_id", entryIds),
+    loadSpeedEndurancePrescriptions(sb, entryIds),
+  ]);
+
+  const entryExercises = (exRes.data ?? [])
+    .map((r) => mapEntryExercise(r as Record<string, unknown>))
+    .filter((r) => r.set_entry_id && r.exercise_id);
+
+  const exIds = [
+    ...new Set(entryExercises.map((e) => e.exercise_id).filter(Boolean)),
+  ];
+  const nameById = new Map<string, string>();
+  if (exIds.length > 0) {
+    const { data: exNames } = await sb
+      .from("exercises")
+      .select("id, name")
+      .in("id", exIds);
+    (exNames ?? []).forEach((r: { id: string; name: string }) => {
+      if (r?.id && r?.name) nameById.set(r.id, r.name);
+    });
+  }
+
+  return {
+    setEntries,
+    entryExercises,
+    exerciseNames: nameById,
+    timeProtocols: (timeRes.data ?? []) as PrescriptionProtocolBundle["timeProtocols"],
+    dropSets: (dropRes.data ?? []) as PrescriptionProtocolBundle["dropSets"],
+    clusterSets: (clusterRes.data ?? []) as PrescriptionProtocolBundle["clusterSets"],
+    restPauseSets: (restRes.data ?? []) as PrescriptionProtocolBundle["restPauseSets"],
+    speedByKey: speedEndurance.speedByKey,
+    enduranceByKey: speedEndurance.enduranceByKey,
+  };
+}
+
 /**
  * Load template prescriptions and compute adherence for a completed workout log.
  */
@@ -130,7 +216,7 @@ export async function computeAdherenceForWorkoutLog(
   const { data: setLogsRaw, error: slErr } = await sb
     .from("workout_set_logs")
     .select(
-      "set_entry_id, block_id, block_type, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b"
+      "set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh, dropset_drops, cluster_number, round_number, emom_minute_number, dropset_initial_weight, dropset_initial_reps, dropset_final_weight, dropset_final_reps, rest_pause_initial_weight, rest_pause_initial_reps, rest_pause_reps_after, tabata_rounds_completed, fortime_time_taken_sec, fortime_time_cap_sec, amrap_duration_seconds"
     )
     .eq("workout_log_id", workoutLogId);
 
@@ -176,7 +262,8 @@ export async function computeAdherenceForWorkoutLog(
     });
   }
 
-  return computeWorkoutAdherence(setLogs, setEntries, entryExercises, nameById);
+  const presc = await loadSpeedEndurancePrescriptions(sb, entryIds);
+  return computeWorkoutAdherence(setLogs, setEntries, entryExercises, nameById, presc);
 }
 
 /** Batch adherence for many logs: bounded queries (no per-log N+1). */
@@ -238,7 +325,7 @@ export async function batchAdherenceForWorkoutLogs(
   const { data: allSetLogs } = await sb
     .from("workout_set_logs")
     .select(
-      "workout_log_id, set_entry_id, block_id, block_type, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh"
+      "workout_log_id, set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh"
     )
     .in("workout_log_id", logIds);
 
@@ -342,21 +429,11 @@ export async function batchAdherenceForWorkoutLogs(
 }
 
 export type CoachWorkoutLogDetailPayload = {
-  log: {
-    id: string;
-    completed_at: string;
-    started_at: string | null;
-    total_duration_minutes: number | null;
-    total_sets_completed: number | null;
-    total_weight_lifted: number | string | null;
-    workoutName: string;
-    templateId: string | null;
-  };
+  payload: WorkoutLogFullPayload;
   adherence: WorkoutAdherenceResult;
-  /** Same units as `log.total_weight_lifted`: Σ(weight×reps), not kg on the bar. */
+  prescribedReference: PrescribedWorkoutReference | null;
   volumeDeltaKg: number | null;
   setsDelta: number | null;
-  /** Prefer first→last set timestamp span; else capped stored minutes for coach UI. */
   displayDurationMinutes: number | null;
   durationDisplaySource: "set_span" | "stored" | "capped_stored" | null;
 };
@@ -366,65 +443,73 @@ export async function getCoachWorkoutLogDetail(
   clientId: string,
   logId: string
 ): Promise<CoachWorkoutLogDetailPayload | null> {
-  const { data: dataRaw, error } = await sb
-    .from("workout_logs")
-    .select(
-      `
-      id,
-      client_id,
-      completed_at,
-      started_at,
-      total_duration_minutes,
-      total_sets_completed,
-      total_weight_lifted,
-      workout_assignment_id,
-      workout_assignments (
-        workout_template_id,
-        workout_templates ( id, name )
-      )
-    `
-    )
-    .eq("id", logId)
-    .eq("client_id", clientId)
-    .maybeSingle();
+  // TODO: replace local type assertion once generated Supabase RPC types include get_workout_log_full.
+  const { data: rpcData, error: rpcError } = await sb.rpc("get_workout_log_full", {
+    p_log_id: logId,
+    p_viewer_id: clientId,
+  });
+  if (rpcError || !rpcData) return null;
+  const payloadCandidate = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+  if (!payloadCandidate || typeof payloadCandidate !== "object") {
+    console.error("[coachClientSummaryServer] Invalid get_workout_log_full payload", {
+      logId,
+      rpcDataType: typeof rpcData,
+      isArray: Array.isArray(rpcData),
+    });
+    return null;
+  }
+  const payloadObj = payloadCandidate as Record<string, unknown>;
+  const rawSetLogs = payloadObj.setLogs;
+  const setLogsArray: WorkoutLogSet[] = Array.isArray(rawSetLogs)
+    ? (rawSetLogs as WorkoutLogSet[])
+    : rawSetLogs && typeof rawSetLogs === "object"
+      ? (Object.values(rawSetLogs as Record<string, unknown>) as WorkoutLogSet[])
+      : [];
+  const blocks = groupSetsIntoBlocks(setLogsArray);
 
-  if (error || !dataRaw) return null;
+  const normalizedPersonalRecords = Array.isArray(payloadObj.personalRecords)
+    ? payloadObj.personalRecords
+    : [];
 
-  type Row = {
-    id: string;
-    completed_at: string;
-    started_at: string | null;
-    total_duration_minutes: number | null;
-    total_sets_completed: number | null;
-    total_weight_lifted: number | string | null;
-    workout_assignment_id?: string | null;
-    workout_assignments?: {
-      workout_template_id?: string | null;
-      workout_templates?: { id?: string; name?: string } | null;
-    } | null;
+  if (!payloadObj.session || typeof payloadObj.session !== "object") {
+    console.error("[coachClientSummaryServer] Missing session in payload", {
+      logId,
+      topLevelKeys: Object.keys(payloadObj),
+      hasSession: Boolean(payloadObj.session),
+      setLogsCount: setLogsArray.length,
+    });
+    return null;
+  }
+
+  const payload: WorkoutLogFullPayload = {
+    session: payloadObj.session as WorkoutLogFullPayload["session"],
+    blocks,
+    personalRecords:
+      normalizedPersonalRecords as WorkoutLogFullPayload["personalRecords"],
+    previousLog:
+      (payloadObj.previousLog as WorkoutLogFullPayload["previousLog"]) ?? null,
   };
-  const row = dataRaw as Row;
-  const wa = row.workout_assignments;
-  const tpl = wa?.workout_templates;
-  const templateId = tpl?.id ?? wa?.workout_template_id ?? null;
-  const workoutName = tpl?.name?.trim() || "Workout";
 
-  const stampsPromise = sb
-    .from("workout_set_logs")
-    .select("completed_at")
-    .eq("workout_log_id", logId)
-    .eq("client_id", clientId)
-    .not("completed_at", "is", null)
-    .order("completed_at", { ascending: true });
-
-  const adherencePromise = templateId
-    ? computeAdherenceForWorkoutLog(sb, logId, templateId)
-    : Promise.resolve(computeWorkoutAdherence([], [], []));
-
-  const [adherence, stampsRes] = await Promise.all([
-    adherencePromise,
-    stampsPromise,
-  ]);
+  const allSets: WorkoutLogSet[] = payload.blocks.flatMap((block) => block.sets);
+  const stampsRes = {
+    data: allSets
+      .filter((setLog) => setLog.completed_at)
+      .map((setLog) => ({ completed_at: setLog.completed_at as string })),
+    error: null,
+  };
+  const templateId = payload.session.workoutTemplateId ?? null;
+  let adherence = computeWorkoutAdherence([], [], []);
+  let prescribedReference: PrescribedWorkoutReference | null = null;
+  if (templateId) {
+    const [bundle, adherenceResult] = await Promise.all([
+      loadPrescriptionProtocolBundle(sb, templateId),
+      computeAdherenceForWorkoutLog(sb, logId, templateId),
+    ]);
+    adherence = adherenceResult;
+    if (bundle) {
+      prescribedReference = buildPrescribedWorkoutReference(payload.blocks, bundle);
+    }
+  }
 
   const stampList =
     !stampsRes.error && stampsRes.data
@@ -433,10 +518,7 @@ export async function getCoachWorkoutLogDetail(
   const derivedDuration = durationMinutesFromSetCompletedAts(
     stampList.map((r) => r.completed_at)
   );
-  const storedMin =
-    row.total_duration_minutes != null
-      ? Number(row.total_duration_minutes)
-      : NaN;
+  const storedMin = payload.session.totalDurationMinutes != null ? Number(payload.session.totalDurationMinutes) : NaN;
   let displayDurationMinutes: number | null = null;
   let durationDisplaySource: "set_span" | "stored" | "capped_stored" | null =
     null;
@@ -455,37 +537,41 @@ export async function getCoachWorkoutLogDetail(
 
   let volumeDelta: number | null = null;
   let setsDeltaVal: number | null = null;
-  const assignmentId = row.workout_assignment_id;
-  if (assignmentId && row.completed_at) {
+  const assignmentId = payload.session.workoutAssignmentId;
+  if (assignmentId && payload.session.completedAt) {
     const { data: prev } = await sb
       .from("workout_logs")
       .select("total_weight_lifted, total_sets_completed, completed_at")
       .eq("client_id", clientId)
       .eq("workout_assignment_id", assignmentId)
       .not("completed_at", "is", null)
-      .lt("completed_at", row.completed_at)
+      .lt("completed_at", payload.session.completedAt)
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (prev) {
-      volumeDelta = volumeDeltaKg(row, prev);
-      setsDeltaVal = setsDelta(row, prev);
+      volumeDelta = volumeDeltaKg(
+        {
+          total_weight_lifted: payload.session.totalWeightLifted,
+          total_sets_completed: payload.session.totalSetsCompleted,
+        },
+        prev
+      );
+      setsDeltaVal = setsDelta(
+        {
+          total_weight_lifted: payload.session.totalWeightLifted,
+          total_sets_completed: payload.session.totalSetsCompleted,
+        },
+        prev
+      );
     }
   }
 
   return {
-    log: {
-      id: row.id,
-      completed_at: row.completed_at,
-      started_at: row.started_at,
-      total_duration_minutes: row.total_duration_minutes,
-      total_sets_completed: row.total_sets_completed,
-      total_weight_lifted: row.total_weight_lifted,
-      workoutName,
-      templateId,
-    },
+    payload,
     adherence,
+    prescribedReference,
     volumeDeltaKg: volumeDelta,
     setsDelta: setsDeltaVal,
     displayDurationMinutes,

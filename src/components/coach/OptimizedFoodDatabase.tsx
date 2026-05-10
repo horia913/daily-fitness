@@ -341,7 +341,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-[var(--fc-bottom-safe-area)]">
       {/* Header Section */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">

@@ -7,7 +7,6 @@ import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
-import { GlassCard } from '@/components/ui/GlassCard'
 import {
   Select,
   SelectContent,
@@ -15,25 +14,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { PageSkeleton } from '@/components/ui/PageSkeleton'
 import {
-  BarChart3,
   Calendar,
   Search,
-  Users,
-  Dumbbell,
-  Activity,
   Heart,
   AlertTriangle,
   CheckCircle,
-  ArrowRight,
-  Flame,
-  ChevronRight,
+  Clock,
+  Zap,
 } from 'lucide-react'
+import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import AnalyticsNav from '@/components/coach/AnalyticsNav'
+import { AnalyticsHero } from '@/components/coach-analytics/AnalyticsHero'
+import { QueueCard } from '@/components/coach-analytics/QueueCard'
+import { QueueRow } from '@/components/coach-analytics/QueueRow'
+import { EmptyMini } from '@/components/coach-analytics/EmptyMini'
+import { CtaBar } from '@/components/coach-analytics/CtaBar'
+import { StatTile } from '@/components/coach-analytics/StatTile'
 
 type Period = 'week' | 'month'
 
@@ -95,41 +95,6 @@ const EMPTY_OVERVIEW: OverviewResponse = {
   wellness: { checkedInToday: 0, totalClients: 0, averageEnergy: null },
 }
 
-function getInitials(name: string): string {
-  const parts = (name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-  if (parts.length === 0) return 'C'
-  return parts.map((p) => p[0]?.toUpperCase() || '').join('') || 'C'
-}
-
-function avatarGradientFor(name: string): string {
-  const colors = [
-    'from-purple-500 to-purple-600',
-    'from-blue-500 to-blue-600',
-    'from-green-500 to-green-600',
-    'from-orange-500 to-orange-600',
-    'from-pink-500 to-pink-600',
-    'from-indigo-500 to-indigo-600',
-    'from-teal-500 to-teal-600',
-    'from-red-500 to-red-600',
-  ]
-  const idx = (name.charCodeAt(0) || 0) % colors.length
-  return colors[idx]
-}
-
-function isLikelyAvatarUrl(value: string | null | undefined): boolean {
-  if (!value) return false
-  return (
-    value.startsWith('http://') ||
-    value.startsWith('https://') ||
-    value.startsWith('/') ||
-    value.includes('/storage/v1/object/public/avatars/')
-  )
-}
-
 function formatLastActive(iso: string | null): string {
   if (!iso) return 'No activity yet'
   const d = new Date(iso)
@@ -138,154 +103,73 @@ function formatLastActive(iso: string | null): string {
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   if (diffDays <= 0) return 'Active today'
   if (diffDays === 1) return 'Active 1 day ago'
-  if (diffDays < 7) return `Active ${diffDays} days ago`
+  if (diffDays < 7) return `Active ${diffDays}d ago`
   if (diffDays < 30)
     return `Active ${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) === 1 ? '' : 's'} ago`
   return `Active ${d.toLocaleDateString()}`
 }
 
-function formatLastCheckIn(daysSince: number | null): string {
-  if (daysSince == null) return 'Never checked in'
-  if (daysSince === 0) return 'Last check-in: today'
-  if (daysSince === 1) return 'Last check-in: 1 day ago'
-  return `Last check-in: ${daysSince} days ago`
+function needAttentionMeta(client: ActionQueueClient): { line: string; color: string } {
+  if (!client.lastActiveAt) return { line: 'No activity yet', color: 'var(--critical)' }
+  const line = formatLastActive(client.lastActiveAt)
+  const d = new Date(client.lastActiveAt)
+  const diffDays = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays >= 2 || line.includes('week')) return { line, color: 'var(--warning)' }
+  return { line, color: 'var(--t3)' }
 }
 
-interface AvatarProps {
-  name: string
-  avatarUrl: string | null
-  size?: 'sm' | 'md'
+function adherencePctColor(pct: number): string {
+  if (pct <= 0) return 'var(--critical)'
+  if (pct < 50) return 'var(--warning)'
+  if (pct > 75) return 'var(--good)'
+  return 'var(--t1)'
 }
 
-function Avatar({ name, avatarUrl, size = 'md' }: AvatarProps) {
-  const dimensions = size === 'sm' ? 'w-9 h-9 text-xs' : 'w-10 h-10 text-sm'
-  const showImage = avatarUrl && isLikelyAvatarUrl(avatarUrl)
-  if (showImage) {
-    return (
-      <div
-        className={`${dimensions} rounded-full overflow-hidden flex-shrink-0 bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]`}
-      >
-        <img
-          src={avatarUrl as string}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
-      </div>
-    )
+function avgAdherenceHeroColor(pct: number): string {
+  if (pct < 20) return 'var(--critical)'
+  if (pct <= 25) return 'var(--warning)'
+  if (pct > 75) return 'var(--good)'
+  return 'var(--t1)'
+}
+
+function sortNeedAttention(items: ActionQueueClient[]): ActionQueueClient[] {
+  return [...items].sort((a, b) => {
+    const aNull = a.lastActiveAt == null
+    const bNull = b.lastActiveAt == null
+    if (aNull !== bNull) return aNull ? -1 : 1
+    if (aNull && bNull) return a.adherence - b.adherence
+    return new Date(a.lastActiveAt!).getTime() - new Date(b.lastActiveAt!).getTime()
+  })
+}
+
+function inactiveStatLine(c: InactiveClient): { line: string; color: string } {
+  if (c.daysSince == null) return { line: 'Never checked in', color: 'var(--t3)' }
+  const line = `Last ${c.daysSince} days ago`
+  if (c.daysSince > 7) return { line, color: 'var(--warning)' }
+  return { line, color: 'var(--t3)' }
+}
+
+function inactiveBadge(c: InactiveClient): { text: string; color: string } {
+  if (c.daysSince == null) return { text: 'Never', color: 'var(--t4)' }
+  return {
+    text: `${c.daysSince}d`,
+    color: c.daysSince > 7 ? 'var(--warning)' : 'var(--t3)',
   }
-  return (
-    <div
-      className={`${dimensions} rounded-full bg-gradient-to-br ${avatarGradientFor(
-        name
-      )} flex items-center justify-center text-white font-semibold flex-shrink-0`}
-    >
-      {getInitials(name)}
-    </div>
-  )
 }
 
-interface ActionCardShellProps {
-  title: string
-  count: number
-  icon: React.ReactNode
-  accent: string
-  emptyState: string
-  empty: boolean
-  ariaLabel?: string
-  children?: React.ReactNode
+function formatLogShort(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  } catch {
+    return iso
+  }
 }
 
-function ActionCardShell({
-  title,
-  count,
-  icon,
-  accent,
-  emptyState,
-  empty,
-  ariaLabel,
-  children,
-}: ActionCardShellProps) {
-  return (
-    <GlassCard
-      elevation={1}
-      className="fc-card-shell p-4 sm:p-5 flex flex-col gap-3 min-h-[280px]"
-      aria-label={ariaLabel}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className={`p-2 rounded-xl ${accent} flex items-center justify-center flex-shrink-0`}
-          >
-            {icon}
-          </div>
-          <h3 className="text-base font-semibold text-[color:var(--fc-text-primary)] truncate">
-            {title}
-          </h3>
-        </div>
-        <Badge
-          variant="outline"
-          className="rounded-full text-xs px-2.5 py-0.5 flex-shrink-0"
-        >
-          {count}
-        </Badge>
-      </div>
-      {empty ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-[color:var(--fc-text-dim)] text-center px-4 py-6">
-          {emptyState}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2 -mx-1">{children}</div>
-      )}
-    </GlassCard>
-  )
-}
-
-interface ActionRowProps {
-  href: string
-  name: string
-  avatarUrl: string | null
-  primary: string
-  secondary?: string | null
-  primaryClass?: string
-}
-
-function ActionRow({
-  href,
-  name,
-  avatarUrl,
-  primary,
-  secondary,
-  primaryClass,
-}: ActionRowProps) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
-    >
-      <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[color:var(--fc-text-primary)] truncate">
-          {name}
-        </p>
-        {secondary && (
-          <p className="text-xs text-[color:var(--fc-text-dim)] truncate">
-            {secondary}
-          </p>
-        )}
-      </div>
-      <span
-        className={`text-xs font-semibold whitespace-nowrap ${
-          primaryClass ?? 'text-[color:var(--fc-text-primary)]'
-        }`}
-      >
-        {primary}
-      </span>
-      <ChevronRight
-        className="w-4 h-4 text-[color:var(--fc-text-subtle)] group-hover:text-[color:var(--fc-accent-cyan)] transition-colors"
-        aria-hidden
-      />
-    </Link>
-  )
+function energyColor(val: number | null): string {
+  if (val == null) return 'var(--t4)'
+  if (val < 4) return 'var(--critical)'
+  if (val < 7) return 'var(--warning)'
+  return 'var(--good)'
 }
 
 export default function CoachProgress() {
@@ -308,10 +192,9 @@ export default function CoachProgress() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(
-          `/api/coach/progress/overview?period=${selectedPeriod}`,
-          { signal: signal ?? null }
-        )
+        const res = await fetch(`/api/coach/progress/overview?period=${selectedPeriod}`, {
+          signal: signal ?? null,
+        })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error ?? `HTTP ${res.status}`)
@@ -328,16 +211,14 @@ export default function CoachProgress() {
           return
         }
         console.error('[coach/progress] load failed:', err)
-        setError(
-          err instanceof Error ? err.message : 'Failed to load progress data'
-        )
+        setError(err instanceof Error ? err.message : 'Failed to load progress data')
         setOverview(EMPTY_OVERVIEW)
       } finally {
         setLoading(false)
         loadingRef.current = false
       }
     },
-    [user]
+    [user],
   )
 
   useEffect(() => {
@@ -359,19 +240,26 @@ export default function CoachProgress() {
     if (!term) return overview.actionQueue
     const matches = (name: string) => name.toLowerCase().includes(term)
     return {
-      needAttention: overview.actionQueue.needAttention.filter((c) =>
-        matches(c.name)
-      ),
-      inactiveCheckIns: overview.actionQueue.inactiveCheckIns.filter((c) =>
-        matches(c.name)
-      ),
+      needAttention: overview.actionQueue.needAttention.filter((c) => matches(c.name)),
+      inactiveCheckIns: overview.actionQueue.inactiveCheckIns.filter((c) => matches(c.name)),
       flagged: overview.actionQueue.flagged.filter((c) => matches(c.name)),
     }
   }, [overview.actionQueue, searchTerm])
 
-  const periodLabel = period === 'week' ? 'This Week' : 'This Month'
-  const completedWorkoutsLabel =
-    period === 'week' ? 'Workouts This Week' : 'Workouts This Month'
+  const needSorted = useMemo(() => sortNeedAttention(filteredQueue.needAttention), [filteredQueue.needAttention])
+  const needDisplay = useMemo(() => needSorted.slice(0, 7), [needSorted])
+  const needExtra = needSorted.length > 7
+
+  const inactiveDisplay = useMemo(() => filteredQueue.inactiveCheckIns.slice(0, 7), [filteredQueue.inactiveCheckIns])
+  const inactiveExtra = filteredQueue.inactiveCheckIns.length > 7
+
+  const stressDisplay = useMemo(() => filteredQueue.flagged.slice(0, 7), [filteredQueue.flagged])
+  const stressExtra = filteredQueue.flagged.length > 7
+
+  const periodLabel = period === 'week' ? 'This week' : 'This month'
+  const avgPct = Math.round(overview.totals.avgAdherence ?? 0)
+  const checkColor =
+    overview.totals.checkinsThisWeek <= 0 ? 'var(--t4)' : 'var(--t1)'
 
   if (loading) {
     return (
@@ -379,7 +267,7 @@ export default function CoachProgress() {
         <AnimatedBackground>
           <CoachPageShell
             widthVariant="data-7xl"
-            className="p-6 pb-24 space-y-6 bg-[color:var(--fc-bg-page)]"
+            className={cn('p-6 pb-[var(--fc-bottom-safe-area)] space-y-6', hub.hub)}
           >
             <PageSkeleton variant="dashboard" />
           </CoachPageShell>
@@ -394,324 +282,288 @@ export default function CoachProgress() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <CoachPageShell
           widthVariant="data-7xl"
-          className="px-4 py-4 pb-32 sm:px-6 sm:py-6 space-y-4 sm:space-y-6"
+          className={cn('px-4 py-4 pb-[var(--fc-bottom-safe-area)] sm:px-6 sm:py-6 space-y-4 sm:space-y-5', hub.hub)}
         >
           <AnalyticsNav />
 
-          {/* Header */}
-          <GlassCard
-            elevation={2}
-            className="fc-card-shell p-3 sm:p-6 md:p-8"
-          >
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] flex-shrink-0">
-                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
+          <AnalyticsHero
+            accent="purple"
+            eyebrow="Progress dashboard"
+            title="Action queue"
+            subtitle="KPIs, action queue, and wellness pulse"
+            controls={
+              <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border py-1.5 pl-2.5 pr-2"
+                  style={{ background: 'var(--card)', borderColor: 'var(--line)' }}
+                >
+                  <Search className="size-3 shrink-0" style={{ color: 'var(--t3)' }} aria-hidden />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search clients..."
+                    className="min-w-0 flex-1 border-0 bg-transparent text-[12.5px] outline-none"
+                    style={{ color: 'var(--t1)' }}
+                    aria-label="Search clients in action queue"
+                  />
+                </div>
+                <Select value={period} onValueChange={(value) => setPeriod(value as Period)}>
+                  <SelectTrigger
+                    className="h-auto min-h-0 w-auto shrink-0 gap-1.5 rounded-[10px] border py-1.5 pl-2 pr-2 text-[11.5px] shadow-none"
+                    style={{
+                      background: 'var(--card-2)',
+                      borderColor: 'var(--line)',
+                      color: 'var(--t1)',
+                      fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    <Calendar className="size-[11px] shrink-0 opacity-80" aria-hidden />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">This week</SelectItem>
+                    <SelectItem value="month">This month</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                  Progress Dashboard
-                </h1>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Team operations cockpit — KPIs, action queue, and wellness pulse.
-                </p>
-              </div>
-            </div>
-          </GlassCard>
+            }
+            stats={[
+              {
+                num: overview.totals.activeClients,
+                label: 'Active',
+                color: 'var(--cyan)',
+              },
+              {
+                num: `${avgPct}%`,
+                label: 'Avg adherence',
+                color: avgAdherenceHeroColor(avgPct),
+              },
+              {
+                num: overview.totals.checkinsThisWeek,
+                label: 'Check-ins · wk',
+                color: checkColor,
+              },
+            ]}
+          />
 
-          {error && (
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 border border-[color-mix(in_srgb,var(--fc-status-error)_30%,transparent)]"
+          {error ? (
+            <div
+              className="rounded-[18px] border p-4 text-sm"
+              style={{
+                background: 'var(--card)',
+                borderColor: 'var(--critical)',
+                color: 'var(--critical)',
+              }}
             >
-              <p className="text-sm text-[color:var(--fc-status-error)]">
-                {error}
-              </p>
-            </GlassCard>
-          )}
+              {error}
+            </div>
+          ) : null}
 
-          {/* Filter row */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
-              <Input
-                placeholder="Search clients by name…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="fc-input h-12 w-full pl-12"
-                aria-label="Search clients in action queue"
+          <section aria-labelledby="queues-heading" className="space-y-3">
+            <h2 id="queues-heading" className="sr-only">
+              Action queues
+            </h2>
+
+            <QueueCard
+              variant="critical"
+              title="Need attention"
+              count={filteredQueue.needAttention.length}
+              icon={<AlertTriangle className="size-3.5 text-[color:var(--critical)]" aria-hidden />}
+            >
+              {filteredQueue.needAttention.length === 0 ? (
+                <p className="text-center text-[11px]" style={{ color: 'var(--t3)' }}>
+                  {searchTerm.trim() ? 'No matches in this list.' : 'All clients on track'}
+                </p>
+              ) : (
+                <>
+                  {needDisplay.map((c) => {
+                    const meta = needAttentionMeta(c)
+                    return (
+                      <QueueRow
+                        key={c.id}
+                        href={`/coach/clients/${c.id}/progress`}
+                        name={c.name}
+                        avatarUrl={c.avatarUrl}
+                        seed={c.id}
+                        statLine={meta.line}
+                        statLineColor={meta.color}
+                        stripe="critical"
+                        rightSlot={
+                          <span
+                            className="text-[13px] font-bold leading-none"
+                            style={{
+                              fontFamily: 'var(--f-display, "Big Shoulders Display", sans-serif)',
+                              color: adherencePctColor(c.adherence),
+                            }}
+                          >
+                            {c.adherence}%
+                          </span>
+                        }
+                      />
+                    )
+                  })}
+                  {needExtra ? (
+                    <Link
+                      href="/coach/clients"
+                      className="text-right text-[11px] font-medium"
+                      style={{ color: 'var(--cyan)' }}
+                    >
+                      View all →
+                    </Link>
+                  ) : null}
+                </>
+              )}
+            </QueueCard>
+
+            <QueueCard
+              variant="purple"
+              title="Inactive check-ins"
+              count={filteredQueue.inactiveCheckIns.length}
+              icon={<Clock className="size-3.5 text-[color:var(--purple)]" aria-hidden />}
+            >
+              {filteredQueue.inactiveCheckIns.length === 0 ? (
+                <p className="text-center text-[11px]" style={{ color: 'var(--t3)' }}>
+                  {searchTerm.trim() ? 'No matches in this list.' : 'All clients checking in regularly'}
+                </p>
+              ) : (
+                <>
+                  {inactiveDisplay.map((c) => {
+                    const line = inactiveStatLine(c)
+                    const badge = inactiveBadge(c)
+                    return (
+                      <QueueRow
+                        key={c.id}
+                        href={`/coach/clients/${c.id}/progress`}
+                        name={c.name}
+                        avatarUrl={c.avatarUrl}
+                        seed={c.id}
+                        statLine={line.line}
+                        statLineColor={line.color}
+                        stripe="purple"
+                        rightSlot={
+                          <span
+                            className="text-[10px] font-medium"
+                            style={{
+                              fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                              color: badge.color,
+                            }}
+                          >
+                            {badge.text}
+                          </span>
+                        }
+                      />
+                    )
+                  })}
+                  {inactiveExtra ? (
+                    <Link
+                      href="/coach/clients"
+                      className="text-right text-[11px] font-medium"
+                      style={{ color: 'var(--cyan)' }}
+                    >
+                      View all →
+                    </Link>
+                  ) : null}
+                </>
+              )}
+            </QueueCard>
+
+            <QueueCard
+              variant="rose"
+              title="High stress"
+              count={filteredQueue.flagged.length}
+              icon={<Heart className="size-3.5 text-[color:var(--rose)]" aria-hidden />}
+            >
+              {filteredQueue.flagged.length === 0 ? (
+                <EmptyMini icon={CheckCircle} text="No high-stress check-ins" />
+              ) : (
+                <>
+                  {stressDisplay.map((c) => (
+                    <QueueRow
+                      key={c.id}
+                      href={`/coach/clients/${c.id}/progress`}
+                      name={c.name}
+                      avatarUrl={c.avatarUrl}
+                      seed={c.id}
+                      statLine={`Stress ${c.stressUi ?? '—'}/5 · ${formatLogShort(c.logDate)}`}
+                      statLineColor="var(--rose)"
+                      stripe="rose"
+                      rightSlot={
+                        <span
+                          className="max-w-[100px] truncate text-right text-[10px] font-medium leading-tight"
+                          style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)', color: 'var(--t3)' }}
+                        >
+                          {c.signal}
+                        </span>
+                      }
+                    />
+                  ))}
+                  {stressExtra ? (
+                    <Link
+                      href="/coach/clients"
+                      className="text-right text-[11px] font-medium"
+                      style={{ color: 'var(--cyan)' }}
+                    >
+                      View all →
+                    </Link>
+                  ) : null}
+                </>
+              )}
+            </QueueCard>
+          </section>
+
+          <div className={hub.sectionCard}>
+            <div className={hub.sectionHead}>
+              <div className={hub.sectionHeadLeft}>
+                <div
+                  className="flex size-6 shrink-0 items-center justify-center rounded-lg"
+                  style={{ background: 'var(--rose-soft)' }}
+                >
+                  <Heart className="size-3.5 text-[color:var(--rose)]" aria-hidden />
+                </div>
+                <h2 className={hub.sectionTitle}>Wellness overview</h2>
+              </div>
+              <span className={hub.sectionMeta}>today</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <StatTile
+                icon={CheckCircle}
+                variant="purple"
+                value={
+                  <>
+                    <span style={{ color: overview.wellness.checkedInToday === 0 ? 'var(--t4)' : 'var(--t1)' }}>
+                      {overview.wellness.checkedInToday}
+                    </span>
+                    <span style={{ color: 'var(--t3)' }}> / {overview.wellness.totalClients}</span>
+                  </>
+                }
+                label={"Today's check-ins"}
+                delta="Clients who logged today"
+                deltaTone="neutral"
+              />
+              <StatTile
+                icon={Zap}
+                variant="warn"
+                value={
+                  overview.wellness.averageEnergy != null
+                    ? overview.wellness.averageEnergy.toFixed(1)
+                    : '—'
+                }
+                label="Avg energy"
+                delta={"From today's check-ins"}
+                deltaTone="neutral"
+                valueColor={energyColor(overview.wellness.averageEnergy)}
               />
             </div>
-            <Select
-              value={period}
-              onValueChange={(value) => setPeriod(value as Period)}
-            >
-              <SelectTrigger className="fc-select h-12 w-full lg:w-48">
-                <Calendar className="w-4 h-4 mr-2" aria-hidden />
-                <SelectValue placeholder="Period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          {/* Canonical KPI strip */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
-            >
-              <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-3 text-white flex-shrink-0">
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
-                  {overview.totals.activeClients}
-                </p>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Active Clients
-                </p>
-              </div>
-            </GlassCard>
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
-            >
-              <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-3 text-white flex-shrink-0">
-                <Dumbbell className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
-                  {overview.totals.completedWorkouts}
-                </p>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  {completedWorkoutsLabel}
-                </p>
-              </div>
-            </GlassCard>
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
-            >
-              <div className="rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 p-3 text-white flex-shrink-0">
-                <Activity className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
-                  {overview.totals.avgAdherence}%
-                </p>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Avg Adherence
-                </p>
-              </div>
-            </GlassCard>
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 flex items-center gap-3 sm:gap-4"
-            >
-              <div className="rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 p-3 text-white flex-shrink-0">
-                <Heart className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] leading-none">
-                  {overview.totals.checkinsThisWeek}
-                </p>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  Check-ins This Week
-                </p>
-              </div>
-            </GlassCard>
-          </div>
-
-          {/* Action Queue */}
-          <section aria-labelledby="action-queue-heading" className="space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
-                  <Flame className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
-                </div>
-                <h2
-                  id="action-queue-heading"
-                  className="text-xl font-bold text-[color:var(--fc-text-primary)]"
-                >
-                  Action Queue
-                </h2>
-              </div>
-              {searchTerm.trim().length > 0 && (
-                <Badge variant="outline" className="rounded-full text-xs">
-                  Filtered by &quot;{searchTerm.trim()}&quot;
-                </Badge>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Card A — Need Attention */}
-              <ActionCardShell
-                title="Need Attention"
-                count={filteredQueue.needAttention.length}
-                icon={<AlertTriangle className="w-5 h-5 text-white" />}
-                accent="bg-gradient-to-br from-red-500 to-orange-500"
-                emptyState={
-                  searchTerm.trim().length > 0
-                    ? 'No matches in this list.'
-                    : 'All clients on track 👍'
-                }
-                empty={filteredQueue.needAttention.length === 0}
-              >
-                {filteredQueue.needAttention.map((c) => (
-                  <ActionRow
-                    key={c.id}
-                    href={`/coach/clients/${c.id}/progress`}
-                    name={c.name}
-                    avatarUrl={c.avatarUrl}
-                    primary={`${c.adherence}%`}
-                    primaryClass={
-                      c.adherence < 60
-                        ? 'text-[color:var(--fc-status-error)]'
-                        : undefined
-                    }
-                    secondary={formatLastActive(c.lastActiveAt)}
-                  />
-                ))}
-              </ActionCardShell>
-
-              {/* Card B — Inactive Check-ins */}
-              <ActionCardShell
-                title="Inactive Check-ins"
-                count={filteredQueue.inactiveCheckIns.length}
-                icon={<Calendar className="w-5 h-5 text-white" />}
-                accent="bg-gradient-to-br from-amber-500 to-yellow-500"
-                emptyState={
-                  searchTerm.trim().length > 0
-                    ? 'No matches in this list.'
-                    : 'All clients checking in regularly'
-                }
-                empty={filteredQueue.inactiveCheckIns.length === 0}
-              >
-                {filteredQueue.inactiveCheckIns.map((c) => (
-                  <ActionRow
-                    key={c.id}
-                    href={`/coach/clients/${c.id}/progress`}
-                    name={c.name}
-                    avatarUrl={c.avatarUrl}
-                    primary={
-                      c.daysSince == null
-                        ? 'Never'
-                        : c.daysSince === 0
-                          ? 'Today'
-                          : `${c.daysSince}d`
-                    }
-                    primaryClass="text-[color:var(--fc-status-warning)]"
-                    secondary={formatLastCheckIn(c.daysSince)}
-                  />
-                ))}
-              </ActionCardShell>
-
-              {/* Card C — High Stress */}
-              <ActionCardShell
-                title="High Stress"
-                count={filteredQueue.flagged.length}
-                icon={<Heart className="w-5 h-5 text-white" />}
-                accent="bg-gradient-to-br from-pink-500 to-rose-500"
-                ariaLabel="High Stress"
-                emptyState={
-                  searchTerm.trim().length > 0
-                    ? 'No matches in this list.'
-                    : 'No high-stress check-ins'
-                }
-                empty={filteredQueue.flagged.length === 0}
-              >
-                {filteredQueue.flagged.map((c) => (
-                  <ActionRow
-                    key={c.id}
-                    href={`/coach/clients/${c.id}/progress`}
-                    name={c.name}
-                    avatarUrl={c.avatarUrl}
-                    primary={
-                      c.stressUi != null && c.stressUi >= 4
-                        ? `Stress ${c.stressUi}/5`
-                        : 'Stress'
-                    }
-                    primaryClass="text-[color:var(--fc-status-error)]"
-                    secondary={c.signal}
-                  />
-                ))}
-              </ActionCardShell>
-            </div>
-          </section>
-
-          {/* Wellness Overview — focused summary */}
-          <section aria-labelledby="wellness-heading" className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
-                <Heart className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
-              </div>
-              <h2
-                id="wellness-heading"
-                className="text-xl font-bold text-[color:var(--fc-text-primary)]"
-              >
-                Wellness Overview
-              </h2>
-            </div>
-            <GlassCard
-              elevation={1}
-              className="fc-card-shell p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4"
-            >
-              <div className="p-4 rounded-2xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
-                <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)] text-sm mb-1">
-                  <CheckCircle className="w-4 h-4" aria-hidden />
-                  <span>Today&apos;s Check-ins</span>
-                </div>
-                <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                  {overview.wellness.checkedInToday} /{' '}
-                  {overview.wellness.totalClients}
-                </p>
-              </div>
-              <div className="p-4 rounded-2xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
-                <div className="flex items-center gap-2 text-[color:var(--fc-text-dim)] text-sm mb-1">
-                  <Activity className="w-4 h-4" aria-hidden />
-                  <span>Avg Energy (today)</span>
-                </div>
-                <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                  {overview.wellness.averageEnergy != null
-                    ? overview.wellness.averageEnergy.toFixed(1)
-                    : '—'}
-                </p>
-                <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
-                  Average across clients who checked in today.
-                </p>
-              </div>
-            </GlassCard>
-          </section>
-
-          {/* Trailing helper bar — link straight into the per-client adherence cockpit. */}
-          <GlassCard
-            elevation={1}
-            className="fc-card-shell p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)]">
-                <BarChart3 className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  Need a deeper look at one client?
-                </p>
-                <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
-                  The full adherence cockpit (calendar, trend chart, per-domain
-                  breakdown) lives on each client&apos;s progress page.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/coach/clients"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--fc-accent-cyan)] hover:underline"
-            >
-              Open client list
-              <ArrowRight className="w-4 h-4" aria-hidden />
-            </Link>
-          </GlassCard>
+          <CtaBar
+            title="Need a deeper look?"
+            subtitle="Per-client adherence cockpit"
+            href="/coach/clients"
+            linkLabel="Open"
+          />
         </CoachPageShell>
       </AnimatedBackground>
     </ProtectedRoute>

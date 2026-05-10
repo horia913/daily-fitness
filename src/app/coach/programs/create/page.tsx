@@ -133,7 +133,7 @@ function CreateProgramContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <CoachPageShell
         widthVariant="form-2xl"
-        className={cn("p-4 pb-32 sm:p-6", css.wrap)}
+        className={cn("p-4 pb-[var(--fc-bottom-safe-area)] sm:p-6", css.wrap)}
       >
         <div className={cn(css.hero, css.heroGlowLime)}>
           <div className="relative z-[1] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

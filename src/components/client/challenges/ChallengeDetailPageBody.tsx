@@ -110,7 +110,7 @@ export function ChallengeDetailPageBody({
   );
 
   return (
-    <ClientPageShell className="max-w-lg px-4 pb-32 pt-6 space-y-4">
+    <ClientPageShell className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6 space-y-4">
       {cornerBadge ? (
         <div className="fixed right-3 top-3 z-[60]">{cornerBadge}</div>
       ) : null}

@@ -36,7 +36,7 @@ export default function CreateWorkoutTemplatePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen pb-32">
+        <div className="relative z-10 min-h-screen pb-[var(--fc-bottom-safe-area)]">
           <div className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] px-4 sm:px-6">
             <div className="max-w-7xl mx-auto flex min-h-11 max-h-12 items-center justify-between gap-2 py-2">
               <h1 className="text-lg font-semibold fc-text-primary truncate">

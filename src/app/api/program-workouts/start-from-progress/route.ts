@@ -9,11 +9,11 @@
  * 1. Accept optional program_schedule_id (for user-selected slot).
  *    If not provided, use programStateService.getNextSlot() as default.
  * 2. Validate the chosen slot belongs to the program and is NOT already completed.
- * 3. Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY:
- *    - workout_sessions with status='in_progress' AND matching program day
- *    - workout_logs with completed_at IS NULL AND matching program day
- * 4. If found, return existing workout_assignment_id (REUSE)
- * 5. If not found, create new workout_assignment + session + log (CREATE)
+ * 3a. Bridge-first: program_day_assignments.workout_assignment_id → reuse assignment / 409 if done.
+ * 3b. Legacy: workout_sessions in_progress for this program day (24h stale guard).
+ * 3c. Legacy: workout_logs incomplete for this program day (24h stale guard).
+ * 4. If a reuse path matched, return existing workout_assignment_id (REUSE).
+ * 5. Otherwise create new workout_assignment + session + log (CREATE)
  *    and TAG them with program_assignment_id + program_schedule_id
  * 
  * Body: { client_id?: string, program_schedule_id?: string }
@@ -22,6 +22,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 import {
   getProgramState,
@@ -29,6 +30,64 @@ import {
   assertWeekUnlocked,
   ProgramScheduleSlot,
 } from '@/lib/programStateService'
+
+/**
+ * Link program_day_assignments.workout_assignment_id when still null (same contract as
+ * POST /api/program-workouts/start). Non-fatal on failure — workout still starts.
+ */
+async function linkProgramDayAssignmentWorkoutBridge(
+  supabaseAdmin: SupabaseClient,
+  programAssignmentId: string,
+  programScheduleId: string | null,
+  workoutAssignmentId: string | null | undefined,
+): Promise<void> {
+  if (!workoutAssignmentId) return
+  if (!programScheduleId) {
+    console.warn('[start-from-progress] bridge skipped: no program_schedule id on slot', {
+      programAssignmentId,
+    })
+    return
+  }
+
+  const { data: scheduleRow, error: scheduleErr } = await supabaseAdmin
+    .from('program_schedule')
+    .select('day_number')
+    .eq('id', programScheduleId)
+    .maybeSingle()
+
+  if (scheduleErr || scheduleRow?.day_number == null) {
+    console.warn('[start-from-progress] could not resolve day_number for bridge', {
+      programScheduleId,
+      error: scheduleErr?.message ?? scheduleErr,
+    })
+    return
+  }
+
+  const dayNumber = Number(scheduleRow.day_number)
+  if (!Number.isFinite(dayNumber)) {
+    console.warn('[start-from-progress] could not resolve day_number for bridge', {
+      programScheduleId,
+      day_number: scheduleRow.day_number,
+    })
+    return
+  }
+
+  const { error: bridgeErr } = await supabaseAdmin
+    .from('program_day_assignments')
+    .update({ workout_assignment_id: workoutAssignmentId })
+    .eq('program_assignment_id', programAssignmentId)
+    .eq('day_number', dayNumber)
+    .is('workout_assignment_id', null)
+
+  if (bridgeErr) {
+    console.warn('[start-from-progress] failed to set bridge', {
+      programAssignmentId,
+      dayNumber,
+      workoutAssignmentId,
+      error: bridgeErr.message ?? bridgeErr,
+    })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -200,11 +259,209 @@ export async function POST(request: NextRequest) {
     const positionLabel = `Week ${chosenSlot.week_number} • Day ${dayPosition}`
     
     // ========================================================================
-    // STEP 3: Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY
+    // STEP 3a: Bridge-first reuse — program_day_assignments.workout_assignment_id
+    // (No 24h staleness here; canonical program day + bridge wins over age.)
+    // Falls through to STEP 3b/3c when bridge is null or unusable (legacy path).
+    // ========================================================================
+    const { data: bridgeScheduleRow, error: bridgeScheduleErr } = await supabaseAdmin
+      .from('program_schedule')
+      .select('day_number')
+      .eq('id', programScheduleId)
+      .maybeSingle()
+
+    if (bridgeScheduleErr) {
+      console.warn('[start-from-progress] STEP 3a — program_schedule lookup error, falling through', bridgeScheduleErr.message)
+    } else if (bridgeScheduleRow?.day_number == null || !Number.isFinite(Number(bridgeScheduleRow.day_number))) {
+      console.warn('[start-from-progress] STEP 3a — program_schedule day_number missing, falling through to session/log reuse', {
+        programScheduleId,
+        day_number: bridgeScheduleRow?.day_number ?? null,
+      })
+    } else {
+      const bridgeDayNumber = Number(bridgeScheduleRow.day_number)
+      const { data: pdaBridge, error: pdaBridgeErr } = await supabaseAdmin
+        .from('program_day_assignments')
+        .select('id, workout_assignment_id')
+        .eq('program_assignment_id', programAssignmentId)
+        .eq('day_number', bridgeDayNumber)
+        .maybeSingle()
+
+      if (pdaBridgeErr) {
+        console.warn('[start-from-progress] STEP 3a — program_day_assignments lookup error, falling through', pdaBridgeErr.message)
+      } else if (!pdaBridge?.workout_assignment_id) {
+        console.log('[start-from-progress] STEP 3a: bridge null, falling through to session/log reuse')
+      } else {
+        const bridgeWaId = pdaBridge.workout_assignment_id
+        const { data: bridgeWa, error: bridgeWaErr } = await supabaseAdmin
+          .from('workout_assignments')
+          .select('id, status, client_id')
+          .eq('id', bridgeWaId)
+          .maybeSingle()
+
+        if (bridgeWaErr) {
+          console.warn('[start-from-progress] STEP 3a — workout_assignments lookup error, falling through', bridgeWaErr.message)
+        } else if (!bridgeWa || bridgeWa.client_id !== clientId) {
+          console.log('[start-from-progress] STEP 3a: bridge points to missing assignment, falling through', {
+            bridgeWaId,
+            hasRow: !!bridgeWa,
+          })
+        } else if (bridgeWa.status === 'completed' || bridgeWa.status === 'skipped') {
+          console.warn('[start-from-progress] STEP 3a: bridge workout already completed, returning 409', {
+            workoutAssignmentId: bridgeWa.id,
+          })
+          return NextResponse.json({
+            error: 'Slot already completed',
+            message: 'This program day has already been completed',
+          }, { status: 409 })
+        } else {
+          console.log('[start-from-progress] STEP 3a: bridge points to existing workout, reusing', {
+            workoutAssignmentId: bridgeWa.id,
+          })
+
+          const { data: bridgeSession, error: bridgeSessionErr } = await supabaseAdmin
+            .from('workout_sessions')
+            .select('id, assignment_id, status, started_at, program_assignment_id, program_schedule_id')
+            .eq('client_id', clientId)
+            .eq('assignment_id', bridgeWa.id)
+            .eq('program_assignment_id', programAssignmentId)
+            .eq('program_schedule_id', programScheduleId)
+            .eq('status', 'in_progress')
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (bridgeSessionErr) {
+            console.error('[start-from-progress] STEP 3a — session check error:', bridgeSessionErr)
+          }
+
+          if (bridgeSession) {
+            await linkProgramDayAssignmentWorkoutBridge(
+              supabaseAdmin,
+              programAssignmentId,
+              programScheduleId,
+              bridgeSession.assignment_id,
+            )
+            return NextResponse.json({
+              workout_assignment_id: bridgeSession.assignment_id,
+              template_id: templateId,
+              week_number: chosenSlot.week_number,
+              day_position: dayPosition,
+              position_label: positionLabel,
+              program_assignment_id: programAssignmentId,
+              program_schedule_id: programScheduleId,
+              reused_existing: true,
+              reuse_reason: 'bridge_in_progress_session',
+              session_id: bridgeSession.id,
+            })
+          }
+
+          const { data: bridgeLog, error: bridgeLogErr } = await supabaseAdmin
+            .from('workout_logs')
+            .select('id, workout_assignment_id, started_at, workout_session_id, program_assignment_id, program_schedule_id, completed_at')
+            .eq('client_id', clientId)
+            .eq('workout_assignment_id', bridgeWa.id)
+            .eq('program_assignment_id', programAssignmentId)
+            .eq('program_schedule_id', programScheduleId)
+            .is('completed_at', null)
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (bridgeLogErr) {
+            console.error('[start-from-progress] STEP 3a — log check error:', bridgeLogErr)
+          }
+
+          if (bridgeLog) {
+            await linkProgramDayAssignmentWorkoutBridge(
+              supabaseAdmin,
+              programAssignmentId,
+              programScheduleId,
+              bridgeLog.workout_assignment_id,
+            )
+            return NextResponse.json({
+              workout_assignment_id: bridgeLog.workout_assignment_id,
+              template_id: templateId,
+              week_number: chosenSlot.week_number,
+              day_position: dayPosition,
+              position_label: positionLabel,
+              program_assignment_id: programAssignmentId,
+              program_schedule_id: programScheduleId,
+              reused_existing: true,
+              reuse_reason: 'bridge_incomplete_log',
+              session_id: bridgeLog.workout_session_id ?? null,
+            })
+          }
+
+          const { data: bridgeNewSession, error: bSessionInsErr } = await supabaseAdmin
+            .from('workout_sessions')
+            .insert({
+              assignment_id: bridgeWa.id,
+              client_id: clientId,
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+              program_assignment_id: programAssignmentId,
+              program_schedule_id: programScheduleId,
+            })
+            .select()
+            .single()
+
+          if (bSessionInsErr || !bridgeNewSession) {
+            console.error('[start-from-progress] STEP 3a — error creating session for bridged assignment:', bSessionInsErr)
+            return NextResponse.json({
+              error: 'Failed to create workout session',
+              details: bSessionInsErr?.message,
+            }, { status: 500 })
+          }
+
+          const { data: bridgeNewLog, error: bLogInsErr } = await supabaseAdmin
+            .from('workout_logs')
+            .insert({
+              workout_assignment_id: bridgeWa.id,
+              client_id: clientId,
+              started_at: new Date().toISOString(),
+              workout_session_id: bridgeNewSession.id,
+              program_assignment_id: programAssignmentId,
+              program_schedule_id: programScheduleId,
+            })
+            .select()
+            .single()
+
+          if (bLogInsErr || !bridgeNewLog) {
+            console.error('[start-from-progress] STEP 3a — error creating log for bridged assignment:', bLogInsErr)
+            return NextResponse.json({
+              error: 'Failed to create workout log',
+              details: bLogInsErr?.message,
+            }, { status: 500 })
+          }
+
+          await linkProgramDayAssignmentWorkoutBridge(
+            supabaseAdmin,
+            programAssignmentId,
+            programScheduleId,
+            bridgeWa.id,
+          )
+
+          return NextResponse.json({
+            workout_assignment_id: bridgeWa.id,
+            template_id: templateId,
+            week_number: chosenSlot.week_number,
+            day_position: dayPosition,
+            position_label: positionLabel,
+            program_assignment_id: programAssignmentId,
+            program_schedule_id: programScheduleId,
+            reused_existing: true,
+            reuse_reason: 'bridge_recovered_session_log',
+            session_id: bridgeNewSession.id,
+            log_id: bridgeNewLog.id,
+          })
+        }
+      }
+    }
+
+    // ========================================================================
+    // STEP 3b: Check workout_sessions for in-progress session (legacy / null-bridge;
+    // keeps 24h staleness guard.)
     // Keyed by (client_id, program_assignment_id, program_schedule_id)
     // ========================================================================
-    
-    // 3a. Check workout_sessions for in-progress session
     const { data: inProgressSession, error: sessionError } = await supabaseAuth
       .from('workout_sessions')
       .select('id, assignment_id, status, started_at, program_assignment_id, program_schedule_id')
@@ -216,7 +473,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    console.log('[start-from-progress] STEP 3a — in-progress session check:', {
+    console.log('[start-from-progress] STEP 3b — in-progress session check:', {
       program_schedule_id: programScheduleId,
       program_assignment_id: programAssignmentId,
       session_error: sessionError ?? null,
@@ -262,7 +519,13 @@ export async function POST(request: NextRequest) {
         }
         // Fall through — create a fresh session below
       } else {
-        console.log('[start-from-progress] REUSING in-progress session →', inProgressSession.assignment_id)
+        console.log('[start-from-progress] STEP 3b REUSING in-progress session →', inProgressSession.assignment_id)
+        await linkProgramDayAssignmentWorkoutBridge(
+          supabaseAdmin,
+          programAssignmentId,
+          programScheduleId,
+          inProgressSession.assignment_id,
+        )
         return NextResponse.json({
           workout_assignment_id: inProgressSession.assignment_id,
           template_id: templateId,
@@ -278,7 +541,10 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // 3b. Check workout_logs for incomplete log
+    // ========================================================================
+    // STEP 3c: Check workout_logs for incomplete log (legacy / null-bridge;
+    // keeps 24h staleness guard.)
+    // ========================================================================
     const { data: incompleteLog, error: logError } = await supabaseAuth
       .from('workout_logs')
       .select('id, workout_assignment_id, started_at, program_assignment_id, program_schedule_id, completed_at')
@@ -290,7 +556,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    console.log('[start-from-progress] STEP 3b — incomplete log check:', {
+    console.log('[start-from-progress] STEP 3c — incomplete log check:', {
       program_schedule_id: programScheduleId,
       program_assignment_id: programAssignmentId,
       log_error: logError ?? null,
@@ -325,7 +591,13 @@ export async function POST(request: NextRequest) {
           .eq('id', incompleteLog.id)
         // Fall through — create fresh session/log below
       } else {
-        console.log('[start-from-progress] REUSING incomplete log →', incompleteLog.workout_assignment_id)
+        console.log('[start-from-progress] STEP 3c REUSING incomplete log →', incompleteLog.workout_assignment_id)
+        await linkProgramDayAssignmentWorkoutBridge(
+          supabaseAdmin,
+          programAssignmentId,
+          programScheduleId,
+          incompleteLog.workout_assignment_id,
+        )
         return NextResponse.json({
           workout_assignment_id: incompleteLog.workout_assignment_id,
           template_id: templateId,
@@ -429,6 +701,13 @@ export async function POST(request: NextRequest) {
     } else {
       newLog = logData
     }
+
+    await linkProgramDayAssignmentWorkoutBridge(
+      supabaseAdmin,
+      programAssignmentId,
+      programScheduleId,
+      newAssignment.id,
+    )
 
     // ========================================================================
     // STEP 5: Return the new assignment info

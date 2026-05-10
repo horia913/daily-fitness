@@ -74,14 +74,10 @@ interface ProgressionNudgeProps {
 function getBorderAndBg(type: ProgressionSuggestion["type"]): string {
   switch (type) {
     case "progress":
+    case "rpe_correction_up":
       return "bg-emerald-900/20 border-emerald-700/30";
-    case "repeat":
-    case "plateau":
+    case "rpe_correction_down":
       return "bg-amber-900/20 border-amber-700/30";
-    case "match":
-      return "bg-gray-700/30 border-gray-600/30";
-    case "deload":
-      return "bg-blue-900/20 border-blue-700/30";
     default:
       return "bg-gray-800/20 border-gray-700/30";
   }
@@ -90,14 +86,10 @@ function getBorderAndBg(type: ProgressionSuggestion["type"]): string {
 function getIconColor(type: ProgressionSuggestion["type"]): string {
   switch (type) {
     case "progress":
+    case "rpe_correction_up":
       return "text-emerald-400";
-    case "repeat":
-    case "plateau":
+    case "rpe_correction_down":
       return "text-amber-400";
-    case "match":
-      return "text-gray-400";
-    case "deload":
-      return "text-blue-400";
     default:
       return "text-gray-400";
   }
@@ -241,18 +233,11 @@ export function ProgressionNudge({
         ? pickLastTimeDisplayForSet(lw as LastWorkoutShape, previousSessionSetNumber)
         : pickLastTimeDisplay(lw as LastWorkoutShape);
 
-  const showSuggestionText = Boolean(
-    suggestion &&
-      suggestion.type !== "first_time" &&
-      suggestion.message,
-  );
+  const showSuggestionText = Boolean(suggestion && suggestion.message);
 
   const hasSuggestedValues =
     suggestion?.suggestedWeight != null || suggestion?.suggestedReps != null;
   const showApply = !!onApplySuggestion && hasSuggestedValues;
-
-  if (suggestion?.type === "first_time" && isLastTimeEmpty(lastTimeDisplay))
-    return null;
 
   if (isLastTimeEmpty(lastTimeDisplay) && !showSuggestionText && !showApply)
     return null;

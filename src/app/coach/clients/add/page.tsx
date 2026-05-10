@@ -384,7 +384,7 @@ export default function AddClient() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="form-2xl" className="px-4 pb-32 pt-4 sm:px-6 space-y-4">
+        <CoachPageShell widthVariant="form-2xl" className="px-4 pb-[var(--fc-bottom-safe-area)] pt-4 sm:px-6 space-y-4">
           <div className="flex min-h-11 max-h-12 items-center justify-between gap-2">
             <h1 className="text-lg font-semibold fc-text-primary truncate">
               Add client

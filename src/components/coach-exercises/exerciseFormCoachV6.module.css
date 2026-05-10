@@ -1,0 +1,143 @@
+/* Scoped tokens — parent should set same as createExerciseModalShell .root */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.iconBadge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-family: var(--f-head);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--t1);
+  line-height: 1.2;
+}
+
+.sectionDesc {
+  font-size: 11px;
+  color: var(--t3);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.stepCard {
+  background: var(--card-2);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stepHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stepBadge {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--cyan-soft);
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
+}
+
+.stepEyebrow {
+  font-family: var(--f-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t4);
+}
+
+.stepDel {
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+
+.stepDel:hover {
+  color: var(--critical);
+  background: var(--critical-soft);
+}
+
+.stepTextarea {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-size: 12.5px;
+  font-family: var(--f-body);
+  line-height: 1.4;
+  resize: none;
+  min-height: 48px;
+  color: var(--t1);
+  outline: none;
+}
+
+.stepTextarea::placeholder {
+  color: var(--t4);
+}
+
+.stepTextarea:focus {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 1px var(--cyan-soft);
+}
+
+.addStepBtn {
+  padding: 10px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 11px;
+  color: var(--cyan);
+  font-family: var(--f-body);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.addStepBtn:hover {
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+}

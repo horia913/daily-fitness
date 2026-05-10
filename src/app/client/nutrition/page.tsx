@@ -736,7 +736,7 @@ function NutritionDashboardContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <ClientPageShell className="max-w-lg mx-auto flex flex-col overflow-x-hidden px-4 pb-32 pt-6">
+      <ClientPageShell className="max-w-lg mx-auto flex flex-col overflow-x-hidden px-4 pb-[var(--fc-bottom-safe-area)] pt-6">
         <header className={fuelStyles.topbar}>
           <button
             type="button"

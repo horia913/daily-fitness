@@ -6,9 +6,9 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 import OptimizedExerciseLibrary from '@/components/coach/OptimizedExerciseLibrary'
+import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import { cn } from '@/lib/utils'
 
 export default function ExerciseLibrary() {
   const { user } = useAuth()
@@ -18,20 +18,10 @@ export default function ExerciseLibrary() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="px-4 pb-32 pt-4 sm:px-6 lg:px-10 space-y-3">
-          <Link
-            href="/coach/training"
-            className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-            Training
-          </Link>
-          <header className="mb-3 flex min-h-10 items-center justify-between gap-3">
-            <h1 className="text-lg font-semibold tracking-tight fc-text-primary sm:text-xl">
-              Exercise library
-            </h1>
-          </header>
-
+        <CoachPageShell
+          widthVariant="data-7xl"
+          className={cn('px-4 pb-[var(--fc-bottom-safe-area)] pt-4 sm:px-6 lg:px-10 space-y-3', hub.hub)}
+        >
           <OptimizedExerciseLibrary coachId={user?.id || ''} />
         </CoachPageShell>
       </AnimatedBackground>

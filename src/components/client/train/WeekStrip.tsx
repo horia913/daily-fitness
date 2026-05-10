@@ -76,6 +76,7 @@ export function WeekStrip({
             !isCompleted &&
             weekday < todayWeekday &&
             !day!.isOptional;
+          const isMissedSelected = isMissed && isSelected;
           const isTodaySlot =
             Boolean(day) && isToday && todaySlot?.scheduleId === day!.scheduleId;
           const calNum = dateNums[idx] ?? weekday + 1;
@@ -127,7 +128,9 @@ export function WeekStrip({
               role="listitem"
               onClick={() => onDaySelect(day, weekday)}
               className={`min-w-0 flex-1 rounded-[14px] border px-1.5 pt-2.5 pb-3 text-center transition-[box-shadow,border-color,background-color] ${
-                isMissed
+                isMissedSelected
+                  ? "border-red-400 bg-[color-mix(in_srgb,#ef4444_12%,var(--fc-surface-card))] shadow-[0_0_0_2px_rgba(239,68,68,0.28)]"
+                  : isMissed
                   ? "border-red-500/50 bg-[color-mix(in_srgb,#ef4444_8%,var(--fc-surface-card))]"
                   : isTodaySlot
                   ? "border-[color:var(--fc-accent-cyan)] bg-[color:var(--fc-surface-elevated)] shadow-[0_0_0_3px_rgba(79,227,232,0.10)]"
@@ -163,10 +166,14 @@ export function WeekStrip({
               </div>
               <p
                 className={`mt-1.5 text-[9.5px] font-medium leading-tight ${
-                  isTodaySlot ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-dim"
+                  isMissed
+                    ? "text-red-300"
+                    : isTodaySlot
+                    ? "text-[color:var(--fc-accent-cyan)]"
+                    : "fc-text-dim"
                 }`}
               >
-                {secondaryLabel(day, weekday, todayWeekday, todaySlot)}
+                {isMissed ? "Missed" : secondaryLabel(day, weekday, todayWeekday, todaySlot)}
               </p>
               {day.isOptional ? (
                 <span className="mt-0.5 block text-[8px] font-medium text-[color:var(--fc-accent-cyan)]">

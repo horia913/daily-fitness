@@ -681,7 +681,7 @@ export default function WorkoutDetailsPage() {
     return (
       <AnimatedBackground>
         <div className="relative fc-app-bg isolate">
-          <ClientPageShell className="min-h-screen pb-32">
+          <ClientPageShell className="min-h-screen pb-[var(--fc-bottom-safe-area)]">
             <main
               className="max-w-3xl mx-auto pt-6 pb-40"
               style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}
@@ -1381,7 +1381,7 @@ export default function WorkoutDetailsPage() {
   return (
     <AnimatedBackground>
       <div className={cn("relative fc-app-bg isolate", styles.pageRoot)}>
-        <ClientPageShell className="min-h-screen pb-32">
+        <ClientPageShell className="min-h-screen pb-[var(--fc-bottom-safe-area)]">
           <nav className={styles.topbar}>
             <IconButton
               variant="filled"

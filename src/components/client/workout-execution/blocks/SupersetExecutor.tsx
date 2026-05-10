@@ -39,6 +39,7 @@ import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
 
 export function SupersetExecutor({
   block,
@@ -361,9 +362,9 @@ export function SupersetExecutor({
       });
       return;
     }
-    const weightANum = parseFloat(editDraft.weightA);
+    const weightANum = parseWeightKgInput(editDraft.weightA);
     const repsANum = parseInt(editDraft.repsA, 10);
-    const weightBNum = parseFloat(editDraft.weightB);
+    const weightBNum = parseWeightKgInput(editDraft.weightB);
     const repsBNum = parseInt(editDraft.repsB, 10);
     if (
       isNaN(weightANum) ||
@@ -437,9 +438,9 @@ export function SupersetExecutor({
   const handleLog = async () => {
     if (!exerciseA || !exerciseB || isLoggingSet) return;
 
-    const weightANum = parseFloat(weightA);
+    const weightANum = parseWeightKgInput(weightA);
     const repsANum = parseInt(repsA);
-    const weightBNum = parseFloat(weightB);
+    const weightBNum = parseWeightKgInput(weightB);
     const repsBNum = parseInt(repsB);
 
     if (
@@ -820,8 +821,8 @@ export function SupersetExecutor({
       : [];
   const viewedSetEntry = forViewedSet[0] ?? null;
 
-  const wLogA = parseFloat(weightA);
-  const wLogB = parseFloat(weightB);
+  const wLogA = parseWeightKgInput(weightA);
+  const wLogB = parseWeightKgInput(weightB);
   const rLogA = parseInt(repsA, 10);
   const rLogB = parseInt(repsB, 10);
   const logInputsReady =
@@ -860,9 +861,9 @@ export function SupersetExecutor({
               editDraft.repsA.trim() === "" ||
               editDraft.weightB.trim() === "" ||
               editDraft.repsB.trim() === "" ||
-              isNaN(parseFloat(editDraft.weightA)) ||
+              isNaN(parseWeightKgInput(editDraft.weightA)) ||
               isNaN(parseInt(editDraft.repsA, 10)) ||
-              isNaN(parseFloat(editDraft.weightB)) ||
+              isNaN(parseWeightKgInput(editDraft.weightB)) ||
               isNaN(parseInt(editDraft.repsB, 10))
             }
             variant="fc-primary"

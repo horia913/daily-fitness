@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,28 +9,37 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  X, 
-  Plus, 
-  Trash2, 
-  Upload, 
-  Dumbbell, 
-  Target, 
-  Clock, 
-  Image, 
-  Video, 
-  FileText, 
-  Save, 
+import {
+  X,
+  Plus,
+  Trash2,
+  Upload,
+  Dumbbell,
+  Target,
+  Clock,
+  Image,
+  Video,
+  FileText,
+  Save,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  User,
+  ListChecks,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { ImageTransform } from '@/lib/imageTransform'
 import { useImageUpload } from '@/hooks/useImageOptimization'
 import { useTheme } from '@/contexts/ThemeContext'
+import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/toast-provider'
 import { showErrorToast, showSuccessToast } from '@/lib/errorUtils'
+import { CreateExerciseModalShell } from '@/components/coach-exercises/CreateExerciseModalShell'
+import sheetStyles from '@/components/coach-exercises/createExerciseModalShell.module.css'
+import coachV6 from '@/components/coach-exercises/exerciseFormCoachV6.module.css'
+import { CheckTileGrid } from '@/components/coach-exercises/CheckTileGrid'
+import profileStyles from '@/components/client-profile/clientProfileV1.module.css'
+import { ProfileField } from '@/components/client-profile/ProfileField'
 
 interface ExerciseCategory {
   id: string
@@ -45,6 +54,8 @@ interface ExerciseFormProps {
   onClose: () => void
   onSuccess: () => void
   exercise?: any
+  /** Coach library: bottom-sheet create flow with v6 chrome (create only; edit uses default). */
+  layout?: 'default' | 'coachCreate'
 }
 
 const muscleGroups = [
@@ -57,11 +68,48 @@ const equipmentOptions = [
   'Bodyweight', 'Dumbbells', 'Barbell', 'Kettlebell', 'Resistance Bands',
   'Cable Machine', 'Smith Machine', 'Bench', 'Pull-up Bar', 'Medicine Ball',
   'Stability Ball', 'Foam Roller', 'Yoga Mat', 'Treadmill', 'Bike',
-  'Rowing Machine', 'Elliptical', 'Jump Rope'
+  'Rowing Machine', 'Elliptical', 'Jump Rope',
 ]
 
+const COACH_V6_MUSCLES = [
+  'Chest',
+  'Back',
+  'Shoulders',
+  'Biceps',
+  'Triceps',
+  'Forearms',
+  'Abs',
+  'Obliques',
+  'Glutes',
+  'Quads',
+  'Hamstrings',
+  'Calves',
+]
 
-export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: ExerciseFormProps) {
+const COACH_V6_EQUIPMENT = [
+  'Bodyweight',
+  'Dumbbells',
+  'Barbell',
+  'Kettlebell',
+  'Resistance Bands',
+  'Cable Machine',
+  'Smith Machine',
+  'Bench',
+  'Pull-up Bar',
+  'Rings',
+  'Box',
+  'Sled',
+  'Trap Bar',
+  'Medicine Ball',
+]
+
+export default function ExerciseForm({
+  isOpen,
+  onClose,
+  onSuccess,
+  exercise,
+  layout = 'default',
+}: ExerciseFormProps) {
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
   const { addToast } = useToast()
@@ -83,6 +131,28 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   const [newTip, setNewTip] = useState('')
   const [newMuscleGroup, setNewMuscleGroup] = useState('')
   const [newEquipment, setNewEquipment] = useState('')
+
+  const coachCreateDirty = useMemo(() => {
+    if (layout !== 'coachCreate' || exercise) return false
+    return (
+      formData.name.trim() !== '' ||
+      formData.category !== '' ||
+      formData.description.trim() !== '' ||
+      formData.muscle_groups.length > 0 ||
+      formData.equipment_types.length > 0 ||
+      formData.instructions.some((s) => s.trim() !== '') ||
+      formData.tips.some((s) => s.trim() !== '') ||
+      !!formData.video_url?.trim() ||
+      !!formData.image_url?.trim()
+    )
+  }, [layout, exercise, formData])
+
+  const tryClose = useCallback(() => {
+    if (layout === 'coachCreate' && !exercise && coachCreateDirty) {
+      if (!window.confirm('Discard changes to this exercise?')) return
+    }
+    onClose()
+  }, [layout, exercise, coachCreateDirty, onClose])
 
   useEffect(() => {
     if (isOpen) {
@@ -349,10 +419,10 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   }
 
   const removeInstruction = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      instructions: prev.instructions.filter((_, i) => i !== index)
-    }))
+    setFormData((prev) => {
+      const next = prev.instructions.filter((_, i) => i !== index)
+      return { ...prev, instructions: next.length > 0 ? next : [''] }
+    })
   }
 
   const addTip = () => {
@@ -366,13 +436,281 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   }
 
   const removeTip = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      tips: prev.tips.filter((_, i) => i !== index)
-    }))
+    setFormData((prev) => {
+      const next = prev.tips.filter((_, i) => i !== index)
+      return { ...prev, tips: next.length > 0 ? next : [''] }
+    })
   }
 
   if (!isOpen) return null
+
+  const isCoachCreate = layout === 'coachCreate' && !exercise
+  const canSubmitCreate = formData.name.trim() !== '' && !!formData.category
+
+  if (isCoachCreate) {
+    return (
+      <CreateExerciseModalShell
+        open={isOpen}
+        onClose={tryClose}
+        footer={
+          <div className={sheetStyles.modalFoot}>
+            <button type="button" className={sheetStyles.btnGhost} onClick={tryClose}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="coach-exercise-create-form"
+              disabled={loading || !canSubmitCreate}
+              className={sheetStyles.btnPrimaryLime}
+            >
+              <CheckCircle size={16} strokeWidth={2} aria-hidden />
+              Create exercise
+            </button>
+          </div>
+        }
+      >
+        <form id="coach-exercise-create-form" onSubmit={handleSubmit} className={coachV6.stack}>
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconCyan)}>
+                <Info size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Basic info</div>
+                <p className={coachV6.sectionDesc}>Name, category, and short description</p>
+              </div>
+            </div>
+            <ProfileField label="Exercise name" required>
+              <input
+                id="coach-ex-name"
+                className={profileStyles.input}
+                value={formData.name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Bulgarian split squat"
+                required
+              />
+            </ProfileField>
+            <ProfileField label="Category" required>
+              <select
+                className={profileStyles.select}
+                value={formData.category}
+                onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
+                required
+              >
+                <option value="">Select category</option>
+                {categories.length > 0 ? (
+                  categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Strength">Strength</option>
+                    <option value="Hypertrophy">Hypertrophy</option>
+                    <option value="Athletic development">Athletic development</option>
+                    <option value="Mobility">Mobility</option>
+                    <option value="Conditioning">Conditioning</option>
+                    <option value="Power">Power</option>
+                  </>
+                )}
+              </select>
+            </ProfileField>
+            <ProfileField label="Description" optional>
+              <textarea
+                className={profileStyles.textarea}
+                value={formData.description}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of the exercise..."
+                rows={3}
+              />
+            </ProfileField>
+          </div>
+
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconPurple)}>
+                <User size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Muscle groups</div>
+                <p className={coachV6.sectionDesc}>
+                  {formData.muscle_groups.length} selected of 10
+                </p>
+              </div>
+            </div>
+            <CheckTileGrid
+              options={COACH_V6_MUSCLES}
+              selected={formData.muscle_groups}
+              maxSelected={10}
+              onMaxReached={() =>
+                showErrorToast(addToast, 'You can select up to 10 muscle areas.', 'Limit')
+              }
+              onToggle={(label, next) => {
+                if (next) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    muscle_groups: prev.muscle_groups.includes(label)
+                      ? prev.muscle_groups
+                      : [...prev.muscle_groups, label],
+                  }))
+                } else {
+                  removeMuscleGroup(label)
+                }
+              }}
+            />
+          </div>
+
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconWarn)}>
+                <Dumbbell size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Equipment</div>
+                <p className={coachV6.sectionDesc}>{formData.equipment_types.length} selected</p>
+              </div>
+            </div>
+            <CheckTileGrid
+              options={COACH_V6_EQUIPMENT}
+              selected={formData.equipment_types}
+              onToggle={(label, next) => {
+                if (next) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    equipment_types: prev.equipment_types.includes(label)
+                      ? prev.equipment_types
+                      : [...prev.equipment_types, label],
+                  }))
+                } else {
+                  removeEquipment(label)
+                }
+              }}
+            />
+          </div>
+
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconLime)}>
+                <ListChecks size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Instructions</div>
+                <p className={coachV6.sectionDesc}>Step-by-step technique cues</p>
+              </div>
+            </div>
+            <div className={coachV6.stack}>
+              {formData.instructions.map((instruction, index) => (
+                <div key={index} className={coachV6.stepCard}>
+                  <div className={coachV6.stepHead}>
+                    <div className="flex items-center gap-2">
+                      <span className={coachV6.stepBadge}>{index + 1}</span>
+                      <span className={coachV6.stepEyebrow}>Step</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={coachV6.stepDel}
+                      aria-label={`Remove step ${index + 1}`}
+                      onClick={() => removeInstruction(index)}
+                    >
+                      <Trash2 size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                  <textarea
+                    className={coachV6.stepTextarea}
+                    value={instruction}
+                    onChange={(e) => {
+                      const next = [...formData.instructions]
+                      next[index] = e.target.value
+                      setFormData((prev) => ({ ...prev, instructions: next }))
+                    }}
+                    placeholder="Step instruction..."
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                className={coachV6.addStepBtn}
+                onClick={() =>
+                  setFormData((prev) => ({ ...prev, instructions: [...prev.instructions, ''] }))
+                }
+              >
+                <Plus size={12} strokeWidth={2} aria-hidden />
+                Add another step
+              </button>
+            </div>
+          </div>
+
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconRose)}>
+                <AlertCircle size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Tips (optional)</div>
+                <p className={coachV6.sectionDesc}>Short cues for your clients</p>
+              </div>
+            </div>
+            <div className={coachV6.stack}>
+              {formData.tips.map((tip, index) => (
+                <div key={index} className={coachV6.stepCard}>
+                  <div className={coachV6.stepHead}>
+                    <span className={coachV6.stepEyebrow}>Tip {index + 1}</span>
+                    <button
+                      type="button"
+                      className={coachV6.stepDel}
+                      onClick={() => removeTip(index)}
+                      aria-label={`Remove tip ${index + 1}`}
+                    >
+                      <Trash2 size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                  <input
+                    className={profileStyles.input}
+                    value={tip}
+                    onChange={(e) => {
+                      const next = [...formData.tips]
+                      next[index] = e.target.value
+                      setFormData((prev) => ({ ...prev, tips: next }))
+                    }}
+                    placeholder="Helpful tip..."
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                className={coachV6.addStepBtn}
+                onClick={() => setFormData((prev) => ({ ...prev, tips: [...prev.tips, ''] }))}
+              >
+                <Plus size={12} strokeWidth={2} aria-hidden />
+                Add tip
+              </button>
+            </div>
+          </div>
+
+          <div className={coachV6.section}>
+            <div className={coachV6.sectionHead}>
+              <div className={cn(profileStyles.sectionIcon, profileStyles.sectionIconPurple)}>
+                <Video size={16} strokeWidth={2} aria-hidden />
+              </div>
+              <div>
+                <div className={coachV6.sectionTitle}>Demo video (optional)</div>
+                <p className={coachV6.sectionDesc}>YouTube or direct link</p>
+              </div>
+            </div>
+            <ProfileField label="Video URL" optional>
+              <input
+                className={profileStyles.input}
+                value={formData.video_url}
+                onChange={(e) => setFormData((prev) => ({ ...prev, video_url: e.target.value }))}
+                placeholder="https://..."
+              />
+            </ProfileField>
+          </div>
+        </form>
+      </CreateExerciseModalShell>
+    )
+  }
 
   return (
     <div 

@@ -118,7 +118,6 @@ function resolveEffectiveTimezone(
 export function computeTrainRpcWeekday(profileTimezone: string | null | undefined): number {
   const tz = profileTimezone?.trim()
   if (!tz) {
-    console.warn('[train] No profile.timezone; using device timezone for RPC p_today_weekday')
     const device = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     return weekdayMon0Sun6InTimezone(new Date(), device)
   }
@@ -146,13 +145,6 @@ export function resolveTrainPageTodayWeekday(
   return weekdayMon0Sun6InTimezone(new Date(), tz)
 }
 
-function computeTodayWeekdayForMapper(
-  data: TrainPageRpcResponse,
-  profileTimezone: string | null | undefined
-): number {
-  return resolveTrainPageTodayWeekday(data, profileTimezone)
-}
-
 /** UTC inclusive bounds for Mon–Sun program week `derivedWeek` in `tz` (matches summary-route style week math). */
 function zonedUtcBoundsForProgramWeek(
   assignmentStartDate: string,
@@ -174,14 +166,17 @@ function zonedUtcBoundsForProgramWeek(
 /**
  * Build ProgramWeekState from get_train_page_data RPC response.
  * When hasProgram is false, returns empty state (extraWorkouts are returned separately).
+ * `todayWeekday` is always resolved here (timezone_snapshot → profile → device + warn) so the week strip matches unlock math.
  */
 export async function rpcResponseToProgramWeekState(
   supabase: SupabaseClient,
   data: TrainPageRpcResponse,
   profileTimezone?: string | null
-): Promise<ProgramWeekState> {
+): Promise<{ programWeek: ProgramWeekState; todayWeekday: number }> {
+  const todayWeekday = resolveTrainPageTodayWeekday(data, profileTimezone ?? null)
+
   if (!data.hasProgram || !data.assignmentId || !data.programId) {
-    return emptyState
+    return { programWeek: emptyState, todayWeekday }
   }
 
   const programId = data.programId
@@ -193,11 +188,10 @@ export async function rpcResponseToProgramWeekState(
   ])
 
   if (slots.length === 0) {
-    return emptyState
+    return { programWeek: emptyState, todayWeekday }
   }
 
   const tz = resolveEffectiveTimezone(data, profileTimezone ?? null)
-  const todayWeekday = computeTodayWeekdayForMapper(data, profileTimezone ?? null)
 
   const templateIds = [...new Set(slots.map((s) => s.template_id).filter(Boolean))]
   const templateMap = new Map<string, { name: string; estimated_duration: number }>()
@@ -250,7 +244,7 @@ export async function rpcResponseToProgramWeekState(
       pause_accumulated_days: data.pauseAccumulatedDays ?? 0,
       pause_status: data.pauseStatus ?? data.pause_status ?? null,
       paused_at: data.pausedAt ?? null,
-      timezone_snapshot: data.timezoneSnapshot ?? null,
+      timezone_snapshot: tz,
       duration_weeks: data.durationWeeks ?? null,
     },
     tz
@@ -345,25 +339,28 @@ export async function rpcResponseToProgramWeekState(
     data.pauseReason ?? data.pause_reason ?? null
 
   return {
-    hasProgram: true,
-    programName: data.programName ?? 'Training Program',
-    programId,
-    programAssignmentId: assignmentId,
-    currentUnlockedWeek: unlockedWeekMax,
-    totalWeeks,
-    unlockedWeekMax,
-    isCompleted: Boolean(isCompleted),
-    days,
-    todaySlot,
-    isRestDay,
-    overdueSlots,
-    completedCount,
-    totalSlots,
-    currentWeekNumber: unlockedWeekMax,
-    progressionMode,
-    isWeekCompleteAwaitingReview,
-    coachFeedback,
-    pauseStatus,
-    pauseReason,
+    programWeek: {
+      hasProgram: true,
+      programName: data.programName ?? 'Training Program',
+      programId,
+      programAssignmentId: assignmentId,
+      currentUnlockedWeek: unlockedWeekMax,
+      totalWeeks,
+      unlockedWeekMax,
+      isCompleted: Boolean(isCompleted),
+      days,
+      todaySlot,
+      isRestDay,
+      overdueSlots,
+      completedCount,
+      totalSlots,
+      currentWeekNumber: unlockedWeekMax,
+      progressionMode,
+      isWeekCompleteAwaitingReview,
+      coachFeedback,
+      pauseStatus,
+      pauseReason,
+    },
+    todayWeekday,
   }
 }

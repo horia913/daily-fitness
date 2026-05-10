@@ -245,7 +245,7 @@ function ClientManagementContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <CoachPageShell widthVariant="data-7xl" className="pb-32 px-0 sm:px-0">
+      <CoachPageShell widthVariant="data-7xl" className="pb-[var(--fc-bottom-safe-area)] px-0 sm:px-0">
         <header className="sticky top-0 z-40 border-b border-[color:var(--fc-glass-border)] bg-[color:color-mix(in_srgb,var(--fc-bg-deep)_88%,transparent)] backdrop-blur-md">
           <div className="px-4 pt-1 sm:px-6 sm:pt-2">
             <div className={styles.topbar}>

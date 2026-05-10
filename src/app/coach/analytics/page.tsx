@@ -6,10 +6,10 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { CoachPageShell } from '@/components/coach-ui/CoachPageShell'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { GlassCard } from '@/components/ui/GlassCard'
-import { BarChart3 } from 'lucide-react'
 import OptimizedAnalyticsOverview from '@/components/coach/OptimizedAnalyticsOverview'
 import AnalyticsNav from '@/components/coach/AnalyticsNav'
+import hub from '@/components/coach-analytics/coachAnalyticsHub.module.css'
+import { cn } from '@/lib/utils'
 
 export default function CoachAnalytics() {
   const { user } = useAuth()
@@ -19,23 +19,11 @@ export default function CoachAnalytics() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6">
+        <CoachPageShell
+          widthVariant="data-7xl"
+          className={cn('p-3 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-6 space-y-4 sm:space-y-6', hub.hub)}
+        >
           <AnalyticsNav />
-          <GlassCard elevation={2} className="fc-card-shell p-3 sm:p-6 md:p-8">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
-                  Analytics
-                </h1>
-                <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1">
-                  High-level insights into client progress and performance.
-                </p>
-              </div>
-            </div>
-          </GlassCard>
           <OptimizedAnalyticsOverview coachId={user?.id || ''} />
         </CoachPageShell>
       </AnimatedBackground>

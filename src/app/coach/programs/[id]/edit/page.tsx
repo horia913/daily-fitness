@@ -647,7 +647,17 @@ function EditProgramContent() {
       } catch (e: unknown) {
         const msg =
           e instanceof Error ? e.message : "Failed to remove schedule cell.";
-        addToast({ title: msg, variant: "destructive" });
+        const propagationFailed =
+          typeof msg === "string" &&
+          (msg.includes("snapshot propagation failed") ||
+            msg.includes("propagation failed"));
+        addToast({
+          title: propagationFailed
+            ? "Schedule did not sync to every client"
+            : "Could not remove this cell",
+          description: msg,
+          variant: "destructive",
+        });
         return;
       }
       setSchedule((prev) =>
@@ -674,8 +684,15 @@ function EditProgramContent() {
           e instanceof Error
             ? e.message
             : "Failed to save schedule. Please check if you have permission to edit this program.";
+        const propagationFailed =
+          typeof msg === "string" &&
+          (msg.includes("snapshot propagation failed") ||
+            msg.includes("propagation failed"));
         addToast({
-          title: msg,
+          title: propagationFailed
+            ? "Schedule did not sync to every client"
+            : "Could not save this cell",
+          description: msg,
           variant: "destructive",
         });
         return;
@@ -724,7 +741,17 @@ function EditProgramContent() {
         } catch (e: unknown) {
           const msg =
             e instanceof Error ? e.message : "Failed to remove schedule cell.";
-          addToast({ title: msg, variant: "destructive" });
+          const propagationFailed =
+            typeof msg === "string" &&
+            (msg.includes("snapshot propagation failed") ||
+              msg.includes("propagation failed"));
+          addToast({
+            title: propagationFailed
+              ? "Schedule did not sync to every client"
+              : "Could not remove this cell",
+            description: msg,
+            variant: "destructive",
+          });
           setScheduleCellSaving(false);
           return;
         }
@@ -755,8 +782,15 @@ function EditProgramContent() {
             e instanceof Error
               ? e.message
               : "Failed to save schedule. Please check your permissions.";
+          const propagationFailed =
+            typeof msg === "string" &&
+            (msg.includes("snapshot propagation failed") ||
+              msg.includes("propagation failed"));
           addToast({
-            title: msg,
+            title: propagationFailed
+              ? "Schedule did not sync to every client"
+              : "Could not save this cell",
+            description: msg,
             variant: "destructive",
           });
           return;
@@ -954,7 +988,7 @@ function EditProgramContent() {
   if (loading || !form) {
     return (
       <AnimatedBackground>
-        <CoachPageShell widthVariant="data-7xl" className="p-3 pb-32 sm:p-6 md:p-6">
+        <CoachPageShell widthVariant="data-7xl" className="p-3 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-6">
           <PageSkeleton variant="form" />
         </CoachPageShell>
       </AnimatedBackground>
@@ -966,7 +1000,7 @@ function EditProgramContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <CoachPageShell
         widthVariant="data-7xl"
-        className={cn("p-3 pb-32 sm:p-6 md:p-6 space-y-4 sm:space-y-6", css.wrap)}
+        className={cn("p-3 pb-[var(--fc-bottom-safe-area)] sm:p-6 md:p-6 space-y-4 sm:space-y-6", css.wrap)}
       >
         <div className={cn(css.hero, css.heroGlowCyan)}>
           <div className="relative z-[1] flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

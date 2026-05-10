@@ -1445,7 +1445,7 @@ export default function EnhancedClientWorkouts({
       {performanceSettings.floatingParticles && (
         <FloatingParticles />
       )}
-      <div className="relative z-10 min-h-screen pb-28 fc-page">
+      <div className="relative z-10 min-h-screen pb-[var(--fc-bottom-safe-area)] fc-page">
           <ClientPageShell className="max-w-3xl flex flex-col gap-6">
             {/* SECTION 1 â€” Current Program (Hero) */}
             <ClientGlassCard className="p-6">
