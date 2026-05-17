@@ -224,6 +224,24 @@ export function buildExerciseFromNewExercise(
     if (!Number.isFinite(km) || km <= 0) {
       return { success: false, error: "Endurance: distance (km) is required" };
     }
+  } else if (newExercise.exercise_type === "timed_set") {
+    if (!newExercise.exercise_id) {
+      return { success: false, error: "Please select an exercise" };
+    }
+    const sets = parseInt(String(newExercise.sets || ""), 10);
+    const workSec = parseInt(
+      String((newExercise as any).timed_work_seconds || ""),
+      10,
+    );
+    if (!Number.isFinite(sets) || sets < 1) {
+      return { success: false, error: "Timed set: sets must be at least 1" };
+    }
+    if (!Number.isFinite(workSec) || workSec < 1) {
+      return {
+        success: false,
+        error: "Timed set: work duration (seconds) is required",
+      };
+    }
   } else {
     if (!newExercise.exercise_id) {
       return { success: false, error: "Please select an exercise" };
@@ -332,6 +350,11 @@ export function buildExerciseFromNewExercise(
       nx.speed_notes as string | undefined,
     );
     exercise.sets = cleanNumericForForm(nx.speed_intervals as string | number | undefined) || exercise.sets;
+  }
+  if (newExercise.exercise_type === "timed_set") {
+    (exercise as Record<string, unknown>).timed_work_seconds = cleanNumericForForm(
+      (nx.timed_work_seconds as string | number | undefined),
+    );
   }
   if (newExercise.exercise_type === "endurance") {
     (exercise as Record<string, unknown>).endurance_distance_km = cleanStringForForm(

@@ -34,7 +34,7 @@ import type { ProgressionProfile, TrainingBlockGoal } from '@/types/trainingBloc
 // ─── Tier classification ──────────────────────────────────────────────────────
 
 export const TIER_3_SKIP = new Set([
-  'amrap', 'emom', 'for_time', 'tabata',
+  'amrap', 'emom', 'for_time', 'tabata', 'timed_set',
 ])
 
 // ─── Profile configs ──────────────────────────────────────────────────────────

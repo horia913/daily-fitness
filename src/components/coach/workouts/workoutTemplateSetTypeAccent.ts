@@ -24,7 +24,8 @@ export function workoutTemplateSetTypeAccent(
     t === "for_time" ||
     t === "tabata" ||
     t === "speed_work" ||
-    t === "endurance"
+    t === "endurance" ||
+    t === "timed_set"
   ) {
     return "good";
   }

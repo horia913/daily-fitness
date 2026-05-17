@@ -407,23 +407,73 @@ export default function ExerciseDetailForm({
               >
                 Pre-Exhaustion
               </SelectItem>
-              {/* Time-Based - Hidden when filtering */}
-              {(!allowedBlockTypes || allowedBlockTypes.length === 0) && (
-                <>
-                  <SelectItem value="amrap" className="rounded-lg">
-                    AMRAP
-                  </SelectItem>
-                  <SelectItem value="emom" className="rounded-lg">
-                    EMOM
-                  </SelectItem>
-                  <SelectItem value="tabata" className="rounded-lg">
-                    Tabata
-                  </SelectItem>
-                  <SelectItem value="for_time" className="rounded-lg">
-                    For Time
-                  </SelectItem>
-                </>
-              )}
+              <SelectItem
+                value="speed_work"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("speed_work")
+                }
+              >
+                Speed Work
+              </SelectItem>
+              <SelectItem
+                value="endurance"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("endurance")
+                }
+              >
+                Endurance
+              </SelectItem>
+              <SelectItem
+                value="amrap"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("amrap")
+                }
+              >
+                AMRAP
+              </SelectItem>
+              <SelectItem
+                value="emom"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("emom")
+                }
+              >
+                EMOM
+              </SelectItem>
+              <SelectItem
+                value="tabata"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("tabata")
+                }
+              >
+                Tabata
+              </SelectItem>
+              <SelectItem
+                value="for_time"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("for_time")
+                }
+              >
+                For Time
+              </SelectItem>
+              <SelectItem
+                value="timed_set"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("timed_set")
+                }
+              >
+                Timed Set
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

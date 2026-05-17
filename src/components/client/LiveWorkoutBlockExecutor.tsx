@@ -32,6 +32,7 @@ import { fetchApi } from "@/lib/apiClient";
 import { useSetLoggingOrchestrator } from "@/hooks/useSetLoggingOrchestrator";
 import { RPEModal } from "@/components/client/RPEModal";
 import { parseWeightKgInput } from "@/lib/parseWeightKgInput";
+import type { PrDetectedPayload } from "@/lib/prService";
 
 // Import type-specific components
 import { StraightSetExecutor } from "./workout-execution/blocks/StraightSetExecutor";
@@ -47,6 +48,7 @@ import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
 import { SpeedWorkExecutor } from "./workout-execution/blocks/SpeedWorkExecutor";
 import { EnduranceExecutor } from "./workout-execution/blocks/EnduranceExecutor";
+import { TimedSetExecutor } from "./workout-execution/blocks/TimedSetExecutor";
 
 /** Accepts kg from DB/JSON or typed input; supports comma decimals (e.g. 16,25). */
 function coerceLoggedWeightKg(raw: unknown): number | null {
@@ -154,15 +156,7 @@ interface LiveWorkoutBlockExecutorProps {
   /** Called whenever the active exercise changes (by exercise_id). Used to trigger per-exercise data fetches in the parent. */
   onExerciseChanged?: (exerciseId: string) => void;
   /** Called when log-set returns pr_detected (new PR stored). Parent can show PRCelebrationModal. */
-  onPRDetected?: (pr: {
-    type: "weight" | "reps";
-    exercise_name: string;
-    new_value: number;
-    previous_value: number | null;
-    unit: string;
-    weight_kg?: number;
-    reps?: number;
-  }) => void;
+  onPRDetected?: (pr: PrDetectedPayload) => void;
   /** Called when log-set returns new_achievements (e.g. PR-triggered). Parent can show AchievementUnlockModal. */
   onAchievementsUnlocked?: (
     achievements: Array<{
@@ -293,7 +287,7 @@ export default function LiveWorkoutBlockExecutor({
     setCurrentVideoTitle("");
   };
 
-  const LOG_SET_TIMEOUT_MS = 12_000;
+  const LOG_SET_TIMEOUT_MS = 25_000;
   const inFlightLogRef = useRef<null | {
     startedAt: number;
     abort: () => void;
@@ -341,22 +335,12 @@ export default function LiveWorkoutBlockExecutor({
       const prShownThisSync = !!(result.pr_detected && onPRDetected);
       if (prShownThisSync && result.pr_detected) {
         onPRDetected!(result.pr_detected);
-      } else if (
-        result.pr?.any_weight_pr ||
-        result.pr?.any_volume_pr ||
-        result.isNewPR
-      ) {
-        addToast({
-          title: "🎉 New Personal Record!",
-          description: result.pr?.message || "New PR achieved!",
-          variant: "success",
-          duration: 4000,
-        });
       }
-      if (result.pr?.warning) {
+
+      if (result.metrics_warning) {
         addToast({
           title: "Set Logged",
-          description: result.pr.warning,
+          description: result.metrics_warning,
           variant: "default",
           duration: 3000,
         });
@@ -723,21 +707,14 @@ export default function LiveWorkoutBlockExecutor({
               }
             }
 
-            // PR celebration: show modal when pr_detected, else toast
+            // PR celebration: modal only (v2)
             if (result.pr_detected && onPRDetected) {
               onPRDetected(result.pr_detected);
-            } else if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
-              addToast({
-                title: "🎉 New Personal Record!",
-                description: result.pr?.message || "New PR achieved!",
-                variant: "success",
-                duration: 4000,
-              });
             }
-            if (result.pr?.warning) {
+            if (result.metrics_warning) {
               addToast({
                 title: "Set Logged",
-                description: result.pr.warning,
+                description: result.metrics_warning,
                 variant: "default",
                 duration: 3000,
               });
@@ -757,7 +734,7 @@ export default function LiveWorkoutBlockExecutor({
               success: true,
               set_log_id: result.set_log_id, // Pass through for RPE modal
               e1rm: result.e1rm?.stored || result.e1rm?.calculated,
-              isNewPR: !!(result.pr?.any_weight_pr || result.pr?.any_volume_pr),
+              isNewPR: !!result.pr_detected,
             };
           }
 
@@ -1101,6 +1078,8 @@ export default function LiveWorkoutBlockExecutor({
         return <SpeedWorkExecutor {...commonProps} />;
       case "endurance":
         return <EnduranceExecutor {...commonProps} />;
+      case "timed_set":
+        return <TimedSetExecutor {...commonProps} />;
       default:
         return <StraightSetExecutor {...commonProps} />;
     }

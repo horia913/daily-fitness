@@ -254,8 +254,9 @@ export function AddExercisePanel({
                             {isVolumeCalculatorActive &&
                               allowedBlockTypes && (
                                 <div className="px-2 py-1.5 text-xs text-blue-600 dark:text-blue-400 border-b border-blue-200 dark:border-blue-800">
-                                  Volume calculator active - only resistance
-                                  training blocks shown
+                                  Volume guidelines apply to resistance blocks.
+                                  Time-based, speed, and endurance blocks do not
+                                  count toward volume.
                                 </div>
                               )}
                             <SelectGroup>
@@ -364,35 +365,56 @@ export function AddExercisePanel({
                               >
                                 Endurance
                               </SelectItem>
-                              {(!isVolumeCalculatorActive ||
-                                !allowedBlockTypes) && (
-                                <>
-                                  <SelectItem
-                                    value="amrap"
-                                    className="rounded-lg"
-                                  >
-                                    AMRAP
-                                  </SelectItem>
-                                  <SelectItem
-                                    value="emom"
-                                    className="rounded-lg"
-                                  >
-                                    EMOM
-                                  </SelectItem>
-                                  <SelectItem
-                                    value="tabata"
-                                    className="rounded-lg"
-                                  >
-                                    Tabata
-                                  </SelectItem>
-                                  <SelectItem
-                                    value="for_time"
-                                    className="rounded-lg"
-                                  >
-                                    For Time
-                                  </SelectItem>
-                                </>
-                              )}
+                              <SelectItem
+                                value="amrap"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("amrap")
+                                }
+                              >
+                                AMRAP
+                              </SelectItem>
+                              <SelectItem
+                                value="emom"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("emom")
+                                }
+                              >
+                                EMOM
+                              </SelectItem>
+                              <SelectItem
+                                value="tabata"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("tabata")
+                                }
+                              >
+                                Tabata
+                              </SelectItem>
+                              <SelectItem
+                                value="for_time"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("for_time")
+                                }
+                              >
+                                For Time
+                              </SelectItem>
+                              <SelectItem
+                                value="timed_set"
+                                className="rounded-lg"
+                                disabled={
+                                  isVolumeCalculatorActive &&
+                                  !allowedBlockTypes?.includes("timed_set")
+                                }
+                              >
+                                Timed Set
+                              </SelectItem>
                             </SelectGroup>
                           </SelectContent>
                         </Select>
@@ -2632,6 +2654,106 @@ export function AddExercisePanel({
                         </div>
                       )}
 
+                      {newExercise.exercise_type === "timed_set" && (
+                        <div className="space-y-5">
+                          <div className="px-3 py-5 sm:p-5 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-700">
+                            <h4
+                              className={`font-semibold ${theme?.text ?? ''} mb-3 flex flex-wrap items-center gap-2`}
+                            >
+                              <Timer className="w-4 h-4 text-sky-600" />
+                              Timed Set Configuration
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                              <div>
+                                <Label
+                                  htmlFor="timed-sets"
+                                  className={`text-sm font-medium ${theme?.text ?? ''}`}
+                                >
+                                  Sets
+                                </Label>
+                                <Input
+                                  id="timed-sets"
+                                  type="number"
+                                  min="1"
+                                  value={
+                                    newExercise.sets === ""
+                                      ? ""
+                                      : newExercise.sets
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      sets: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label
+                                  htmlFor="timed-work"
+                                  className={`text-sm font-medium ${theme?.text ?? ''}`}
+                                >
+                                  Work (seconds)
+                                </Label>
+                                <Input
+                                  id="timed-work"
+                                  type="number"
+                                  min="1"
+                                  value={
+                                    (newExercise as any).timed_work_seconds ===
+                                    ""
+                                      ? ""
+                                      : (newExercise as any).timed_work_seconds
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      timed_work_seconds: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label
+                                  htmlFor="timed-rest"
+                                  className={`text-sm font-medium ${theme?.text ?? ''}`}
+                                >
+                                  Rest (seconds)
+                                </Label>
+                                <Input
+                                  id="timed-rest"
+                                  type="number"
+                                  min="0"
+                                  value={
+                                    newExercise.rest_seconds === ""
+                                      ? ""
+                                      : newExercise.rest_seconds
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      rest_seconds: handleNumberChange(
+                                        e.target.value,
+                                        0,
+                                      ),
+                                    })
+                                  }
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {newExercise.exercise_type === "endurance" && (
                         <div className="space-y-2">
                           <div className="rounded-lg border border-emerald-200/50 bg-emerald-50/80 p-2.5 dark:border-emerald-800/50 dark:bg-emerald-950/30 sm:p-3">
@@ -2812,6 +2934,7 @@ export function AddExercisePanel({
                           "tabata",
                           "speed_work",
                           "endurance",
+                          "timed_set",
                         ].includes(newExercise.exercise_type) &&
                         renderLoadWeightField(
                           newExercise.load_percentage,

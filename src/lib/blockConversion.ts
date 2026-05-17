@@ -377,6 +377,9 @@ export function convertBlocksToExercises(blocks: any[]): any[] {
           targetHr != null ? String(targetHr) : "";
         (exercise as any).speed_notes = sp.notes || "";
       }
+    } else if (block.set_type === "timed_set") {
+      (exercise as any).timed_work_seconds =
+        block.duration_seconds != null ? String(block.duration_seconds) : "";
     } else if (block.set_type === "endurance") {
       const en =
         firstExercise?.endurance_sets?.[0] ||

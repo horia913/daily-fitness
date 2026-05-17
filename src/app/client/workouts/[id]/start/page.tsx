@@ -50,8 +50,8 @@ import type { Achievement } from "@/components/ui/AchievementCard";
 import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
 import {
   PRCelebrationModal,
-  type PRDetectedPayload,
 } from "@/components/client/workout-execution/ui/PRCelebrationModal";
+import type { PrDetectedPayload } from "@/lib/prService";
 import {
   ExecProgressSegments,
   countWorkoutExercises,
@@ -171,7 +171,7 @@ export default function LiveWorkout() {
   >([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [prCelebrationData, setPrCelebrationData] =
-    useState<PRDetectedPayload | null>(null);
+    useState<PrDetectedPayload | null>(null);
   /** Latest body weight (kg) for PR tier multiplier; one fetch per page load */
   const [clientBodyWeightKg, setClientBodyWeightKg] = useState<number | null>(
     null,
@@ -788,7 +788,7 @@ export default function LiveWorkout() {
         startedAt = prefetched.startedAt ?? null;
       } else {
         const SET_LOGS_RESUME_SELECT =
-          "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh";
+          "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps, actual_time_seconds, actual_duration_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh";
 
         const [setLogsRpcResult, blockCompletionsResult, workoutLogResult] =
           await Promise.all([
@@ -1020,6 +1020,10 @@ export default function LiveWorkout() {
                 actual_time_seconds:
                   s.actual_time_seconds != null
                     ? Number(s.actual_time_seconds)
+                    : undefined,
+                actual_duration_seconds:
+                  s.actual_duration_seconds != null
+                    ? Number(s.actual_duration_seconds)
                     : undefined,
                 actual_distance_meters:
                   s.actual_distance_meters != null

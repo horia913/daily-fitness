@@ -17,6 +17,7 @@ export type SetType =
   | 'for_time'          // Complete as fast as possible
   | 'speed_work'        // Sprint intervals with full recovery
   | 'endurance'         // Distance or time-based continuous work
+  | 'timed_set'         // Sets × work seconds × rest (no reps/weight)
 
 export interface WorkoutSetEntry {
   id: string
@@ -244,6 +245,7 @@ export interface LoggedSet {
   actual_distance_meters?: number
   actual_hr_avg?: number
   actual_speed_kmh?: number
+  actual_duration_seconds?: number
 }
 
 // Set Type Configurations
@@ -398,6 +400,18 @@ export const WORKOUT_SET_TYPE_CONFIGS: Record<SetType, SetTypeConfig> = {
     description: 'Distance or time-based continuous work',
     icon: '🏃',
     color: 'emerald',
+    requiresMultipleExercises: false,
+    supportsTimeProtocols: false,
+    supportsDropSets: false,
+    supportsClusterSets: false,
+    supportsRestPause: false
+  },
+  timed_set: {
+    type: 'timed_set',
+    name: 'Timed Set',
+    description: 'Sets of timed work with rest between sets',
+    icon: '⏱️',
+    color: 'sky',
     requiresMultipleExercises: false,
     supportsTimeProtocols: false,
     supportsDropSets: false,

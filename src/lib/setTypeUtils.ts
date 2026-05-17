@@ -19,6 +19,8 @@ const SET_TYPE_MAP: Record<string, string> = {
   speedwork: 'speed_work',
   speed_work: 'speed_work',
   endurance: 'endurance',
+  timedset: 'timed_set',
+  timed_set: 'timed_set',
 };
 
 /** Human-readable labels for UI (coach + client) */
@@ -36,6 +38,7 @@ export const SET_TYPE_DISPLAY: Record<string, string> = {
   for_time: 'For Time',
   speed_work: 'Speed Work',
   endurance: 'Endurance',
+  timed_set: 'Timed Set',
 };
 
 /**
@@ -44,6 +47,7 @@ export const SET_TYPE_DISPLAY: Record<string, string> = {
 export const SET_TYPE_ICON: Record<string, string> = {
   speed_work: '⚡',
   endurance: '🏃',
+  timed_set: '⏱️',
 };
 
 /**

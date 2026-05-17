@@ -83,6 +83,17 @@ import { ActionButtons } from '@/components/workout-form/ActionButtons';
 import { EmptyExerciseState } from '@/components/workout-form/EmptyExerciseState';
 import { AddExercisePanel } from '@/components/workout-form/AddExercisePanel';
 import { saveWorkoutTemplate } from '@/services/saveWorkoutTemplate';
+import { cache } from '@/lib/prefetch';
+
+const WORKOUT_FORM_EXERCISES_CACHE_KEY = 'workout_template_form_exercises';
+const WORKOUT_FORM_CATEGORIES_CACHE_KEY = 'workout_template_form_categories';
+const WORKOUT_FORM_MUSCLE_GROUPS_CACHE_KEY = 'workout_template_form_muscle_groups';
+const FORM_DATA_CACHE_TTL = 10 * 60 * 1000;
+
+let exercisesFormFetchInflight: Promise<unknown[]> | null = null;
+let categoriesFormFetchInflight: Promise<
+  { id: string; name: string; color: string }[]
+> | null = null;
 
 interface WorkoutTemplateFormProps {
   isOpen: boolean;
@@ -239,6 +250,7 @@ export default function WorkoutTemplateForm({
     endurance_hr_zone: "",
     endurance_hr_percentage: "",
     endurance_notes: "",
+    timed_work_seconds: "",
     // Tabata specific
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Load percentage / Weight toggle
@@ -659,103 +671,134 @@ export default function WorkoutTemplateForm({
       };
     });
   }, [isOpen, categories]);
+  const fallbackCategories = useMemo(
+    () => [
+      { id: "general", name: "General", color: "#6B7280" },
+      { id: "strength", name: "Strength", color: "#EF4444" },
+      { id: "cardio", name: "Cardio", color: "#10B981" },
+      { id: "hiit", name: "HIIT", color: "#F59E0B" },
+      { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
+      { id: "functional", name: "Functional", color: "#8B5CF6" },
+    ],
+    [],
+  );
+
   const loadCategories = useCallback(async () => {
     try {
       if (!user?.id) {
-        console.log("No user found, using fallback categories");
-        // Fallback minimal categories to keep UI functional
-        setCategories([
-          { id: "general", name: "General", color: "#6B7280" },
-          { id: "strength", name: "Strength", color: "#EF4444" },
-          { id: "cardio", name: "Cardio", color: "#10B981" },
-          { id: "hiit", name: "HIIT", color: "#F59E0B" },
-          { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
-          { id: "functional", name: "Functional", color: "#8B5CF6" },
-        ]);
+        setCategories(fallbackCategories);
         return;
       }
 
-      const { data, error } = await supabase
-        .from("workout_categories")
-        .select("id,name,color")
-        .eq("coach_id", user.id)
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-
-      // If we have categories from database, use them
-      if (data && data.length > 0) {
-        setCategories(data);
-      } else {
-        // If no categories exist, use fallback categories
-        console.log("No categories found for coach, using fallback categories");
-        setCategories([
-          { id: "general", name: "General", color: "#6B7280" },
-          { id: "strength", name: "Strength", color: "#EF4444" },
-          { id: "cardio", name: "Cardio", color: "#10B981" },
-          { id: "hiit", name: "HIIT", color: "#F59E0B" },
-          { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
-          { id: "functional", name: "Functional", color: "#8B5CF6" },
-        ]);
+      const cacheKey = `${WORKOUT_FORM_CATEGORIES_CACHE_KEY}_${user.id}`;
+      const cached = cache.get<{ id: string; name: string; color: string }[]>(
+        cacheKey,
+      );
+      if (cached) {
+        setCategories(cached);
+        return;
       }
+
+      if (!categoriesFormFetchInflight) {
+        categoriesFormFetchInflight = (async () => {
+          const { data, error } = await supabase
+            .from("workout_categories")
+            .select("id,name,color")
+            .eq("coach_id", user.id)
+            .eq("is_active", true)
+            .order("name", { ascending: true });
+
+          if (error) throw error;
+
+          const result =
+            data && data.length > 0 ? data : fallbackCategories;
+          cache.set(cacheKey, result, FORM_DATA_CACHE_TTL);
+          return result;
+        })().finally(() => {
+          categoriesFormFetchInflight = null;
+        });
+      }
+
+      const data = await categoriesFormFetchInflight;
+      setCategories(data);
     } catch (error) {
       console.error("Error loading categories:", error);
-      // Fallback minimal categories to keep UI functional
-      setCategories([
-        { id: "general", name: "General", color: "#6B7280" },
-        { id: "strength", name: "Strength", color: "#EF4444" },
-        { id: "cardio", name: "Cardio", color: "#10B981" },
-        { id: "hiit", name: "HIIT", color: "#F59E0B" },
-        { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
-        { id: "functional", name: "Functional", color: "#8B5CF6" },
-      ]);
+      setCategories(fallbackCategories);
     }
-  }, [user]);
+  }, [user, fallbackCategories]);
 
   const loadAvailableExercises = useCallback(async () => {
     try {
-      // Load exercises
-      const { data: exercisesData, error: exercisesError } = await supabase
-        .from("exercises")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (exercisesError) throw exercisesError;
-
-      // Load muscle groups (optional - if table doesn't exist, continue without it)
-      let muscleGroupMap = new Map<string, string>();
-      try {
-        const { data: muscleGroupsData, error: muscleGroupsError } =
-          await supabase.from("muscle_groups").select("id, name");
-
-        if (!muscleGroupsError && muscleGroupsData) {
-          muscleGroupsData.forEach((mg: any) => {
-            muscleGroupMap.set(mg.id, mg.name);
-          });
-        }
-      } catch (mgError) {
-        // Silently continue if muscle_groups table doesn't exist or query fails
-        console.warn(
-          "Could not load muscle groups (this is optional):",
-          mgError,
-        );
+      const cached = cache.get<unknown[]>(WORKOUT_FORM_EXERCISES_CACHE_KEY);
+      if (cached) {
+        setAvailableExercises(cached);
+        return;
       }
 
-      // Transform exercises to include primary_muscle_group name
-      const exercisesWithMuscleGroups = (exercisesData || []).map(
-        (exercise: any) => ({
-          ...exercise,
-          primary_muscle_group: exercise.primary_muscle_group_id
-            ? muscleGroupMap.get(exercise.primary_muscle_group_id) || null
-            : null,
-        }),
-      );
+      if (!exercisesFormFetchInflight) {
+        exercisesFormFetchInflight = (async () => {
+          const { data: exercisesData, error: exercisesError } = await supabase
+            .from("exercises")
+            .select("*")
+            .order("name", { ascending: true });
 
-      setAvailableExercises(exercisesWithMuscleGroups);
+          if (exercisesError) throw exercisesError;
+
+          let muscleGroupMap = new Map<string, string>();
+          const cachedMg = cache.get<{ id: string; name: string }[]>(
+            WORKOUT_FORM_MUSCLE_GROUPS_CACHE_KEY,
+          );
+          if (cachedMg) {
+            cachedMg.forEach((mg) => muscleGroupMap.set(mg.id, mg.name));
+          } else {
+            try {
+              const { data: muscleGroupsData, error: muscleGroupsError } =
+                await supabase.from("muscle_groups").select("id, name");
+
+              if (!muscleGroupsError && muscleGroupsData) {
+                cache.set(
+                  WORKOUT_FORM_MUSCLE_GROUPS_CACHE_KEY,
+                  muscleGroupsData,
+                  FORM_DATA_CACHE_TTL,
+                );
+                muscleGroupsData.forEach((mg: { id: string; name: string }) => {
+                  muscleGroupMap.set(mg.id, mg.name);
+                });
+              }
+            } catch (mgError) {
+              console.warn(
+                "Could not load muscle groups (this is optional):",
+                mgError,
+              );
+            }
+          }
+
+          const exercisesWithMuscleGroups = (exercisesData || []).map(
+            (exercise: Record<string, unknown>) => ({
+              ...exercise,
+              primary_muscle_group: exercise.primary_muscle_group_id
+                ? muscleGroupMap.get(
+                    String(exercise.primary_muscle_group_id),
+                  ) || null
+                : null,
+            }),
+          );
+
+          cache.set(
+            WORKOUT_FORM_EXERCISES_CACHE_KEY,
+            exercisesWithMuscleGroups,
+            FORM_DATA_CACHE_TTL,
+          );
+          return exercisesWithMuscleGroups;
+        })().finally(() => {
+          exercisesFormFetchInflight = null;
+        });
+      }
+
+      const data = await exercisesFormFetchInflight;
+      setAvailableExercises(data);
     } catch (error) {
       console.error("Error loading exercises:", error);
-      // Fallback: just set exercises without muscle groups if main query fails
       setAvailableExercises([]);
     }
   }, []);
@@ -942,6 +985,7 @@ export default function WorkoutTemplateForm({
       endurance_hr_zone: "",
       endurance_hr_percentage: "",
       endurance_notes: "",
+      timed_work_seconds: "",
       tabata_sets: [] as Array<{
         exercises: any[];
         rest_between_sets: string;
@@ -1069,6 +1113,8 @@ export default function WorkoutTemplateForm({
         return "Speed Work";
       case "endurance":
         return "Endurance";
+      case "timed_set":
+        return "Timed Set";
       default:
         return "Straight Set";
     }
@@ -1192,6 +1238,7 @@ export default function WorkoutTemplateForm({
       endurance_hr_zone: (exercise as any).endurance_hr_zone ?? "",
       endurance_hr_percentage: (exercise as any).endurance_hr_percentage ?? "",
       endurance_notes: (exercise as any).endurance_notes ?? "",
+      timed_work_seconds: (exercise as any).timed_work_seconds ?? "",
     });
     setShowAddExercise(true);
   };

@@ -312,6 +312,21 @@ const TIME_BASED_BLOCK_TYPES: WorkoutBlock['set_type'][] = [
   'tabata',
 ];
 
+/** Sprint / aerobic blocks — selectable in templates but excluded from set-volume totals */
+const SPEED_ENDURANCE_BLOCK_TYPES: WorkoutBlock['set_type'][] = [
+  'speed_work',
+  'endurance',
+];
+
+/** Simple timed work (sets × seconds) — no rep/volume tracking */
+const TIMED_SET_BLOCK_TYPES: WorkoutBlock['set_type'][] = ['timed_set'];
+
+const NON_VOLUME_BLOCK_TYPES: WorkoutBlock['set_type'][] = [
+  ...TIME_BASED_BLOCK_TYPES,
+  ...SPEED_ENDURANCE_BLOCK_TYPES,
+  ...TIMED_SET_BLOCK_TYPES,
+];
+
 // ============================================================================
 // PUBLIC FUNCTIONS
 // ============================================================================
@@ -324,11 +339,12 @@ export function isGuidelineCategory(category: string): boolean {
 }
 
 /**
- * Get allowed block types for volume calculator
- * Returns only block types that contribute to volume (excludes time-based blocks)
+ * Get allowed block types when the volume calculator is active.
+ * Includes resistance types plus non-volume types (time-based, speed, endurance).
+ * Non-volume types remain selectable but are excluded from set-volume totals.
  */
 export function getAllowedBlockTypesForVolumeCalculator(): WorkoutBlock['set_type'][] {
-  return [...VOLUME_CALCULATOR_BLOCK_TYPES];
+  return [...VOLUME_CALCULATOR_BLOCK_TYPES, ...NON_VOLUME_BLOCK_TYPES];
 }
 
 /**
@@ -427,9 +443,9 @@ export function calculateVolumePerMuscleGroup(
 ): Map<string, number> {
   const volumeMap = new Map<string, number>();
   
-  // Filter out time-based blocks
+  // Filter out blocks that do not use traditional set/rep volume
   const resistanceBlocks = blocks.filter(
-    (block) => !TIME_BASED_BLOCK_TYPES.includes(block.set_type)
+    (block) => !NON_VOLUME_BLOCK_TYPES.includes(block.set_type)
   );
   
   for (const block of resistanceBlocks) {

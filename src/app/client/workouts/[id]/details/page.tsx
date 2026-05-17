@@ -98,6 +98,19 @@ function getSpeedEnduranceDisplayFields(
   const exId = raw?.exercise_id as string | undefined;
   const exOrder = normExerciseOrder(raw?.exercise_order);
 
+  if (blockType === "timed_set") {
+    const rb = block.rawBlock as Record<string, unknown> | null | undefined;
+    const sets = rb?.total_sets;
+    const work = rb?.duration_seconds;
+    const rest = rb?.rest_seconds;
+    const parts: string[] = [];
+    if (sets != null && Number(sets) > 0) parts.push(`${sets} sets`);
+    if (work != null && Number(work) > 0) parts.push(`${work}s work`);
+    if (rest != null && Number(rest) >= 0) parts.push(`${rest}s rest`);
+    const s = parts.length > 0 ? parts.join(" · ") : "";
+    return s ? [{ label: "Prescription", value: s }] : [];
+  }
+
   if (blockType === "speed_work") {
     const fromEx = Array.isArray(raw?.speed_sets)
       ? (raw!.speed_sets as Record<string, unknown>[])

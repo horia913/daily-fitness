@@ -9,10 +9,44 @@ const SET_TYPES_REQUIRING_WSEE = new Set([
   "pre_exhaustion",
   "speed_work",
   "endurance",
+  "timed_set",
 ]);
+
+function prescriptionDurationSeconds(
+  exercise: { amrap_duration?: unknown; emom_duration?: unknown; timed_work_seconds?: unknown },
+  exerciseType: string,
+): number | undefined {
+  if (exerciseType === "timed_set") {
+    const raw = exercise.timed_work_seconds;
+    if (raw === "" || raw == null) return undefined;
+    const n = parseInt(String(raw), 10);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }
+  if (exercise.amrap_duration) return parseInt(String(exercise.amrap_duration), 10) * 60;
+  if (exercise.emom_duration) return parseInt(String(exercise.emom_duration), 10) * 60;
+  return undefined;
+}
+
+function prescriptionTotalSets(
+  exercise: {
+    sets?: unknown;
+    speed_intervals?: unknown;
+  },
+  exerciseType: string,
+): number | undefined {
+  if (exerciseType === "speed_work") {
+    if (exercise.speed_intervals) return parseInt(String(exercise.speed_intervals), 10);
+    if (exercise.sets) return parseInt(String(exercise.sets), 10);
+    return 1;
+  }
+  if (exerciseType === "endurance") return 1;
+  if (exercise.sets) return parseInt(String(exercise.sets), 10);
+  return undefined;
+}
 
 /**
  * Warn if any set entry that should have workout_set_entry_exercises has none after save.
+ * Uses one batched SELECT (HEAD+count per row was slow and returned 500 from PostgREST).
  */
 async function warnIfAnySetEntryMissingExercises(
   supabase: SupabaseClient,
@@ -25,19 +59,45 @@ async function warnIfAnySetEntryMissingExercises(
 
   if (error || !entries?.length) return;
 
-  for (const entry of entries) {
-    if (!SET_TYPES_REQUIRING_WSEE.has(entry.set_type)) continue;
+  const needingWsee = entries.filter((entry) =>
+    SET_TYPES_REQUIRING_WSEE.has(entry.set_type),
+  );
+  if (needingWsee.length === 0) return;
 
-    const { count, error: countErr } = await supabase
-      .from("workout_set_entry_exercises")
-      .select("id", { count: "exact", head: true })
-      .eq("set_entry_id", entry.id);
+  const setEntryIds = needingWsee.map((e) => e.id);
+  const { data: wseeRows, error: wseeErr } = await supabase
+    .from("workout_set_entry_exercises")
+    .select("set_entry_id")
+    .in("set_entry_id", setEntryIds);
 
-    if (countErr) continue;
-    if (count === 0) {
+  if (wseeErr) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[saveWorkoutTemplate] Could not verify set entry exercises:",
+        wseeErr.message,
+      );
+    }
+    return;
+  }
+
+  const countBySetEntry = new Map<string, number>();
+  for (const row of wseeRows ?? []) {
+    if (!row.set_entry_id) continue;
+    countBySetEntry.set(
+      row.set_entry_id,
+      (countBySetEntry.get(row.set_entry_id) ?? 0) + 1,
+    );
+  }
+
+  for (const entry of needingWsee) {
+    if ((countBySetEntry.get(entry.id) ?? 0) === 0) {
       console.warn(
         "[saveWorkoutTemplate] Set entry has 0 workout_set_entry_exercises after save (bug).",
-        { set_entry_id: entry.id, set_type: entry.set_type, template_id: templateId },
+        {
+          set_entry_id: entry.id,
+          set_type: entry.set_type,
+          template_id: templateId,
+        },
       );
     }
   }
@@ -130,9 +190,10 @@ export async function saveWorkoutTemplate(
         savedTemplateId,
       );
 
-      // Get existing blocks for this template
-      const existingBlocks =
-        await WorkoutBlockService.getWorkoutBlocks(savedTemplateId);
+      // Get existing blocks for this template (skip on create — no rows yet)
+      const existingBlocks = template
+        ? await WorkoutBlockService.getWorkoutBlocks(savedTemplateId)
+        : [];
       const existingBlockIds = new Set(existingBlocks.map((b) => b.id));
       const newExerciseIds = new Set(
         exercises
@@ -154,7 +215,7 @@ export async function saveWorkoutTemplate(
 
       // Process each exercise: UPDATE if block exists, CREATE if new
       if (exercises.length > 0) {
-        for (let i = 0; i < exercises.length; i++) {
+        const processExerciseAtIndex = async (i: number) => {
           const exercise = exercises[i];
           const exerciseType = exercise.exercise_type || "straight_set";
           const isUpdate = exercise.id && existingBlockIds.has(exercise.id);
@@ -237,30 +298,16 @@ export async function saveWorkoutTemplate(
                 set_order: i + 1,
                 set_name: generatedBlockName || undefined,
                 set_notes: exercise.notes || undefined,
-                total_sets:
-                  exerciseType === "speed_work"
-                    ? exercise.speed_intervals
-                      ? parseInt(String(exercise.speed_intervals), 10)
-                      : exercise.sets
-                        ? parseInt(String(exercise.sets), 10)
-                        : 1
-                    : exerciseType === "endurance"
-                      ? 1
-                      : exercise.sets
-                        ? parseInt(exercise.sets)
-                        : undefined,
-                reps_per_set: exercise.reps || undefined,
+                total_sets: prescriptionTotalSets(exercise, exerciseType),
+                reps_per_set:
+                  exerciseType === "timed_set" ? undefined : exercise.reps || undefined,
                 rest_seconds:
                   exerciseType === "speed_work" && exercise.speed_rest_seconds
                     ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
                     : exercise.rest_seconds
                       ? Math.round(parseFloat(exercise.rest_seconds))
                       : undefined,
-                duration_seconds: exercise.amrap_duration
-                  ? parseInt(exercise.amrap_duration) * 60
-                  : exercise.emom_duration
-                    ? parseInt(exercise.emom_duration) * 60
-                    : undefined,
+                duration_seconds: prescriptionDurationSeconds(exercise, exerciseType),
               },
             );
           } else {
@@ -328,30 +375,16 @@ export async function saveWorkoutTemplate(
               {
                 set_name: generatedBlockName || undefined,
                 set_notes: exercise.notes || undefined,
-                total_sets:
-                  exerciseType === "speed_work"
-                    ? exercise.speed_intervals
-                      ? parseInt(String(exercise.speed_intervals), 10)
-                      : exercise.sets
-                        ? parseInt(String(exercise.sets), 10)
-                        : 1
-                    : exerciseType === "endurance"
-                      ? 1
-                      : exercise.sets
-                        ? parseInt(exercise.sets)
-                        : undefined,
-                reps_per_set: exercise.reps || undefined,
+                total_sets: prescriptionTotalSets(exercise, exerciseType),
+                reps_per_set:
+                  exerciseType === "timed_set" ? undefined : exercise.reps || undefined,
                 rest_seconds:
                   exerciseType === "speed_work" && exercise.speed_rest_seconds
                     ? Math.round(parseFloat(String(exercise.speed_rest_seconds)))
                     : exercise.rest_seconds
                       ? Math.round(parseFloat(exercise.rest_seconds))
                       : undefined,
-                duration_seconds: exercise.amrap_duration
-                  ? parseInt(exercise.amrap_duration) * 60
-                  : exercise.emom_duration
-                    ? parseInt(exercise.emom_duration) * 60
-                    : undefined,
+                duration_seconds: prescriptionDurationSeconds(exercise, exerciseType),
               },
             );
           }
@@ -418,6 +451,19 @@ export async function saveWorkoutTemplate(
                         exercise.endurance_notes ||
                         exercise.notes ||
                         undefined,
+                    },
+                  );
+                if (addedExercise) {
+                  mainExerciseId = exercise.exercise_id;
+                }
+              } else if (exerciseType === "timed_set") {
+                const addedExercise =
+                  await WorkoutBlockService.addExerciseToBlock(
+                    block.id,
+                    exercise.exercise_id,
+                    1,
+                    {
+                      notes: exercise.notes || undefined,
                     },
                   );
                 if (addedExercise) {
@@ -1101,6 +1147,17 @@ export async function saveWorkoutTemplate(
                 isUpdate ? "update" : "create"
               } block for exercise ${i + 1}`,
             );
+          }
+        };
+
+        // New templates: blocks are independent — save in parallel
+        if (!template) {
+          await Promise.all(
+            exercises.map((_, i) => processExerciseAtIndex(i)),
+          );
+        } else {
+          for (let i = 0; i < exercises.length; i++) {
+            await processExerciseAtIndex(i);
           }
         }
         console.log(

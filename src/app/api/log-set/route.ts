@@ -6,6 +6,12 @@ import { createForbiddenResponse } from '@/lib/apiAuth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
 import { normalizeSetType } from '@/lib/setTypeUtils'
+import {
+  checkAndStorePR,
+  detectionResultToPrDetected,
+  personalRecordRowsToPrDetected,
+  prDetectionHasResult,
+} from '@/lib/prService'
 
 /** Request body for POST /api/log-set. Common fields + set-type-specific (optional). */
 interface LogSetRequestBody {
@@ -151,6 +157,7 @@ export async function POST(req: NextRequest) {
       'for_time',
       'speed_work',
       'endurance',
+      'timed_set',
     ] as const
 
     type BlockType = (typeof validBlockTypes)[number]
@@ -722,6 +729,29 @@ export async function POST(req: NextRequest) {
           break
         }
 
+        case 'timed_set': {
+          const exerciseId = body.exercise_id as string | undefined
+          const durationSec = parseIntNumber(body.actual_duration_seconds)
+          if (!exerciseId || durationSec === null || durationSec <= 0) {
+            return NextResponse.json(
+              {
+                error:
+                  'Missing required fields for timed_set: exercise_id, actual_duration_seconds',
+                details: {
+                  exercise_id: exerciseId || 'missing',
+                  actual_duration_seconds: durationSec,
+                },
+              },
+              { status: 400 },
+            )
+          }
+          insertData.exercise_id = exerciseId
+          insertData.set_number = body.set_number ?? 1
+          insertData.actual_duration_seconds = durationSec
+          primaryExerciseId = exerciseId
+          break
+        }
+
         default: {
           return NextResponse.json(
             { error: `Unhandled set_type: ${blockType}` },
@@ -742,32 +772,101 @@ export async function POST(req: NextRequest) {
     // If idempotency_key is provided, check for an existing row matching
     // (workout_log_id, set_entry_id, exercise_id, set_number) before inserting.
     if (idempotency_key && workoutLogId && insertData.set_number != null) {
-      const dedupeQuery = supabaseAdmin
+      let dedupeQuery = supabaseAdmin
         .from('workout_set_logs')
-        .select('id')
+        .select(
+          'id, exercise_id, client_id, completed_at, workout_log_id, weight, reps, set_type',
+        )
         .eq('workout_log_id', workoutLogId)
         .eq('set_entry_id', set_entry_id)
         .eq('set_number', insertData.set_number)
 
       // exercise_id may be null for some block types
       if (insertData.exercise_id) {
-        dedupeQuery.eq('exercise_id', insertData.exercise_id)
+        dedupeQuery = dedupeQuery.eq('exercise_id', insertData.exercise_id)
       }
 
       const { data: rawExisting } = await dedupeQuery.limit(1)
-      const existingRows = rawExisting as { id: string }[] | null
+      const existingRows = rawExisting as Array<{
+        id: string
+        exercise_id: string | null
+        client_id: string
+        completed_at: string | null
+        workout_log_id: string
+        weight: number | null
+        reps: number | null
+        set_type: string | null
+      }> | null
 
       if (existingRows && existingRows.length > 0) {
-        return NextResponse.json({
-          success: true,
-          set_log_id: existingRows[0].id,
-          workout_log_id: workoutLogId ?? null,
-          deduplicated: true,
-          message: 'Set already logged (deduplicated)',
-        }, {
-          status: 200,
-          headers: perf.getHeaders(),
-        })
+        const row = existingRows[0]
+        let prDetected: ReturnType<typeof detectionResultToPrDetected> = null
+        let exerciseName = 'Exercise'
+        if (row.exercise_id) {
+          const { data: prRows } = await supabaseAdmin
+            .from('personal_records')
+            .select(
+              'record_type, record_value, previous_record_value, improvement_percentage, weight_at_record, reps_at_record',
+            )
+            .eq('workout_set_log_id', row.id)
+
+          const { data: exRow } = await supabaseAdmin
+            .from('exercises')
+            .select('name')
+            .eq('id', row.exercise_id)
+            .maybeSingle()
+          exerciseName = (exRow as { name?: string } | null)?.name || exerciseName
+
+          if (prRows && prRows.length > 0) {
+            prDetected = personalRecordRowsToPrDetected(exerciseName, prRows as any[])
+          }
+        }
+
+        const dedupeBlock = (row.set_type || 'straight_set') as string
+        const canE1 =
+          row.exercise_id &&
+          row.weight != null &&
+          row.reps != null &&
+          ['straight_set', 'superset', 'drop_set', 'cluster_set', 'rest_pause'].includes(dedupeBlock)
+        const w = Number(row.weight)
+        const r = Number(row.reps)
+        const e1Calc = canE1 && w > 0 && r > 0 ? w * (1 + 0.0333 * r) : 0
+        let finalE1 = e1Calc
+        if (row.exercise_id) {
+          const { data: met } = await supabaseAdmin
+            .from('user_exercise_metrics')
+            .select('estimated_1rm')
+            .eq('user_id', effectiveClientId)
+            .eq('exercise_id', row.exercise_id)
+            .maybeSingle()
+          const metRow = met as { estimated_1rm?: number | null } | null
+          if (metRow?.estimated_1rm != null) {
+            finalE1 = Number(metRow.estimated_1rm)
+          }
+        }
+
+        return NextResponse.json(
+          {
+            success: true,
+            set_log_id: row.id,
+            workout_log_id: workoutLogId ?? null,
+            deduplicated: true,
+            message: 'Set already logged (deduplicated)',
+            e1rm: {
+              calculated: parseFloat(e1Calc.toFixed(2)),
+              stored: parseFloat(finalE1.toFixed(2)),
+              action: 'deduplicated',
+              is_new_pr: false,
+            },
+            pr_detected: prDetected,
+            is_new_pr: !!prDetected,
+            new_achievements: [],
+          },
+          {
+            status: 200,
+            headers: perf.getHeaders(),
+          },
+        )
       }
     }
 
@@ -886,6 +985,7 @@ export async function POST(req: NextRequest) {
       case 'tabata':
       case 'speed_work':
       case 'endurance':
+      case 'timed_set':
         break
       default:
         break
@@ -923,14 +1023,6 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedMetricsByExercise = new Map<string, any>()
-    const prResults: Array<{
-      exercise_id: string
-      weight_pr: boolean
-      volume_pr: boolean
-      weight: number
-      reps: number
-      volume: number
-    }> = []
 
     for (const entry of performanceEntries) {
       const existing = existingMetricsByExercise.get(entry.exercise_id)
@@ -940,8 +1032,6 @@ export async function POST(req: NextRequest) {
       const existingBestVolumeWeight = existing?.best_volume_weight ?? null
       const existingBestVolumeReps = existing?.best_volume_reps ?? null
 
-      let weightPR = false
-      let volumePR = false
       let bestWeight = existingBestWeight
       let bestReps = existingBestReps
       let bestVolume = existingBestVolume
@@ -955,7 +1045,6 @@ export async function POST(req: NextRequest) {
       ) {
         bestWeight = entry.weight
         bestReps = entry.reps
-        weightPR = true
       }
 
       const volume = entry.weight * entry.reps
@@ -963,7 +1052,6 @@ export async function POST(req: NextRequest) {
         bestVolume = volume
         bestVolumeWeight = entry.weight
         bestVolumeReps = entry.reps
-        volumePR = true
       }
 
       updatedMetricsByExercise.set(entry.exercise_id, {
@@ -976,15 +1064,6 @@ export async function POST(req: NextRequest) {
         best_volume_weight: bestVolumeWeight,
         best_volume_reps: bestVolumeReps,
         updated_at: new Date().toISOString(),
-      })
-
-      prResults.push({
-        exercise_id: entry.exercise_id,
-        weight_pr: weightPR,
-        volume_pr: volumePR,
-        weight: entry.weight,
-        reps: entry.reps,
-        volume,
       })
     }
 
@@ -1040,21 +1119,13 @@ export async function POST(req: NextRequest) {
       console.error('Failed to sync goals (non-blocking):', syncError)
     }
 
-    const anyWeightPR = prResults.some((r) => r.weight_pr)
-    const anyVolumePR = prResults.some((r) => r.volume_pr)
-    const prMessage = anyWeightPR && anyVolumePR
-      ? 'New weight and volume PR!'
-      : anyWeightPR
-      ? 'New weight PR!'
-      : anyVolumePR
-      ? 'New volume PR!'
-      : null
+    const setLogId = insertedData?.id ?? null
 
-    // Step 6.5: Check and store PRs in personal_records table (non-blocking)
-    const storedPRResults: Array<{ exercise_id: string; exercise_name: string; prResult: any }> = []
+    let prDetectionSummary: import('@/lib/prService').PRDetectionResult = {}
+    let prDetectedPayload: import('@/lib/prService').PrDetectedPayload | null = null
+
     if (primaryExerciseId && primaryWeight && primaryReps) {
       try {
-        const { checkAndStorePR } = await import('@/lib/prService')
         const { data: rawExercise } = await supabaseAdmin
           .from('exercises')
           .select('id, name')
@@ -1063,7 +1134,6 @@ export async function POST(req: NextRequest) {
         const exercise = rawExercise as { id: string; name: string } | null
 
         if (exercise) {
-          // Get workout_assignment_id from workout_log_id if available
           let workoutAssignmentId: string | undefined = undefined
           if (workoutLogId) {
             const { data: rawWl } = await supabaseAdmin
@@ -1074,20 +1144,27 @@ export async function POST(req: NextRequest) {
             const workoutLog = rawWl as { workout_assignment_id: string | null } | null
             workoutAssignmentId = workoutLog?.workout_assignment_id || undefined
           }
-          
-          const prResult = await checkAndStorePR(effectiveClientId, {
-            exercise_id: primaryExerciseId,
-            weight: primaryWeight,
-            reps: primaryReps,
-            workout_assignment_id: workoutAssignmentId,
-            completed_at: insertData.completed_at || new Date().toISOString(),
-          }, supabaseAdmin)
-          if (prResult?.isNewPR) {
-            storedPRResults.push({
+
+          prDetectionSummary = await checkAndStorePR(
+            effectiveClientId,
+            {
               exercise_id: primaryExerciseId,
-              exercise_name: exercise.name,
-              prResult,
-            })
+              weight: primaryWeight,
+              reps: primaryReps,
+              workout_assignment_id: workoutAssignmentId,
+              workout_log_id: workoutLogId ?? null,
+              workout_set_log_id: setLogId,
+              completed_at: insertData.completed_at || new Date().toISOString(),
+            },
+            supabaseAdmin,
+          )
+          if (prDetectionHasResult(prDetectionSummary)) {
+            prDetectedPayload = detectionResultToPrDetected(
+              exercise.name,
+              primaryWeight,
+              primaryReps,
+              prDetectionSummary,
+            )
           }
         }
       } catch (prError) {
@@ -1105,7 +1182,7 @@ export async function POST(req: NextRequest) {
       nextTier: { tier: string; threshold: number; label: string } | null
       currentMetricValue: number
     }> = []
-    if (storedPRResults.length > 0) {
+    if (prDetectionHasResult(prDetectionSummary) && primaryExerciseId) {
       try {
         const { AchievementService } = await import('@/lib/achievementService')
         const unlocked = await AchievementService.checkAndUnlockAchievements(effectiveClientId, 'pr_count', supabaseAdmin)
@@ -1123,20 +1200,15 @@ export async function POST(req: NextRequest) {
       } catch (achErr) {
         console.error('Achievement check after PR (non-blocking):', achErr)
       }
-      for (const stored of storedPRResults) {
-        try {
-          const { updateLeaderboardForClient } = await import('@/lib/leaderboardPopulationService')
-          await updateLeaderboardForClient(effectiveClientId, stored.exercise_id, supabaseAdmin)
-        } catch (lbErr) {
-          console.error('Leaderboard update after PR (non-blocking):', lbErr)
-        }
+      try {
+        const { updateLeaderboardForClient } = await import('@/lib/leaderboardPopulationService')
+        await updateLeaderboardForClient(effectiveClientId, primaryExerciseId, supabaseAdmin)
+      } catch (lbErr) {
+        console.error('Leaderboard update after PR (non-blocking):', lbErr)
       }
     }
 
     // Step 7: Return success (set logging succeeded, metrics update may have warnings)
-    // Include set_log_id and workout_log_id at top level for RPE modal and Undo (set correction)
-    const setLogId = insertedData?.id ?? null;
-    
     const response: any = {
       success: true,
       set_log_id: setLogId,
@@ -1153,38 +1225,17 @@ export async function POST(req: NextRequest) {
         action: e1rmAction,
         is_new_pr: e1rmUpdated,
       },
-      pr: {
-        any_weight_pr: anyWeightPR,
-        any_volume_pr: anyVolumePR,
-        results: prResults,
-        message: prMessage,
-        stored_prs: storedPRResults,
-      },
-      pr_detected:
-        storedPRResults.length > 0
-          ? {
-              type: storedPRResults[0].prResult.prType ?? 'weight',
-              exercise_name: storedPRResults[0].exercise_name,
-              new_value: storedPRResults[0].prResult.pr?.record_value,
-              previous_value:
-                storedPRResults[0].prResult.pr?.previous_record_value ?? null,
-              unit: storedPRResults[0].prResult.pr?.record_unit ?? 'kg',
-              weight_kg: primaryWeight,
-              reps: primaryReps,
-            }
-          : null,
+      pr_detected: prDetectedPayload,
+      is_new_pr: !!prDetectedPayload,
+      metrics_warning: metricsError || undefined,
       new_achievements: newAchievements,
     }
 
-    if (metricsError) {
-      response.pr.warning = `Performance PRs may not have been saved: ${metricsError}`
-    }
-
-    response.message = prMessage || 'Set logged!'
+    response.message = 'Set logged!'
 
     // Log performance summary
     perf.logSummary()
-    
+
     // Create response with Server-Timing header
     const jsonResponse = NextResponse.json(response, { status: 200 })
     const perfHeaders = perf.getHeaders()

@@ -17,7 +17,6 @@ import { supabase } from "@/lib/supabase";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
 import NotificationTriggers from "@/lib/notificationTriggers";
-import { PersonalRecordsService } from "@/lib/progressTrackingService";
 import { fetchApi } from "@/lib/apiClient";
 import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/ui/toast-provider";
@@ -197,6 +196,7 @@ interface WorkoutSetLog {
   preexhaust_compound_reps?: number | null;
 
   actual_time_seconds?: number | null;
+  actual_duration_seconds?: number | null;
   actual_distance_meters?: number | null;
   actual_hr_avg?: number | null;
   actual_speed_kmh?: number | null;
@@ -731,6 +731,7 @@ function WorkoutCompleteContent() {
           preexhaust_compound_weight,
           preexhaust_compound_reps,
           actual_time_seconds,
+          actual_duration_seconds,
           actual_distance_meters,
           actual_hr_avg,
           actual_speed_kmh,
@@ -1340,6 +1341,22 @@ function WorkoutCompleteContent() {
             )}
           </div>
         );
+
+      case "timed_set": {
+        const timedName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
+        const actual = set.actual_duration_seconds;
+        const sec =
+          actual != null && Number.isFinite(Number(actual))
+            ? `${Math.round(Number(actual))}s`
+            : "—";
+        return (
+          <span className="text-sm font-semibold block">
+            • {timedName} — Set {set.set_number || 1}: {sec}
+          </span>
+        );
+      }
 
       case "speed_work": {
         const speedName = set.exercise_id

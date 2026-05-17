@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Star,
   Activity,
+  Timer,
 } from "lucide-react";
 import wt from "./workoutTemplateEditV1.module.css";
 import {
@@ -122,6 +123,12 @@ const CONFIG_COPY: Record<
     title: "Endurance",
     description: "Longer efforts paced by time, distance, or heart rate.",
     Icon: Activity,
+  },
+  timed_set: {
+    eyebrow: "Timed",
+    title: "Timed Set",
+    description: "Sets of timed work with rest between sets (e.g. plank, jump rope).",
+    Icon: Timer,
   },
 };
 
