@@ -690,6 +690,14 @@ export default function UiGalleryPage() {
             </PreviewCard>
             <PreviewCard name="AthleteScoreRing" path="components/client-ui/AthleteScoreRing.tsx">
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2">
+                  <p className="mb-2 text-xs fc-text-subtle">placeholder</p>
+                  <AthleteScoreRing placeholder score={null} tier={null} animated={false} size={140} />
+                </div>
+                <div className="rounded-lg border border-[color:var(--fc-glass-border)] p-2">
+                  <p className="mb-2 text-xs fc-text-subtle">paused (dimmed)</p>
+                  <AthleteScoreRing score={72} tier="locked_in" paused size={140} />
+                </div>
                 {(["beast_mode", "locked_in", "showing_up", "slipping", "benched"] as const).map((tier) => (
                   <div key={tier} className="rounded-lg border border-[color:var(--fc-glass-border)] p-2">
                     <p className="mb-2 text-xs fc-text-subtle">{tier}</p>
@@ -703,8 +711,40 @@ export default function UiGalleryPage() {
             </PreviewCard>
             <PreviewCard name="ScoreBreakdown" path="components/client-ui/ScoreBreakdown.tsx">
               <div className="space-y-2">
-                <ScoreBreakdown programCompletion={82} dailyCheckins={75} nutrition={64} nutritionConfigured trends={{ programCompletion: 4, dailyCheckins: 0, nutrition: -3 }} />
-                <ScoreBreakdown programCompletion={60} dailyCheckins={49} trends={{ programCompletion: -2, dailyCheckins: 0 }} />
+                <ScoreBreakdown
+                  alwaysVisible
+                  components={[
+                    {
+                      label: "Training",
+                      value: 82,
+                      delta: 3,
+                      subRows: [
+                        { label: "Completion", value: 90 },
+                        { label: "Execution", value: 70 },
+                      ],
+                    },
+                    {
+                      label: "Recovery",
+                      value: 71,
+                      delta: -2,
+                      subRows: [
+                        { label: "Sleep", value: 68 },
+                        { label: "Steps", value: 78 },
+                      ],
+                    },
+                    { label: "Nutrition", value: 40, delta: 5 },
+                    { label: "Extras", value: 0, delta: 0, hint: "Log activities to boost your score." },
+                  ]}
+                />
+                <ScoreBreakdown
+                  alwaysVisible
+                  components={[
+                    { label: "Training", value: 60, delta: -2 },
+                    { label: "Recovery", value: null, delta: 0 },
+                    { label: "Nutrition", value: 0, hint: "off" },
+                    { label: "Extras", value: 22 },
+                  ]}
+                />
               </div>
             </PreviewCard>
             <PreviewCard name="ProgressCircles / StreakCounters" path="components/client/ProgressCircles.tsx + components/client/StreakCounters.tsx">

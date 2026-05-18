@@ -19,6 +19,7 @@ import CoachClientSubscriptionSection from "@/components/coach/client-views/Coac
 import { HabitsList } from "@/components/coach/client-views/ClientHabitsView";
 import { CoachClientActivitiesPanel } from "@/components/coach/client-views/CoachClientActivitiesPanel";
 import ClientAccountSection from "@/components/coach/client-views/ClientAccountSection";
+import { RecoveryTargetsForm } from "@/components/coach/RecoveryTargetsForm";
 
 const SECTIONS = [
   { id: "personal" as const, label: "Personal", icon: User },
@@ -158,8 +159,9 @@ export default function CoachProfileShell() {
       <SubTabs tabs={PROFILE_TABS} active={activeSection} onChange={navigateSection} />
 
       {activeSection === "personal" && (
-        <div role="tabpanel">
+        <div role="tabpanel" className="space-y-6">
           <ClientProfileView clientId={clientId} layoutVariant="coachV6" />
+          <RecoveryTargetsForm clientId={clientId} />
         </div>
       )}
 

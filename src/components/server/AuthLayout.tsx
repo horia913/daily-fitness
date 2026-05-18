@@ -1,9 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dumbbell, Heart, Target, Trophy, Users, Zap, Sparkles } from 'lucide-react'
+﻿import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dumbbell, Heart, ClipboardList, TrendingUp, Users } from 'lucide-react'
 
 // Server Component for auth page layout (Design System v2: fc tokens)
 export function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -27,23 +23,23 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
                   <h1 className="text-4xl font-bold text-white">
                     DailyFitness
                   </h1>
-                  <p className="text-white/80 text-sm font-medium">Your Journey to a Healthier You Starts Here</p>
+                  <p className="text-white/80 text-sm font-medium">Coach-led training for clients and coaches</p>
                 </div>
               </div>
               <p className="text-white/90 text-lg leading-relaxed">
-                Join thousands of users who are transforming their lives with personalized fitness coaching and nutrition guidance.
+                Sign in to view workouts, programs, nutrition, and habits assigned by your coach.
               </p>
             </div>
 
             <div className="space-y-6">
               <div className="flex items-start gap-4 group">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
-                  <Target className="w-6 h-6" />
+                  <ClipboardList className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-2 text-lg">Personalized Workouts</h3>
+                  <h3 className="font-semibold mb-2 text-lg">Assigned Workouts</h3>
                   <p className="text-white/85 text-sm leading-relaxed">
-                    AI-powered workout plans designed by certified trainers, tailored to your goals and fitness level
+                    Follow workouts and training programs your coach assigns to you
                   </p>
                 </div>
               </div>
@@ -53,9 +49,9 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
                   <Heart className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-2 text-lg">Smart Nutrition</h3>
+                  <h3 className="font-semibold mb-2 text-lg">Coach Nutrition</h3>
                   <p className="text-white/85 text-sm leading-relaxed">
-                    Comprehensive meal logging, macro tracking, and personalized nutrition recommendations
+                    View meal plans and nutrition guidance assigned by your coach
                   </p>
                 </div>
               </div>
@@ -65,36 +61,22 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
                   <Users className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-2 text-lg">Expert Coaching</h3>
+                  <h3 className="font-semibold mb-2 text-lg">Your Coach</h3>
                   <p className="text-white/85 text-sm leading-relaxed">
-                    Direct access to certified fitness professionals for guidance and motivation
+                    Connect with your coach for training, check-ins, and accountability
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4 group">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
-                  <Trophy className="w-6 h-6" />
+                  <TrendingUp className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="font-semibold mb-2 text-lg">Track Progress</h3>
                   <p className="text-white/85 text-sm leading-relaxed">
-                    Detailed analytics, achievement milestones, and celebration of your fitness journey
+                    Log workouts, habits, and see your progress over time
                   </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust indicators */}
-            <div className="mt-8 pt-6 border-t border-white/20">
-              <div className="flex items-center gap-4 text-sm text-white/80">
-                <div className="flex items-center gap-1">
-                  <Sparkles className="w-4 h-4 text-white/90" />
-                  <span>4.9/5 Rating</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  <span>10K+ Users</span>
                 </div>
               </div>
             </div>
@@ -138,40 +120,5 @@ export function AuthFormContainer({
         {children}
       </CardContent>
     </Card>
-  )
-}
-
-// Server Component for feature highlights
-export function FeatureHighlights() {
-  const features = [
-    {
-      icon: Target,
-      title: "Smart Workouts",
-      description: "AI-powered recommendations"
-    },
-    {
-      icon: Heart,
-      title: "Health Tracking",
-      description: "Comprehensive wellness monitoring"
-    },
-    {
-      icon: Zap,
-      title: "Quick Results",
-      description: "See progress in 2 weeks"
-    }
-  ]
-
-  return (
-    <div className="grid grid-cols-3 gap-3 mt-6">
-      {features.map((feature, index) => (
-        <div key={index} className="text-center p-3 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-sm" style={{ background: "linear-gradient(to bottom right, var(--fc-accent-indigo), var(--fc-accent-cyan))" }}>
-            <feature.icon className="w-5 h-5 text-white" />
-          </div>
-          <h3 className="font-semibold fc-text-primary text-sm mb-1">{feature.title}</h3>
-          <p className="text-xs fc-text-dim leading-tight">{feature.description}</p>
-        </div>
-      ))}
-    </div>
   )
 }

@@ -28,6 +28,7 @@ export default function EditWorkoutTemplatePage() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [initialBlocks, setInitialBlocks] = useState<any[] | null>(null);
 
@@ -42,6 +43,50 @@ export default function EditWorkoutTemplatePage() {
   }, [templateId]);
 
   const editTemplateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadInFlightRef = useRef(false);
+
+  const loadTemplate = async () => {
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
+    try {
+      setLoading(true);
+      const loadLabel = `[EditTemplate] load ${templateId}`;
+      if (process.env.NODE_ENV !== "production") console.time(loadLabel);
+      // Fetch template and blocks in parallel so the form can show without a second round-trip
+      const [found, blocks] = await Promise.all([
+        WorkoutTemplateService.getWorkoutTemplateById(templateId, { skipExerciseCount: true }),
+        (async () => {
+          const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+          // Full enrichment (drop_sets, cluster_sets, time_protocols, etc.) — lite skips those and breaks non-straight-set blocks in the editor.
+          return WorkoutBlockService.getWorkoutBlocks(templateId);
+        })(),
+      ]);
+      if (process.env.NODE_ENV !== "production") {
+        console.timeEnd(loadLabel);
+        console.log("[EditTemplate] template:", !!found, "blocks:", blocks?.length ?? 0);
+      }
+      if (found) {
+        setTemplate(found);
+        setInitialBlocks(blocks || []);
+        setLoadError(null);
+        setIsOpen(true);
+      } else {
+        setTemplate(null);
+        setInitialBlocks([]);
+        setIsOpen(false);
+        setLoadError("Template not found");
+      }
+    } catch (error) {
+      console.error("Error loading template:", error);
+      setTemplate(null);
+      setInitialBlocks([]);
+      setIsOpen(false);
+      setLoadError("Failed to load template");
+    } finally {
+      loadInFlightRef.current = false;
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && templateId && user?.id) {
@@ -63,46 +108,7 @@ export default function EditWorkoutTemplatePage() {
         }
       };
     }
-  }, [templateId, user, authLoading]);
-
-  const loadTemplate = async () => {
-    try {
-      setLoading(true);
-      if (process.env.NODE_ENV !== "production") console.time("[EditTemplate] load");
-      // Fetch template and blocks in parallel so the form can show without a second round-trip
-      const [found, blocks] = await Promise.all([
-        WorkoutTemplateService.getWorkoutTemplateById(templateId, { skipExerciseCount: true }),
-        (async () => {
-          const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
-          // Full enrichment (drop_sets, cluster_sets, time_protocols, etc.) — lite skips those and breaks non-straight-set blocks in the editor.
-          return WorkoutBlockService.getWorkoutBlocks(templateId);
-        })(),
-      ]);
-      if (process.env.NODE_ENV !== "production") {
-        console.timeEnd("[EditTemplate] load");
-        console.log("[EditTemplate] template:", !!found, "blocks:", blocks?.length ?? 0);
-      }
-      if (found) {
-        setTemplate(found);
-        setInitialBlocks(blocks || []);
-        setLoadError(null);
-        setIsOpen(true);
-      } else {
-        setTemplate(null);
-        setInitialBlocks([]);
-        setIsOpen(false);
-        setLoadError("Template not found");
-      }
-    } catch (error) {
-      console.error("Error loading template:", error);
-      setTemplate(null);
-      setInitialBlocks([]);
-      setIsOpen(false);
-      setLoadError("Failed to load template");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [templateId, user?.id, authLoading]);
 
   const handleClose = () => {
     router.push(`/coach/workouts/templates/${templateId}`);
@@ -180,6 +186,7 @@ export default function EditWorkoutTemplatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={handleClose}
+                  disabled={isSaving}
                   className="h-8 text-xs px-2"
                   aria-label="Back"
                 >
@@ -202,6 +209,7 @@ export default function EditWorkoutTemplatePage() {
                 initialBlocks={initialBlocks ?? undefined}
                 renderMode="page"
                 onDirtyChange={setIsDirty}
+                onSavingChange={setIsSaving}
                 pageIsDirty={isDirty}
               />
             )}

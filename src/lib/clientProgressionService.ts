@@ -611,7 +611,7 @@ export async function getPrDateKeysByExercise(
     .select('exercise_id, achieved_date, record_type')
     .eq('client_id', clientId)
     .in('exercise_id', uniqueExerciseIds)
-    .in('record_type', ['weight', 'reps']);
+    .in('record_type', ['max_strength', 'strength_endurance']);
 
   if (error || !data) return out;
 

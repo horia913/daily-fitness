@@ -58,7 +58,7 @@ export function filterMilestonesByTimeRange(
 export function PRTimelineChart({
   milestones,
   exerciseName,
-  recordType = "weight",
+  recordType = "max_strength",
   valueUnit = null,
   defaultTimeRange = "3M",
   defaultExpanded = true,

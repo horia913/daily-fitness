@@ -7,7 +7,11 @@ export interface PersonalRecord {
   date: string
   weight: number
   reps: number
+  /** strength_endurance: record_value (kg × reps) */
+  volume?: number
   isRecent: boolean // PR set in last 30 days
+  /** v2 PR category when sourced from `personal_records` */
+  prKind?: "max_strength" | "strength_endurance"
 }
 
 export interface ExercisePR {
@@ -43,7 +47,7 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
       // Convert stored PRs to PersonalRecord format
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       const personalRecords: PersonalRecord[] = storedPRs
-        .filter((pr: any) => pr.record_type === 'weight' || pr.record_type === 'reps') // Only show weight/reps PRs
+        .filter((pr: any) => pr.record_type === 'max_strength' || pr.record_type === 'strength_endurance')
         .map((pr: any) => {
           const exerciseName = pr.exercises?.name || 'Unknown Exercise'
           const isRecent = new Date(pr.achieved_date + 'T12:00:00') >= thirtyDaysAgo
@@ -51,16 +55,20 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
           // Extract weight and reps from record_value based on record_type
           let weight = 0
           let reps = 0
+          let volume: number | undefined
           let record = ''
           
-          if (pr.record_type === 'weight') {
-            weight = pr.record_value || 0
-            // For weight PRs, we don't store reps separately, so use 0 or try to infer from notes
-            record = `${weight}${pr.record_unit || 'kg'}`
-          } else if (pr.record_type === 'reps') {
-            reps = pr.record_value || 0
-            // For reps PRs, weight might be in notes or we don't have it
-            record = `${reps} ${pr.record_unit || 'reps'}`
+          if (pr.record_type === 'max_strength') {
+            weight = pr.weight_at_record ?? pr.record_value ?? 0
+            reps = pr.reps_at_record ?? 0
+            record = `${weight} kg`
+          } else if (pr.record_type === 'strength_endurance') {
+            const w = pr.weight_at_record ?? 0
+            const r = pr.reps_at_record ?? 0
+            reps = r
+            weight = typeof w === 'number' ? w : 0
+            volume = Math.round((pr.record_value || 0) * 10) / 10
+            record = `${volume} vol`
           }
           
           return {
@@ -70,7 +78,9 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
             date: pr.achieved_date,
             weight,
             reps,
-            isRecent
+            volume,
+            isRecent,
+            prKind: pr.record_type,
           }
         })
       

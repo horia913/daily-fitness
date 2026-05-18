@@ -11,6 +11,18 @@ import { ATHLETE_TIERS } from "@/types/athleteScore";
 import type { DailyWellnessLog } from "@/lib/wellnessService";
 import { weekdayMon0Sun6InTimezone } from "@/lib/clientZonedCalendar";
 
+export type AthleteScoreChipState = "default" | "paused" | "no_program";
+
+/** Home chip: placeholder only when the client has no persisted athlete_scores row. */
+export function resolveAthleteScoreChipState(
+  athleteScore: AthleteScore | null,
+  activeAssignmentPauseStatus: string | null | undefined,
+): AthleteScoreChipState {
+  if (athleteScore == null) return "no_program";
+  if (activeAssignmentPauseStatus === "paused") return "paused";
+  return "default";
+}
+
 export interface DashboardData {
   avatarUrl: string | null;
   firstName: string | null;
@@ -50,6 +62,8 @@ export interface DashboardData {
   };
   /** Latest active `program_assignments.pause_status` (parallel read; matches RPC active-assignment scope). */
   activeProgramPauseStatus?: string | null;
+  /** Home / Me chip: no active program, paused program, or normal. */
+  athleteScoreChipState?: AthleteScoreChipState;
   highlights?: {
     prsThisMonth: number;
     latestAchievement: { name: string; icon: string | null; tier: string | null } | null;
@@ -141,6 +155,40 @@ function buildDashboardOverlayFromTrainRpc(
   };
 }
 
+/** Map `get_client_dashboard` athleteScore JSON (camelCase) or DB-shaped rows to AthleteScore. */
+export function mapRpcAthleteScore(
+  raw: Record<string, unknown> | null | undefined,
+): AthleteScore | null {
+  if (!raw || typeof raw.score !== "number") return null;
+
+  const num = (camel: string, snake: string): number | null => {
+    const v = raw[camel] ?? raw[snake];
+    if (v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const tierRaw = typeof raw.tier === "string" ? raw.tier : "benched";
+  const tier = (ATHLETE_TIERS.some((x) => x.key === tierRaw) ? tierRaw : "benched") as AthleteScore["tier"];
+
+  return {
+    id: typeof raw.id === "string" ? raw.id : undefined,
+    score: raw.score as number,
+    tier,
+    training_score: num("trainingScore", "training_score"),
+    training_completion_score: num("trainingCompletionScore", "training_completion_score"),
+    training_execution_score: num("trainingExecutionScore", "training_execution_score"),
+    recovery_score: num("recoveryScore", "recovery_score"),
+    recovery_sleep_score: num("recoverySleepScore", "recovery_sleep_score"),
+    recovery_steps_score: num("recoveryStepsScore", "recovery_steps_score"),
+    nutrition_score: num("nutritionScore", "nutrition_score") ?? 0,
+    extras_score: num("extrasScore", "extras_score") ?? 0,
+    window_start: String(raw.windowStart ?? raw.window_start ?? ""),
+    window_end: String(raw.windowEnd ?? raw.window_end ?? ""),
+    calculated_at: String(raw.calculatedAt ?? raw.calculated_at ?? ""),
+  };
+}
+
 /** Tier from API when valid; otherwise infer from score so the ring matches ATHLETE_TIERS bands. */
 export function tierForAthleteScoreRow(row: AthleteScore): string {
   const t = row.tier;
@@ -179,8 +227,8 @@ export function mapDashboardRpcResponse(
   };
 
   const rawScore = rpc.athleteScore as Record<string, unknown> | null | undefined;
-  const athleteScore: AthleteScore | null =
-    rawScore && typeof rawScore.score === "number" ? (rawScore as unknown as AthleteScore) : null;
+  /** Latest persisted row (any week); not gated on active program — see resolveAthleteScoreChipState. */
+  const athleteScore: AthleteScore | null = mapRpcAthleteScore(rawScore);
 
   const todayWellnessLog = (rpc.todayWellnessLog as DailyWellnessLog | null) ?? null;
   const hasCheckInToday = todayWellnessLog != null;
@@ -239,15 +287,20 @@ export async function fetchDashboardPageData(userId: string): Promise<DashboardP
     (data ?? null) as Record<string, unknown> | null,
     hasScheduledCheckInThisPeriod,
   );
+  const trainOverlay = (trainOverlayRes.data ?? null) as TrainRpcDashboardOverlay | null;
+  const athleteScoreChipState = resolveAthleteScoreChipState(
+    pageData.athleteScore,
+    activePaRes.data?.pause_status,
+  );
+
   if (pageData.dashboard) {
-    const overlay = buildDashboardOverlayFromTrainRpc(
-      (trainOverlayRes.data ?? null) as TrainRpcDashboardOverlay | null,
-    );
+    const overlay = buildDashboardOverlayFromTrainRpc(trainOverlay);
     if (overlay) {
       pageData.dashboard.weeklyProgress = overlay.weeklyProgress;
       pageData.dashboard.todaysWorkout = overlay.todaysWorkout;
     }
     pageData.dashboard.activeProgramPauseStatus = activePaRes.data?.pause_status ?? null;
+    pageData.dashboard.athleteScoreChipState = athleteScoreChipState;
   }
   return pageData;
 }

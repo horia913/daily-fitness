@@ -7,14 +7,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   validateApiAuth,
   createUnauthorizedResponse,
-  createForbiddenResponse,
 } from '@/lib/apiAuth'
 import {
-  diffCalendarDaysYmd,
-  zonedCalendarDateString,
-  zonedYmdFromIsoTimestamp,
-} from '@/lib/clientZonedCalendar'
-import { getClientIanaTimezone } from '@/lib/programStateService'
+  coachPauseProgramAssignment,
+  coachResumeProgramAssignment,
+} from '@/lib/programAssignmentCoachPause'
 
 type RouteCtx = { params: Promise<{ id: string }> }
 
@@ -32,59 +29,26 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
       // no body
     }
 
-    const { data: row, error: fetchErr } = await supabaseAdmin
-      .from('program_assignments')
-      .select('id, coach_id, client_id, pause_status, paused_at')
-      .eq('id', assignmentId)
-      .single()
+    const result = await coachPauseProgramAssignment(
+      supabaseAdmin,
+      user.id,
+      assignmentId,
+      { forcePause, reason },
+    )
 
-    if (fetchErr || !row) {
-      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
-    }
-    if (row.coach_id !== user.id) {
-      return createForbiddenResponse('You are not the coach for this assignment')
-    }
-    if (row.pause_status === 'paused') {
-      return NextResponse.json({ error: 'Program is already paused' }, { status: 400 })
-    }
-
-    if (!forcePause) {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const { data: wipLogs } = await supabaseAdmin
-        .from('workout_logs')
-        .select('id')
-        .eq('program_assignment_id', assignmentId)
-        .is('completed_at', null)
-        .gte('created_at', since)
-        .limit(1)
-      const logId = wipLogs?.[0]?.id as string | undefined
-      if (logId) {
+    if (!result.ok) {
+      if (result.status === 409 && result.logId) {
         return NextResponse.json(
           {
             error: 'in_progress_workout',
             message:
               'Client has an in-progress workout. Resolve or force-pause.',
-            logId,
+            logId: result.logId,
           },
           { status: 409 },
         )
       }
-    }
-
-    const { error: upErr } = await supabaseAdmin
-      .from('program_assignments')
-      .update({
-        pause_status: 'paused',
-        paused_at: new Date().toISOString(),
-        pause_reason: reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assignmentId)
-      .eq('coach_id', user.id)
-
-    if (upErr) {
-      console.error('[pause] POST', upErr)
-      return NextResponse.json({ error: 'Failed to pause' }, { status: 500 })
+      return NextResponse.json({ error: result.error }, { status: result.status })
     }
 
     return NextResponse.json({ success: true, pause_status: 'paused' })
@@ -107,51 +71,22 @@ export async function DELETE(request: NextRequest, ctx: RouteCtx) {
     const { user, supabaseAdmin } = await validateApiAuth(request)
     const { id: assignmentId } = await ctx.params
 
-    const { data: row, error: fetchErr } = await supabaseAdmin
-      .from('program_assignments')
-      .select('id, coach_id, client_id, pause_status, paused_at, pause_accumulated_days')
-      .eq('id', assignmentId)
-      .single()
+    const result = await coachResumeProgramAssignment(
+      supabaseAdmin,
+      user.id,
+      assignmentId,
+    )
 
-    if (fetchErr || !row) {
-      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
-    }
-    if (row.coach_id !== user.id) {
-      return createForbiddenResponse('You are not the coach for this assignment')
-    }
-    if (row.pause_status !== 'paused' || !row.paused_at) {
-      return NextResponse.json({ error: 'Program is not paused' }, { status: 400 })
-    }
-
-    const clientTz = await getClientIanaTimezone(supabaseAdmin, row.client_id as string)
-    const pauseStartYmd = zonedYmdFromIsoTimestamp(row.paused_at as string, clientTz)
-    const todayYmd = zonedCalendarDateString(new Date(), clientTz)
-    const daysPaused = Math.max(0, diffCalendarDaysYmd(pauseStartYmd, todayYmd))
-    const prevAccum = Math.max(0, Number(row.pause_accumulated_days) || 0)
-
-    const { error: upErr } = await supabaseAdmin
-      .from('program_assignments')
-      .update({
-        pause_status: 'active',
-        paused_at: null,
-        pause_reason: null,
-        pause_accumulated_days: prevAccum + daysPaused,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', assignmentId)
-      .eq('coach_id', user.id)
-
-    if (upErr) {
-      console.error('[pause] DELETE', upErr)
-      return NextResponse.json({ error: 'Failed to resume' }, { status: 500 })
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status })
     }
 
     return NextResponse.json({
       success: true,
       pause_status: 'active',
-      daysPaused,
-      daysAddedToAccumulated: daysPaused,
-      pause_accumulated_days: prevAccum + daysPaused,
+      daysPaused: result.daysPaused,
+      daysAddedToAccumulated: result.daysPaused,
+      pause_accumulated_days: result.pause_accumulated_days,
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unauthorized'

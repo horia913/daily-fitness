@@ -1,50 +1,52 @@
 /**
  * GET /api/client/athlete-score
- * 
+ *
  * Returns the latest athlete score for the authenticated client.
  * If no recent score exists (within last hour), recalculates it.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { validateApiAuth } from '@/lib/apiAuth'
-import { calculateAthleteScore, getLatestAthleteScore, getAthleteScoreHistory } from '@/lib/athleteScoreService'
+import { NextRequest, NextResponse } from "next/server";
+import { validateApiAuth } from "@/lib/apiAuth";
+import {
+  calculateAthleteScore,
+  getLatestAthleteScore,
+  getAthleteScoreHistory,
+} from "@/lib/athleteScoreService";
 
 export async function GET(request: NextRequest) {
   try {
-    // Validate authentication and get clients
-    const { user, supabaseAdmin } = await validateApiAuth(request)
+    const { user, supabaseAdmin } = await validateApiAuth(request);
 
-    // Check if a recent score exists (calculated within last hour)
-    const oneHourAgo = new Date()
-    oneHourAgo.setHours(oneHourAgo.getHours() - 1)
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-    const latestScore = await getLatestAthleteScore(user.id, supabaseAdmin)
-    const scoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 12)
+    const latestScore = await getLatestAthleteScore(user.id, supabaseAdmin);
+    const scoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 4);
 
-    // If score exists and was calculated within last hour, return it
     if (latestScore && new Date(latestScore.calculated_at) >= oneHourAgo) {
-      return NextResponse.json({ score: latestScore, scoreHistory })
+      return NextResponse.json({ score: latestScore, scoreHistory });
     }
 
-    // Otherwise, recalculate
-    const newScore = await calculateAthleteScore(user.id, supabaseAdmin)
+    const computed = await calculateAthleteScore(user.id, supabaseAdmin);
+    const updatedScoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 4);
 
-    // Re-fetch history so the just-calculated score is included
-    const updatedScoreHistory = await getAthleteScoreHistory(user.id, supabaseAdmin, 12)
-    return NextResponse.json({ score: newScore, scoreHistory: updatedScoreHistory })
-  } catch (error: any) {
-    console.error('[athlete-score API] Error:', error)
-    
-    if (error.message === 'User not authenticated') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    if ("skipped" in computed && computed.skipped) {
+      return NextResponse.json({
+        score: latestScore,
+        scoreHistory: updatedScoreHistory,
+        computeSkipped: { reason: computed.reason },
+      });
     }
 
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch athlete score' },
-      { status: 500 }
-    )
+    return NextResponse.json({ score: computed, scoreHistory: updatedScoreHistory });
+  } catch (error: unknown) {
+    console.error("[athlete-score API] Error:", error);
+
+    if (error instanceof Error && error.message === "User not authenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const message = error instanceof Error ? error.message : "Failed to fetch athlete score";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

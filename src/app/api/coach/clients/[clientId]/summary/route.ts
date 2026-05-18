@@ -62,6 +62,9 @@ type WeeklyReviewBucket = {
       exerciseName: string | null;
       weight: number | null;
       reps: number | null;
+      /** v2 strength_endurance: single-set volume (kg × reps) */
+      volumeKgReps?: number | null;
+      recordType?: string | null;
       achievedDate: string;
     }>;
   };
@@ -527,8 +530,14 @@ export async function GET(
       const item = {
         exerciseId: row.exercise_id ?? null,
         exerciseName,
-        weight: row.record_type === 'weight' ? Number(row.record_value) : null,
-        reps: row.record_type === 'reps' ? Number(row.record_value) : null,
+        weight:
+          row.record_type === "max_strength" || row.record_type === "weight"
+            ? Number(row.record_value)
+            : null,
+        reps: row.record_type === "reps" ? Number(row.record_value) : null,
+        volumeKgReps:
+          row.record_type === "strength_endurance" ? Number(row.record_value) : null,
+        recordType: row.record_type,
         achievedDate: row.achieved_date,
       };
       if (bucket === 'current') currentPrItems.push(item);

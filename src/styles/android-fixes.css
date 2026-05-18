@@ -51,87 +51,39 @@
   -webkit-transform: none !important;
 }
 
-/* Bottom navigation fixes for Android */
-.android-device nav.fixed.bottom-0,
-.android-device nav[class*="fixed"][class*="bottom-0"] {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
-  flex-shrink: 0 !important; /* Prevent it from shrinking */
-  /* Ensure it has a solid background to cover content */
-  background-color: rgba(255, 255, 255, 0.95) !important; /* Light mode background */
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important; /* Add a subtle shadow for separation */
-  padding-bottom: env(safe-area-inset-bottom) !important; /* Account for gesture bar on modern Android */
-  /* Ensure no transforms that could interfere with fixed positioning */
-  transform: none !important;
-  -webkit-transform: none !important;
-  /* Prevent any scrolling interference */
-  overflow: hidden !important;
-  touch-action: manipulation !important;
-}
+/* Bottom navigation — matches floating shell `[data-fc-bottom-nav].fc-bottom-nav-float` */
+@media (max-width: 1023px) {
+  .android-device nav[data-fc-bottom-nav].fc-bottom-nav-float {
+    transform: none !important;
+    -webkit-transform: none !important;
+    touch-action: manipulation !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
 
-/* Android bottom navigation inner container */
-.android-device nav.fixed.bottom-0.left-0.right-0 > div {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: space-around !important;
-  height: 100% !important;
-  width: 100% !important;
-  padding: 0 8px !important;
-  max-width: none !important;
-  /* Ensure equal spacing between buttons */
-  gap: 0 !important;
-}
+  .android-device nav[data-fc-bottom-nav].fc-bottom-nav-float .fc-bottom-nav-inner {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: space-around !important;
+    width: 100% !important;
+  }
 
-/* Android bottom navigation inner container - second level */
-.android-device nav.fixed.bottom-0.left-0.right-0 > div > div {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: space-around !important;
-  height: 100% !important;
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-}
+  .android-device nav[data-fc-bottom-nav].fc-bottom-nav-float .fc-bottom-nav-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
 
-/* Android bottom navigation items */
-.android-device nav.fixed.bottom-0.left-0.right-0 a,
-.android-device nav.fixed.bottom-0.left-0.right-0 button {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  min-width: 60px !important;
-  flex: 1 !important;
-  /* Ensure equal distribution */
-  margin: 0 4px !important;
-  padding: 8px 4px !important;
-}
+  .android-device nav[data-fc-bottom-nav].fc-bottom-nav-float svg,
+  .android-device nav[data-fc-bottom-nav].fc-bottom-nav-float [class*="lucide"] {
+    display: block !important;
+    margin: 0 auto !important;
+  }
 
-/* Android bottom navigation icons */
-.android-device nav.fixed.bottom-0.left-0.right-0 svg,
-.android-device nav.fixed.bottom-0.left-0.right-0 [class*="lucide"] {
-  display: block !important;
-  margin: 0 auto !important;
-  text-align: center !important;
-}
-
-/* Android bottom navigation text */
-.android-device nav.fixed.bottom-0.left-0.right-0 span {
-  text-align: center !important;
-  display: block !important;
-  margin: 0 auto !important;
-}
-
-/* Android dark mode bottom navigation background */
-.android-device.dark nav.fixed.bottom-0,
-.android-device.dark nav[class*="fixed"][class*="bottom-0"] {
-  background-color: rgba(15, 23, 42, 0.95) !important; /* Dark mode background */
 }
 
 /* Android header fixes */

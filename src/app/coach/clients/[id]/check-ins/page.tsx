@@ -4,6 +4,7 @@ import React from "react";
 import { useParams } from "next/navigation";
 import { ClipboardCheck } from "lucide-react";
 import { useCoachClient } from "@/contexts/CoachClientContext";
+import { CoachCheckInsScoreChip } from "@/components/coach/CoachCheckInsScoreChip";
 import ClientProgressWellnessSection from "@/components/coach/client-views/ClientProgressWellnessSection";
 import ClientProgressBodySection from "@/components/coach/client-views/ClientProgressBodySection";
 
@@ -15,18 +16,21 @@ export default function ClientCheckInsPage() {
   return (
     <div className="space-y-6">
       <div className="fc-card-shell p-6 sm:p-10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
-            <ClipboardCheck className="w-6 h-6" />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent-cyan)] shrink-0">
+              <ClipboardCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Check-ins
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                Daily wellness and scheduled check-ins for {clientName}.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
-              Check-ins
-            </h1>
-            <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
-              Daily wellness and scheduled check-ins for {clientName}.
-            </p>
-          </div>
+          <CoachCheckInsScoreChip clientId={clientId} />
         </div>
       </div>
 

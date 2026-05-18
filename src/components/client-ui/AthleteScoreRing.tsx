@@ -50,6 +50,10 @@ interface AthleteScoreRingProps {
   size?: number;
   sizePreset?: AthleteScoreRingSizePreset;
   showTierBelow?: boolean;
+  /** Grey “—” state (e.g. no program assigned). */
+  placeholder?: boolean;
+  /** Dimmed ring for paused program (last score still shown). */
+  paused?: boolean;
 }
 
 export function AthleteScoreRing({
@@ -59,6 +63,8 @@ export function AthleteScoreRing({
   size: sizeProp,
   sizePreset = "md",
   showTierBelow = false,
+  placeholder = false,
+  paused = false,
 }: AthleteScoreRingProps) {
   const uid = useId().replace(/:/g, "");
   const size = sizeProp ?? SIZE_PRESET_PX[sizePreset];
@@ -103,6 +109,45 @@ export function AthleteScoreRing({
   const gidBeastTip = `asg-b-tip-${uid}`;
   const gidShowFlow = `asg-flow-${uid}`;
   const gidBeastAura = `asg-beast-aura-${uid}`;
+
+  if (placeholder) {
+    const phCenter = size / 2;
+    const phStroke = strokeWidthForTier("benched", size);
+    const phR = Math.max(4, (size - phStroke * 2) / 2);
+    return (
+      <div
+        className="as-ring-root relative flex flex-col items-center justify-center mx-auto max-w-full"
+        style={{ width: size, height: size, minWidth: 0 }}
+      >
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="as-ring-gpu transform -rotate-90"
+        >
+          <circle
+            cx={phCenter}
+            cy={phCenter}
+            r={phR}
+            fill="none"
+            stroke="var(--fc-surface-sunken)"
+            strokeWidth={phStroke}
+          />
+        </svg>
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center px-1 text-center"
+          style={{ width: size, height: size }}
+        >
+          <span className="font-extrabold tabular-nums fc-text-dim leading-none" style={{ fontSize: size < 80 ? "0.85rem" : "1.75rem" }}>
+            —
+          </span>
+          {size >= 80 ? (
+            <span className="mt-0.5 text-[10px] fc-text-dim leading-tight px-1">No score yet</span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   if (score === null || !tierInfo) {
     return (
@@ -190,7 +235,7 @@ export function AthleteScoreRing({
           ? "as-ring-beast--with-motion-bg"
           : ""
       }`}
-      style={{ width: size, height: size, minWidth: 0 }}
+      style={{ width: size, height: size, minWidth: 0, opacity: paused ? 0.6 : 1 }}
     >
       {tierKey === "showing_up" && <div className="as-ring-halo" aria-hidden />}
       {tierKey === "locked_in" && <div className="as-ring-halo" aria-hidden />}
@@ -478,7 +523,16 @@ export function AthleteScoreRing({
           >
             {Math.round(percentage)}
           </span>
-          {!showTierBelow && (
+          {!showTierBelow && paused ? (
+            <span
+              className="mt-0.5 font-semibold uppercase leading-tight tracking-wide fc-text-dim"
+              style={{
+                fontSize: size < 80 ? "0.4rem" : "clamp(0.55rem, 2.2vw, 0.75rem)",
+              }}
+            >
+              Paused
+            </span>
+          ) : !showTierBelow ? (
             <>
               <span
                 className={`mt-0.5 font-semibold leading-tight ${labelClass}`}
@@ -503,7 +557,7 @@ export function AthleteScoreRing({
                 {tierInfo.emoji}
               </span>
             </>
-          )}
+          ) : null}
           {showTierBelow && (
             <span style={{ fontSize: size < 80 ? "0.5rem" : "1rem" }}>{tierInfo.emoji}</span>
           )}

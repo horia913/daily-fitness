@@ -1,30 +1,25 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { ClientPageShell } from "@/components/client-ui/ClientPageShell";
-import { ClientScoreInsightsSection } from "@/components/client/ClientScoreInsightsSection";
 import { usePageData } from "@/hooks/usePageData";
 import {
   fetchDashboardPageData,
   type DashboardPageData,
 } from "@/lib/clientDashboardPageData";
 import { tierBackdropVariant } from "@/lib/tierBackdrop";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { Button } from "@/components/ui/button";
 import {
   User,
   Target,
   BarChart3,
-  Award,
   Sparkles,
   Trophy,
-  CreditCard,
+  Medal,
   ChevronRight,
-  AlertTriangle,
 } from "lucide-react";
 
 interface NavCard {
@@ -60,10 +55,10 @@ const NAV_CARDS: NavCard[] = [
     description: "Build healthy routines",
   },
   {
-    href: "/client/progress/achievements",
-    title: "Achievements",
-    icon: Award,
-    description: "Unlock badges and milestones",
+    href: "/client/progress/leaderboard",
+    title: "Leaderboards",
+    icon: Medal,
+    description: "See how you rank",
   },
   {
     href: "/client/challenges",
@@ -71,18 +66,17 @@ const NAV_CARDS: NavCard[] = [
     icon: Trophy,
     description: "Join fitness challenges",
   },
-  {
-    href: "/client/profile",
-    title: "Subscription",
-    icon: CreditCard,
-    description: "Your coaching plan on Profile",
-  },
 ];
 
 export default function MePage() {
   const { user, profile } = useAuth();
+  const [hasMounted, setHasMounted] = useState(false);
   const userName = profile?.first_name || user?.email?.split("@")[0] || "there";
   const avatarUrl = profile?.avatar_url;
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const fetchFn = useCallback(async (): Promise<DashboardPageData> => {
     if (!user?.id) {
@@ -99,10 +93,7 @@ export default function MePage() {
     return fetchDashboardPageData(user.id);
   }, [user?.id]);
 
-  const { data: pageData, loading: dashboardLoading, error, refetch } = usePageData(
-    fetchFn,
-    [user?.id],
-  );
+  const { data: pageData } = usePageData(fetchFn, [user?.id]);
 
   const getAvatarUrl = () => {
     if (avatarUrl) return avatarUrl;
@@ -118,14 +109,22 @@ export default function MePage() {
         <AnimatedBackground>
           <ClientPageShell
             className="max-w-lg px-4 pb-[var(--fc-bottom-safe-area)] pt-6"
-            backdrop={tierBackdropVariant(pageData?.athleteScore?.tier)}
+          backdrop={tierBackdropVariant(
+            !pageData?.athleteScore ||
+              pageData?.dashboard?.athleteScoreChipState === "paused"
+              ? undefined
+              : pageData?.athleteScore?.tier,
+          )}
           >
-            {/* Header */}
             <div className="mb-4">
               <h1 className="text-xl font-bold fc-text-primary mb-4">Me</h1>
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-[color:var(--fc-accent-cyan)] flex items-center justify-center">
-                  {avatarUrl ? (
+                  {!hasMounted ? (
+                    <span className="text-2xl font-bold text-[color:var(--fc-bg-base)]">
+                      ·
+                    </span>
+                  ) : avatarUrl ? (
                     <img
                       src={getAvatarUrl()}
                       alt={userName}
@@ -147,38 +146,6 @@ export default function MePage() {
                 </div>
               </div>
             </div>
-
-            {error ? (
-              <div className="mb-8 flex flex-col items-center border-t border-[var(--fc-glass-border)] pt-8 text-center">
-                <AlertTriangle
-                  className="mb-3 h-10 w-10 text-[var(--fc-status-error)]"
-                  aria-hidden
-                />
-                <h2 className="mb-2 text-lg font-semibold fc-text-primary">
-                  Couldn&apos;t load this page
-                </h2>
-                <p className="mb-4 text-sm fc-text-dim">{error}</p>
-                <Button
-                  type="button"
-                  className="fc-btn fc-btn-primary"
-                  onClick={() => void refetch()}
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : dashboardLoading ? (
-              <div className="mb-8 border-t border-[var(--fc-glass-border)] pt-6">
-                <Skeleton className="mb-4 h-5 w-40" />
-                <Skeleton className="mx-auto mb-4 h-40 w-40 rounded-full" />
-                <Skeleton className="h-24 w-full rounded-xl" />
-              </div>
-            ) : (
-              <ClientScoreInsightsSection
-                userId={user?.id ?? null}
-                athleteScore={pageData?.athleteScore ?? null}
-                scoreError={pageData?.scoreError ?? null}
-              />
-            )}
 
             <nav
               className="flex flex-col border-y border-[color:var(--fc-glass-border)]"

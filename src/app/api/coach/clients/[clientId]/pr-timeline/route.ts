@@ -6,7 +6,11 @@ import {
   createUnauthorizedResponse,
 } from "@/lib/apiAuth";
 
-import { formatPersonalRecordCaption } from "@/lib/personalRecordDisplay";
+import {
+  formatPersonalRecordCaption,
+  formatPrKindTag,
+  formatPrRecentListLine,
+} from "@/lib/personalRecordDisplay";
 
 /** Most recent PR rows returned for coach client stats "Recent PRs" (achieved_date desc, id desc). */
 const RECENT_PRS_DISPLAY_LIMIT = 10;
@@ -21,6 +25,10 @@ type PrRow = {
   record_value: number;
 
   record_unit: string | null;
+
+  weight_at_record: number | null;
+
+  reps_at_record: number | null;
 
   achieved_date: string;
 
@@ -171,7 +179,8 @@ function pickDefaultSeriesKey(
 
   const isFiniteWeightRow = (r: PrRow) =>
     Boolean(r.exercise_id) &&
-    normalizedRecordType(r) === "weight" &&
+    (normalizedRecordType(r) === "max_strength" ||
+      normalizedRecordType(r) === "weight") &&
     Number.isFinite(Number(r.record_value));
 
   const currentWeight = prRows.filter(
@@ -265,7 +274,7 @@ export async function GET(
       .from("personal_records")
 
       .select(
-        "id, exercise_id, record_type, record_value, record_unit, achieved_date, workout_assignment_id, is_current_record, exercises(name)",
+        "id, exercise_id, record_type, record_value, record_unit, weight_at_record, reps_at_record, achieved_date, workout_assignment_id, is_current_record, exercises(name)",
       )
 
       .eq("client_id", clientId)
@@ -318,11 +327,13 @@ export async function GET(
 
         recordUnit: r.record_unit ?? null,
 
-        caption: formatPersonalRecordCaption(
-          r.record_type,
-          r.record_value,
-          r.record_unit,
-        ),
+        caption: formatPrRecentListLine({
+          record_type: r.record_type,
+          record_value: r.record_value,
+          record_unit: r.record_unit,
+          weight_at_record: r.weight_at_record,
+          reps_at_record: r.reps_at_record,
+        }),
 
         achievedDate: r.achieved_date,
 

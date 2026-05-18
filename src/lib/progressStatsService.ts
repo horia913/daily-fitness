@@ -12,7 +12,8 @@ import { AchievementService } from './achievementService'
 import { BodyMetricsService } from './progressTrackingService'
 import { fetchPersonalRecords } from './personalRecords'
 import { getNutritionComplianceTrend } from './nutritionLogService'
-import { dbToUiScale } from './wellnessService'
+import { dbToUiScale, getCheckinStreak } from './wellnessService'
+import { calculateSetVolume } from './volumeAnalytics'
 
 export interface ProgressStats {
   weeklyWorkouts: {
@@ -374,8 +375,15 @@ export interface ProgressMonthHubSnapshot {
   volumeKg: number
   newPRs: number
   streakDays: number
+  /** Consecutive complete daily check-ins (wellness), same definition as dashboard. */
+  checkinStreak: number
   weeklyWorkoutCounts: number[]
+  /** Fixed five buckets (W1–W5) for hub bar row; padded from `weeklyWorkoutCounts`. */
+  weeklyBarsW1toW5: number[]
   currentWeekIndex: number
+  topExerciseByVolume: { name: string; volumeKg: number } | null
+  /** Latest minus earliest logged weight in the calendar month (kg); null if not enough data. */
+  weightDeltaKg: number | null
 }
 
 /**
@@ -401,7 +409,7 @@ export async function getProgressMonthHubSnapshot(
   )
 
   try {
-    const [logsRes, streak, prsRes] = await Promise.all([
+    const [logsRes, streak, prsRes, checkinStreak, bodyMonthRes] = await Promise.all([
       supabase
         .from('workout_logs')
         .select('id, completed_at, total_duration_minutes')
@@ -416,6 +424,15 @@ export async function getProgressMonthHubSnapshot(
         .eq('client_id', clientId)
         .gte('achieved_date', first)
         .lte('achieved_date', last),
+      getCheckinStreak(clientId),
+      supabase
+        .from('body_metrics')
+        .select('measured_date, weight_kg')
+        .eq('client_id', clientId)
+        .gte('measured_date', first)
+        .lte('measured_date', last)
+        .not('weight_kg', 'is', null)
+        .order('measured_date', { ascending: true }),
     ])
 
     const logs = (logsRes.data ?? []) as {
@@ -444,20 +461,45 @@ export async function getProgressMonthHubSnapshot(
     )
 
     let volumeKg = 0
+    let topExerciseByVolume: { name: string; volumeKg: number } | null = null
     const logIds = inMonth.map((r) => r.id)
     if (logIds.length > 0) {
       const { data: sets } = await supabase
         .from('workout_set_logs')
-        .select('weight, reps')
+        .select('*, exercises ( name )')
         .in('workout_log_id', logIds)
         .eq('client_id', clientId)
-      volumeKg = (sets ?? []).reduce(
-        (sum, row) => sum + (Number(row.weight) || 0) * (Number(row.reps) || 0),
-        0
-      )
+      const byName = new Map<string, number>()
+      for (const row of sets ?? []) {
+        const vol = calculateSetVolume(row as Record<string, unknown>)
+        volumeKg += vol
+        const name = (row as { exercises?: { name?: string } }).exercises?.name ?? 'Exercise'
+        byName.set(name, (byName.get(name) ?? 0) + vol)
+      }
+      let bestName: string | null = null
+      let bestVol = 0
+      for (const [name, v] of byName.entries()) {
+        if (v > bestVol) {
+          bestVol = v
+          bestName = name
+        }
+      }
+      if (bestName && bestVol > 0) topExerciseByVolume = { name: bestName, volumeKg: Math.round(bestVol) }
     }
 
     const newPRs = prsRes.count ?? 0
+
+    const bodyRows = (bodyMonthRes.data ?? []) as { measured_date: string; weight_kg: number | null }[]
+    let weightDeltaKg: number | null = null
+    if (bodyRows.length >= 2) {
+      const w0 = Number(bodyRows[0].weight_kg) || 0
+      const w1 = Number(bodyRows[bodyRows.length - 1].weight_kg) || 0
+      if (w0 > 0 && w1 > 0) weightDeltaKg = Math.round((w1 - w0) * 10) / 10
+    } else if (bodyRows.length === 1) {
+      weightDeltaKg = 0
+    }
+
+    const weeklyBarsW1toW5 = Array.from({ length: 5 }, (_, i) => weeklyWorkoutCounts[i] ?? 0)
 
     return {
       monthYearLabel,
@@ -466,8 +508,12 @@ export async function getProgressMonthHubSnapshot(
       volumeKg,
       newPRs,
       streakDays: streak,
+      checkinStreak,
       weeklyWorkoutCounts,
+      weeklyBarsW1toW5,
       currentWeekIndex,
+      topExerciseByVolume,
+      weightDeltaKg,
     }
   } catch (error) {
     console.error('Error in getProgressMonthHubSnapshot:', error)
@@ -478,8 +524,170 @@ export async function getProgressMonthHubSnapshot(
       volumeKg: 0,
       newPRs: 0,
       streakDays: 0,
+      checkinStreak: 0,
       weeklyWorkoutCounts: Array.from({ length: numWeeks }, () => 0),
+      weeklyBarsW1toW5: [0, 0, 0, 0, 0],
       currentWeekIndex,
+      topExerciseByVolume: null,
+      weightDeltaKg: null,
+    }
+  }
+}
+
+/** Current ISO-week (Mon–Sun) aggregates for Progress Hub period recap. */
+export interface ProgressWeekHubSnapshot {
+  weekRangeLabel: string
+  workouts: number
+  totalDurationMinutes: number
+  volumeKg: number
+  newPRs: number
+  checkinStreak: number
+  weightDeltaKg: number | null
+  topExerciseByVolume: { name: string; volumeKg: number } | null
+  /** Mon=0 … Sun=6 for current calendar week window. */
+  dailyWorkoutCounts: number[]
+  /** Index 0–6 (Mon–Sun) matching “today” for highlight. */
+  todayWeekdayIndex: number
+}
+
+export async function getProgressWeekHubSnapshot(
+  clientId: string,
+): Promise<ProgressWeekHubSnapshot> {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const mon = new Date(now)
+  mon.setDate(now.getDate() + diffToMonday)
+  mon.setHours(0, 0, 0, 0)
+  const sun = new Date(mon)
+  sun.setDate(mon.getDate() + 6)
+  sun.setHours(23, 59, 59, 999)
+  const monStr = mon.toISOString().split('T')[0]
+  const sunStr = sun.toISOString().split('T')[0]
+  const firstISO = mon.toISOString()
+  const lastISO = sun.toISOString()
+  const weekRangeLabel = `${mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${sun.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+
+  try {
+    const [logsRes, checkinStreak, prsRes, bodyInWeekRes, bodyBeforeRes] = await Promise.all([
+      supabase
+        .from('workout_logs')
+        .select('id, completed_at, total_duration_minutes')
+        .eq('client_id', clientId)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', firstISO)
+        .lte('completed_at', lastISO),
+      getCheckinStreak(clientId),
+      supabase
+        .from('personal_records')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('achieved_date', monStr)
+        .lte('achieved_date', sunStr),
+      supabase
+        .from('body_metrics')
+        .select('measured_date, weight_kg')
+        .eq('client_id', clientId)
+        .gte('measured_date', monStr)
+        .lte('measured_date', sunStr)
+        .not('weight_kg', 'is', null)
+        .order('measured_date', { ascending: true }),
+      supabase
+        .from('body_metrics')
+        .select('measured_date, weight_kg')
+        .eq('client_id', clientId)
+        .lt('measured_date', monStr)
+        .not('weight_kg', 'is', null)
+        .order('measured_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    const logs = (logsRes.data ?? []) as {
+      id: string
+      completed_at: string
+      total_duration_minutes: number | null
+    }[]
+    const workouts = logs.length
+    const logIds = logs.map((r) => r.id)
+    const totalDurationMinutes = logs.reduce(
+      (s, r) => s + (Number(r.total_duration_minutes) || 0),
+      0,
+    )
+    const dailyWorkoutCounts = [0, 0, 0, 0, 0, 0, 0]
+    for (const log of logs) {
+      const d = new Date(log.completed_at)
+      const idx = (d.getDay() + 6) % 7
+      dailyWorkoutCounts[idx] += 1
+    }
+    const todayWeekdayIndex = (new Date().getDay() + 6) % 7
+
+    let volumeKg = 0
+    let topExerciseByVolume: { name: string; volumeKg: number } | null = null
+    if (logIds.length > 0) {
+      const { data: sets } = await supabase
+        .from('workout_set_logs')
+        .select('*, exercises ( name )')
+        .in('workout_log_id', logIds)
+        .eq('client_id', clientId)
+      const byName = new Map<string, number>()
+      for (const row of sets ?? []) {
+        const vol = calculateSetVolume(row as Record<string, unknown>)
+        volumeKg += vol
+        const name = (row as { exercises?: { name?: string } }).exercises?.name ?? 'Exercise'
+        byName.set(name, (byName.get(name) ?? 0) + vol)
+      }
+      let bestName: string | null = null
+      let bestVol = 0
+      for (const [name, v] of byName.entries()) {
+        if (v > bestVol) {
+          bestVol = v
+          bestName = name
+        }
+      }
+      if (bestName && bestVol > 0) topExerciseByVolume = { name: bestName, volumeKg: Math.round(bestVol) }
+    }
+
+    const newPRs = prsRes.count ?? 0
+
+    const inWeek = (bodyInWeekRes.data ?? []) as { measured_date: string; weight_kg: number | null }[]
+    const before = bodyBeforeRes.data as { weight_kg: number | null } | null
+    let weightDeltaKg: number | null = null
+    if (inWeek.length > 0 && before?.weight_kg != null) {
+      const lastW = Number(inWeek[inWeek.length - 1].weight_kg) || 0
+      const prevW = Number(before.weight_kg) || 0
+      if (lastW > 0 && prevW > 0) weightDeltaKg = Math.round((lastW - prevW) * 10) / 10
+    } else if (inWeek.length >= 2) {
+      const w0 = Number(inWeek[0].weight_kg) || 0
+      const w1 = Number(inWeek[inWeek.length - 1].weight_kg) || 0
+      if (w0 > 0 && w1 > 0) weightDeltaKg = Math.round((w1 - w0) * 10) / 10
+    }
+
+    return {
+      weekRangeLabel,
+      workouts,
+      totalDurationMinutes,
+      volumeKg,
+      newPRs,
+      checkinStreak,
+      weightDeltaKg,
+      topExerciseByVolume,
+      dailyWorkoutCounts,
+      todayWeekdayIndex,
+    }
+  } catch (error) {
+    console.error('Error in getProgressWeekHubSnapshot:', error)
+    return {
+      weekRangeLabel,
+      workouts: 0,
+      totalDurationMinutes: 0,
+      volumeKg: 0,
+      newPRs: 0,
+      checkinStreak: 0,
+      weightDeltaKg: null,
+      topExerciseByVolume: null,
+      dailyWorkoutCounts: [0, 0, 0, 0, 0, 0, 0],
+      todayWeekdayIndex: (new Date().getDay() + 6) % 7,
     }
   }
 }

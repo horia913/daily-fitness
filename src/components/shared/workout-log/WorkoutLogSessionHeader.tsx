@@ -8,9 +8,18 @@ type Props = {
   onBack?: () => void;
   actions?: ReactNode;
   derivedDurationMinutes?: number;
+  /** Coach detail: prescribed-set adherence aggregate (aligned with row coloring). */
+  adherenceSummary?: { setsOnTarget: number; totalPrescribedSets: number } | null;
 };
 
-export function WorkoutLogSessionHeader({ session, previousLog, onBack, actions, derivedDurationMinutes }: Props) {
+export function WorkoutLogSessionHeader({
+  session,
+  previousLog,
+  onBack,
+  actions,
+  derivedDurationMinutes,
+  adherenceSummary,
+}: Props) {
   const completedDate = session.completedAt ? new Date(session.completedAt) : null;
   const duration = session.totalDurationMinutes && session.totalDurationMinutes > 0 ? session.totalDurationMinutes : derivedDurationMinutes ?? 0;
   const volumeDelta = previousLog ? session.totalWeightLifted - previousLog.totalWeightLifted : null;
@@ -45,6 +54,14 @@ export function WorkoutLogSessionHeader({ session, previousLog, onBack, actions,
           </div>
         ) : null}
       </dl>
+      {adherenceSummary && adherenceSummary.totalPrescribedSets > 0 ? (
+        <div className="rounded-lg border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-border)]/10 px-3 py-2 text-sm">
+          <span className="fc-text-dim">Sets on target </span>
+          <span className="font-semibold tabular-nums fc-text-primary">
+            {adherenceSummary.setsOnTarget}/{adherenceSummary.totalPrescribedSets}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

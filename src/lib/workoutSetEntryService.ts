@@ -15,6 +15,45 @@ import {
   LoggedSet
 } from '@/types/workoutSetEntries'
 
+const ALL_SET_ENTRY_CHILD_TABLES = [
+  'workout_set_entry_exercises',
+  'workout_drop_sets',
+  'workout_cluster_sets',
+  'workout_rest_pause_sets',
+  'workout_time_protocols',
+  'workout_speed_sets',
+  'workout_endurance_sets',
+] as const
+
+/** Child tables touched per set type on template save (same-type updates only clear these). */
+function childTablesForSetType(setType: string): string[] {
+  switch (setType) {
+    case 'straight_set':
+    case 'superset':
+    case 'giant_set':
+    case 'pre_exhaustion':
+    case 'timed_set':
+      return ['workout_set_entry_exercises']
+    case 'drop_set':
+      return ['workout_set_entry_exercises', 'workout_drop_sets']
+    case 'cluster_set':
+      return ['workout_set_entry_exercises', 'workout_cluster_sets']
+    case 'rest_pause':
+      return ['workout_set_entry_exercises', 'workout_rest_pause_sets']
+    case 'amrap':
+    case 'emom':
+    case 'for_time':
+    case 'tabata':
+      return ['workout_time_protocols']
+    case 'speed_work':
+      return ['workout_set_entry_exercises', 'workout_speed_sets']
+    case 'endurance':
+      return ['workout_set_entry_exercises', 'workout_endurance_sets']
+    default:
+      return [...ALL_SET_ENTRY_CHILD_TABLES]
+  }
+}
+
 export class WorkoutSetEntryService {
   private static blocksCache = new Map<
     string,
@@ -345,7 +384,13 @@ export class WorkoutSetEntryService {
       block.time_protocols = blockTimeProtocols
       block.time_protocol = blockTimeProtocols.length > 0 ? blockTimeProtocols[0] : null
 
-      const usesBlockExercises = ['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(setType)
+      const usesBlockExercises = [
+        'straight_set',
+        'superset',
+        'giant_set',
+        'pre_exhaustion',
+        'timed_set',
+      ].includes(setType)
       const usesDropSets = setType === 'drop_set'
       const usesClusterSets = setType === 'cluster_set'
       const usesRestPause = setType === 'rest_pause'
@@ -1121,19 +1166,55 @@ export class WorkoutSetEntryService {
     }
   }
 
-  /**
-   * Clears all child rows for one set entry in a single DB transaction (RPC).
-   * Use before re-inserting exercises / special sets on template save — avoids
-   * duplicate rows when the old timeout-based delete failed silently.
-   */
-  static async deleteAllRelatedDataForSetEntryStrict(setEntryId: string): Promise<void> {
-    const { error } = await supabase.rpc('delete_workout_set_entry_children', {
-      p_set_entry_id: setEntryId,
-    })
+  private static async deleteChildTableStrict(
+    setEntryId: string,
+    table: string,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('set_entry_id', setEntryId)
     if (error) {
-      console.error('delete_workout_set_entry_children RPC failed:', error)
+      console.error(`Error deleting from ${table}:`, error)
       throw error
     }
+  }
+
+  /** Clears all child tables sequentially (avoids RPC statement timeout on hosted Supabase). */
+  static async deleteAllChildTablesSequential(setEntryId: string): Promise<void> {
+    for (const table of ALL_SET_ENTRY_CHILD_TABLES) {
+      await this.deleteChildTableStrict(setEntryId, table)
+    }
+  }
+
+  /**
+   * Before re-inserting block data on template save.
+   * Same set type → only relevant table(s). Type change → all child tables (sequential).
+   */
+  static async clearChildRowsForSave(
+    setEntryId: string,
+    newSetType: string,
+    previousSetType?: string | null,
+  ): Promise<void> {
+    const typeChanged =
+      previousSetType != null &&
+      previousSetType !== '' &&
+      previousSetType !== newSetType
+
+    const tables = typeChanged
+      ? [...ALL_SET_ENTRY_CHILD_TABLES]
+      : childTablesForSetType(newSetType)
+
+    for (const table of tables) {
+      await this.deleteChildTableStrict(setEntryId, table)
+    }
+  }
+
+  /**
+   * @deprecated Prefer clearChildRowsForSave or deleteAllChildTablesSequential — RPC hits statement timeout.
+   */
+  static async deleteAllRelatedDataForSetEntryStrict(setEntryId: string): Promise<void> {
+    await this.deleteAllChildTablesSequential(setEntryId)
   }
 
   // Delete all special table data for a set entry (helper for updates)
@@ -1152,7 +1233,7 @@ export class WorkoutSetEntryService {
     }
 
     if (setType) {
-      if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(setType)) {
+      if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion', 'timed_set'].includes(setType)) {
         await safeDelete('workout_set_entry_exercises')
       } else if (setType === 'drop_set') {
         await safeDelete('workout_drop_sets')
@@ -1184,7 +1265,7 @@ export class WorkoutSetEntryService {
   // Delete workout set entry (and all related special table data)
   static async deleteWorkoutBlock(setEntryId: string): Promise<boolean> {
     try {
-      await this.deleteBlockSpecialData(setEntryId)
+      await this.deleteAllChildTablesSequential(setEntryId)
 
       const { error } = await supabase
         .from('workout_set_entries')

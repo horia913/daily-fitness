@@ -18,7 +18,15 @@ import {
 import { getWellnessValueColor } from "@/lib/wellnessValueColors";
 import { getLatestMeasurement } from "@/lib/measurementService";
 import { createMeasurement } from "@/lib/measurementService";
-import { Check, Pencil, ChevronDown, ChevronUp, Scale, Minus, Plus } from "lucide-react";
+import {
+  Check,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  Scale,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import type { Achievement } from "@/components/ui/AchievementCard";
@@ -58,11 +66,11 @@ const CHECKIN_SEVERITY_SCALE_COLORS: Record<RatingScaleKey, string> = {
 
 const ratingColors = {
   steps: {
-    '1K': '#DC2626',  // Deep red
-    '2K': '#EF4444',  // Red
-    '5K': '#EAB308',  // Yellow
-    '10K': '#22C55E', // Green
-    '20K': '#16A34A', // Deep green
+    "1K": "#DC2626", // Deep red
+    "2K": "#EF4444", // Red
+    "5K": "#EAB308", // Yellow
+    "10K": "#22C55E", // Green
+    "20K": "#16A34A", // Deep green
   },
 };
 
@@ -71,11 +79,11 @@ const SLEEP_QUICK_PRESETS = [6, 7, 8, 9, 10];
 
 // Steps quick-select presets
 const STEPS_QUICK_PRESETS = [
-  { value: 1000, label: '1K' },
-  { value: 2000, label: '2K' },
-  { value: 5000, label: '5K' },
-  { value: 10000, label: '10K' },
-  { value: 20000, label: '20K' },
+  { value: 1000, label: "1K" },
+  { value: 2000, label: "2K" },
+  { value: 5000, label: "5K" },
+  { value: 10000, label: "10K" },
+  { value: 20000, label: "20K" },
 ];
 
 const SLEEP_QUALITY_OPTIONS = [
@@ -106,7 +114,9 @@ const SLEEP_QUALITY_LABELS = SLEEP_QUALITY_OPTIONS.map((o) => o.label);
 const STRESS_LABELS = STRESS_OPTIONS.map((o) => o.label);
 const SORENESS_LABELS = SORENESS_OPTIONS.map((o) => o.label);
 
-function getStreakMilestone(streak: number): { emoji: string; message: string; nextMilestone: number } | null {
+function getStreakMilestone(
+  streak: number,
+): { emoji: string; message: string; nextMilestone: number } | null {
   if (streak >= 100) {
     return { emoji: "💎", message: "100 Days!", nextMilestone: 0 };
   }
@@ -176,15 +186,27 @@ function WellnessRatingPills({
   variant,
   compact,
 }: {
-  options: readonly { readonly value: number; readonly emoji: string; readonly label: string }[];
+  options: readonly {
+    readonly value: number;
+    readonly emoji: string;
+    readonly label: string;
+  }[];
   value: number | null;
   onChange: (v: number) => void;
   variant: "sleep" | "severity";
   compact?: boolean;
 }) {
-  const palette = variant === "sleep" ? CHECKIN_SLEEP_SCALE_COLORS : CHECKIN_SEVERITY_SCALE_COLORS;
+  const palette =
+    variant === "sleep"
+      ? CHECKIN_SLEEP_SCALE_COLORS
+      : CHECKIN_SEVERITY_SCALE_COLORS;
   return (
-    <div className={cn("flex flex-row flex-wrap items-stretch gap-2", compact && "gap-1.5")}>
+    <div
+      className={cn(
+        "flex flex-row flex-wrap items-stretch gap-2",
+        compact && "gap-1.5",
+      )}
+    >
       {options.map((opt) => {
         const selected = value === opt.value;
         const color = palette[opt.value as RatingScaleKey];
@@ -195,7 +217,9 @@ function WellnessRatingPills({
             onClick={() => onChange(opt.value)}
             className={cn(
               "rounded-full border-2 transition-all duration-150 flex items-center justify-center gap-1.5 font-semibold active:scale-95",
-              compact ? "text-[10px] px-2 py-1.5 min-h-[30px]" : "text-xs px-2.5 py-2 min-h-[34px]",
+              compact
+                ? "text-[10px] px-2 py-1.5 min-h-[30px]"
+                : "text-xs px-2.5 py-2 min-h-[34px]",
               selected ? "shadow-sm" : "hover:opacity-90 bg-transparent",
             )}
             style={{
@@ -206,7 +230,10 @@ function WellnessRatingPills({
             aria-pressed={selected}
             aria-label={opt.label}
           >
-            <span className={cn("leading-none", compact ? "text-sm" : "text-base")} aria-hidden>
+            <span
+              className={cn("leading-none", compact ? "text-sm" : "text-base")}
+              aria-hidden
+            >
               {opt.emoji}
             </span>
             <span>{opt.label}</span>
@@ -225,8 +252,15 @@ interface DailyWellnessFormProps {
   immersive?: boolean;
 }
 
-export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immersive = false }: DailyWellnessFormProps) {
-  const [todayLog, setTodayLog] = useState<DailyWellnessLog | null>(initialTodayLog ?? null);
+export function DailyWellnessForm({
+  clientId,
+  initialTodayLog,
+  onSuccess,
+  immersive = false,
+}: DailyWellnessFormProps) {
+  const [todayLog, setTodayLog] = useState<DailyWellnessLog | null>(
+    initialTodayLog ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const [streak, setStreak] = useState(0);
   const [successInsight, setSuccessInsight] = useState<string | null>(null);
@@ -236,7 +270,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(false);
-  
+
   // Form values
   const [sleepHours, setSleepHours] = useState<number | null>(null);
   const [sleepHoursInput, setSleepHoursInput] = useState<string>("");
@@ -248,14 +282,18 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
   const [stepsInput, setStepsInput] = useState<string>("");
   const [showStepsInput, setShowStepsInput] = useState(false);
   const [notes, setNotes] = useState("");
-  
+
   const [hasWeightToday, setHasWeightToday] = useState<boolean | null>(null);
-  const [newAchievementsQueue, setNewAchievementsQueue] = useState<Achievement[]>([]);
+  const [newAchievementsQueue, setNewAchievementsQueue] = useState<
+    Achievement[]
+  >([]);
   const [achievementModalIndex, setAchievementModalIndex] = useState(0);
   const [showWeightPrompt, setShowWeightPrompt] = useState(false);
   const [quickWeight, setQuickWeight] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
-  const [yesterdayLog, setYesterdayLog] = useState<DailyWellnessLog | null>(null);
+  const [yesterdayLog, setYesterdayLog] = useState<DailyWellnessLog | null>(
+    null,
+  );
   const [weekLogs, setWeekLogs] = useState<DailyWellnessLog[]>([]);
 
   const today = new Date().toISOString().split("T")[0];
@@ -283,10 +321,14 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
       setSleepHoursInput(initialTodayLog.sleep_hours?.toString() ?? "");
       setSleepQuality(initialTodayLog.sleep_quality ?? null);
       setStressLevel(
-        initialTodayLog.stress_level != null ? dbToUiScale(initialTodayLog.stress_level) : null
+        initialTodayLog.stress_level != null
+          ? dbToUiScale(initialTodayLog.stress_level)
+          : null,
       );
       setSorenessLevel(
-        initialTodayLog.soreness_level != null ? dbToUiScale(initialTodayLog.soreness_level) : null
+        initialTodayLog.soreness_level != null
+          ? dbToUiScale(initialTodayLog.soreness_level)
+          : null,
       );
       setSteps(initialTodayLog.steps ?? null);
       setStepsInput(initialTodayLog.steps?.toString() ?? "");
@@ -302,7 +344,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
       setShowForm(true);
       setShowSuccess(false);
     }
-    
+
     // Only fetch weight data (not wellness data)
     const loadWeight = async () => {
       try {
@@ -347,7 +389,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
     setSubmitError(null);
     try {
       const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error("Save timed out")), SAVE_TIMEOUT_MS)
+        setTimeout(() => reject(new Error("Save timed out")), SAVE_TIMEOUT_MS),
       );
       const result = await Promise.race([
         upsertDailyLog(clientId, {
@@ -371,8 +413,14 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
         setSleepHours(result.sleep_hours ?? null);
         setSleepHoursInput(result.sleep_hours?.toString() ?? "");
         setSleepQuality(result.sleep_quality ?? null);
-        setStressLevel(result.stress_level != null ? dbToUiScale(result.stress_level) : null);
-        setSorenessLevel(result.soreness_level != null ? dbToUiScale(result.soreness_level) : null);
+        setStressLevel(
+          result.stress_level != null ? dbToUiScale(result.stress_level) : null,
+        );
+        setSorenessLevel(
+          result.soreness_level != null
+            ? dbToUiScale(result.soreness_level)
+            : null,
+        );
         setSteps(result.steps ?? null);
         setStepsInput(result.steps?.toString() ?? "");
         setNotes(result.notes ?? "");
@@ -397,7 +445,11 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
         }
 
         try {
-          const checkinNew = await AchievementService.checkAndUnlockAchievements(clientId, "checkin_streak");
+          const checkinNew =
+            await AchievementService.checkAndUnlockAchievements(
+              clientId,
+              "checkin_streak",
+            );
           if (checkinNew.length > 0) {
             const mapped: Achievement[] = checkinNew.map((a) => ({
               id: a.templateId,
@@ -424,15 +476,31 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
           endLast.setDate(endLast.getDate() - 1);
           const [logsThisWeek, logsLastWeek] = await Promise.all([
             getLogRange(clientId, weekStartStr, endThis),
-            getLogRange(clientId, startLast.toISOString().split("T")[0], endLast.toISOString().split("T")[0]),
+            getLogRange(
+              clientId,
+              startLast.toISOString().split("T")[0],
+              endLast.toISOString().split("T")[0],
+            ),
           ]);
           const complete = (arr: DailyWellnessLog[]) =>
-            arr.filter((l) => l.sleep_hours != null && l.stress_level != null && l.soreness_level != null);
-          const avg = (arr: DailyWellnessLog[], field: "stress_level" | "soreness_level" | "sleep_hours") => {
+            arr.filter(
+              (l) =>
+                l.sleep_hours != null &&
+                l.stress_level != null &&
+                l.soreness_level != null,
+            );
+          const avg = (
+            arr: DailyWellnessLog[],
+            field: "stress_level" | "soreness_level" | "sleep_hours",
+          ) => {
             const c = complete(arr);
             if (c.length === 0) return null;
-            if (field === "sleep_hours") return c.reduce((s, l) => s + (l.sleep_hours ?? 0), 0) / c.length;
-            const scale = field === "stress_level" ? dbToUiScale : (v: number | null) => dbToUiScale(v);
+            if (field === "sleep_hours")
+              return c.reduce((s, l) => s + (l.sleep_hours ?? 0), 0) / c.length;
+            const scale =
+              field === "stress_level"
+                ? dbToUiScale
+                : (v: number | null) => dbToUiScale(v);
             const sum = c.reduce((s, l) => s + (scale(l[field]) ?? 0), 0);
             return sum / c.length;
           };
@@ -443,11 +511,23 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
           const sorenessThis = avg(logsThisWeek, "soreness_level");
           const sorenessLast = avg(logsLastWeek, "soreness_level");
           let insight: string | null = null;
-          if (stressThis != null && stressLast != null && stressThis < stressLast) {
+          if (
+            stressThis != null &&
+            stressLast != null &&
+            stressThis < stressLast
+          ) {
             insight = "Your stress is trending down this week — nice work!";
-          } else if (sleepThis != null && sleepLast != null && sleepThis > sleepLast) {
+          } else if (
+            sleepThis != null &&
+            sleepLast != null &&
+            sleepThis > sleepLast
+          ) {
             insight = "You're sleeping better this week — keep it up!";
-          } else if (sorenessThis != null && sorenessLast != null && sorenessThis < sorenessLast) {
+          } else if (
+            sorenessThis != null &&
+            sorenessLast != null &&
+            sorenessThis < sorenessLast
+          ) {
             insight = "Less sore than last week — recovery is on track.";
           } else if (currentStreak >= 7) {
             insight = "7+ days in a row! Consistency is your superpower.";
@@ -457,7 +537,9 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
           setSuccessInsight(insight);
         } catch (insightErr) {
           console.warn("Error loading success insight:", insightErr);
-          setSuccessInsight("Every check-in counts. You're building a great habit.");
+          setSuccessInsight(
+            "Every check-in counts. You're building a great habit.",
+          );
         }
 
         onSuccess?.();
@@ -499,7 +581,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
         setShowWeightPrompt(false);
         setQuickWeight("");
         try {
-          const weightNew = await AchievementService.checkAndUnlockAchievements(clientId, "weight_goal");
+          const weightNew = await AchievementService.checkAndUnlockAchievements(
+            clientId,
+            "weight_goal",
+          );
           if (weightNew.length > 0) {
             const mapped: Achievement[] = weightNew.map((a) => ({
               id: a.templateId,
@@ -585,7 +670,9 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
 
   if (loading) {
     return (
-      <div className={`space-y-4 ${immersive ? "py-1" : "border-y border-white/5 px-4 py-3"}`}>
+      <div
+        className={`space-y-4 ${immersive ? "py-1" : "border-y border-white/5 px-4 py-3"}`}
+      >
         <Skeleton className="h-8 w-48 rounded-lg" />
         <Skeleton className="h-24 w-full rounded-xl" />
         <Skeleton className="h-24 w-full rounded-xl" />
@@ -600,13 +687,19 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
     if (immersive && log) {
       return (
         <div className="transition-all">
-          <CompletedCheckInSummary log={log} logDate={today} onEdit={startEdit} />
+          <CompletedCheckInSummary
+            log={log}
+            logDate={today}
+            onEdit={startEdit}
+          />
           {showWeightPrompt && !hasWeightToday && (
             <div className="mt-4 p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
               <div className="flex items-start gap-3">
                 <Scale className="w-5 h-5 fc-text-subtle mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium fc-text-primary mb-2">Also log your weight today?</p>
+                  <p className="text-sm font-medium fc-text-primary mb-2">
+                    Also log your weight today?
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     <input
                       type="number"
@@ -661,7 +754,9 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
             <Check className="w-7 h-7 text-[color:var(--fc-status-success)]" />
           </div>
           <div>
-            <h2 className="text-xl font-bold fc-text-primary">Check-in complete</h2>
+            <h2 className="text-xl font-bold fc-text-primary">
+              Check-in complete
+            </h2>
             <p className="text-sm fc-text-dim">
               {todayLog?.created_at
                 ? `Updated at ${formatTime(todayLog.created_at)}`
@@ -669,39 +764,69 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
             </p>
           </div>
         </div>
-        
+
         {/* Display summary */}
         <div className="flex flex-wrap gap-2 mb-4">
           {log?.sleep_hours != null && (
             <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
               <span className="text-sm fc-text-subtle">
-                😴 <span className={getWellnessValueColor(log.sleep_hours, "sleep_hours")}>{log.sleep_hours}h</span>
+                😴{" "}
+                <span
+                  className={getWellnessValueColor(
+                    log.sleep_hours,
+                    "sleep_hours",
+                  )}
+                >
+                  {log.sleep_hours}h
+                </span>
                 {log.sleep_quality != null && (
-                  <> (<span className={getWellnessValueColor(log.sleep_quality, "sleep_quality")}>{getSleepQualityLabel(log.sleep_quality)}</span>)</>
+                  <>
+                    {" "}
+                    (
+                    <span
+                      className={getWellnessValueColor(
+                        log.sleep_quality,
+                        "sleep_quality",
+                      )}
+                    >
+                      {getSleepQualityLabel(log.sleep_quality)}
+                    </span>
+                    )
+                  </>
                 )}
               </span>
             </div>
           )}
-          {log?.stress_level != null && (() => {
-            const uiVal = dbToUiScale(log.stress_level);
-            return uiVal != null ? (
-              <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
-                <span className="text-sm fc-text-subtle">
-                  😤 <span className={getWellnessValueColor(uiVal, "stress")}>{getStressLabel(log.stress_level)}</span> stress
-                </span>
-              </div>
-            ) : null;
-          })()}
-          {log?.soreness_level != null && (() => {
-            const uiVal = dbToUiScale(log.soreness_level);
-            return uiVal != null ? (
-              <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
-                <span className="text-sm fc-text-subtle">
-                  💪 <span className={getWellnessValueColor(uiVal, "soreness")}>{getSorenessLabel(log.soreness_level)}</span> soreness
-                </span>
-              </div>
-            ) : null;
-          })()}
+          {log?.stress_level != null &&
+            (() => {
+              const uiVal = dbToUiScale(log.stress_level);
+              return uiVal != null ? (
+                <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
+                  <span className="text-sm fc-text-subtle">
+                    😤{" "}
+                    <span className={getWellnessValueColor(uiVal, "stress")}>
+                      {getStressLabel(log.stress_level)}
+                    </span>{" "}
+                    stress
+                  </span>
+                </div>
+              ) : null;
+            })()}
+          {log?.soreness_level != null &&
+            (() => {
+              const uiVal = dbToUiScale(log.soreness_level);
+              return uiVal != null ? (
+                <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
+                  <span className="text-sm fc-text-subtle">
+                    💪{" "}
+                    <span className={getWellnessValueColor(uiVal, "soreness")}>
+                      {getSorenessLabel(log.soreness_level)}
+                    </span>{" "}
+                    soreness
+                  </span>
+                </div>
+              ) : null;
+            })()}
           {log?.steps != null && (
             <div className="fc-glass-soft px-3 py-2 rounded-xl border border-[color:var(--fc-glass-border)]">
               <span className="text-sm fc-text-subtle">
@@ -710,35 +835,40 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
             </div>
           )}
         </div>
-        
+
         {todayLog?.notes && (
-          <p className="text-sm fc-text-dim mb-4 italic">&ldquo;{todayLog.notes}&rdquo;</p>
+          <p className="text-sm fc-text-dim mb-4 italic">
+            &ldquo;{todayLog.notes}&rdquo;
+          </p>
         )}
-        {streak > 0 && (() => {
-          const milestone = getStreakMilestone(streak);
-          const nextMilestone = milestone?.nextMilestone || (streak < 7 ? 7 : streak < 30 ? 30 : streak < 100 ? 100 : 0);
-          const daysToNext = nextMilestone > 0 ? nextMilestone - streak : 0;
-          
-          return (
-            <div className="mb-3">
-              {milestone && submitSuccess && (
-                <div className="mb-2 p-3 rounded-xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/40 animate-pulse">
-                  <p className="text-sm font-bold fc-text-primary text-center">
-                    {milestone.emoji} {milestone.message}
-                  </p>
-                </div>
-              )}
-              <p className="text-sm font-semibold fc-text-primary">
-                🔥 {streak}-day check-in streak
-                {daysToNext > 0 && (
-                  <span className="text-xs fc-text-subtle ml-2">
-                    — {daysToNext} more to next milestone!
-                  </span>
+        {streak > 0 &&
+          (() => {
+            const milestone = getStreakMilestone(streak);
+            const nextMilestone =
+              milestone?.nextMilestone ||
+              (streak < 7 ? 7 : streak < 30 ? 30 : streak < 100 ? 100 : 0);
+            const daysToNext = nextMilestone > 0 ? nextMilestone - streak : 0;
+
+            return (
+              <div className="mb-3">
+                {milestone && submitSuccess && (
+                  <div className="mb-2 p-3 rounded-xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/40 animate-pulse">
+                    <p className="text-sm font-bold fc-text-primary text-center">
+                      {milestone.emoji} {milestone.message}
+                    </p>
+                  </div>
                 )}
-              </p>
-            </div>
-          );
-        })()}
+                <p className="text-sm font-semibold fc-text-primary">
+                  🔥 {streak}-day check-in streak
+                  {daysToNext > 0 && (
+                    <span className="text-xs fc-text-subtle ml-2">
+                      — {daysToNext} more to next milestone!
+                    </span>
+                  )}
+                </p>
+              </div>
+            );
+          })()}
         {successInsight && (
           <p className="text-sm fc-text-primary mb-4">
             {successInsight.startsWith("Your stress") && "📉 "}
@@ -749,8 +879,10 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
             {successInsight}
           </p>
         )}
-        <p className="text-xs fc-text-subtle mb-4">Your coach can see this data.</p>
-        
+        <p className="text-xs fc-text-subtle mb-4">
+          Your coach can see this data.
+        </p>
+
         {/* Optional: Quick weight prompt */}
         {showWeightPrompt && !hasWeightToday && (
           <div className="mt-4 p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
@@ -789,7 +921,7 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
             </div>
           </div>
         )}
-        
+
         <button
           type="button"
           onClick={startEdit}
@@ -807,610 +939,758 @@ export function DailyWellnessForm({ clientId, initialTodayLog, onSuccess, immers
 
   return (
     <>
-    <div className={formShell}>
-      <header className={immersive ? cn(checkinSuiteStyles.dailySectionHeader, "mb-4") : "mb-6"}>
-        {immersive ? (
-          <>
-            <h2 className={checkinSuiteStyles.dailySectionTitle}>Today&apos;s check-in</h2>
-            <p className={checkinSuiteStyles.dailySectionDate}>{todayFormatted}</p>
-          </>
-        ) : (
-          <>
-            <h2 className="font-bold fc-text-primary text-[22px]">Daily Check-in</h2>
-            <p className="text-sm fc-text-dim mt-0.5">{todayFormatted}</p>
-            {todayLog?.created_at && (
-              <p className="text-xs fc-text-subtle mt-1">
-                Updated at {formatTime(todayLog.created_at)} — you can edit below.
+      <div className={formShell}>
+        <header
+          className={
+            immersive
+              ? cn(checkinSuiteStyles.dailySectionHeader, "mb-4")
+              : "mb-6"
+          }
+        >
+          {immersive ? (
+            <>
+              <h2 className={checkinSuiteStyles.dailySectionTitle}>
+                Today&apos;s check-in
+              </h2>
+              <p className={checkinSuiteStyles.dailySectionDate}>
+                {todayFormatted}
               </p>
-            )}
-          </>
-        )}
-      </header>
-
-      <form onSubmit={handleSubmit} className={formSpacing}>
-        {immersive ? (
-          <>
-            <CheckinSectionCard stripe="cyan" title="Sleep duration">
-              {yesterdayLog?.sleep_hours != null && (
-                <p className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)} style={{ color: "var(--cs-t3)" }}>
-                  Yesterday: {yesterdayLog.sleep_hours}h
-                  {sleepHours != null && yesterdayLog.sleep_hours !== sleepHours && (
-                    <span className="ml-1">{sleepHours > yesterdayLog.sleep_hours ? "↑" : "↓"}</span>
-                  )}
+            </>
+          ) : (
+            <>
+              <h2 className="font-bold fc-text-primary text-[22px]">
+                Daily Check-in
+              </h2>
+              <p className="text-sm fc-text-dim mt-0.5">{todayFormatted}</p>
+              {todayLog?.created_at && (
+                <p className="text-xs fc-text-subtle mt-1">
+                  Updated at {formatTime(todayLog.created_at)} — you can edit
+                  below.
                 </p>
               )}
-              <CheckinStepper
-                minusDisabled={sleepHours != null && sleepHours <= 0}
-                plusDisabled={sleepHours != null && sleepHours >= 24}
-                onMinus={decrementSleep}
-                onPlus={incrementSleep}
-                unit="hours"
-                center={
-                  showSleepInput ? (
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="24"
-                      value={sleepHoursInput}
-                      onChange={(e) => handleSleepHoursInputChange(e.target.value)}
-                      onBlur={() => setShowSleepInput(false)}
-                      className={cn(
-                        checkinSuiteStyles.stepperValue,
-                        "w-full max-w-[140px] bg-transparent border-none outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                      )}
-                      autoFocus
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSleepInput(true);
-                        setSleepHoursInput(sleepHours?.toString() ?? "");
-                      }}
-                      className={cn(
-                        checkinSuiteStyles.stepperValue,
-                        sleepHours == null && checkinSuiteStyles.stepperValueMuted,
-                        "bg-transparent border-none cursor-text",
-                      )}
-                    >
-                      {sleepHours != null ? `${sleepHours.toFixed(1)}` : "—"}
-                    </button>
-                  )
-                }
-              />
-              <CheckinPresetGrid
-                items={SLEEP_QUICK_PRESETS.map((h) => ({ value: h, label: `${h}h` }))}
-                selectedValue={
-                  sleepHours != null && SLEEP_QUICK_PRESETS.some((h) => h === sleepHours) ? sleepHours : null
-                }
-                onSelect={(h) => {
-                  setSleepHours(h);
-                  setSleepHoursInput(h.toString());
-                }}
-              />
-            </CheckinSectionCard>
+            </>
+          )}
+        </header>
 
-            <CheckinSectionCard stripe="purple" title="Sleep quality">
-              <CheckinScalePills
-                options={SLEEP_QUALITY_OPTIONS}
-                value={sleepQuality}
-                onChange={setSleepQuality}
-                variant="sleep"
-              />
-            </CheckinSectionCard>
-
-            <CheckinSectionCard stripe="warning" title="Stress level">
-              {yesterdayLog?.stress_level != null && (
-                <p className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)} style={{ color: "var(--cs-t3)" }}>
-                  Yesterday: {getStressLabel(yesterdayLog.stress_level)}
-                  {stressLevel != null && (() => {
-                    const yUi = dbToUiScale(yesterdayLog.stress_level);
-                    if (yUi == null) return null;
-                    return <span className="ml-1">{stressLevel > yUi ? "↑" : stressLevel < yUi ? "↓" : ""}</span>;
-                  })()}
-                </p>
-              )}
-              <CheckinScalePills
-                options={STRESS_OPTIONS}
-                value={stressLevel}
-                onChange={setStressLevel}
-                variant="inverted"
-              />
-            </CheckinSectionCard>
-
-            <CheckinSectionCard stripe="good" title="Muscle soreness">
-              {yesterdayLog?.soreness_level != null && (
-                <p className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)} style={{ color: "var(--cs-t3)" }}>
-                  Yesterday: {getSorenessLabel(yesterdayLog.soreness_level)}
-                  {sorenessLevel != null && (() => {
-                    const yUi = dbToUiScale(yesterdayLog.soreness_level);
-                    if (yUi == null) return null;
-                    return <span className="ml-1">{sorenessLevel > yUi ? "↑" : sorenessLevel < yUi ? "↓" : ""}</span>;
-                  })()}
-                </p>
-              )}
-              <CheckinScalePills
-                options={SORENESS_OPTIONS}
-                value={sorenessLevel}
-                onChange={setSorenessLevel}
-                variant="inverted"
-              />
-            </CheckinSectionCard>
-
-            <CheckinSectionCard stripe="lime" title="Steps" titleRight="Optional">
-              {yesterdayLog?.steps != null && (
-                <p className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)} style={{ color: "var(--cs-t3)" }}>
-                  Yesterday: {yesterdayLog.steps.toLocaleString()}
-                  {steps != null && yesterdayLog.steps != null && (
-                    <span className="ml-1">{steps > yesterdayLog.steps ? "↑" : steps < yesterdayLog.steps ? "↓" : ""}</span>
-                  )}
-                </p>
-              )}
-              <CheckinStepper
-                minusDisabled={steps != null && steps <= 0}
-                plusDisabled={false}
-                onMinus={decrementSteps}
-                onPlus={incrementSteps}
-                unit="steps"
-                center={
-                  showStepsInput ? (
-                    <input
-                      type="text"
-                      value={stepsInput}
-                      onChange={(e) => handleStepsInputChange(e.target.value)}
-                      onBlur={() => setShowStepsInput(false)}
-                      className={cn(
-                        checkinSuiteStyles.stepperValue,
-                        "w-full max-w-[160px] bg-transparent border-none outline-none text-center",
-                      )}
-                      placeholder="0"
-                      autoFocus
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowStepsInput(true);
-                        setStepsInput(steps?.toString() ?? "");
-                      }}
-                      className={cn(
-                        checkinSuiteStyles.stepperValue,
-                        steps == null && checkinSuiteStyles.stepperValueMuted,
-                        "bg-transparent border-none cursor-text",
-                      )}
-                    >
-                      {steps != null ? steps.toLocaleString() : "—"}
-                    </button>
-                  )
-                }
-              />
-              <CheckinPresetGrid
-                items={STEPS_QUICK_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
-                selectedValue={steps}
-                onSelect={(v) => {
-                  setSteps(v);
-                  setStepsInput(v.toString());
-                }}
-              />
-            </CheckinSectionCard>
-
-            <CheckinSectionCard title="Notes" titleRight="Optional">
-              {!notesExpanded ? (
-                <button
-                  type="button"
-                  onClick={() => setNotesExpanded(true)}
-                  className={cn(
-                    "flex w-full items-center justify-between text-left text-sm font-medium py-2 rounded-lg transition-colors",
-                    checkinSuiteStyles.fontBody,
-                  )}
-                  style={{ color: "var(--cs-t3)" }}
-                >
-                  <span>Add notes</span>
-                  <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
-                </button>
-              ) : (
-                <div>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES))}
-                    placeholder="How are you feeling today?"
-                    rows={4}
-                    maxLength={MAX_NOTES}
-                    className={cn(
-                      "w-full min-h-[64px] px-3 py-3 rounded-xl text-sm border resize-none",
-                      checkinSuiteStyles.fontBody,
-                    )}
-                    style={{
-                      background: "var(--cs-card-2)",
-                      borderColor: "var(--cs-line)",
-                      color: "var(--cs-t1)",
-                    }}
-                  />
-                  <p className="text-xs mt-1" style={{ color: "var(--cs-t4)" }}>
-                    {notes.length}/{MAX_NOTES}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setNotesExpanded(false)}
-                    className="text-xs mt-1 flex items-center gap-1"
+        <form onSubmit={handleSubmit} className={formSpacing}>
+          {immersive ? (
+            <>
+              <CheckinSectionCard stripe="cyan" title="Sleep duration">
+                {yesterdayLog?.sleep_hours != null && (
+                  <p
+                    className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)}
                     style={{ color: "var(--cs-t3)" }}
                   >
-                    <ChevronUp className="w-3 h-3" /> Collapse
-                  </button>
-                </div>
-              )}
-            </CheckinSectionCard>
-          </>
-        ) : (
-          <>
-            {/* A) Sleep Duration */}
-            <div>
-              <CheckInMetricHeading>
-                <span className="block text-base font-semibold text-white">Sleep Duration</span>
-                {yesterdayLog?.sleep_hours != null && (
-                  <span className="mt-1 block text-xs font-normal fc-text-subtle">
                     Yesterday: {yesterdayLog.sleep_hours}h
-                    {sleepHours != null && yesterdayLog.sleep_hours !== sleepHours && (
-                      <span className="ml-1">{sleepHours > yesterdayLog.sleep_hours ? "↑" : "↓"}</span>
-                    )}
-                  </span>
+                    {sleepHours != null &&
+                      yesterdayLog.sleep_hours !== sleepHours && (
+                        <span className="ml-1">
+                          {sleepHours > yesterdayLog.sleep_hours ? "↑" : "↓"}
+                        </span>
+                      )}
+                  </p>
                 )}
-              </CheckInMetricHeading>
+                <CheckinStepper
+                  minusDisabled={sleepHours != null && sleepHours <= 0}
+                  plusDisabled={sleepHours != null && sleepHours >= 24}
+                  onMinus={decrementSleep}
+                  onPlus={incrementSleep}
+                  unit="hours"
+                  center={
+                    showSleepInput ? (
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        value={sleepHoursInput}
+                        onChange={(e) =>
+                          handleSleepHoursInputChange(e.target.value)
+                        }
+                        onBlur={() => setShowSleepInput(false)}
+                        className={cn(
+                          checkinSuiteStyles.stepperValue,
+                          "w-full max-w-[140px] bg-transparent border-none outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                        )}
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSleepInput(true);
+                          setSleepHoursInput(sleepHours?.toString() ?? "");
+                        }}
+                        className={cn(
+                          checkinSuiteStyles.stepperValue,
+                          sleepHours == null &&
+                            checkinSuiteStyles.stepperValueMuted,
+                          "bg-transparent border-none cursor-text",
+                        )}
+                      >
+                        {sleepHours != null ? `${sleepHours.toFixed(1)}` : "—"}
+                      </button>
+                    )
+                  }
+                />
+                <CheckinPresetGrid
+                  items={SLEEP_QUICK_PRESETS.map((h) => ({
+                    value: h,
+                    label: `${h}h`,
+                  }))}
+                  selectedValue={
+                    sleepHours != null &&
+                    SLEEP_QUICK_PRESETS.some((h) => h === sleepHours)
+                      ? sleepHours
+                      : null
+                  }
+                  onSelect={(h) => {
+                    setSleepHours(h);
+                    setSleepHoursInput(h.toString());
+                  }}
+                />
+              </CheckinSectionCard>
 
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <button
-                  type="button"
-                  onClick={decrementSleep}
-                  className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
-                >
-                  <Minus className="w-5 h-5 fc-text-primary" />
-                </button>
+              <CheckinSectionCard stripe="purple" title="Sleep quality">
+                <CheckinScalePills
+                  options={SLEEP_QUALITY_OPTIONS}
+                  value={sleepQuality}
+                  onChange={setSleepQuality}
+                  variant="sleep"
+                />
+              </CheckinSectionCard>
 
-                <div className="min-w-[120px] text-center">
-                  {showSleepInput ? (
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="24"
-                      value={sleepHoursInput}
-                      onChange={(e) => handleSleepHoursInputChange(e.target.value)}
-                      onBlur={() => setShowSleepInput(false)}
-                      className="w-full text-4xl font-bold fc-text-primary bg-transparent border-none outline-none text-center"
-                      autoFocus
-                    />
-                  ) : (
-                    <div
-                      onClick={() => {
-                        setShowSleepInput(true);
-                        setSleepHoursInput(sleepHours?.toString() ?? "");
-                      }}
-                      className="text-4xl font-bold fc-text-primary cursor-text"
-                    >
-                      {sleepHours != null ? `${sleepHours.toFixed(1)}h` : "—"}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={incrementSleep}
-                  className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
-                >
-                  <Plus className="w-5 h-5 fc-text-primary" />
-                </button>
-              </div>
-
-              <div className="flex gap-1.5 sm:gap-2 justify-center">
-                {SLEEP_QUICK_PRESETS.map((hours) => {
-                  const selected = sleepHours === hours;
-                  return (
-                    <button
-                      key={hours}
-                      type="button"
-                      onClick={() => {
-                        setSleepHours(hours);
-                        setSleepHoursInput(hours.toString());
-                      }}
-                      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all active:scale-95 flex-1 max-w-[60px] ${
-                        selected
-                          ? "fc-btn fc-btn-primary"
-                          : "fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
-                      }`}
-                    >
-                      {hours}h
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <CheckInMetricHeading>
-                <span className="block text-base font-semibold text-white">Sleep Quality</span>
-              </CheckInMetricHeading>
-              <WellnessRatingPills
-                options={SLEEP_QUALITY_OPTIONS}
-                value={sleepQuality}
-                onChange={setSleepQuality}
-                variant="sleep"
-                compact={false}
-              />
-            </div>
-
-            <div>
-              <CheckInMetricHeading>
-                <span className="block text-base font-semibold text-white">Stress Level</span>
+              <CheckinSectionCard stripe="warning" title="Stress level">
                 {yesterdayLog?.stress_level != null && (
-                  <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                  <p
+                    className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)}
+                    style={{ color: "var(--cs-t3)" }}
+                  >
                     Yesterday: {getStressLabel(yesterdayLog.stress_level)}
-                    {stressLevel != null && (() => {
-                      const yUi = dbToUiScale(yesterdayLog.stress_level);
-                      if (yUi == null) return null;
-                      return <span className="ml-1">{stressLevel > yUi ? "↑" : stressLevel < yUi ? "↓" : ""}</span>;
-                    })()}
-                  </span>
+                    {stressLevel != null &&
+                      (() => {
+                        const yUi = dbToUiScale(yesterdayLog.stress_level);
+                        if (yUi == null) return null;
+                        return (
+                          <span className="ml-1">
+                            {stressLevel > yUi
+                              ? "↑"
+                              : stressLevel < yUi
+                                ? "↓"
+                                : ""}
+                          </span>
+                        );
+                      })()}
+                  </p>
                 )}
-              </CheckInMetricHeading>
-              <WellnessRatingPills
-                options={STRESS_OPTIONS}
-                value={stressLevel}
-                onChange={setStressLevel}
-                variant="severity"
-                compact={false}
-              />
-            </div>
+                <CheckinScalePills
+                  options={STRESS_OPTIONS}
+                  value={stressLevel}
+                  onChange={setStressLevel}
+                  variant="inverted"
+                />
+              </CheckinSectionCard>
 
-            <div>
-              <CheckInMetricHeading>
-                <span className="block text-base font-semibold text-white">Muscle Soreness</span>
+              <CheckinSectionCard stripe="good" title="Muscle soreness">
                 {yesterdayLog?.soreness_level != null && (
-                  <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                  <p
+                    className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)}
+                    style={{ color: "var(--cs-t3)" }}
+                  >
                     Yesterday: {getSorenessLabel(yesterdayLog.soreness_level)}
-                    {sorenessLevel != null && (() => {
-                      const yUi = dbToUiScale(yesterdayLog.soreness_level);
-                      if (yUi == null) return null;
-                      return <span className="ml-1">{sorenessLevel > yUi ? "↑" : sorenessLevel < yUi ? "↓" : ""}</span>;
-                    })()}
-                  </span>
+                    {sorenessLevel != null &&
+                      (() => {
+                        const yUi = dbToUiScale(yesterdayLog.soreness_level);
+                        if (yUi == null) return null;
+                        return (
+                          <span className="ml-1">
+                            {sorenessLevel > yUi
+                              ? "↑"
+                              : sorenessLevel < yUi
+                                ? "↓"
+                                : ""}
+                          </span>
+                        );
+                      })()}
+                  </p>
                 )}
-              </CheckInMetricHeading>
-              <WellnessRatingPills
-                options={SORENESS_OPTIONS}
-                value={sorenessLevel}
-                onChange={setSorenessLevel}
-                variant="severity"
-                compact={false}
-              />
-            </div>
+                <CheckinScalePills
+                  options={SORENESS_OPTIONS}
+                  value={sorenessLevel}
+                  onChange={setSorenessLevel}
+                  variant="inverted"
+                />
+              </CheckinSectionCard>
 
-            <div>
-              <CheckInMetricHeading>
-                <span className="block text-base font-semibold text-white">Steps</span>
+              <CheckinSectionCard
+                stripe="lime"
+                title="Steps"
+                titleRight="Optional"
+              >
                 {yesterdayLog?.steps != null && (
-                  <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                  <p
+                    className={cn("text-xs -mt-1", checkinSuiteStyles.fontBody)}
+                    style={{ color: "var(--cs-t3)" }}
+                  >
                     Yesterday: {yesterdayLog.steps.toLocaleString()}
                     {steps != null && yesterdayLog.steps != null && (
-                      <span className="ml-1">{steps > yesterdayLog.steps ? "↑" : steps < yesterdayLog.steps ? "↓" : ""}</span>
+                      <span className="ml-1">
+                        {steps > yesterdayLog.steps
+                          ? "↑"
+                          : steps < yesterdayLog.steps
+                            ? "↓"
+                            : ""}
+                      </span>
                     )}
-                  </span>
+                  </p>
                 )}
-              </CheckInMetricHeading>
+                <CheckinStepper
+                  minusDisabled={steps != null && steps <= 0}
+                  plusDisabled={false}
+                  onMinus={decrementSteps}
+                  onPlus={incrementSteps}
+                  unit="steps"
+                  center={
+                    showStepsInput ? (
+                      <input
+                        type="text"
+                        value={stepsInput}
+                        onChange={(e) => handleStepsInputChange(e.target.value)}
+                        onBlur={() => setShowStepsInput(false)}
+                        className={cn(
+                          checkinSuiteStyles.stepperValue,
+                          "w-full max-w-[160px] bg-transparent border-none outline-none text-center",
+                        )}
+                        placeholder="0"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStepsInput(true);
+                          setStepsInput(steps?.toString() ?? "");
+                        }}
+                        className={cn(
+                          checkinSuiteStyles.stepperValue,
+                          steps == null && checkinSuiteStyles.stepperValueMuted,
+                          "bg-transparent border-none cursor-text",
+                        )}
+                      >
+                        {steps != null ? steps.toLocaleString() : "—"}
+                      </button>
+                    )
+                  }
+                />
+                <CheckinPresetGrid
+                  items={STEPS_QUICK_PRESETS.map((p) => ({
+                    value: p.value,
+                    label: p.label,
+                  }))}
+                  selectedValue={steps}
+                  onSelect={(v) => {
+                    setSteps(v);
+                    setStepsInput(v.toString());
+                  }}
+                />
+              </CheckinSectionCard>
 
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <button
-                  type="button"
-                  onClick={decrementSteps}
-                  className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
-                >
-                  <Minus className="w-5 h-5 fc-text-primary" />
-                </button>
-
-                <div className="min-w-[140px] text-center">
-                  {showStepsInput ? (
-                    <input
-                      type="text"
-                      value={stepsInput}
-                      onChange={(e) => handleStepsInputChange(e.target.value)}
-                      onBlur={() => setShowStepsInput(false)}
-                      className="w-full text-4xl font-bold fc-text-primary bg-transparent border-none outline-none text-center"
-                      placeholder="0"
-                      autoFocus
-                    />
-                  ) : (
-                    <div
-                      onClick={() => {
-                        setShowStepsInput(true);
-                        setStepsInput(steps?.toString() ?? "");
-                      }}
-                      className="text-4xl font-bold fc-text-primary cursor-text"
-                    >
-                      {steps != null ? steps.toLocaleString() : "—"}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={incrementSteps}
-                  className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
-                >
-                  <Plus className="w-5 h-5 fc-text-primary" />
-                </button>
-              </div>
-
-              <div className="flex gap-1.5 sm:gap-2 justify-center">
-                {STEPS_QUICK_PRESETS.map((preset) => {
-                  const selected = steps === preset.value;
-                  const color = ratingColors.steps[preset.label as keyof typeof ratingColors.steps];
-                  return (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => {
-                        setSteps(preset.value);
-                        setStepsInput(preset.value.toString());
-                      }}
-                      className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all active:scale-95 text-white flex-1 max-w-[60px]"
-                      style={{
-                        backgroundColor: selected ? color : `${color}60`,
-                        opacity: selected ? 1 : 0.8,
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              {!notesExpanded ? (
-                <button
-                  type="button"
-                  onClick={() => setNotesExpanded(true)}
-                  className="flex w-full items-center justify-between text-left text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors py-1"
-                >
-                  <span>Add note</span>
-                  <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
-                </button>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium fc-text-primary mb-2">Notes</label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES))}
-                    placeholder="Optional — injuries, lifestyle factors, etc."
-                    rows={3}
-                    maxLength={MAX_NOTES}
-                    className="w-full px-4 py-3 rounded-xl text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
-                  />
-                  <p className="text-xs fc-text-subtle mt-1">{notes.length}/{MAX_NOTES}</p>
+              <CheckinSectionCard title="Notes" titleRight="Optional">
+                {!notesExpanded ? (
                   <button
                     type="button"
-                    onClick={() => setNotesExpanded(false)}
-                    className="text-xs fc-text-subtle mt-1 flex items-center gap-1"
+                    onClick={() => setNotesExpanded(true)}
+                    className={cn(
+                      "flex w-full items-center justify-between text-left text-sm font-medium py-2 rounded-lg transition-colors",
+                      checkinSuiteStyles.fontBody,
+                    )}
+                    style={{ color: "var(--cs-t3)" }}
                   >
-                    <ChevronUp className="w-3 h-3" /> Collapse
+                    <span>Add notes</span>
+                    <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
+                  </button>
+                ) : (
+                  <div>
+                    <textarea
+                      value={notes}
+                      onChange={(e) =>
+                        setNotes(e.target.value.slice(0, MAX_NOTES))
+                      }
+                      placeholder="How are you feeling today?"
+                      rows={4}
+                      maxLength={MAX_NOTES}
+                      className={cn(
+                        "w-full min-h-[64px] px-3 py-3 rounded-xl text-sm border resize-none",
+                        checkinSuiteStyles.fontBody,
+                      )}
+                      style={{
+                        background: "var(--cs-card-2)",
+                        borderColor: "var(--cs-line)",
+                        color: "var(--cs-t1)",
+                      }}
+                    />
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--cs-t4)" }}
+                    >
+                      {notes.length}/{MAX_NOTES}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setNotesExpanded(false)}
+                      className="text-xs mt-1 flex items-center gap-1"
+                      style={{ color: "var(--cs-t3)" }}
+                    >
+                      <ChevronUp className="w-3 h-3" /> Collapse
+                    </button>
+                  </div>
+                )}
+              </CheckinSectionCard>
+            </>
+          ) : (
+            <>
+              {/* A) Sleep Duration */}
+              <div>
+                <CheckInMetricHeading>
+                  <span className="block text-base font-semibold text-white">
+                    Sleep Duration
+                  </span>
+                  {yesterdayLog?.sleep_hours != null && (
+                    <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                      Yesterday: {yesterdayLog.sleep_hours}h
+                      {sleepHours != null &&
+                        yesterdayLog.sleep_hours !== sleepHours && (
+                          <span className="ml-1">
+                            {sleepHours > yesterdayLog.sleep_hours ? "↑" : "↓"}
+                          </span>
+                        )}
+                    </span>
+                  )}
+                </CheckInMetricHeading>
+
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <button
+                    type="button"
+                    onClick={decrementSleep}
+                    className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
+                  >
+                    <Minus className="w-5 h-5 fc-text-primary" />
+                  </button>
+
+                  <div className="min-w-[120px] text-center">
+                    {showSleepInput ? (
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        value={sleepHoursInput}
+                        onChange={(e) =>
+                          handleSleepHoursInputChange(e.target.value)
+                        }
+                        onBlur={() => setShowSleepInput(false)}
+                        className="w-full text-4xl font-bold fc-text-primary bg-transparent border-none outline-none text-center"
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        onClick={() => {
+                          setShowSleepInput(true);
+                          setSleepHoursInput(sleepHours?.toString() ?? "");
+                        }}
+                        className="text-4xl font-bold fc-text-primary cursor-text"
+                      >
+                        {sleepHours != null ? `${sleepHours.toFixed(1)}h` : "—"}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={incrementSleep}
+                    className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
+                  >
+                    <Plus className="w-5 h-5 fc-text-primary" />
                   </button>
                 </div>
-              )}
-            </div>
-          </>
-        )}
 
-        {/* 7-day trend strip (hidden on immersive check-in page — shown in WeeklyStrip below fold) */}
-        {!immersive && weekLogs.length > 0 && (
-          <div className="border-t border-[color:var(--fc-glass-border)] pt-4">
-            <p className="text-xs font-semibold fc-text-subtle uppercase mb-2">This week</p>
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
-                <div key={i} className="text-[10px] font-medium fc-text-subtle">
-                  {day}
+                <div className="flex gap-1.5 sm:gap-2 justify-center">
+                  {SLEEP_QUICK_PRESETS.map((hours) => {
+                    const selected = sleepHours === hours;
+                    return (
+                      <button
+                        key={hours}
+                        type="button"
+                        onClick={() => {
+                          setSleepHours(hours);
+                          setSleepHoursInput(hours.toString());
+                        }}
+                        className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all active:scale-95 flex-1 max-w-[60px] ${
+                          selected
+                            ? "fc-btn fc-btn-primary"
+                            : "fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary"
+                        }`}
+                      >
+                        {hours}h
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-              {(() => {
-                const weekDays: string[] = [];
-                for (let i = 0; i < 7; i++) {
-                  const d = new Date(weekStart + "T12:00:00Z");
-                  d.setUTCDate(d.getUTCDate() + i);
-                  weekDays.push(d.toISOString().split("T")[0]);
-                }
-                const logByDate = new Map(weekLogs.map((l) => [l.log_date, l]));
-                return weekDays.map((dateStr) => {
-                  const log = logByDate.get(dateStr);
-                  const isFuture = dateStr > today;
-                  const hasData = log && log.sleep_hours != null && log.sleep_quality != null && log.stress_level != null && log.soreness_level != null;
-                  const emoji = isFuture ? "—" : hasData
-                    ? ((log?.sleep_hours ?? 0) >= 7 && (log?.stress_level ?? 10) <= 6 ? "😊" : "😐")
-                    : "—";
-                  return (
-                    <div key={dateStr} className="text-sm" title={dateStr}>
-                      {emoji}
-                    </div>
-                  );
-                });
-              })()}
-              {(() => {
-                const weekDays: string[] = [];
-                for (let i = 0; i < 7; i++) {
-                  const d = new Date(weekStart + "T12:00:00Z");
-                  d.setUTCDate(d.getUTCDate() + i);
-                  weekDays.push(d.toISOString().split("T")[0]);
-                }
-                const logByDate = new Map(weekLogs.map((l) => [l.log_date, l]));
-                return weekDays.map((dateStr) => {
-                  const log = logByDate.get(dateStr);
-                  const isFuture = dateStr > today;
-                  return (
-                    <div key={dateStr} className="text-[10px] fc-text-subtle font-mono">
-                      {isFuture ? "—" : log?.sleep_hours != null ? `${log.sleep_hours}h` : "—"}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-        )}
+              </div>
 
-        {submitError && (
-          <p className="text-sm text-red-500 mb-2" role="alert">
-            {submitError}
-          </p>
-        )}
+              <div>
+                <CheckInMetricHeading>
+                  <span className="block text-base font-semibold text-white">
+                    Sleep Quality
+                  </span>
+                </CheckInMetricHeading>
+                <WellnessRatingPills
+                  options={SLEEP_QUALITY_OPTIONS}
+                  value={sleepQuality}
+                  onChange={setSleepQuality}
+                  variant="sleep"
+                  compact={false}
+                />
+              </div>
 
-        {immersive ? (
-          <CheckinSaveCta
-            disabled={!allRequiredSelected}
-            submitting={submitting}
-            label="Save check-in"
-            helper={
-              !allRequiredSelected && !submitting
-                ? "Save unlocks after you set sleep duration, quality, stress, and soreness. Steps and notes are optional."
-                : undefined
-            }
-          />
-        ) : (
-          <>
-            <button
-              type="submit"
-              disabled={!allRequiredSelected || submitting}
-              className="w-full py-4 rounded-xl font-semibold text-base fc-btn fc-btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px]"
-            >
-              {submitting ? (
-                <>
-                  <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
-            </button>
-            {!allRequiredSelected && !submitting && (
-              <p className="text-xs fc-text-subtle text-center mt-2 px-1 leading-relaxed">
-                Fill sleep duration, sleep quality, stress, and soreness to save. Steps and notes are optional.
+              <div>
+                <CheckInMetricHeading>
+                  <span className="block text-base font-semibold text-white">
+                    Stress Level
+                  </span>
+                  {yesterdayLog?.stress_level != null && (
+                    <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                      Yesterday: {getStressLabel(yesterdayLog.stress_level)}
+                      {stressLevel != null &&
+                        (() => {
+                          const yUi = dbToUiScale(yesterdayLog.stress_level);
+                          if (yUi == null) return null;
+                          return (
+                            <span className="ml-1">
+                              {stressLevel > yUi
+                                ? "↑"
+                                : stressLevel < yUi
+                                  ? "↓"
+                                  : ""}
+                            </span>
+                          );
+                        })()}
+                    </span>
+                  )}
+                </CheckInMetricHeading>
+                <WellnessRatingPills
+                  options={STRESS_OPTIONS}
+                  value={stressLevel}
+                  onChange={setStressLevel}
+                  variant="severity"
+                  compact={false}
+                />
+              </div>
+
+              <div>
+                <CheckInMetricHeading>
+                  <span className="block text-base font-semibold text-white">
+                    Muscle Soreness
+                  </span>
+                  {yesterdayLog?.soreness_level != null && (
+                    <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                      Yesterday: {getSorenessLabel(yesterdayLog.soreness_level)}
+                      {sorenessLevel != null &&
+                        (() => {
+                          const yUi = dbToUiScale(yesterdayLog.soreness_level);
+                          if (yUi == null) return null;
+                          return (
+                            <span className="ml-1">
+                              {sorenessLevel > yUi
+                                ? "↑"
+                                : sorenessLevel < yUi
+                                  ? "↓"
+                                  : ""}
+                            </span>
+                          );
+                        })()}
+                    </span>
+                  )}
+                </CheckInMetricHeading>
+                <WellnessRatingPills
+                  options={SORENESS_OPTIONS}
+                  value={sorenessLevel}
+                  onChange={setSorenessLevel}
+                  variant="severity"
+                  compact={false}
+                />
+              </div>
+
+              <div>
+                <CheckInMetricHeading>
+                  <span className="block text-base font-semibold text-white">
+                    Steps
+                  </span>
+                  {yesterdayLog?.steps != null && (
+                    <span className="mt-1 block text-xs font-normal fc-text-subtle">
+                      Yesterday: {yesterdayLog.steps.toLocaleString()}
+                      {steps != null && yesterdayLog.steps != null && (
+                        <span className="ml-1">
+                          {steps > yesterdayLog.steps
+                            ? "↑"
+                            : steps < yesterdayLog.steps
+                              ? "↓"
+                              : ""}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </CheckInMetricHeading>
+
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <button
+                    type="button"
+                    onClick={decrementSteps}
+                    className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
+                  >
+                    <Minus className="w-5 h-5 fc-text-primary" />
+                  </button>
+
+                  <div className="min-w-[140px] text-center">
+                    {showStepsInput ? (
+                      <input
+                        type="text"
+                        value={stepsInput}
+                        onChange={(e) => handleStepsInputChange(e.target.value)}
+                        onBlur={() => setShowStepsInput(false)}
+                        className="w-full text-4xl font-bold fc-text-primary bg-transparent border-none outline-none text-center"
+                        placeholder="0"
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        onClick={() => {
+                          setShowStepsInput(true);
+                          setStepsInput(steps?.toString() ?? "");
+                        }}
+                        className="text-4xl font-bold fc-text-primary cursor-text"
+                      >
+                        {steps != null ? steps.toLocaleString() : "—"}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={incrementSteps}
+                    className="w-12 h-12 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center hover:bg-[color:var(--fc-glass-highlight)] transition-all active:scale-95"
+                  >
+                    <Plus className="w-5 h-5 fc-text-primary" />
+                  </button>
+                </div>
+
+                <div className="flex gap-1.5 sm:gap-2 justify-center">
+                  {STEPS_QUICK_PRESETS.map((preset) => {
+                    const selected = steps === preset.value;
+                    const color =
+                      ratingColors.steps[
+                        preset.label as keyof typeof ratingColors.steps
+                      ];
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => {
+                          setSteps(preset.value);
+                          setStepsInput(preset.value.toString());
+                        }}
+                        className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all active:scale-95 text-white flex-1 max-w-[60px]"
+                        style={{
+                          backgroundColor: selected ? color : `${color}60`,
+                          opacity: selected ? 1 : 0.8,
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                {!notesExpanded ? (
+                  <button
+                    type="button"
+                    onClick={() => setNotesExpanded(true)}
+                    className="flex w-full items-center justify-between text-left text-sm font-medium fc-text-subtle hover:fc-text-primary transition-colors py-1"
+                  >
+                    <span>Add note</span>
+                    <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
+                  </button>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium fc-text-primary mb-2">
+                      Notes
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) =>
+                        setNotes(e.target.value.slice(0, MAX_NOTES))
+                      }
+                      placeholder="Optional — injuries, lifestyle factors, etc."
+                      rows={3}
+                      maxLength={MAX_NOTES}
+                      className="w-full px-4 py-3 rounded-xl text-sm fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
+                    />
+                    <p className="text-xs fc-text-subtle mt-1">
+                      {notes.length}/{MAX_NOTES}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setNotesExpanded(false)}
+                      className="text-xs fc-text-subtle mt-1 flex items-center gap-1"
+                    >
+                      <ChevronUp className="w-3 h-3" /> Collapse
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* 7-day trend strip (hidden on immersive check-in page — shown in WeeklyStrip below fold) */}
+          {!immersive && weekLogs.length > 0 && (
+            <div className="border-t border-[color:var(--fc-glass-border)] pt-4">
+              <p className="text-xs font-semibold fc-text-subtle uppercase mb-2">
+                This week
               </p>
-            )}
-          </>
-        )}
-      </form>
-    </div>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
+                  <div
+                    key={i}
+                    className="text-[10px] font-medium fc-text-subtle"
+                  >
+                    {day}
+                  </div>
+                ))}
+                {(() => {
+                  const weekDays: string[] = [];
+                  for (let i = 0; i < 7; i++) {
+                    const d = new Date(weekStart + "T12:00:00Z");
+                    d.setUTCDate(d.getUTCDate() + i);
+                    weekDays.push(d.toISOString().split("T")[0]);
+                  }
+                  const logByDate = new Map(
+                    weekLogs.map((l) => [l.log_date, l]),
+                  );
+                  return weekDays.map((dateStr) => {
+                    const log = logByDate.get(dateStr);
+                    const isFuture = dateStr > today;
+                    const hasData =
+                      log &&
+                      log.sleep_hours != null &&
+                      log.sleep_quality != null &&
+                      log.stress_level != null &&
+                      log.soreness_level != null;
+                    const emoji = isFuture
+                      ? "—"
+                      : hasData
+                        ? (log?.sleep_hours ?? 0) >= 7 &&
+                          (log?.stress_level ?? 10) <= 6
+                          ? "😊"
+                          : "😐"
+                        : "—";
+                    return (
+                      <div key={dateStr} className="text-sm" title={dateStr}>
+                        {emoji}
+                      </div>
+                    );
+                  });
+                })()}
+                {(() => {
+                  const weekDays: string[] = [];
+                  for (let i = 0; i < 7; i++) {
+                    const d = new Date(weekStart + "T12:00:00Z");
+                    d.setUTCDate(d.getUTCDate() + i);
+                    weekDays.push(d.toISOString().split("T")[0]);
+                  }
+                  const logByDate = new Map(
+                    weekLogs.map((l) => [l.log_date, l]),
+                  );
+                  return weekDays.map((dateStr) => {
+                    const log = logByDate.get(dateStr);
+                    const isFuture = dateStr > today;
+                    return (
+                      <div
+                        key={dateStr}
+                        className="text-[10px] fc-text-subtle font-mono"
+                      >
+                        {isFuture
+                          ? "—"
+                          : log?.sleep_hours != null
+                            ? `${log.sleep_hours}h`
+                            : "—"}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
 
-    {newAchievementsQueue.length > 0 && (
-      <AchievementUnlockModal
-        achievement={newAchievementsQueue[achievementModalIndex] ?? null}
-        visible={achievementModalIndex < newAchievementsQueue.length}
-        onClose={() => {
-          if (achievementModalIndex < newAchievementsQueue.length - 1) {
-            setAchievementModalIndex((i) => i + 1);
-          } else {
-            setNewAchievementsQueue([]);
-            setAchievementModalIndex(0);
-          }
-        }}
-      />
-    )}
+          {submitError && (
+            <p className="text-sm text-red-500 mb-2" role="alert">
+              {submitError}
+            </p>
+          )}
+
+          {immersive ? (
+            <CheckinSaveCta
+              disabled={!allRequiredSelected}
+              submitting={submitting}
+              label="Save check-in"
+              helper={
+                !allRequiredSelected && !submitting
+                  ? "Save unlocks after you set sleep duration, quality, stress, and soreness. Steps and notes are optional."
+                  : undefined
+              }
+            />
+          ) : (
+            <>
+              <button
+                type="submit"
+                disabled={!allRequiredSelected || submitting}
+                className="w-full py-4 rounded-xl font-semibold text-base fc-btn fc-btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px]"
+              >
+                {submitting ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </button>
+              {!allRequiredSelected && !submitting && (
+                <p className="text-xs fc-text-subtle text-center mt-2 px-1 leading-relaxed">
+                  Fill sleep duration, sleep quality, stress, and soreness to
+                  save. Steps and notes are optional.
+                </p>
+              )}
+            </>
+          )}
+        </form>
+      </div>
+
+      {newAchievementsQueue.length > 0 && (
+        <AchievementUnlockModal
+          achievement={newAchievementsQueue[achievementModalIndex] ?? null}
+          visible={achievementModalIndex < newAchievementsQueue.length}
+          onClose={() => {
+            if (achievementModalIndex < newAchievementsQueue.length - 1) {
+              setAchievementModalIndex((i) => i + 1);
+            } else {
+              setNewAchievementsQueue([]);
+              setAchievementModalIndex(0);
+            }
+          }}
+        />
+      )}
     </>
   );
 }

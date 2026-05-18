@@ -2,7 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { formatPersonalRecordCaption } from "@/lib/personalRecordDisplay";
+import {
+  formatPersonalRecordCaption,
+  formatPrKindTag,
+} from "@/lib/personalRecordDisplay";
 import { fetchApi } from "@/lib/apiClient";
 import type { PRMilestone } from "@/components/progress/PRTimelineChart";
 import type { PRTimelineTimeRange } from "@/components/progress/PRTimelineChart";
@@ -140,7 +143,7 @@ export default function ClientPRTimeline({
                   >
                     {seriesList.map((s) => (
                       <option key={s.key} value={s.key}>
-                        {s.exerciseName} — {s.recordType}
+                        {s.exerciseName} — {formatPrKindTag(s.recordType)}
                       </option>
                     ))}
                   </select>
@@ -190,12 +193,18 @@ export default function ClientPRTimeline({
                     >
                       <div className={prStyles.prRowLeft}>
                         <span className={prStyles.prExercise}>{item.exerciseName ?? "Exercise"}</span>
-                        <span className={prStyles.prValue}>
+                        <span
+                          className={
+                            item.recordType === "strength_endurance"
+                              ? prStyles.prValueSecondary
+                              : prStyles.prValue
+                          }
+                        >
                           {item.caption ??
                             formatPersonalRecordCaption(
                               item.recordType,
                               item.recordValue,
-                              item.recordUnit ?? null
+                              item.recordUnit ?? null,
                             )}
                         </span>
                       </div>

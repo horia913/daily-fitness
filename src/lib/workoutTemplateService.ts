@@ -1417,11 +1417,13 @@ export class WorkoutTemplateService {
     weekNumber: number,
     programDay: number,
     templateId: string | null | undefined,
-    options?: { ensureMissingRows?: boolean; templateNameHint?: string | null },
+    options?: { ensureMissingRows?: boolean; templateNameHint?: string | null; isOptional?: boolean },
   ): Promise<PropagateScheduleSlotResult> {
     const empty = (): PropagateScheduleSlotResult => ({ updated: 0, inserted: 0, failures: [] })
     try {
       if (programDay < 1 || programDay > 7 || weekNumber < 1) return empty()
+
+      const isOptionalFlag = Boolean(options?.isOptional)
 
       const tid =
         templateId && typeof templateId === 'string' && templateId.trim().length > 0
@@ -1447,6 +1449,7 @@ export class WorkoutTemplateService {
           workout_template_id: tid,
           name,
           day_type: dayType,
+          is_optional: isOptionalFlag,
           updated_at: now,
         })
         .in('program_assignment_id', assignmentIds)
@@ -1520,6 +1523,7 @@ export class WorkoutTemplateService {
           completed_date: null,
           notes: null,
           is_customized: false,
+          is_optional: isOptionalFlag,
         }))
 
         const { error: insErr } = await supabase.from('program_day_assignments').insert(insertRows)
@@ -1555,6 +1559,7 @@ export class WorkoutTemplateService {
       const r = await this.propagateScheduleSlotToSnapshots(programId, w, d, tid, {
         ensureMissingRows: true,
         templateNameHint: slot.template_name ?? null,
+        isOptional: Boolean(slot.is_optional),
       })
       failures.push(...r.failures)
     }
@@ -2072,6 +2077,7 @@ export class WorkoutTemplateService {
       {
         ensureMissingRows: true,
         templateNameHint: row.template_name ?? null,
+        isOptional: Boolean(row.is_optional),
       }
     )
     if (propagation.failures.length > 0) {
@@ -2120,6 +2126,7 @@ export class WorkoutTemplateService {
 
     const propagation = await this.propagateScheduleSlotToSnapshots(programId, weekNumber, programDay, null, {
       ensureMissingRows: false,
+      isOptional: false,
     })
     if (propagation.failures.length > 0) {
       const lines = propagation.failures.map((f) => `  • ${f.assignmentId} (${f.stage}): ${f.error}`)

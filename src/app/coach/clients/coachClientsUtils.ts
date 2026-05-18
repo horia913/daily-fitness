@@ -2,11 +2,55 @@ import type { AttentionLevel } from "@/lib/coachClientAttention";
 import { daysSinceIsoDate } from "@/lib/coachClientAttention";
 import type { ClientMetrics } from "@/lib/coachDashboardService";
 import type { ClientAvatarSeverity } from "@/components/coach/dashboard/ClientAvatar";
+import type { ClientTrainingStatusKind } from "@/lib/coachClientListTrainingStatus";
 import type { Client } from "./coachClientsTypes";
 
 export type CoachClientRosterStatus = Client["status"];
 
 export type CoachClientVisualTier = "critical" | "warning" | "new" | "good";
+
+/** Sort / bell / quick-filter: clients worth surfacing on the roster. */
+export function coachClientNeedsTrainingAttention(
+  trainingStatus: ClientTrainingStatusKind,
+): boolean {
+  return (
+    trainingStatus === "missed_week" ||
+    trainingStatus === "behind" ||
+    trainingStatus === "paused" ||
+    trainingStatus === "no_program"
+  );
+}
+
+export function coachClientTrainingAttentionSortKey(
+  trainingStatus: ClientTrainingStatusKind,
+): number {
+  switch (trainingStatus) {
+    case "missed_week":
+      return 0;
+    case "behind":
+      return 1;
+    case "paused":
+      return 2;
+    case "no_program":
+      return 3;
+    default:
+      return 10;
+  }
+}
+
+/** List/grid row border + avatar severity from training + roster (not check-ins). */
+export function coachClientListVisualTierFromTraining(
+  rosterStatus: Client["status"],
+  trainingStatus: ClientTrainingStatusKind,
+): CoachClientVisualTier {
+  if (rosterStatus === "pending") return "new";
+  if (rosterStatus === "inactive") return "warning";
+  if (trainingStatus === "paused") return "good";
+  if (trainingStatus === "missed_week") return "critical";
+  if (trainingStatus === "behind") return "warning";
+  if (trainingStatus === "no_program") return "new";
+  return "good";
+}
 
 /**
  * Maps existing `computeClientAttention` output + roster status to list/grid chrome tiers.

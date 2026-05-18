@@ -207,16 +207,21 @@ export async function loadPrescriptionProtocolBundle(
 
 /**
  * Load template prescriptions and compute adherence for a completed workout log.
+ *
+ * @param preloadedPrescriptionBundle When set (including `null`), skips an internal
+ *        `loadPrescriptionProtocolBundle` call and uses this value — avoids duplicate
+ *        fetches when the caller already loaded the bundle (e.g. coach log detail).
  */
 export async function computeAdherenceForWorkoutLog(
   sb: SupabaseClient,
   workoutLogId: string,
-  templateId: string
+  templateId: string,
+  preloadedPrescriptionBundle?: PrescriptionProtocolBundle | null
 ): Promise<WorkoutAdherenceResult> {
   const { data: setLogsRaw, error: slErr } = await sb
     .from("workout_set_logs")
     .select(
-      "set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh, dropset_drops, cluster_number, round_number, emom_minute_number, dropset_initial_weight, dropset_initial_reps, dropset_final_weight, dropset_final_reps, rest_pause_initial_weight, rest_pause_initial_reps, rest_pause_reps_after, tabata_rounds_completed, fortime_time_taken_sec, fortime_time_cap_sec, amrap_duration_seconds"
+      "set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh, dropset_drops, cluster_number, round_number, emom_minute_number, emom_total_reps_this_min, emom_total_duration_sec, dropset_initial_weight, dropset_initial_reps, dropset_final_weight, dropset_final_reps, rest_pause_initial_weight, rest_pause_initial_reps, rest_pause_reps_after, rest_pause_number, tabata_rounds_completed, tabata_total_duration_sec, fortime_time_taken_sec, fortime_time_cap_sec, fortime_total_reps, fortime_target_reps, amrap_duration_seconds, amrap_total_reps, amrap_target_reps, giant_set_exercises, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps, completed_at"
     )
     .eq("workout_log_id", workoutLogId);
 
@@ -236,6 +241,8 @@ export async function computeAdherenceForWorkoutLog(
   if (entryIds.length === 0) {
     return computeWorkoutAdherence([], [], []);
   }
+
+  const blocks = groupSetsIntoBlocks(setLogs as WorkoutLogSet[]);
 
   const { data: exRaw } = await sb
     .from("workout_set_entry_exercises")
@@ -262,8 +269,42 @@ export async function computeAdherenceForWorkoutLog(
     });
   }
 
-  const presc = await loadSpeedEndurancePrescriptions(sb, entryIds);
-  return computeWorkoutAdherence(setLogs, setEntries, entryExercises, nameById, presc);
+  let bundle: PrescriptionProtocolBundle | null;
+  let presc: Awaited<ReturnType<typeof loadSpeedEndurancePrescriptions>>;
+  if (preloadedPrescriptionBundle !== undefined) {
+    bundle = preloadedPrescriptionBundle;
+    presc = await loadSpeedEndurancePrescriptions(sb, entryIds);
+  } else {
+    const pair = await Promise.all([
+      loadSpeedEndurancePrescriptions(sb, entryIds),
+      loadPrescriptionProtocolBundle(sb, templateId),
+    ]);
+    presc = pair[0];
+    bundle = pair[1];
+  }
+
+  const prescribedRef =
+    bundle != null ? buildPrescribedWorkoutReference(blocks, bundle) : null;
+  const protocolSlice =
+    bundle != null
+      ? {
+          timeProtocols: bundle.timeProtocols,
+          dropSets: bundle.dropSets,
+          clusterSets: bundle.clusterSets,
+          restPauseSets: bundle.restPauseSets,
+        }
+      : null;
+
+  return computeWorkoutAdherence(
+    setLogs,
+    setEntries,
+    entryExercises,
+    nameById,
+    presc,
+    protocolSlice,
+    prescribedRef,
+    blocks
+  );
 }
 
 /** Batch adherence for many logs: bounded queries (no per-log N+1). */
@@ -325,7 +366,7 @@ export async function batchAdherenceForWorkoutLogs(
   const { data: allSetLogs } = await sb
     .from("workout_set_logs")
     .select(
-      "workout_log_id, set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh"
+      "workout_log_id, set_entry_id, set_type, exercise_id, set_number, weight, reps, rpe, superset_exercise_a_id, superset_weight_a, superset_reps_a, superset_exercise_b_id, superset_weight_b, superset_reps_b, actual_time_seconds, actual_distance_meters, actual_hr_avg, actual_speed_kmh, cluster_number, round_number, emom_minute_number, emom_total_reps_this_min, dropset_initial_weight, dropset_initial_reps, rest_pause_number, rest_pause_reps_after, giant_set_exercises, amrap_total_reps, amrap_duration_seconds, tabata_rounds_completed, fortime_total_reps, fortime_time_taken_sec, fortime_time_cap_sec, completed_at"
     )
     .in("workout_log_id", logIds);
 
@@ -412,12 +453,16 @@ export async function batchAdherenceForWorkoutLogs(
       entIdsForTemplate.has(e.set_entry_id)
     );
     const logs = setLogsByLogId.get(logId) ?? [];
+    const blocks = groupSetsIntoBlocks(logs as WorkoutLogSet[]);
     const res = computeWorkoutAdherence(
       logs,
       ents,
       exForTemplate,
       nameById,
-      presc
+      presc,
+      null,
+      null,
+      blocks
     );
     out[logId] = {
       adherencePercent: res.adherencePercent,
@@ -501,11 +546,13 @@ export async function getCoachWorkoutLogDetail(
   let adherence = computeWorkoutAdherence([], [], []);
   let prescribedReference: PrescribedWorkoutReference | null = null;
   if (templateId) {
-    const [bundle, adherenceResult] = await Promise.all([
-      loadPrescriptionProtocolBundle(sb, templateId),
-      computeAdherenceForWorkoutLog(sb, logId, templateId),
-    ]);
-    adherence = adherenceResult;
+    const bundle = await loadPrescriptionProtocolBundle(sb, templateId);
+    adherence = await computeAdherenceForWorkoutLog(
+      sb,
+      logId,
+      templateId,
+      bundle
+    );
     if (bundle) {
       prescribedReference = buildPrescribedWorkoutReference(payload.blocks, bundle);
     }

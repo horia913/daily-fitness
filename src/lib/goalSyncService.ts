@@ -152,7 +152,7 @@ async function fetchPrMaxByExerciseId(
     .from('personal_records')
     .select('exercise_id, record_value, is_current_record')
     .eq('client_id', clientId)
-    .eq('record_type', 'weight')
+    .eq('record_type', 'max_strength')
     .in('exercise_id', exerciseIds)
     .or('is_current_record.is.null,is_current_record.eq.true')
 

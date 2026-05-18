@@ -28,8 +28,8 @@ describe('PreviousPerformanceCard', () => {
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
   })
 
-  test('renders fallback when no previous performance', () => {
-    render(
+  test('renders nothing when no previous performance and not loading', () => {
+    const { container } = render(
       <PreviousPerformanceCard
         previousPerformance={{
           lastWorkout: null,
@@ -39,11 +39,7 @@ describe('PreviousPerformanceCard', () => {
         theme={defaultTheme}
       />
     )
-    expect(screen.getByText('Previous Performance')).toBeInTheDocument()
-    expect(screen.getByText('Last Workout')).toBeInTheDocument()
-    expect(screen.getByText('Personal Best')).toBeInTheDocument()
-    expect(screen.getByText('No previous data')).toBeInTheDocument()
-    expect(screen.getByText('No personal best yet')).toBeInTheDocument()
+    expect(container.firstChild).toBeNull()
   })
 
   test('renders with valid previous performance data', () => {
@@ -67,14 +63,13 @@ describe('PreviousPerformanceCard', () => {
         theme={defaultTheme}
       />
     )
-    expect(screen.getByText('Previous Performance')).toBeInTheDocument()
-    expect(screen.getByText('Last Workout')).toBeInTheDocument()
-    expect(screen.getByText('Personal Best')).toBeInTheDocument()
+    expect(screen.getByText('Previous performance')).toBeInTheDocument()
+    expect(screen.getByText('Last workout')).toBeInTheDocument()
+    expect(screen.getByText('Personal best')).toBeInTheDocument()
     expect(screen.getByText(/60/)).toBeInTheDocument()
     expect(screen.getByText(/10/)).toBeInTheDocument()
     expect(screen.getByText(/70/)).toBeInTheDocument()
     expect(screen.getByText(/8/)).toBeInTheDocument()
     expect(screen.getByText(new Date(lastWorkout.logged_at).toLocaleDateString())).toBeInTheDocument()
-    expect(screen.getByText(new Date(personalBest.logged_at).toLocaleDateString())).toBeInTheDocument()
   })
 })

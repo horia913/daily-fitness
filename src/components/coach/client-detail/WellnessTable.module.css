@@ -18,6 +18,16 @@
   background: var(--fc-surface-card);
 }
 
+.rowCompare {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.valDisplay {
+  font-family: var(--f-display, "Big Shoulders Display", ui-serif, serif);
+  font-weight: 700;
+  font-size: 15px;
+}
+
 .head {
   background: var(--fc-glass-soft);
   font-family: var(--font-geist-mono, ui-monospace, monospace);

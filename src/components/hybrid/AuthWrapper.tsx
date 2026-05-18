@@ -18,7 +18,6 @@ import {
 import {
   AuthLayout,
   AuthFormContainer,
-  FeatureHighlights,
 } from "@/components/server/AuthLayout";
 import {
   LogIn,
@@ -361,8 +360,8 @@ export function AuthWrapper() {
             : hasInviteInUrl
               ? "Create your account"
               : isLogin
-                ? "Welcome Back!"
-                : "Start Your Journey"
+                ? "Sign in"
+                : "Create account"
         }
         description={
           isForgot
@@ -370,8 +369,8 @@ export function AuthWrapper() {
             : hasInviteInUrl
             ? "Use the details from your invite link to get started"
             : isLogin
-              ? "Sign in to continue your fitness journey"
-              : "Create your account and begin transforming your health"
+              ? "Access your coach-assigned workouts and programs"
+              : "Use your invite code to join your coach on DailyFitness"
         }
       >
         {/* Segmented Control - hidden when client arrives via invite link (sign-up only) */}
@@ -817,11 +816,10 @@ export function AuthWrapper() {
         <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-center gap-2 text-sm fc-text-dim">
             <Shield className="w-4 h-4 fc-text-success" />
-            <span>Your data is protected with enterprise-grade security</span>
+            <span>Your account and data are kept secure</span>
           </div>
         </div>
 
-        <FeatureHighlights />
       </AuthFormContainer>
     </AuthLayout>
   );

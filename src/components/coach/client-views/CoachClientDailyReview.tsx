@@ -19,6 +19,7 @@ import type { AttentionLevel } from "@/lib/coachClientAttention";
 import { deltaTone, adherenceTierFromPercent } from "@/lib/coachWorkoutAdherence";
 import { cn } from "@/lib/utils";
 import ClientHeaderCard from "@/components/coach/client-detail/ClientHeaderCard";
+import { CoachAthleteScoreHero } from "@/components/coach/CoachAthleteScoreHero";
 import ov from "./CoachClientDailyReview.module.css";
 
 export type TodayWorkoutJson = {
@@ -354,6 +355,8 @@ export default function CoachClientDailyReview({
         phone={phone}
         onMessage={openMessage}
       />
+
+      <CoachAthleteScoreHero clientId={clientId} />
 
       {/* Today */}
       <section className={ov.section}>

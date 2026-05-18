@@ -21,9 +21,13 @@ import {
 import {
   fetchPersonalRecords,
   PersonalRecord,
-  formatRecordDisplay,
-  getRecordType,
 } from "@/lib/personalRecords";
+import {
+  formatKgRepsLift,
+  formatPrKindTag,
+  formatPrLatestLine,
+  formatPrRecentListLine,
+} from "@/lib/personalRecordDisplay";
 import {
   getPRTimeline,
   getPRStats,
@@ -57,6 +61,36 @@ function getExerciseIconClass(exerciseName: string, index: number): string {
   return EXERCISE_ICON_CLASSES[index % EXERCISE_ICON_CLASSES.length];
 }
 
+function personalRecordToUiRow(record: PersonalRecord) {
+  return {
+    record_type: record.prKind ?? "",
+    record_value:
+      record.prKind === "strength_endurance" ? record.volume : record.weight,
+    weight_at_record: record.weight,
+    reps_at_record: record.reps,
+  };
+}
+
+function exerciseHeaderLatest(records: PersonalRecord[]): string {
+  const ms = records.find((r) => r.prKind === "max_strength");
+  if (ms) return `${ms.weight} kg · ${formatRelative(ms.date)}`;
+  const vol = records.find((r) => r.prKind === "strength_endurance");
+  if (vol && vol.volume != null) {
+    return `${vol.volume} vol · ${formatRelative(vol.date)}`;
+  }
+  const first = records[0];
+  return first ? `${first.record} · ${formatRelative(first.date)}` : "—";
+}
+
+function sortRecordsForExpandedView(records: PersonalRecord[]): PersonalRecord[] {
+  return [...records].sort((a, b) => {
+    const aMs = a.prKind === "max_strength" ? 0 : 1;
+    const bMs = b.prKind === "max_strength" ? 0 : 1;
+    if (aMs !== bMs) return aMs - bMs;
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+}
+
 export default function PersonalRecordsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -70,6 +104,8 @@ export default function PersonalRecordsPage() {
     totalPRs: number;
     prsThisMonth: number;
     prsThisWeek: number;
+    prRecordRowsThisMonth: number;
+    prRecordRowsThisWeek: number;
     latestPR: StoredPR | null;
     mostImproved: StoredPR | null;
   } | null>(null);
@@ -152,16 +188,6 @@ export default function PersonalRecordsPage() {
   }, [loadPersonalRecords, user, authLoading]);
 
   const totalRecords = personalRecords.length;
-  const thisMonthStart = useMemo(() => {
-    const d = new Date();
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-  const thisMonthCount = personalRecords.filter(
-    (r) => new Date(r.date) >= thisMonthStart
-  ).length;
-
   const exerciseNames = useMemo(() => {
     const set = new Set(personalRecords.map((r) => r.exerciseName));
     return Array.from(set).sort();
@@ -193,7 +219,7 @@ export default function PersonalRecordsPage() {
       string,
       { name: string; milestones: PRMilestone[] }
     >();
-    const weightPRs = prTimeline.filter((pr) => pr.record_type === "weight");
+    const weightPRs = prTimeline.filter((pr) => pr.record_type === "max_strength");
     for (const pr of weightPRs) {
       const id = pr.exercise_id;
       const name = pr.exercises?.name ?? "Unknown Exercise";
@@ -243,6 +269,33 @@ export default function PersonalRecordsPage() {
     [personalRecords]
   );
 
+  const dualPrSubtitle = useMemo(() => {
+    if (!prStats) return null;
+    const parts: string[] = [];
+    if (
+      prStats.prRecordRowsThisWeek > prStats.prsThisWeek &&
+      prStats.prsThisWeek > 0
+    ) {
+      const sets = prStats.prsThisWeek === 1 ? "set" : "sets";
+      const records = prStats.prRecordRowsThisWeek === 1 ? "record" : "records";
+      parts.push(
+        `This week: across ${prStats.prsThisWeek} unique ${sets} (${prStats.prRecordRowsThisWeek} ${records})`,
+      );
+    }
+    if (
+      prStats.prRecordRowsThisMonth > prStats.prsThisMonth &&
+      prStats.prsThisMonth > 0
+    ) {
+      const sets = prStats.prsThisMonth === 1 ? "set" : "sets";
+      const records =
+        prStats.prRecordRowsThisMonth === 1 ? "record" : "records";
+      parts.push(
+        `This month: across ${prStats.prsThisMonth} unique ${sets} (${prStats.prRecordRowsThisMonth} ${records})`,
+      );
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }, [prStats]);
+
   if (loadError && !loading) {
     return (
       <ProtectedRoute requiredRole="client">
@@ -281,16 +334,6 @@ export default function PersonalRecordsPage() {
     );
   }
 
-  const summaryLine = [
-    `${prStats?.totalPRs ?? totalRecords} PR${(prStats?.totalPRs ?? totalRecords) === 1 ? "" : "s"}`,
-    prStats && prStats.prsThisWeek > 0 ? `${prStats.prsThisWeek} this week` : null,
-    (prStats?.prsThisMonth ?? thisMonthCount) > 0
-      ? `${prStats?.prsThisMonth ?? thisMonthCount} this month`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
@@ -324,15 +367,38 @@ export default function PersonalRecordsPage() {
                 <p className="text-sm uppercase tracking-wider fc-text-dim mb-2">
                   Overview
                 </p>
-                <p className="text-sm font-medium fc-text-primary leading-snug">{summaryLine}</p>
+                <div className="space-y-1 text-sm fc-text-primary">
+                  {prStats && prStats.prsThisWeek > 0 && (
+                    <p>
+                      PRs this week:{" "}
+                      <span className="font-semibold">{prStats.prsThisWeek}</span>
+                    </p>
+                  )}
+                  {prStats && prStats.prsThisMonth > 0 && (
+                    <p>
+                      PRs this month:{" "}
+                      <span className="font-semibold">{prStats.prsThisMonth}</span>
+                    </p>
+                  )}
+                </div>
+                {dualPrSubtitle && (
+                  <p className="text-xs fc-text-dim mt-1 leading-snug">{dualPrSubtitle}</p>
+                )}
                 {prStats?.latestPR && (
                   <p className="text-xs fc-text-dim mt-2 leading-snug">
                     Latest:{" "}
                     <span className="font-semibold fc-text-primary">
                       {prStats.latestPR.exercises?.name || "Unknown Exercise"}
                     </span>{" "}
-                    — {prStats.latestPR.record_value}
-                    {prStats.latestPR.record_unit} (
+                    —{" "}
+                    {formatPrLatestLine({
+                      record_type: prStats.latestPR.record_type,
+                      record_value: prStats.latestPR.record_value,
+                      record_unit: prStats.latestPR.record_unit,
+                      weight_at_record: prStats.latestPR.weight_at_record,
+                      reps_at_record: prStats.latestPR.reps_at_record,
+                    })}{" "}
+                    (
                     {new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -346,7 +412,7 @@ export default function PersonalRecordsPage() {
                 <PRTimelineChart
                   milestones={chartExercise?.milestones ?? []}
                   exerciseName={chartExercise?.name ?? "—"}
-                  recordType="weight"
+                  recordType="max_strength"
                   valueUnit={null}
                   defaultTimeRange="3M"
                   defaultExpanded={true}
@@ -383,12 +449,7 @@ export default function PersonalRecordsPage() {
                   Recent PRs
                 </p>
                 <div className="flex flex-col border-y border-[color:var(--fc-glass-border)]">
-                  {recentRecords.map((record) => {
-                    const display =
-                      record.weight > 0
-                        ? `${record.weight} kg`
-                        : formatRecordDisplay(record.weight, record.reps);
-                    return (
+                  {recentRecords.map((record) => (
                       <div
                         key={record.id}
                         className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 pl-1 pr-1 border-b border-[color:var(--fc-glass-border)] last:border-0 text-left"
@@ -401,15 +462,11 @@ export default function PersonalRecordsPage() {
                             {formatRelative(record.date)}
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-mono font-bold fc-text-primary">{display}</p>
-                          <p className="text-[10px] fc-text-dim">
-                            {record.reps} rep{record.reps !== 1 ? "s" : ""}
-                          </p>
-                        </div>
+                        <p className="text-sm font-mono font-bold fc-text-primary text-right shrink-0 tabular-nums">
+                          {formatPrRecentListLine(personalRecordToUiRow(record))}
+                        </p>
                       </div>
-                    );
-                  })}
+                  ))}
                 </div>
               </section>
 
@@ -445,12 +502,14 @@ export default function PersonalRecordsPage() {
                       const isRecent =
                         new Date(pr.achieved_date + "T12:00:00") >=
                         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                      const achievementText =
-                        pr.record_type === "weight"
-                          ? `${exerciseName}: ${pr.record_value}${pr.record_unit}`
-                          : pr.record_type === "reps"
-                            ? `${exerciseName}: ${pr.record_value} ${pr.record_unit}`
-                            : `${exerciseName}: ${pr.record_value} ${pr.record_unit}`;
+                      const valueLine = formatPrRecentListLine({
+                        record_type: pr.record_type,
+                        record_value: pr.record_value,
+                        record_unit: pr.record_unit,
+                        weight_at_record: pr.weight_at_record,
+                        reps_at_record: pr.reps_at_record,
+                      });
+                      const typeLabel = formatPrKindTag(pr.record_type);
 
                       return (
                         <div
@@ -464,7 +523,7 @@ export default function PersonalRecordsPage() {
                           <div className="flex flex-col gap-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-xs font-semibold fc-text-primary leading-snug">
-                                {achievementText}
+                                {exerciseName}: {valueLine}
                               </span>
                               {isRecent && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]">
@@ -485,7 +544,7 @@ export default function PersonalRecordsPage() {
                                   +{pr.improvement_percentage.toFixed(1)}%
                                 </span>
                               )}
-                              <span className="capitalize">{pr.record_type.replace("_", " ")}</span>
+                              <span>{typeLabel}</span>
                             </div>
                           </div>
                         </div>
@@ -518,9 +577,7 @@ export default function PersonalRecordsPage() {
                               <h3 className="text-sm font-bold fc-text-primary truncate">{exerciseName}</h3>
                               <p className="text-[11px] fc-text-dim truncate">
                                 Latest:{" "}
-                                {latest
-                                  ? `${latest.weight} kg · ${formatRelative(latest.date)}`
-                                  : "—"}
+                                {exerciseHeaderLatest(records)}
                               </p>
                             </div>
                           </div>
@@ -532,31 +589,56 @@ export default function PersonalRecordsPage() {
                         </button>
                         {isOpen && (
                           <div className="pb-2 pl-1 space-y-1.5 border-t border-[color:var(--fc-glass-border)] pt-2">
-                            {records.map((record) => (
+                            {sortRecordsForExpandedView(records).map((record) => {
+                              const isMax = record.prKind === "max_strength";
+                              const isVol = record.prKind === "strength_endurance";
+                              return (
                               <div
                                 key={record.id}
-                                className="flex justify-between items-center gap-2 py-1.5 px-2 rounded-lg fc-glass-soft text-xs"
+                                className={`flex justify-between items-start gap-2 py-2 px-2 rounded-lg fc-glass-soft ${
+                                  isVol ? "opacity-90" : ""
+                                }`}
                               >
-                                <span className="fc-text-dim shrink-0">
+                                <span className="fc-text-dim shrink-0 text-xs pt-0.5">
                                   {new Date(record.date).toLocaleDateString("en-US", {
                                     month: "short",
                                     day: "numeric",
                                   })}
                                 </span>
-                                <div className="flex items-center gap-2 min-w-0 justify-end">
-                                  <span className="font-mono font-bold fc-text-primary tabular-nums">
-                                    {record.weight > 0 && record.reps > 0
-                                      ? `${record.weight} kg × ${record.reps}`
-                                      : record.weight > 0
+                                <div className="flex flex-col items-end gap-0.5 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`font-mono font-bold tabular-nums text-right ${
+                                        isMax
+                                          ? "text-base fc-text-primary"
+                                          : "text-sm fc-text-subtle"
+                                      }`}
+                                    >
+                                      {isMax
                                         ? `${record.weight} kg`
-                                        : `${record.reps} reps`}
-                                  </span>
-                                  <span className="text-[9px] font-semibold fc-text-success whitespace-nowrap">
-                                    {getRecordType(record.weight, record.reps).label}
+                                        : `${record.volume ?? record.weight} vol`}
+                                    </span>
+                                    <span
+                                      className={`text-[9px] font-semibold whitespace-nowrap ${
+                                        isMax ? "fc-text-success" : "fc-text-dim"
+                                      }`}
+                                    >
+                                      {formatPrKindTag(record.prKind ?? "")}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`text-[10px] tabular-nums ${
+                                      isMax ? "fc-text-dim" : "fc-text-subtle"
+                                    }`}
+                                  >
+                                    {isMax
+                                      ? `(× ${record.reps} rep${record.reps !== 1 ? "s" : ""})`
+                                      : `(${formatKgRepsLift(record.weight, record.reps)})`}
                                   </span>
                                 </div>
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         )}
                       </div>

@@ -806,3 +806,65 @@
   color: var(--ps-t3);
   line-height: 1.4;
 }
+
+/* Progress hub summary cards (extends nav row glass treatment) */
+.psSummaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 13px;
+  background: var(--ps-card);
+  border: 1px solid var(--ps-line);
+  border-radius: 13px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  min-height: 120px;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.psSummaryCard:hover {
+  background: var(--ps-row-hover);
+  border-color: var(--ps-cyan-dim);
+}
+.psSummaryCardHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+}
+.psSummaryCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.psSummaryCardChevron {
+  margin-left: auto;
+  color: var(--ps-t4);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.psSummaryCard:hover .psSummaryCardChevron {
+  color: var(--ps-cyan);
+}
+.psSummaryCardAccentTraining {
+  border-left: 3px solid var(--fc-domain-workouts);
+}
+.psSummaryCardAccentWellness {
+  border-left: 3px solid var(--ps-purple);
+}
+.psSummaryCardAccentNutrition {
+  border-left: 3px solid var(--fc-domain-meals);
+}
+.psSummaryCardAccentHabits {
+  border-left: 3px solid var(--fc-domain-habits);
+}
+.psSummaryCardAccentChallenges {
+  border-left: 3px solid var(--fc-domain-challenges);
+}
+.psSummaryCardAccentNeutral {
+  border-left: 3px solid var(--fc-domain-neutral);
+}

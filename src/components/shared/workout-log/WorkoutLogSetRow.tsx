@@ -79,11 +79,32 @@ export function WorkoutLogSetRow({ set, rowIndex, setType, prescribed, twoColumn
   const prescribedLine = prescribed ? formatPrescribedStrengthLine(prescribed) : null;
 
   if (twoColumn) {
+    const infoBadge = prescribed?.informationalRowBadge;
     return (
-      <div className="grid grid-cols-[2.25rem_1fr_1fr] gap-2 py-2 px-2 rounded-lg text-sm border border-[color:var(--fc-glass-border)] items-start">
-        {setNumberCell}
+      <div
+        className={cn(
+          "grid grid-cols-[2.25rem_1fr_1fr] gap-2 py-2 px-2 rounded-lg text-sm border items-start",
+          infoBadge
+            ? "border-[color:var(--fc-glass-border)]/50 bg-[color:var(--fc-glass-border)]/[0.06]"
+            : "border-[color:var(--fc-glass-border)]"
+        )}
+      >
+        <div className="flex flex-col items-center gap-1">
+          {setNumberCell}
+          {infoBadge ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-center fc-text-dim max-w-[5.5rem] leading-tight rounded px-1 py-0.5 border border-[color:var(--fc-glass-border)]/50">
+              {infoBadge}
+            </span>
+          ) : null}
+        </div>
         <p className="fc-text-dim tabular-nums min-w-0 break-words">{prescribedLine ?? "—"}</p>
-        <p className={cn("font-medium tabular-nums text-right min-w-0 break-words", outcomeClass(prescribed?.outcome))}>
+        <p
+          className={cn(
+            "font-medium tabular-nums text-right min-w-0 break-words",
+            outcomeClass(prescribed?.outcome),
+            infoBadge && "fc-text-dim"
+          )}
+        >
           {actualLine}
         </p>
       </div>

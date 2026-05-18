@@ -49,11 +49,14 @@ export async function GET(req: NextRequest) {
 
       for (const client of clients) {
         try {
-          await calculateAthleteScore(client.id, supabaseAdmin)
-          successCount++
+          const r = await calculateAthleteScore(client.id, supabaseAdmin);
+          if ("skipped" in r && r.skipped) {
+            continue;
+          }
+          successCount++;
         } catch (error) {
-          console.error(`[daily-sync] Error calculating athlete score for client ${client.id}:`, error)
-          errorCount++
+          console.error(`[daily-sync] Error calculating athlete score for client ${client.id}:`, error);
+          errorCount++;
         }
       }
 

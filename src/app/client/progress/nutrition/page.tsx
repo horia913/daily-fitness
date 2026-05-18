@@ -23,6 +23,14 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
+interface FoodMacros {
+  calories_per_serving: number;
+  serving_size: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 interface MealFoodItem {
   id: string;
   quantity: number;
@@ -30,11 +38,18 @@ interface MealFoodItem {
   food: {
     id: string;
     name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  } | null;
+  } & FoodMacros | null;
+}
+
+function macrosForQuantity(food: FoodMacros, quantity: number) {
+  const mult =
+    (food.serving_size ? quantity / food.serving_size : quantity) || 0;
+  return {
+    calories: Math.round((food.calories_per_serving ?? 0) * mult),
+    protein: Math.round(((food.protein ?? 0) * mult) * 10) / 10,
+    carbs: Math.round(((food.carbs ?? 0) * mult) * 10) / 10,
+    fat: Math.round(((food.fat ?? 0) * mult) * 10) / 10,
+  };
 }
 
 interface MealCompletion {
@@ -158,7 +173,8 @@ export default function NutritionPage() {
               food:foods(
                 id,
                 name,
-                calories,
+                calories_per_serving,
+                serving_size,
                 protein,
                 carbs,
                 fat
@@ -227,18 +243,21 @@ export default function NutritionPage() {
         const extraFoodIds = effectiveLines.map((l) => l.food_id);
         const { data: extraFoods } = await supabase
           .from("foods")
-          .select("id, name, calories, protein, carbs, fat")
+          .select(
+            "id, name, calories_per_serving, serving_size, protein, carbs, fat"
+          )
           .in("id", [...new Set(extraFoodIds)]);
 
         const foodMacro = new Map<
           string,
-          { id: string; name: string; calories: number; protein: number; carbs: number; fat: number }
+          { id: string; name: string } & FoodMacros
         >();
         (extraFoods || []).forEach((f: any) =>
           foodMacro.set(f.id, {
             id: f.id,
             name: f.name,
-            calories: Number(f.calories) || 0,
+            calories_per_serving: Number(f.calories_per_serving) || 0,
+            serving_size: Number(f.serving_size) || 0,
             protein: Number(f.protein) || 0,
             carbs: Number(f.carbs) || 0,
             fat: Number(f.fat) || 0,
@@ -256,7 +275,8 @@ export default function NutritionPage() {
             food: {
               id: f.id,
               name: f.name,
-              calories: f.calories,
+              calories_per_serving: f.calories_per_serving,
+              serving_size: f.serving_size,
               protein: f.protein,
               carbs: f.carbs,
               fat: f.fat,
@@ -273,17 +293,13 @@ export default function NutritionPage() {
             const foodItems = byMeal.get(meal.id) || [];
             const totals = foodItems.reduce(
               (acc, item) => {
-                const calories =
-                  (item.food?.calories || 0) * (item.quantity || 0);
-                const protein =
-                  (item.food?.protein || 0) * (item.quantity || 0);
-                const carbs = (item.food?.carbs || 0) * (item.quantity || 0);
-                const fat = (item.food?.fat || 0) * (item.quantity || 0);
+                if (!item.food) return acc;
+                const m = macrosForQuantity(item.food, item.quantity || 0);
                 return {
-                  calories: acc.calories + calories,
-                  protein: acc.protein + protein,
-                  carbs: acc.carbs + carbs,
-                  fat: acc.fat + fat,
+                  calories: acc.calories + m.calories,
+                  protein: acc.protein + m.protein,
+                  carbs: acc.carbs + m.carbs,
+                  fat: acc.fat + m.fat,
                 };
               },
               { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -548,7 +564,11 @@ export default function NutritionPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {meal.foodItems.map((item) => (
+                    {meal.foodItems.map((item) => {
+                      const itemMacros = item.food
+                        ? macrosForQuantity(item.food, item.quantity)
+                        : { calories: 0, protein: 0, carbs: 0, fat: 0 };
+                      return (
                       <div
                         key={item.id}
                         className="flex items-start justify-between border-b border-[color:var(--fc-glass-border)] pb-2"
@@ -563,33 +583,17 @@ export default function NutritionPage() {
                         </div>
                         <div className="text-right ml-3 text-xs text-[color:var(--fc-text-dim)]">
                           <div className="font-semibold text-sm text-[color:var(--fc-text-primary)]">
-                            {formatNumber(
-                              (item.food?.calories || 0) * item.quantity,
-                              0
-                            )}{" "}
-                            cal
+                            {formatNumber(itemMacros.calories, 0)} cal
                           </div>
                           <div>
-                            P:
-                            {formatNumber(
-                              (item.food?.protein || 0) * item.quantity,
-                              0
-                            )}
-                            g | C:
-                            {formatNumber(
-                              (item.food?.carbs || 0) * item.quantity,
-                              0
-                            )}
-                            g | F:
-                            {formatNumber(
-                              (item.food?.fat || 0) * item.quantity,
-                              0
-                            )}
-                            g
+                            P:{formatNumber(itemMacros.protein, 0)}g | C:
+                            {formatNumber(itemMacros.carbs, 0)}g | F:
+                            {formatNumber(itemMacros.fat, 0)}g
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

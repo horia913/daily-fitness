@@ -127,6 +127,41 @@ export async function getClientMeasurements(
 /**
  * Get latest measurement for a client
  */
+/**
+ * Daily-ish weight series for charts (ascending by date).
+ */
+export async function getWeightSeries(
+  clientId: string,
+  days: number,
+): Promise<{ measured_date: string; weight_kg: number }[]> {
+  try {
+    const start = new Date();
+    start.setDate(start.getDate() - Math.max(1, days));
+    const startStr = start.toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("body_metrics")
+      .select("measured_date, weight_kg")
+      .eq("client_id", clientId)
+      .not("weight_kg", "is", null)
+      .gte("measured_date", startStr)
+      .order("measured_date", { ascending: true });
+
+    if (error) {
+      console.error("Error in getWeightSeries:", error);
+      return [];
+    }
+    return (data ?? [])
+      .map((r: { measured_date: string; weight_kg: number | null }) => ({
+        measured_date: r.measured_date,
+        weight_kg: Number(r.weight_kg) || 0,
+      }))
+      .filter((r) => r.weight_kg > 0);
+  } catch (e) {
+    console.error("Error in getWeightSeries:", e);
+    return [];
+  }
+}
+
 export async function getLatestMeasurement(
   clientId: string
 ): Promise<BodyMeasurement | null> {
@@ -149,6 +184,36 @@ export async function getLatestMeasurement(
     console.error('Error in getLatestMeasurement:', error);
     return null;
   }
+}
+
+export interface BodyMetricsSummary {
+  currentWeightKg: number | null;
+  delta30dKg: number | null;
+  sparkline90d: number[];
+}
+
+/** Progress hub BODY row: latest weight, 30d delta, 90d sparkline values. */
+export async function getBodyMetricsSummary(
+  clientId: string,
+): Promise<BodyMetricsSummary> {
+  const [latest, series] = await Promise.all([
+    getLatestMeasurement(clientId),
+    getWeightSeries(clientId, 90),
+  ]);
+  const cur =
+    latest?.weight_kg != null ? Number(latest.weight_kg) : null;
+  let delta30dKg: number | null = null;
+  if (cur != null && series.length >= 1) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const ck = cutoff.toISOString().split("T")[0];
+    const old = series.find((p) => p.measured_date <= ck);
+    if (old?.weight_kg) {
+      delta30dKg = Math.round((cur - old.weight_kg) * 10) / 10;
+    }
+  }
+  const sparkline90d = series.map((p) => p.weight_kg);
+  return { currentWeightKg: cur, delta30dKg, sparkline90d };
 }
 
 /**

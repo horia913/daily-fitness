@@ -5,8 +5,8 @@
  * 
  * This service reads from:
  *   - program_assignments (active assignment)
- *   - program_day_assignments (per-client canonical schedule snapshot)
- *   - program_schedule (resolves program_schedule.id per snapshot row for legacy keys)
+ *   - program_day_assignments (per-client canonical schedule snapshot, including is_optional)
+ *   - program_schedule (resolves program_schedule.id per snapshot cell for FK keys only)
  *   - workout_logs (completion — program_schedule_id + program_assignment_id, completed_at)
  *   - program_progress (cache — derived from next-slot reads)
  * 
@@ -74,6 +74,8 @@ export interface AssignmentScheduleSlot {
   name: string
   is_customized: boolean
   day_type: string
+  /** Per-client optional day (materialized from master / coach edits). */
+  is_optional?: boolean
 }
 
 export interface ProgramScheduleSlot {
@@ -229,7 +231,7 @@ export async function getAssignmentSchedule(
   const { data, error } = await supabase
     .from('program_day_assignments')
     .select(
-      'id, program_assignment_id, day_number, program_day, workout_template_id, name, is_customized, day_type'
+      'id, program_assignment_id, day_number, program_day, workout_template_id, name, is_customized, day_type, is_optional'
     )
     .eq('program_assignment_id', assignmentId)
     .order('day_number', { ascending: true })
@@ -263,6 +265,7 @@ export async function getAssignmentSchedule(
       name: typeof row.name === 'string' ? row.name : '',
       is_customized: Boolean(row.is_customized),
       day_type: typeof row.day_type === 'string' ? row.day_type : 'workout',
+      is_optional: Boolean(row.is_optional),
     }
   })
 
@@ -275,8 +278,9 @@ function scheduleLookupKey(weekNumber: number, dayWithinWeek: number): string {
 }
 
 /**
- * Canonical assignment-scoped slots as ProgramScheduleSlot[] (program_schedule.id, week/day, template).
- * Joins snapshot to program_schedule via (program_id, week_number, day_number 1..7).
+ * Canonical assignment-scoped slots as ProgramScheduleSlot[] (program_schedule.id for FK keys).
+ * Iteration order and optional/custom template come from program_day_assignments; program_schedule
+ * is only used to resolve program_schedule.id and day_of_week for legacy keys.
  */
 export async function getProgramScheduleSlotsForAssignment(
   supabase: SupabaseClient,
@@ -287,7 +291,7 @@ export async function getProgramScheduleSlotsForAssignment(
     getAssignmentSchedule(supabase, assignmentId),
     supabase
       .from('program_schedule')
-      .select('id, program_id, week_number, day_number, day_of_week, template_id, is_optional')
+      .select('id, program_id, week_number, day_number, day_of_week, template_id')
       .eq('program_id', programId),
   ])
 
@@ -295,9 +299,9 @@ export async function getProgramScheduleSlotsForAssignment(
     console.warn(
       '[assignment-schedule] No program_day_assignments for assignment',
       assignmentId,
-      '— falling back to program_schedule'
+      '— returning no slots (master program_schedule is not used as assignment schedule)'
     )
-    return getProgramSlots(supabase, programId)
+    return []
   }
 
   const { data: psRows, error: psErr } = scheduleResult
@@ -313,7 +317,6 @@ export async function getProgramScheduleSlotsForAssignment(
     day_number: number
     day_of_week: number
     template_id: string
-    is_optional?: boolean
   }>()
   for (const ps of psRows ?? []) {
     const w = Number(ps.week_number) || 1
@@ -352,7 +355,7 @@ export async function getProgramScheduleSlotsForAssignment(
       day_number: snap.program_day,
       day_of_week: dayOfWeek,
       template_id: templateId || templateFromMaster || '',
-      is_optional: ps?.is_optional ?? false,
+      is_optional: snap.is_optional ?? false,
     }
   })
 }

@@ -107,26 +107,14 @@ export async function fetchLeaderboardData(
           return prExerciseName.includes(exerciseName.toLowerCase())
         })
         if (exercisePRs.length === 0) return 0
-        
-        // For bodyweight exercises (pushups, chinups), use reps (record_type = 'reps')
-        if (exerciseName === 'pushup' || exerciseName === 'chinup') {
-          const repsPRs = exercisePRs.filter((pr: PersonalRecord) => pr.record_type === 'reps')
-          if (repsPRs.length === 0) return 0
-          return Math.max(...repsPRs.map((pr: PersonalRecord) => pr.record_value || 0))
-        }
-        
-        // For weighted exercises, use weight PRs and calculate 1RM estimate
-        // Formula: Weight × (1 + Reps/30)
-        // Note: We only have record_value for weight, not reps, so we estimate conservatively
-        const weightPRs = exercisePRs.filter((pr: PersonalRecord) => pr.record_type === 'weight')
-        if (weightPRs.length === 0) return 0
-        
-        // Use the max weight value (conservative 1RM estimate assumes 1 rep)
-        return Math.max(...weightPRs.map((pr: PersonalRecord) => {
-          const weight = pr.record_value || 0
-          // Since we don't have reps stored with weight PRs, estimate conservatively as 1RM
-          return weight
-        }))
+
+        // v2: max_strength = heaviest weight; strength_endurance = volume (kg·reps)
+        const strengthPRs = exercisePRs.filter(
+          (pr: PersonalRecord) => pr.record_type === 'max_strength' || pr.record_type === 'weight',
+        )
+        if (strengthPRs.length === 0) return 0
+
+        return Math.max(...strengthPRs.map((pr: PersonalRecord) => pr.record_value || 0))
       }
 
       return {

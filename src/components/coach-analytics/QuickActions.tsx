@@ -1,56 +1,60 @@
-'use client'
+"use client";
 
-import { useRouter } from 'next/navigation'
-import { MessageSquare, Sparkles, Target, FileText, Zap } from 'lucide-react'
-import hub from './coachAnalyticsHub.module.css'
+import { useRouter } from "next/navigation";
+import { MessageSquare, Sparkles, Target, FileText, Zap } from "lucide-react";
+import hub from "./coachAnalyticsHub.module.css";
 
 const ACTIONS = [
   {
-    key: 'msg',
-    title: 'Message all',
-    sub: 'Send group msg',
+    key: "msg",
+    title: "Message all",
+    sub: "Send group msg",
     icon: MessageSquare,
-    bg: 'var(--cyan-soft)',
-    fg: 'var(--cyan)',
-    href: '/coach/clients',
+    bg: "var(--cyan-soft)",
+    fg: "var(--cyan)",
+    href: "/coach/clients",
   },
   {
-    key: 'cel',
-    title: 'Celebrate',
-    sub: 'Acknowledge wins',
+    key: "cel",
+    title: "Celebrate",
+    sub: "Acknowledge wins",
     icon: Sparkles,
-    bg: 'var(--lime-soft)',
-    fg: 'var(--lime)',
-    href: '/coach',
+    bg: "var(--lime-soft)",
+    fg: "var(--lime)",
+    href: "/coach",
   },
   {
-    key: 'goals',
-    title: 'Set goals',
-    sub: 'Update targets',
+    key: "goals",
+    title: "Set goals",
+    sub: "Update targets",
     icon: Target,
-    bg: 'var(--warning-soft)',
-    fg: 'var(--warning)',
-    href: '/coach/goals',
+    bg: "var(--warning-soft)",
+    fg: "var(--warning)",
+    href: "/coach/goals",
   },
   {
-    key: 'rep',
-    title: 'Generate report',
-    sub: 'Export data',
+    key: "rep",
+    title: "Generate report",
+    sub: "Export data",
     icon: FileText,
-    bg: 'var(--purple-soft)',
-    fg: 'var(--purple)',
-    href: '/coach/reports',
+    bg: "var(--purple-soft)",
+    fg: "var(--purple)",
+    href: "/coach/reports",
   },
-] as const
+] as const;
 
 export function QuickActions() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <div className={hub.sectionCard}>
       <div className={hub.sectionHead}>
         <div className={hub.sectionHeadLeft}>
-          <Zap className="size-3 shrink-0" style={{ color: 'var(--lime)' }} aria-hidden />
+          <Zap
+            className="size-3 shrink-0"
+            style={{ color: "var(--lime)" }}
+            aria-hidden
+          />
           <span className={hub.sectionTitle}>Quick actions</span>
         </div>
       </div>
@@ -62,8 +66,8 @@ export function QuickActions() {
             onClick={() => router.push(a.href)}
             className="flex cursor-pointer flex-col items-start gap-1.5 rounded-[11px] border p-2.5 text-left transition-colors hover:bg-white/[0.04]"
             style={{
-              background: 'var(--card-2)',
-              borderColor: 'var(--line-2)',
+              background: "var(--card-2)",
+              borderColor: "var(--line-2)",
             }}
           >
             <div
@@ -72,12 +76,18 @@ export function QuickActions() {
             >
               <a.icon className="size-3.5" strokeWidth={2} aria-hidden />
             </div>
-            <span className="text-xs font-semibold" style={{ color: 'var(--t1)' }}>
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--t1)" }}
+            >
               {a.title}
             </span>
             <span
               className="text-[9.5px] leading-snug"
-              style={{ fontFamily: 'var(--f-mono, "Geist Mono", monospace)', color: 'var(--t3)' }}
+              style={{
+                fontFamily: 'var(--f-mono, "Geist Mono", monospace)',
+                color: "var(--t3)",
+              }}
             >
               {a.sub}
             </span>
@@ -85,5 +95,5 @@ export function QuickActions() {
         ))}
       </div>
     </div>
-  )
+  );
 }

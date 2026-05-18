@@ -285,6 +285,40 @@ export async function getTrainedExercises(
 }
 
 /**
+ * Distinct exercises with at least one set log in the time range (by `completed_at` on set logs).
+ */
+export async function countDistinctExercisesWithSetsInRange(
+  clientId: string,
+  timeRange: StrengthTimeRange,
+): Promise<number> {
+  const { ensureAuthenticated } = await import("./supabase");
+  await ensureAuthenticated();
+
+  const days = DEFAULT_TIME_RANGES[timeRange];
+  const start = new Date();
+  if (timeRange === "ALL" || days >= 9999) {
+    start.setFullYear(start.getFullYear() - 8);
+  } else {
+    start.setDate(start.getDate() - days);
+  }
+  const startIso = start.toISOString();
+
+  const { data, error } = await supabase
+    .from("workout_set_logs")
+    .select("exercise_id")
+    .eq("client_id", clientId)
+    .not("exercise_id", "is", null)
+    .gte("completed_at", startIso);
+
+  if (error || !data?.length) return 0;
+  return new Set(
+    (data as { exercise_id: string | null }[])
+      .map((r) => r.exercise_id)
+      .filter((id): id is string => Boolean(id)),
+  ).size;
+}
+
+/**
  * Builds a single ExerciseProgression from grouped set logs.
  */
 function buildProgressionFromSets(

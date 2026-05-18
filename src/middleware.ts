@@ -52,7 +52,13 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for App Router
   // This writes refreshed session cookies to the response
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[middleware] supabase.auth.getUser failed (request continues):', err)
+    }
+  }
 
   // DEV-only logging to prove middleware execution
   if (process.env.NODE_ENV !== 'production') {

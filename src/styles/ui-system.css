@@ -2389,11 +2389,11 @@ select.fc-pr-series-select option {
 
 /* §6.21 — Floating Action Button (lime, NOT red).
    Phase 0b Task 6: replaces .fc-fab on create CTAs.
-   Offset tracks `--fc-bottom-safe-area` (see `globals.css`): ~96px on mobile
-   (0.75 × 8rem), tighter on desktop when bottom nav is absent. */
+   `--fc-fab-bottom` (globals.css): ~7.2rem mobile (clearance above floating pill nav);
+   desktop uses a fixed rem offset — independent of `--fc-bottom-safe-area`. */
 .fab-action {
   position: fixed;
-  bottom: calc(0.75 * var(--fc-bottom-safe-area, 8rem));
+  bottom: var(--fc-fab-bottom, calc(0.9 * var(--fc-bottom-safe-area, 8rem)));
   right: 16px;
   width: 56px;
   height: 56px;

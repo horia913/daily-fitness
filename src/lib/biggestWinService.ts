@@ -234,7 +234,7 @@ function biggestWinFromPr(row: PrRow): BiggestWin {
   const cur = row.record_value;
   const unit = row.record_unit || "";
 
-  if (row.record_type === "weight") {
+  if (row.record_type === "max_strength" || row.record_type === "weight") {
     const u = unit || "kg";
     const delta = prev != null ? cur - prev : cur;
     const imp =
@@ -255,16 +255,16 @@ function biggestWinFromPr(row: PrRow): BiggestWin {
     };
   }
 
-  if (row.record_type === "reps") {
+  if (row.record_type === "strength_endurance" || row.record_type === "reps") {
     const delta = prev != null ? cur - prev : cur;
     return {
       exerciseId: row.exercise_id,
       exerciseName: name,
       improvementType: "reps",
-      improvementValue: `${delta >= 0 ? "+" : ""}${Math.round(delta)} ${unit || "reps"}`.trim(),
-      improvementUnit: unit || "reps",
-      currentBest: `${cur} ${unit || "reps"}`,
-      previousBest: prev != null ? `${prev} ${unit || "reps"}` : "—",
+      improvementValue: `${delta >= 0 ? "+" : ""}${Math.round(delta)} ${unit || "kg·reps"}`.trim(),
+      improvementUnit: unit || "kg·reps",
+      currentBest: `${Math.round(cur * 10) / 10} ${unit || "kg·reps"}`,
+      previousBest: prev != null ? `${Math.round(prev * 10) / 10} ${unit || "kg·reps"}` : "—",
       hasImprovement: prev == null || cur > prev,
       improvementPercent:
         prev != null && prev > 0 && cur > prev ? pctHigherIsBetter(prev, cur) : null,

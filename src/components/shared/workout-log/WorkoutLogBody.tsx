@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { useMemo } from "react";
+import type { WorkoutAdherenceResult } from "@/lib/coachWorkoutAdherence";
+import type { AdherenceBlock } from "@/lib/workoutLog/adherenceTypes";
 import type { PrescribedWorkoutReference, WorkoutLogFullPayload } from "@/types/workoutLog";
 import { WorkoutLogBlockCard } from "./WorkoutLogBlockCard";
 import { WorkoutLogPRList } from "./WorkoutLogPRList";
@@ -8,12 +11,29 @@ import { WorkoutLogSessionMeta } from "./WorkoutLogSessionMeta";
 type Props = {
   payload: WorkoutLogFullPayload;
   prescribedReference?: PrescribedWorkoutReference | null;
+  adherence?: WorkoutAdherenceResult | null;
   derivedDurationMinutes?: number;
   headerActions?: ReactNode;
   onBack?: () => void;
 };
 
-export function WorkoutLogBody({ payload, prescribedReference, derivedDurationMinutes, headerActions, onBack }: Props) {
+export function WorkoutLogBody({
+  payload,
+  prescribedReference,
+  adherence,
+  derivedDurationMinutes,
+  headerActions,
+  onBack,
+}: Props) {
+  const adherenceByBlock = useMemo(() => {
+    const m = new Map<string, AdherenceBlock>();
+    if (!adherence?.blocks) return m;
+    for (const b of adherence.blocks) {
+      m.set(b.setEntryId, b);
+    }
+    return m;
+  }, [adherence]);
+
   return (
     <div className="space-y-4">
       <WorkoutLogSessionHeader
@@ -22,6 +42,14 @@ export function WorkoutLogBody({ payload, prescribedReference, derivedDurationMi
         onBack={onBack}
         actions={headerActions}
         derivedDurationMinutes={derivedDurationMinutes}
+        adherenceSummary={
+          adherence && adherence.totalPrescribedSets > 0
+            ? {
+                setsOnTarget: adherence.setsOnTarget,
+                totalPrescribedSets: adherence.totalPrescribedSets,
+              }
+            : null
+        }
       />
       <WorkoutLogSessionMeta
         notes={payload.session.notes}
@@ -37,6 +65,7 @@ export function WorkoutLogBody({ payload, prescribedReference, derivedDurationMi
             <WorkoutLogBlockCard
               block={block}
               prescribedReference={prescribedReference?.byBlockId?.[block.setEntryId] ?? null}
+              adherenceBlock={adherenceByBlock.get(block.setEntryId) ?? null}
             />
           </div>
         ))}

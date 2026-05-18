@@ -81,6 +81,7 @@ export default function CoachClientWorkoutLogDetailPage() {
         <WorkoutLogBody
           payload={detail.payload}
           prescribedReference={detail.prescribedReference ?? null}
+          adherence={detail.adherence}
           derivedDurationMinutes={detail.displayDurationMinutes ?? undefined}
           onBack={() => router.back()}
           headerActions={

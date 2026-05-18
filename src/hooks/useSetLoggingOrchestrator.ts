@@ -26,9 +26,8 @@ import {
   persistToStorage,
   rehydrateFromStorage,
   clearStorageKey,
-  type PrDetectedFromLogSet,
-  type LogSetPrSummary,
 } from "@/lib/setLogging/goldenLogSet";
+import type { PrDetectedPayload } from "@/lib/prService";
 import { fetchApi } from "@/lib/apiClient";
 
 // ---------------------------------------------------------------------------
@@ -103,8 +102,8 @@ export interface SyncSuccessResult {
   e1rm?: number;
   isNewPR?: boolean;
   deduplicated?: boolean;
-  pr_detected?: PrDetectedFromLogSet | null;
-  pr?: LogSetPrSummary;
+  pr_detected?: PrDetectedPayload | null;
+  metrics_warning?: string;
   new_achievements?: unknown[];
 }
 
@@ -206,7 +205,7 @@ export function useSetLoggingOrchestrator(
             isNewPR: result.isNewPR,
             deduplicated: result.deduplicated,
             pr_detected: result.pr_detected,
-            pr: result.pr,
+            metrics_warning: result.metrics_warning,
             new_achievements: result.new_achievements,
           });
 
@@ -236,7 +235,7 @@ export function useSetLoggingOrchestrator(
         }
       })();
     },
-    [persist, sessionId],
+    [persist, sessionId, onSyncSuccess],
   );
 
   // ---- logSet ----

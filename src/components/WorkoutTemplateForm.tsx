@@ -82,7 +82,10 @@ import { BasicInfoSection } from '@/components/workout-form/BasicInfoSection';
 import { ActionButtons } from '@/components/workout-form/ActionButtons';
 import { EmptyExerciseState } from '@/components/workout-form/EmptyExerciseState';
 import { AddExercisePanel } from '@/components/workout-form/AddExercisePanel';
-import { saveWorkoutTemplate } from '@/services/saveWorkoutTemplate';
+import {
+  saveWorkoutTemplate,
+  serializeExercisesForSaveCompare,
+} from '@/services/saveWorkoutTemplate';
 import { cache } from '@/lib/prefetch';
 
 const WORKOUT_FORM_EXERCISES_CACHE_KEY = 'workout_template_form_exercises';
@@ -105,6 +108,8 @@ interface WorkoutTemplateFormProps {
   renderMode?: "modal" | "page";
   /** Called when dirty state changes (edit page uses this for "Saved" vs "Unsaved changes" indicator). */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Called while template save is in progress (edit page disables nav back). */
+  onSavingChange?: (saving: boolean) => void;
   /** Edit page passes live dirty flag for hero status (optional). */
   pageIsDirty?: boolean;
 }
@@ -133,6 +138,7 @@ export default function WorkoutTemplateForm({
   initialBlocks,
   renderMode = "modal",
   onDirtyChange,
+  onSavingChange,
   pageIsDirty,
 }: WorkoutTemplateFormProps) {
   const { isDark, getThemeStyles } = useTheme();
@@ -141,7 +147,12 @@ export default function WorkoutTemplateForm({
   const { addToast } = useToast();
 
   const lastSavedSnapshotRef = useRef<string | null>(null);
+  const exercisesBaselineRef = useRef<string | null>(null);
   const justLoadedRef = useRef(false);
+
+  const setExercisesBaseline = useCallback((list: unknown[]) => {
+    exercisesBaselineRef.current = serializeExercisesForSaveCompare(list);
+  }, []);
 
   // Helper function to handle number input changes properly
   const handleNumberChange = (value: string, defaultValue: number = 0) => {
@@ -159,6 +170,12 @@ export default function WorkoutTemplateForm({
     difficulty_level: "Beginner",
   });
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const saveInFlightRef = useRef(false);
+
+  useEffect(() => {
+    onSavingChange?.(loading);
+  }, [loading, onSavingChange]);
   const [exercises, setExercises] = useState<any[]>([]);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [availableExercises, setAvailableExercises] = useState<any[]>([]);
@@ -570,6 +587,7 @@ export default function WorkoutTemplateForm({
           setWorkoutBlocks(initialBlocks);
           const convertedExercises = convertBlocksToExercises(initialBlocks);
           setExercises(convertedExercises);
+          setExercisesBaseline(convertedExercises);
           hasLoadedBlocks.current = true;
           justLoadedRef.current = true;
           if (process.env.NODE_ENV !== "production") {
@@ -833,6 +851,7 @@ export default function WorkoutTemplateForm({
       if (blocks && blocks.length > 0) {
         const convertedExercises = convertBlocksToExercises(blocks);
         setExercises(convertedExercises);
+        setExercisesBaseline(convertedExercises);
         justLoadedRef.current = true;
       }
     } catch (error) {
@@ -853,7 +872,10 @@ export default function WorkoutTemplateForm({
 
   const handleSubmit = async (e?: React.SyntheticEvent) => {
     e?.preventDefault?.();
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setLoading(true);
+    setSaveStatus("Saving template…");
 
     try {
       const {
@@ -864,6 +886,12 @@ export default function WorkoutTemplateForm({
         return;
       }
 
+      const exercisesSnapshot = serializeExercisesForSaveCompare(exercises);
+      const saveBlocks =
+        !template ||
+        exercisesBaselineRef.current === null ||
+        exercisesSnapshot !== exercisesBaselineRef.current;
+
       const result = await saveWorkoutTemplate({
         supabase,
         userId: authUser.id,
@@ -871,6 +899,24 @@ export default function WorkoutTemplateForm({
         exercises,
         template,
         generateBlockName,
+        saveBlocks,
+        onProgress: ({ phase, current, total }) => {
+          if (phase === "template") {
+            setSaveStatus("Saving template details…");
+          } else if (phase === "delete") {
+            setSaveStatus(
+              total === 1
+                ? "Removing deleted exercise…"
+                : `Removing deleted exercises (${current} of ${total})…`,
+            );
+          } else {
+            setSaveStatus(
+              total === 1
+                ? "Saving exercise…"
+                : `Saving exercises (${current} of ${total})…`,
+            );
+          }
+        },
       });
 
       if (!result.success) {
@@ -878,7 +924,12 @@ export default function WorkoutTemplateForm({
         return;
       }
 
+      setSaveStatus(
+        saveBlocks ? "Done! Opening template…" : "Saved!",
+      );
+
       clearDraft();
+      setExercisesBaseline(exercises);
       if (onDirtyChange) {
         lastSavedSnapshotRef.current = JSON.stringify({
           formData,
@@ -893,7 +944,9 @@ export default function WorkoutTemplateForm({
       console.error("Error saving template:", err);
       addToast({ title: "An error occurred while saving", variant: "destructive" });
     } finally {
+      saveInFlightRef.current = false;
       setLoading(false);
+      setSaveStatus(null);
     }
   };
 
@@ -1356,6 +1409,8 @@ export default function WorkoutTemplateForm({
                     type="button"
                     className={wt.backBtn}
                     onClick={onClose}
+                    disabled={loading}
+                    aria-disabled={loading}
                   >
                     <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={2} />
                     Back
@@ -1599,14 +1654,43 @@ export default function WorkoutTemplateForm({
 
         <ActionButtons
           onCancel={() => {
+            if (loading) return;
             clearDraft();
             onClose();
           }}
           onSubmit={(e) => handleSubmit(e ?? ({} as React.FormEvent<HTMLFormElement>))}
           loading={loading}
+          saveStatus={saveStatus}
           template={template}
           visualVariant={isPage ? "coachV1" : "default"}
         />
+
+        {loading && (
+          <div
+            className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+            role="alertdialog"
+            aria-modal="true"
+            aria-busy="true"
+            aria-label={saveStatus ?? "Saving workout template"}
+          >
+            <div
+              className={cn(
+                "max-w-sm w-full rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg-deep)] p-6 shadow-xl text-center space-y-3",
+              )}
+            >
+              <div
+                className="mx-auto h-10 w-10 rounded-full border-2 border-[color:var(--fc-accent-lime)] border-t-transparent animate-spin"
+                aria-hidden
+              />
+              <p className="text-base font-semibold fc-text-primary">
+                {saveStatus ?? "Saving…"}
+              </p>
+              <p className="text-sm fc-text-dim">
+                Please wait — do not close this page or tap save again.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Custom CSS for animations */}

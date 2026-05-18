@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import {
   AuthLayout,
   AuthFormContainer,
-  FeatureHighlights,
 } from "@/components/server/AuthLayout";
 import { AlertCircle, CheckCircle, Eye, EyeOff, KeyRound, Shield } from "lucide-react";
 
@@ -288,7 +287,6 @@ export default function ResetPasswordPage() {
           </div>
         </div>
 
-        <FeatureHighlights />
       </AuthFormContainer>
     </AuthLayout>
   );

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useCoachClient } from "@/contexts/CoachClientContext";
 import ClientDetailHero from "@/components/coach/client-detail/ClientDetailHero";
+import { CoachScoreBreakdownBlock } from "@/components/coach/CoachScoreBreakdownBlock";
 import ClientPRTimeline from "@/components/coach/client-views/ClientPRTimeline";
 import ClientAnalyticsView from "@/components/coach/client-views/ClientAnalyticsView";
 import { fetchApi } from "@/lib/apiClient";
@@ -121,6 +122,7 @@ export default function ClientCoachStatsTab({ clientId }: { clientId: string }) 
           },
         ]}
       />
+      <CoachScoreBreakdownBlock clientId={clientId} />
       <ClientPRTimeline clientId={clientId} prefetched={pr} />
       <ClientAnalyticsView
         key={`${clientId}-coach-stats`}

@@ -32,7 +32,8 @@ const CATEGORIES: {
   {
     id: "nutrition",
     label: "Nutrition",
-    description: "Calories, protein, hydration, and meal-plan adherence — each tied to a data source.",
+    description:
+      "Calories, protein, hydration, and meal-plan adherence — each tied to a data source.",
     Icon: Apple,
   },
 ];
@@ -51,9 +52,16 @@ export function CategoryPicker({
           onClick={() => onPick(id)}
           className="flex flex-col items-start text-left rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-highlight)] p-4 min-h-[120px] hover:border-[color-mix(in_srgb,var(--fc-accent-cyan)_45%,transparent)] transition-colors fc-press"
         >
-          <Icon className="h-8 w-8 mb-2 text-[color:var(--fc-accent-cyan)]" aria-hidden />
-          <span className="text-sm font-semibold fc-text-primary leading-tight">{label}</span>
-          <span className="text-[11px] fc-text-dim mt-1.5 leading-snug">{description}</span>
+          <Icon
+            className="h-8 w-8 mb-2 text-[color:var(--fc-accent-cyan)]"
+            aria-hidden
+          />
+          <span className="text-sm font-semibold fc-text-primary leading-tight">
+            {label}
+          </span>
+          <span className="text-[11px] fc-text-dim mt-1.5 leading-snug">
+            {description}
+          </span>
         </button>
       ))}
     </div>

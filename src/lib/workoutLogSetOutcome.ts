@@ -71,3 +71,26 @@ export function worstOfOutcomes(
 ): NonNullable<DimensionOutcome> {
   return (PRIORITY[a] ?? 0) >= (PRIORITY[b] ?? 0) ? a : b;
 }
+
+export type StrengthSetScalars = {
+  actualReps: number | null;
+  prescribedReps: number | null;
+  actualWeightKg: number | null;
+  prescribedWeightKg: number | null;
+  actualRpe: number | null;
+  prescribedRir: number | null;
+};
+
+/**
+ * Single source of truth for "on target" in aggregate adherence counts.
+ * Aligns with prescribed-vs-actual row coloring (non-miss, non-flag outcomes
+ * after consolidation: hit, under, or over).
+ */
+export function isSetOnTarget(s: StrengthSetScalars): boolean {
+  const row = consolidateRowOutcome(
+    repsOutcome(s.actualReps, s.prescribedReps),
+    weightOutcome(s.actualWeightKg, s.prescribedWeightKg),
+    rpeVsPrescribedRirOutcome(s.actualRpe, s.prescribedRir)
+  );
+  return row === "hit" || row === "under" || row === "over";
+}

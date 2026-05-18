@@ -11,7 +11,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 
 import { supabase } from "@/lib/supabase";
-import { ChevronLeft, Edit3 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 interface Food {
   id: string;
@@ -296,18 +296,6 @@ export default function FoodDetailPage() {
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/90 to-transparent z-50">
-            <div className="max-w-lg mx-auto w-full">
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/client/nutrition/foods/create?edit=${food.id}`)}
-                className="w-full h-11 rounded-lg border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)] bg-[color-mix(in_srgb,var(--fc-accent-cyan)_10%,transparent)] text-[color:var(--fc-accent-cyan)] font-semibold text-sm gap-1.5"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit food
-              </Button>
-            </div>
-          </div>
         </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>

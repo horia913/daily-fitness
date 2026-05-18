@@ -1,4 +1,5 @@
 import { computeWorkoutAdherence } from "@/lib/coachWorkoutAdherence";
+import type { PerSetAdherenceBlock } from "@/lib/workoutLog/adherenceTypes";
 
 jest.mock("@/lib/clientProgressionService", () => ({
   parseRepsRange: (value: string) => {
@@ -12,6 +13,8 @@ describe("coachWorkoutAdherence", () => {
     const result = computeWorkoutAdherence(
       [
         {
+          id: "sl-1",
+          workout_log_id: "wl-1",
           set_entry_id: "entry-1",
           set_type: "superset",
           set_number: 1,
@@ -35,13 +38,19 @@ describe("coachWorkoutAdherence", () => {
       ])
     );
 
-    expect(result.exerciseBlocks[0]?.sets[0]?.rpe.actual).toBe(8);
+    const sup = result.blocks.find(
+      (b): b is PerSetAdherenceBlock => b.kind === "per_set" && b.setType === "superset"
+    );
+    expect(sup).toBeDefined();
+    expect(sup?.setOutcomes[0]?.row).toBe("hit");
   });
 
   it("creates speed and endurance blocks when prescriptions exist", () => {
     const result = computeWorkoutAdherence(
       [
         {
+          id: "sl-s",
+          workout_log_id: "wl-1",
           set_entry_id: "speed-entry",
           set_type: "speed_work",
           exercise_id: "speed-ex",
@@ -49,6 +58,8 @@ describe("coachWorkoutAdherence", () => {
           actual_time_seconds: 45,
         },
         {
+          id: "sl-e",
+          workout_log_id: "wl-1",
           set_entry_id: "endurance-entry",
           set_type: "endurance",
           exercise_id: "endurance-ex",
@@ -81,7 +92,11 @@ describe("coachWorkoutAdherence", () => {
       }
     );
 
-    expect(result.exerciseBlocks.some((block) => block.displayVariant === "speed_work")).toBe(true);
-    expect(result.exerciseBlocks.some((block) => block.displayVariant === "endurance")).toBe(true);
+    expect(
+      result.blocks.some((b) => b.kind === "speed_endurance" && b.setType === "speed_work")
+    ).toBe(true);
+    expect(
+      result.blocks.some((b) => b.kind === "speed_endurance" && b.setType === "endurance")
+    ).toBe(true);
   });
 });

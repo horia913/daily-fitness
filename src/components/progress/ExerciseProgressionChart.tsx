@@ -133,8 +133,14 @@ export function ExerciseProgressionChart({
       )}
     >
       <div className={cn("flex items-start justify-between gap-2", compact ? "mb-3" : "mb-4")}>
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className={cn("font-bold text-[color:var(--fc-text-primary)] truncate", compact ? "text-base" : "text-lg")}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h3
+            className={cn(
+              "font-bold text-[color:var(--fc-text-primary)]",
+              compact ? "text-base" : "text-lg",
+              "min-w-0 flex-1 overflow-wrap-anywhere [overflow-wrap:anywhere] break-words leading-tight",
+            )}
+          >
             {progression.exerciseName}
           </h3>
           {trendIcon}

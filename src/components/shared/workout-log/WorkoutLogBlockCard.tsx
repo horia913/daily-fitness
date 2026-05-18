@@ -1,11 +1,19 @@
+import { useMemo } from "react";
 import { ProgramEditSetTypePill } from "@/components/coach/programs/ProgramEditSetTypePill";
-import type { PrescribedBlockReference, PrescribedTimeBlockReference, WorkoutLogBlock } from "@/types/workoutLog";
+import type { AdherenceBlock, PerSetAdherenceBlock } from "@/lib/workoutLog/adherenceTypes";
+import type {
+  PrescribedBlockReference,
+  PrescribedSetReference,
+  PrescribedTimeBlockReference,
+  WorkoutLogBlock,
+} from "@/types/workoutLog";
 import { WorkoutLogSetRow } from "./WorkoutLogSetRow";
 import { WorkoutLogTimeBlockSummary } from "./WorkoutLogTimeBlockSummary";
 
 type Props = {
   block: WorkoutLogBlock;
   prescribedReference?: PrescribedBlockReference | PrescribedTimeBlockReference | null;
+  adherenceBlock?: AdherenceBlock | null;
 };
 
 const TIME_BLOCK_TYPES = new Set(["amrap", "emom", "tabata", "for_time"]);
@@ -37,18 +45,54 @@ function hasComparablePrescription(ref: PrescribedBlockReference): boolean {
   return false;
 }
 
-export function WorkoutLogBlockCard({ block, prescribedReference }: Props) {
+function mergePerSetWithAdherence(
+  ref: PrescribedBlockReference,
+  per: PerSetAdherenceBlock,
+  rowCount: number
+): PrescribedBlockReference {
+  const baseSets = ref.sets ?? [];
+  const sets: PrescribedSetReference[] = baseSets.map((s, i) => {
+    if (i >= rowCount) return s;
+    const o = per.setOutcomes[i];
+    if (!o) return s;
+    const outcome: PrescribedSetReference["outcome"] = o.applyRowColor
+      ? o.row
+      : "neutral";
+    const next: PrescribedSetReference = { ...s, outcome };
+    if (o.informationalRowBadge) {
+      next.informationalRowBadge = o.informationalRowBadge;
+    }
+    return next;
+  });
+  return { ...ref, sets };
+}
+
+export function WorkoutLogBlockCard({ block, prescribedReference, adherenceBlock }: Props) {
   const title = block.exerciseNames.join(" + ").trim() || "Exercise";
-  const isTimeBlock = TIME_BLOCK_TYPES.has(block.setType);
-  const blockPrescribed = prescribedReference as PrescribedBlockReference | PrescribedTimeBlockReference | null;
+  const isTimeFromType = TIME_BLOCK_TYPES.has(block.setType);
+  const isTimeFromAdherence = adherenceBlock?.kind === "time_block";
+  const showTimeLayout = isTimeFromAdherence || isTimeFromType;
+
+  const blockPrescribed = prescribedReference as
+    | PrescribedBlockReference
+    | PrescribedTimeBlockReference
+    | null;
   const headerSummary =
     blockPrescribed && "headerSummary" in blockPrescribed && blockPrescribed.headerSummary
       ? String(blockPrescribed.headerSummary).trim()
-      : null;
+      : adherenceBlock?.headerSummary?.trim() ?? null;
 
   const blockRef = isPerSetPrescribedBlock(blockPrescribed) ? blockPrescribed : null;
+
+  const mergedBlockRef = useMemo(() => {
+    if (!blockRef || adherenceBlock?.kind !== "per_set") return blockRef;
+    return mergePerSetWithAdherence(blockRef, adherenceBlock, block.sets.length);
+  }, [blockRef, adherenceBlock, block.sets.length]);
+
+  const effectiveRef = mergedBlockRef ?? blockRef;
+
   const showStrengthTwoColumn =
-    Boolean(blockRef) && !isTimeBlock && hasComparablePrescription(blockRef!);
+    Boolean(effectiveRef) && !showTimeLayout && hasComparablePrescription(effectiveRef!);
 
   return (
     <div className="fc-card-shell p-3 space-y-3">
@@ -61,10 +105,14 @@ export function WorkoutLogBlockCard({ block, prescribedReference }: Props) {
           </p>
         ) : null}
       </div>
-      {isTimeBlock ? (
+      {showTimeLayout ? (
         <WorkoutLogTimeBlockSummary
           block={block}
-          prescribed={blockPrescribed as PrescribedTimeBlockReference | null}
+          prescribed={
+            blockPrescribed && "setType" in blockPrescribed && blockPrescribed.setType
+              ? (blockPrescribed as PrescribedTimeBlockReference)
+              : null
+          }
         />
       ) : showStrengthTwoColumn ? (
         <div className="space-y-2">
@@ -80,14 +128,14 @@ export function WorkoutLogBlockCard({ block, prescribedReference }: Props) {
               rowIndex={index}
               setType={block.setType}
               twoColumn
-              prescribed={blockRef?.sets?.[index] ?? null}
+              prescribed={effectiveRef?.sets?.[index] ?? null}
             />
           ))}
         </div>
       ) : (
         <div className="space-y-2">
-          {blockRef &&
-          hasComparablePrescription(blockRef) &&
+          {effectiveRef &&
+          hasComparablePrescription(effectiveRef) &&
           (block.setType === "speed_work" || block.setType === "endurance") ? (
             <div className="grid grid-cols-[2.25rem_1fr_1fr] gap-2 text-xs fc-text-dim px-2 font-medium">
               <span className="text-center">#</span>
@@ -102,11 +150,11 @@ export function WorkoutLogBlockCard({ block, prescribedReference }: Props) {
               rowIndex={index}
               setType={block.setType}
               twoColumn={Boolean(
-                blockRef &&
-                  hasComparablePrescription(blockRef) &&
+                effectiveRef &&
+                  hasComparablePrescription(effectiveRef) &&
                   (block.setType === "speed_work" || block.setType === "endurance")
               )}
-              prescribed={blockRef?.sets?.[index] ?? null}
+              prescribed={effectiveRef?.sets?.[index] ?? null}
             />
           ))}
         </div>

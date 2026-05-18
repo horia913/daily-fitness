@@ -14,20 +14,14 @@ export function AnimatedBackground({
 }: AnimatedBackgroundProps) {
   const { isDark, performanceSettings, getTimeBasedGradientColors } =
     useTheme();
-  // Initialize with colors immediately to avoid empty gradient on first render
-  const [gradientColors, setGradientColors] = useState<string[]>(() => {
-    try {
-      return getTimeBasedGradientColors();
-    } catch {
-      // Fallback to evening colors (blue and yellow) if theme context isn't ready
-      return isDark
-        ? ["#0b0f14", "#121824", "#0E7490", "#155E75"]
-        : ["#f6f2ec", "#e8e3db", "#7DD3FC", "#60A5FA"];
-    }
-  });
+  // Static defaults for SSR + hydration; time-of-day colors apply after mount only.
+  const defaultColors = isDark
+    ? ["#0b0f14", "#121824", "#0E7490", "#155E75"]
+    : ["#f6f2ec", "#e8e3db", "#7DD3FC", "#60A5FA"];
+
+  const [gradientColors, setGradientColors] = useState<string[]>(defaultColors);
 
   useEffect(() => {
-    // Update gradient colors based on time of day
     const colors = getTimeBasedGradientColors();
     if (colors && colors.length > 0) {
       setGradientColors(colors);

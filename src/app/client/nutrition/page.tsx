@@ -8,14 +8,13 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
-import { Eyebrow, IconButton } from "@/components/client-ui";
+import { Eyebrow } from "@/components/client-ui";
 import {
   Droplet,
   BarChart3,
   ChevronDown,
   ChevronUp,
   UtensilsCrossed,
-  Bell,
   Plus,
   Clock,
   Target,
@@ -79,7 +78,12 @@ interface Meal {
 }
 
 interface MealFoodItemDisplay {
-  food: { id: string; name: string; serving_size: number; serving_unit: string };
+  food: {
+    id: string;
+    name: string;
+    serving_size: number;
+    serving_unit: string;
+  };
   quantity: number;
   calories: number;
   protein: number;
@@ -92,11 +96,21 @@ interface MealOptionDisplay {
   name: string;
   order_index: number;
   items: MealFoodItemDisplay[];
-  totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+  totals: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+  };
 }
 
 function formatFuelDateShort(d: Date = new Date()): string {
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function NutritionDashboardContent() {
@@ -120,14 +134,23 @@ function NutritionDashboardContent() {
   const loadGenerationRef = useRef(0);
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [hasMealsInPlan, setHasMealsInPlan] = useState<boolean | null>(null);
-  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(
+    null,
+  );
   /** All active assignments (for plan picker when >1). Phase N4. */
-  const [activeAssignments, setActiveAssignments] = useState<Array<{
-    id: string;
-    meal_plan_id: string;
-    label?: string | null;
-    meal_plans: { id: string; name: string; target_calories?: number; notes?: string } | null;
-  }>>([]);
+  const [activeAssignments, setActiveAssignments] = useState<
+    Array<{
+      id: string;
+      meal_plan_id: string;
+      label?: string | null;
+      meal_plans: {
+        id: string;
+        name: string;
+        target_calories?: number;
+        notes?: string;
+      } | null;
+    }>
+  >([]);
   const [activeMealPlanInfo, setActiveMealPlanInfo] = useState<{
     mealPlanId: string;
     name: string;
@@ -141,28 +164,49 @@ function NutritionDashboardContent() {
   const [loadingWaterGoal, setLoadingWaterGoal] = useState(false); // Prevent duplicate goal creation
 
   // E4.1 — Real data for sections 4, 5, 7
-  const [nutritionGoals, setNutritionGoals] = useState<{
-    id: string;
-    title: string;
-    target_value: number | string | null;
-    target_unit?: string | null;
-    current_value?: number | null;
-    progress_percentage?: number | null;
-    status: string;
-  }[]>([]);
+  const [nutritionGoals, setNutritionGoals] = useState<
+    {
+      id: string;
+      title: string;
+      target_value: number | string | null;
+      target_unit?: string | null;
+      current_value?: number | null;
+      progress_percentage?: number | null;
+      status: string;
+    }[]
+  >([]);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
   const [goalsAdherence, setGoalsAdherence] = useState<number | null>(null);
-  const [calorieTrendData, setCalorieTrendData] = useState<{ label: string; date: string; calories: number }[]>([]);
+  const [calorieTrendData, setCalorieTrendData] = useState<
+    { label: string; date: string; calories: number }[]
+  >([]);
   const [recentHistory, setRecentHistory] = useState<
-    { label: string; date: string; calories: number; protein: number; completedCount: number }[]
+    {
+      label: string;
+      date: string;
+      calories: number;
+      protein: number;
+      completedCount: number;
+    }[]
   >([]);
   /** Last 30 days for Nutrition Trends chart */
   const [nutritionTrends, setNutritionTrends] = useState<
-    { date: string; calories: number; protein: number; carbs: number; fat: number; targetCalories?: number }[]
+    {
+      date: string;
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      targetCalories?: number;
+    }[]
   >([]);
-  const [nutritionTrendsTarget, setNutritionTrendsTarget] = useState<number | null>(null);
-  const [nutritionTrendsMetric, setNutritionTrendsMetric] = useState<"calories" | "protein" | "carbs" | "fat">("calories");
+  const [nutritionTrendsTarget, setNutritionTrendsTarget] = useState<
+    number | null
+  >(null);
+  const [nutritionTrendsMetric, setNutritionTrendsMetric] = useState<
+    "calories" | "protein" | "carbs" | "fat"
+  >("calories");
   const [nutritionTrendsOpen, setNutritionTrendsOpen] = useState(false);
   const [, setAllFoods] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -175,10 +219,6 @@ function NutritionDashboardContent() {
     }
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "User"}`;
   };
-
-  /** TODO(product): wire unread state when notifications backend exists. */
-  const hasUnreadNotifications = false;
-  const notificationsHref = "/client";
 
   const runMealsLoad = async () => {
     if (!user?.id) return;
@@ -214,14 +254,18 @@ function NutritionDashboardContent() {
 
     try {
       setLoadingMeals(true);
-      const { data: rpcData, error: rpcError } = await supabase.rpc("get_client_nutrition_page", {
-        p_client_id: user.id,
-        p_date: today,
-      });
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "get_client_nutrition_page",
+        {
+          p_client_id: user.id,
+          p_date: today,
+        },
+      );
 
       if (rpcError) {
         console.error("[Fuel] get_client_nutrition_page RPC error:", rpcError);
-        if (isCurrent()) setMealsLoadError(rpcError.message || "Failed to load nutrition");
+        if (isCurrent())
+          setMealsLoadError(rpcError.message || "Failed to load nutrition");
         return;
       }
 
@@ -235,7 +279,13 @@ function NutritionDashboardContent() {
           setHasMealsInPlan(false);
           setMeals([]);
           setNutritionGoals([]);
-          setNutritionData((prev) => ({ ...prev, calories: { consumed: 0, goal: 0 }, protein: { consumed: 0, goal: 0 }, carbs: { consumed: 0, goal: 0 }, fat: { consumed: 0, goal: 0 } }));
+          setNutritionData((prev) => ({
+            ...prev,
+            calories: { consumed: 0, goal: 0 },
+            protein: { consumed: 0, goal: 0 },
+            carbs: { consumed: 0, goal: 0 },
+            fat: { consumed: 0, goal: 0 },
+          }));
         }
         return;
       }
@@ -251,10 +301,16 @@ function NutritionDashboardContent() {
       setActiveAssignments(mapped.activeAssignments as any);
       setHasMealsInPlan(mapped.hasAssignment && mapped.meals.length > 0);
       setNutritionGoals(mapped.nutritionGoals);
-      setAllFoods((mapped.allFoods ?? []).map((f) => ({ id: f.id, name: f.name })));
+      setAllFoods(
+        (mapped.allFoods ?? []).map((f) => ({ id: f.id, name: f.name })),
+      );
       const complianceRows = mapped.weeklyCompliance ?? [];
       const complianceTrend = complianceRows.map((row) => ({
-        label: new Date(`${row.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+        label: new Date(`${row.date}T12:00:00`).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
         date: row.date,
         calories: Number(row.meals_completed ?? 0),
       }));
@@ -264,12 +320,15 @@ function NutritionDashboardContent() {
           .sort((a, b) => b.date.localeCompare(a.date))
           .slice(0, 7)
           .map((row) => ({
-            label: new Date(`${row.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+            label: new Date(`${row.date}T12:00:00`).toLocaleDateString(
+              "en-US",
+              { weekday: "short", month: "short", day: "numeric" },
+            ),
             date: row.date,
             calories: 0,
             protein: 0,
             completedCount: Number(row.meals_completed ?? 0),
-          }))
+          })),
       );
       setNutritionTrends(
         complianceRows.map((row) => ({
@@ -279,7 +338,7 @@ function NutritionDashboardContent() {
           carbs: 0,
           fat: 0,
           targetCalories: mapped.targetCalories || undefined,
-        }))
+        })),
       );
       setNutritionTrendsTarget(mapped.targetCalories || null);
 
@@ -296,7 +355,7 @@ function NutritionDashboardContent() {
         mapped.targetCalories,
         mapped.targetProtein,
         mapped.targetCarbs,
-        mapped.targetFat
+        mapped.targetFat,
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -309,26 +368,33 @@ function NutritionDashboardContent() {
 
   /** Resolve completion photo_url storage paths to signed URLs. */
   async function resolveMealPhotoUrls(meals: MappedMeal[]): Promise<Meal[]> {
-    const withPhotos = meals.filter((m) => m.logged && m.photoUrl && !/^https?:\/\//i.test(m.photoUrl));
+    const withPhotos = meals.filter(
+      (m) => m.logged && m.photoUrl && !/^https?:\/\//i.test(m.photoUrl),
+    );
     if (withPhotos.length === 0) return meals;
     const resolved = await Promise.all(
       meals.map(async (m) => {
         if (!m.photoUrl || /^https?:\/\//i.test(m.photoUrl)) return m;
         try {
-          const { data, error } = await supabase.storage.from("meal-photos").createSignedUrl(m.photoUrl, 3600);
+          const { data, error } = await supabase.storage
+            .from("meal-photos")
+            .createSignedUrl(m.photoUrl, 3600);
           if (error || !data?.signedUrl) return { ...m, photoUrl: undefined };
           return { ...m, photoUrl: data.signedUrl };
         } catch {
           return m;
         }
-      })
+      }),
     );
     return resolved;
   }
 
   const todayStr = () => new Date().toISOString().split("T")[0];
 
-  const handleMarkComplete = async (mealId: string, optionId: string | null) => {
+  const handleMarkComplete = async (
+    mealId: string,
+    optionId: string | null,
+  ) => {
     if (!user?.id) {
       addToast({
         title: "Cannot complete meal",
@@ -340,7 +406,8 @@ function NutritionDashboardContent() {
     if (!activeAssignmentId) {
       addToast({
         title: "Cannot complete meal",
-        description: "No active meal plan. Please refresh the page or ask your coach to assign a plan.",
+        description:
+          "No active meal plan. Please refresh the page or ask your coach to assign a plan.",
         variant: "destructive",
       });
       return;
@@ -413,13 +480,31 @@ function NutritionDashboardContent() {
   };
 
   /** When goalsFromRpc is provided (from get_client_nutrition_page RPC), use it and skip the goals fetch. */
-  const loadWaterGoal = async (goalsFromRpc?: Array<{ id: string; title?: string; target_value?: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null }>) => {
+  const loadWaterGoal = async (
+    goalsFromRpc?: Array<{
+      id: string;
+      title?: string;
+      target_value?: number | string | null;
+      target_unit?: string | null;
+      current_value?: number | null;
+      progress_percentage?: number | null;
+    }>,
+  ) => {
     if (!user?.id) return;
     if (loadingWaterGoal) return;
 
     setLoadingWaterGoal(true);
     try {
-      let goalsList: Array<{ id: string; title?: string; target_value?: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; pillar?: string; category?: string }>;
+      let goalsList: Array<{
+        id: string;
+        title?: string;
+        target_value?: number | string | null;
+        target_unit?: string | null;
+        current_value?: number | null;
+        progress_percentage?: number | null;
+        pillar?: string;
+        category?: string;
+      }>;
       if (goalsFromRpc !== undefined) {
         goalsList = goalsFromRpc.map((g) => ({
           ...g,
@@ -428,7 +513,9 @@ function NutritionDashboardContent() {
       } else {
         const { data: allGoals, error } = await supabase
           .from("goals")
-          .select("id, title, target_value, target_unit, current_value, category, progress_percentage, pillar")
+          .select(
+            "id, title, target_value, target_unit, current_value, category, progress_percentage, pillar",
+          )
           .eq("client_id", user.id)
           .eq("status", "active")
           .order("created_at", { ascending: false });
@@ -437,7 +524,10 @@ function NutritionDashboardContent() {
           setWaterGoalId(null);
           setWaterGoalGlasses(0);
           setDisplayedWaterGlasses(1);
-          setNutritionData((prev) => ({ ...prev, water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 } }));
+          setNutritionData((prev) => ({
+            ...prev,
+            water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
+          }));
           return;
         }
         goalsList = allGoals || [];
@@ -447,35 +537,84 @@ function NutritionDashboardContent() {
       const adherence =
         goalsList.length > 0
           ? Math.round(
-              goalsList.reduce((sum: number, g: { progress_percentage?: number | null }) => sum + (g.progress_percentage ?? 0), 0) /
-                goalsList.length
+              goalsList.reduce(
+                (sum: number, g: { progress_percentage?: number | null }) =>
+                  sum + (g.progress_percentage ?? 0),
+                0,
+              ) / goalsList.length,
             )
           : null;
       setGoalsAdherence(adherence);
 
       if (goalsFromRpc == null) {
-        let nutrition: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status: string }[] = [];
-        const pillarGoals = goalsList.filter((g: { pillar?: string }) => (g.pillar || "") === "nutrition").slice(0, 3);
+        let nutrition: {
+          id: string;
+          title: string;
+          target_value: number | string | null;
+          target_unit?: string | null;
+          current_value?: number | null;
+          progress_percentage?: number | null;
+          status: string;
+        }[] = [];
+        const pillarGoals = goalsList
+          .filter((g: { pillar?: string }) => (g.pillar || "") === "nutrition")
+          .slice(0, 3);
         if (pillarGoals.length > 0) {
-          nutrition = pillarGoals.map((g: any) => ({ id: g.id, title: g.title, target_value: g.target_value, target_unit: g.target_unit, current_value: g.current_value, progress_percentage: g.progress_percentage, status: "active" }));
+          nutrition = pillarGoals.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            target_value: g.target_value,
+            target_unit: g.target_unit,
+            current_value: g.current_value,
+            progress_percentage: g.progress_percentage,
+            status: "active",
+          }));
         } else {
-          const nutritionKeywords = ["calorie", "protein", "carb", "fat", "macro", "nutrition", "diet", "food"];
+          const nutritionKeywords = [
+            "calorie",
+            "protein",
+            "carb",
+            "fat",
+            "macro",
+            "nutrition",
+            "diet",
+            "food",
+          ];
           nutrition = goalsList
-            .filter((g: any) => (g.category || "").toLowerCase() === "nutrition" || nutritionKeywords.some((k) => (g.title || "").toLowerCase().includes(k)))
-            .filter((g: any) => !(g.title || "").toLowerCase().includes("water intake"))
+            .filter(
+              (g: any) =>
+                (g.category || "").toLowerCase() === "nutrition" ||
+                nutritionKeywords.some((k) =>
+                  (g.title || "").toLowerCase().includes(k),
+                ),
+            )
+            .filter(
+              (g: any) =>
+                !(g.title || "").toLowerCase().includes("water intake"),
+            )
             .slice(0, 3)
-            .map((g: any) => ({ id: g.id, title: g.title, target_value: g.target_value, target_unit: g.target_unit, current_value: g.current_value, progress_percentage: g.progress_percentage, status: "active" }));
+            .map((g: any) => ({
+              id: g.id,
+              title: g.title,
+              target_value: g.target_value,
+              target_unit: g.target_unit,
+              current_value: g.current_value,
+              progress_percentage: g.progress_percentage,
+              status: "active",
+            }));
         }
         setNutritionGoals(nutrition);
       }
 
-      const goals = goalsList.filter((g: { title?: string }) => (g.title || "").toLowerCase().includes("water intake"));
+      const goals = goalsList.filter((g: { title?: string }) =>
+        (g.title || "").toLowerCase().includes("water intake"),
+      );
 
       if (!goals || goals.length === 0) {
         // No water goal configured - create one automatically with default values
         const defaultTargetLiters = 3; // 3 liters (8 glasses) default goal
         const defaultTargetMl = defaultTargetLiters * 1000;
-        
+
         const { data: newGoal, error: createError } = await supabase
           .from("goals")
           .insert({
@@ -512,7 +651,7 @@ function NutritionDashboardContent() {
         // Use the newly created goal
         const goalGlasses = Math.ceil(defaultTargetMl / 375); // 8 glasses
         const displayGoalGlasses = Math.min(goalGlasses, 16);
-        
+
         setWaterGoalId(newGoal.id);
         setWaterGoalGlasses(displayGoalGlasses);
         setDisplayedWaterGlasses(Math.max(displayGoalGlasses, 1));
@@ -551,19 +690,19 @@ function NutritionDashboardContent() {
       }
 
       const goalGlasses = Math.ceil(goalMl / 375); // Round up to nearest glass
-      
+
       // Cap at 16 glasses (6000ml) for display, but allow tracking up to 16
       const displayGoalGlasses = Math.min(goalGlasses, 16);
 
       setWaterGoalGlasses(displayGoalGlasses);
-      
+
       // Convert current_value (ml) to glasses for display
       const currentGlasses = Math.floor(currentValue / 375); // 375ml per glass
       const currentMl = currentValue;
-      
+
       // Initialize displayed glasses to max of goal, current, or 1
       setDisplayedWaterGlasses(Math.max(displayGoalGlasses, currentGlasses, 1));
-      
+
       setNutritionData((prev) => ({
         ...prev,
         water: {
@@ -596,11 +735,11 @@ function NutritionDashboardContent() {
           targetGlasses === prev.water.glasses
             ? Math.max(prev.water.glasses - 1, 0)
             : Math.min(targetGlasses, maxGlasses);
-        
+
         if (newGlasses > displayedWaterGlasses && newGlasses <= maxGlasses) {
           setDisplayedWaterGlasses(newGlasses);
         }
-        
+
         const newMl = newGlasses * 375;
         return {
           ...prev,
@@ -614,7 +753,7 @@ function NutritionDashboardContent() {
       // Store old value for error revert
       const oldGlasses = nutritionData.water.glasses;
       const oldMl = nutritionData.water.ml;
-      
+
       // Allow tracking up to 16 glasses (6000ml max)
       const maxGlasses = 16;
       // If clicking the same number of glasses, remove one
@@ -622,14 +761,14 @@ function NutritionDashboardContent() {
         targetGlasses === oldGlasses
           ? Math.max(oldGlasses - 1, 0)
           : Math.min(targetGlasses, maxGlasses); // Cap at 16 glasses
-      
+
       // Expand displayed glasses if user clicks beyond current display (up to 16)
       if (newGlasses > displayedWaterGlasses && newGlasses <= maxGlasses) {
         setDisplayedWaterGlasses(newGlasses);
       }
-      
+
       const newMl = newGlasses * 375; // 375ml per glass
-      
+
       // Update UI state immediately (optimistic update)
       setNutritionData((prev) => ({
         ...prev,
@@ -641,10 +780,14 @@ function NutritionDashboardContent() {
         .from("goals")
         .update({
           current_value: newMl, // Store in ml
-          progress_percentage: waterGoalGlasses > 0 
-            ? Math.min((newGlasses / waterGoalGlasses) * 100, 100)
-            : 0,
-          status: waterGoalGlasses > 0 && newGlasses >= waterGoalGlasses ? "completed" : "active",
+          progress_percentage:
+            waterGoalGlasses > 0
+              ? Math.min((newGlasses / waterGoalGlasses) * 100, 100)
+              : 0,
+          status:
+            waterGoalGlasses > 0 && newGlasses >= waterGoalGlasses
+              ? "completed"
+              : "active",
           updated_at: new Date().toISOString(),
         })
         .eq("id", waterGoalId)
@@ -657,11 +800,19 @@ function NutritionDashboardContent() {
           ...prev,
           water: { ...prev.water, glasses: oldGlasses, ml: oldMl },
         }));
-        addToast({ title: "Error", description: "Failed to save water intake. Please try again.", variant: "destructive" });
+        addToast({
+          title: "Error",
+          description: "Failed to save water intake. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error in handleWaterGlassClick:", error);
-      addToast({ title: "Error", description: "Failed to save water intake. Please try again.", variant: "destructive" });
+      addToast({
+        title: "Error",
+        description: "Failed to save water intake. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -684,25 +835,29 @@ function NutritionDashboardContent() {
     targetCalories?: number,
     targetProtein?: number,
     targetCarbs?: number,
-    targetFat?: number
+    targetFat?: number,
   ) => {
     // Sum macros from completed (logged) meals only; each meal's items reflect chosen option when logged
     const loggedMeals = mealsArray.filter((m) => m.logged);
     const totalCalories = loggedMeals.reduce(
-      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.calories, 0),
-      0
+      (sum, meal) =>
+        sum + meal.items.reduce((itemSum, item) => itemSum + item.calories, 0),
+      0,
     );
     const totalProtein = loggedMeals.reduce(
-      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0),
-      0
+      (sum, meal) =>
+        sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0),
+      0,
     );
     const totalCarbs = loggedMeals.reduce(
-      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0),
-      0
+      (sum, meal) =>
+        sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0),
+      0,
     );
     const totalFat = loggedMeals.reduce(
-      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0),
-      0
+      (sum, meal) =>
+        sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0),
+      0,
     );
 
     // Update nutrition data
@@ -711,7 +866,8 @@ function NutritionDashboardContent() {
       ...prev,
       calories: {
         consumed: totalCalories,
-        goal: targetCalories !== undefined ? targetCalories : prev.calories.goal,
+        goal:
+          targetCalories !== undefined ? targetCalories : prev.calories.goal,
       },
       protein: {
         consumed: totalProtein,
@@ -730,8 +886,10 @@ function NutritionDashboardContent() {
 
   const fuelChipBase =
     "px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.1em] border shrink-0 transition-colors";
-  const fuelChipActive = "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]";
-  const fuelChipInactive = "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)]";
+  const fuelChipActive =
+    "bg-[color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)] text-[color:var(--fc-accent-cyan)] border-[color-mix(in_srgb,var(--fc-accent-cyan)_30%,transparent)]";
+  const fuelChipInactive =
+    "fc-glass-soft fc-text-dim border-[color:var(--fc-glass-border)]";
 
   return (
     <AnimatedBackground>
@@ -748,18 +906,6 @@ function NutritionDashboardContent() {
           >
             <img src={getAvatarUrl()} alt="" />
           </button>
-          <IconButton
-            size="md"
-            variant="ghost"
-            className="btn-ghost-icon shrink-0 border-transparent"
-            aria-label="Notifications"
-            showDot={hasUnreadNotifications}
-            onClick={() => {
-              window.location.href = notificationsHref;
-            }}
-          >
-            <Bell className="h-5 w-5 fc-text-dim" strokeWidth={1.5} />
-          </IconButton>
         </header>
         <header className={fuelStyles.pageHeader}>
           <div className={fuelStyles.headerLeft}>
@@ -773,18 +919,14 @@ function NutritionDashboardContent() {
           <div className={fuelStyles.headerActions}>
             <button
               type="button"
-              className={fuelStyles.pillAddFood}
-              onClick={() => router.push("/client/nutrition/foods/create")}
-            >
-              <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
-              Add food
-            </button>
-            <button
-              type="button"
               className={fuelStyles.pillHistory}
               onClick={() => router.push("/client/progress/nutrition")}
             >
-              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+              <Clock
+                className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={2}
+                aria-hidden
+              />
               History
             </button>
           </div>
@@ -797,9 +939,15 @@ function NutritionDashboardContent() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className={fuelStyles.goalPromptTitle}>No goals set</p>
-                <p className={fuelStyles.goalPromptSub}>Track your nutrition with personalized targets</p>
+                <p className={fuelStyles.goalPromptSub}>
+                  Track your nutrition with personalized targets
+                </p>
               </div>
-              <button type="button" className={fuelStyles.goalPromptCta} onClick={() => setShowAddGoalModal(true)}>
+              <button
+                type="button"
+                className={fuelStyles.goalPromptCta}
+                onClick={() => setShowAddGoalModal(true)}
+              >
                 Set up →
               </button>
             </div>
@@ -808,7 +956,9 @@ function NutritionDashboardContent() {
         {mealsLoadError && !loadingMeals && (
           <div className="py-8 px-4 text-center">
             <p className="text-sm fc-text-dim mb-1">{mealsLoadError}</p>
-            <p className="text-xs fc-text-subtle mb-4">Tap retry to reload today&apos;s plan.</p>
+            <p className="text-xs fc-text-subtle mb-4">
+              Tap retry to reload today&apos;s plan.
+            </p>
             <Button
               type="button"
               variant="fc-secondary"
@@ -834,9 +984,14 @@ function NutritionDashboardContent() {
         ) : !hasActivePlan ? (
           <>
             <div className="py-8 px-4 text-center rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
-              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 fc-text-subtle" aria-hidden />
+              <UtensilsCrossed
+                className="mx-auto mb-3 h-10 w-10 fc-text-subtle"
+                aria-hidden
+              />
               <p className="text-sm fc-text-dim mb-1">No meal plan</p>
-              <p className="text-xs fc-text-dim">Ask your coach to assign a meal plan.</p>
+              <p className="text-xs fc-text-dim">
+                Ask your coach to assign a meal plan.
+              </p>
             </div>
           </>
         ) : (
@@ -872,7 +1027,9 @@ function NutritionDashboardContent() {
                     const labelPart = a.label?.trim() ? ` (${a.label})` : "";
                     return (
                       <option key={a.id} value={a.id}>
-                        {name}{kcal ? ` - ${kcal}kcal` : ""}{labelPart}
+                        {name}
+                        {kcal ? ` - ${kcal}kcal` : ""}
+                        {labelPart}
                       </option>
                     );
                   })}
@@ -887,28 +1044,46 @@ function NutritionDashboardContent() {
               totalMeals={meals.length}
               caloriesConsumed={nutritionData.calories.consumed}
               caloriesGoal={nutritionData.calories.goal}
-              protein={{ consumed: nutritionData.protein.consumed, goal: nutritionData.protein.goal }}
-              carbs={{ consumed: nutritionData.carbs.consumed, goal: nutritionData.carbs.goal }}
-              fat={{ consumed: nutritionData.fat.consumed, goal: nutritionData.fat.goal }}
+              protein={{
+                consumed: nutritionData.protein.consumed,
+                goal: nutritionData.protein.goal,
+              }}
+              carbs={{
+                consumed: nutritionData.carbs.consumed,
+                goal: nutritionData.carbs.goal,
+              }}
+              fat={{
+                consumed: nutritionData.fat.consumed,
+                goal: nutritionData.fat.goal,
+              }}
             />
 
             <section className={fuelStyles.waterCard} aria-label="Water intake">
               <div className={fuelStyles.waterHead}>
                 <div className={fuelStyles.waterHeadLeft}>
-                  <Droplet className="h-4 w-4 shrink-0 text-[color:var(--fc-accent-cyan)]" aria-hidden />
+                  <Droplet
+                    className="h-4 w-4 shrink-0 text-[color:var(--fc-accent-cyan)]"
+                    aria-hidden
+                  />
                   <span className={fuelStyles.waterLabel}>Water</span>
                 </div>
                 <div className={fuelStyles.waterVal}>
-                  <span className={fuelStyles.waterCurrent}>{nutritionData.water.ml.toLocaleString()}</span>
+                  <span className={fuelStyles.waterCurrent}>
+                    {nutritionData.water.ml.toLocaleString()}
+                  </span>
                   <span className={fuelStyles.waterSep}>/</span>
                   <span className={fuelStyles.waterTarget}>
-                    {nutritionData.water.goalMl > 0 ? nutritionData.water.goalMl.toLocaleString() : "—"}
+                    {nutritionData.water.goalMl > 0
+                      ? nutritionData.water.goalMl.toLocaleString()
+                      : "—"}
                   </span>
                   <span className={fuelStyles.waterUnit}>mL</span>
                 </div>
               </div>
               <div className={fuelStyles.dropletRow}>
-                {Array.from({ length: Math.min(displayedWaterGlasses, 16) }).map((_, index) => {
+                {Array.from({
+                  length: Math.min(displayedWaterGlasses, 16),
+                }).map((_, index) => {
                   const isActive = index < nutritionData.water.glasses;
                   const glassNumber = index + 1;
                   const isGoalGlass = glassNumber <= waterGoalGlasses;
@@ -919,27 +1094,36 @@ function NutritionDashboardContent() {
                       onClick={() => handleWaterGlassClick(glassNumber)}
                       className={cn(
                         fuelStyles.dropletBtn,
-                        isActive ? fuelStyles.dropletBtnActive : fuelStyles.dropletBtnInactive,
+                        isActive
+                          ? fuelStyles.dropletBtnActive
+                          : fuelStyles.dropletBtnInactive,
                         isActive &&
                           isGoalGlass &&
-                          "ring-1 ring-[color:color-mix(in_srgb,var(--fc-accent-cyan)_35%,transparent)]"
+                          "ring-1 ring-[color:color-mix(in_srgb,var(--fc-accent-cyan)_35%,transparent)]",
                       )}
-                      aria-label={isActive ? `Water ${glassNumber}, logged` : `Log water glass ${glassNumber}`}
+                      aria-label={
+                        isActive
+                          ? `Water ${glassNumber}, logged`
+                          : `Log water glass ${glassNumber}`
+                      }
                     >
                       <Droplet className="h-4 w-4" />
                     </button>
                   );
                 })}
-                {displayedWaterGlasses < 16 && nutritionData.water.glasses >= displayedWaterGlasses && (
-                  <button
-                    type="button"
-                    onClick={() => handleWaterGlassClick(nutritionData.water.glasses + 1)}
-                    className={fuelStyles.waterAddBtn}
-                  >
-                    <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    Add
-                  </button>
-                )}
+                {displayedWaterGlasses < 16 &&
+                  nutritionData.water.glasses >= displayedWaterGlasses && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleWaterGlassClick(nutritionData.water.glasses + 1)
+                      }
+                      className={fuelStyles.waterAddBtn}
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                      Add
+                    </button>
+                  )}
               </div>
             </section>
 
@@ -966,8 +1150,12 @@ function NutritionDashboardContent() {
                       onMarkComplete={handleMarkComplete}
                       onUndo={() => handleUndo(meal.id)}
                       onAddPhoto={handleAddPhoto}
-                      onOpenMealDetails={() => router.push(`/client/nutrition/meals/${meal.id}`)}
-                      onFoodClick={(foodId) => router.push(`/client/nutrition/foods/${foodId}`)}
+                      onOpenMealDetails={() =>
+                        router.push(`/client/nutrition/meals/${meal.id}`)
+                      }
+                      onFoodClick={(foodId) =>
+                        router.push(`/client/nutrition/foods/${foodId}`)
+                      }
                     />
                   );
                 })}
@@ -976,8 +1164,12 @@ function NutritionDashboardContent() {
 
             {hasActivePlan && hasMealsInPlan === false && !loadingMeals && (
               <div className="py-8 px-4 text-center">
-                <p className="text-sm fc-text-dim">No meals in this plan yet.</p>
-                <p className="text-xs fc-text-subtle mt-1">Your coach can add meals to this plan.</p>
+                <p className="text-sm fc-text-dim">
+                  No meals in this plan yet.
+                </p>
+                <p className="text-xs fc-text-subtle mt-1">
+                  Your coach can add meals to this plan.
+                </p>
               </div>
             )}
 
@@ -988,44 +1180,75 @@ function NutritionDashboardContent() {
                 className={fuelStyles.trendsHead}
               >
                 <div className={fuelStyles.trendsHeadLeft}>
-                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-text-dim)]" aria-hidden />
-                  <span className={fuelStyles.trendsTitle}>Nutrition trends</span>
+                  <BarChart3
+                    className="h-3.5 w-3.5 shrink-0 text-[color:var(--fc-text-dim)]"
+                    aria-hidden
+                  />
+                  <span className={fuelStyles.trendsTitle}>
+                    Nutrition trends
+                  </span>
                 </div>
                 {nutritionTrendsOpen ? (
-                  <ChevronUp className="h-5 w-5 shrink-0 fc-text-dim" aria-hidden />
+                  <ChevronUp
+                    className="h-5 w-5 shrink-0 fc-text-dim"
+                    aria-hidden
+                  />
                 ) : (
-                  <ChevronDown className="h-5 w-5 shrink-0 fc-text-dim" aria-hidden />
+                  <ChevronDown
+                    className="h-5 w-5 shrink-0 fc-text-dim"
+                    aria-hidden
+                  />
                 )}
               </button>
               {!nutritionTrendsOpen ? (
                 <div className={fuelStyles.trendsEmpty}>
-                  <p className={fuelStyles.trendsEmptyPrimary}>Start logging meals to see trends</p>
-                  <p className={fuelStyles.trendsEmptySecondary}>Your last 30 days will appear here</p>
+                  <p className={fuelStyles.trendsEmptyPrimary}>
+                    Start logging meals to see trends
+                  </p>
+                  <p className={fuelStyles.trendsEmptySecondary}>
+                    Your last 30 days will appear here
+                  </p>
                 </div>
               ) : null}
               {nutritionTrendsOpen && (
                 <div className={fuelStyles.trendsBody}>
                   {nutritionTrends.length === 0 ? (
                     <div className={fuelStyles.trendsEmpty}>
-                      <p className={fuelStyles.trendsEmptyPrimary}>Start logging meals to see trends</p>
-                      <p className={fuelStyles.trendsEmptySecondary}>Your last 30 days will appear here</p>
+                      <p className={fuelStyles.trendsEmptyPrimary}>
+                        Start logging meals to see trends
+                      </p>
+                      <p className={fuelStyles.trendsEmptySecondary}>
+                        Your last 30 days will appear here
+                      </p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">Metric</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider fc-text-subtle mb-2">
+                        Metric
+                      </p>
                       <div className="-mx-1 px-1 mb-4 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         <div className="flex flex-wrap gap-2 min-w-min">
-                          {(["calories", "protein", "carbs", "fat"] as const).map((m) => (
+                          {(
+                            ["calories", "protein", "carbs", "fat"] as const
+                          ).map((m) => (
                             <button
                               key={m}
                               type="button"
                               onClick={() => setNutritionTrendsMetric(m)}
                               className={cn(
                                 fuelChipBase,
-                                nutritionTrendsMetric === m ? fuelChipActive : fuelChipInactive
+                                nutritionTrendsMetric === m
+                                  ? fuelChipActive
+                                  : fuelChipInactive,
                               )}
                             >
-                              {m === "calories" ? "Calories" : m === "protein" ? "Protein" : m === "carbs" ? "Carbs" : "Fat"}
+                              {m === "calories"
+                                ? "Calories"
+                                : m === "protein"
+                                  ? "Protein"
+                                  : m === "carbs"
+                                    ? "Carbs"
+                                    : "Fat"}
                             </button>
                           ))}
                         </div>
@@ -1033,7 +1256,12 @@ function NutritionDashboardContent() {
                       <div className="relative h-40 flex items-end gap-0.5">
                         {nutritionTrends.map((day) => {
                           const val = day[nutritionTrendsMetric];
-                          const maxVal = Math.max(...nutritionTrends.map((d) => d[nutritionTrendsMetric]), 1);
+                          const maxVal = Math.max(
+                            ...nutritionTrends.map(
+                              (d) => d[nutritionTrendsMetric],
+                            ),
+                            1,
+                          );
                           const height = (val / maxVal) * 100;
                           const barClass =
                             nutritionTrendsMetric === "calories"
@@ -1044,28 +1272,50 @@ function NutritionDashboardContent() {
                                   ? "bg-[color:var(--fc-macro-carbs,#fbbf24)]/70"
                                   : "bg-[color:var(--fc-macro-fat,#34d399)]/70";
                           return (
-                            <div key={day.date} className="flex-1 min-w-0 flex flex-col items-center" title={`${day.date}: ${val}`}>
+                            <div
+                              key={day.date}
+                              className="flex-1 min-w-0 flex flex-col items-center"
+                              title={`${day.date}: ${val}`}
+                            >
                               <div
                                 className={`w-full rounded-t hover:opacity-90 transition-opacity ${barClass}`}
-                                style={{ height: `${Math.max(height, val > 0 ? 4 : 0)}%`, minHeight: val > 0 ? "4px" : "0" }}
+                                style={{
+                                  height: `${Math.max(height, val > 0 ? 4 : 0)}%`,
+                                  minHeight: val > 0 ? "4px" : "0",
+                                }}
                               />
                             </div>
                           );
                         })}
                       </div>
                       <p className="text-xs fc-text-subtle mt-2">
-                        Last 30 days · {nutritionTrendsMetric === "calories" ? "kcal" : "g"}
+                        Last 30 days ·{" "}
+                        {nutritionTrendsMetric === "calories" ? "kcal" : "g"}
                       </p>
                       {(() => {
                         const last7 = nutritionTrends.slice(-7);
-                        const weekAvg = last7.length > 0
-                          ? Math.round(last7.reduce((s, d) => s + d[nutritionTrendsMetric], 0) / last7.length)
-                          : 0;
-                        const target = nutritionTrendsMetric === "calories" ? nutritionTrendsTarget : null;
+                        const weekAvg =
+                          last7.length > 0
+                            ? Math.round(
+                                last7.reduce(
+                                  (s, d) => s + d[nutritionTrendsMetric],
+                                  0,
+                                ) / last7.length,
+                              )
+                            : 0;
+                        const target =
+                          nutritionTrendsMetric === "calories"
+                            ? nutritionTrendsTarget
+                            : null;
                         return (
                           <p className="text-sm fc-text-dim mt-1">
-                            This week avg: {weekAvg.toLocaleString()}{nutritionTrendsMetric === "calories" ? " cal" : " g"}
-                            {target != null && nutritionTrendsMetric === "calories" && ` (target: ${target.toLocaleString()})`}
+                            This week avg: {weekAvg.toLocaleString()}
+                            {nutritionTrendsMetric === "calories"
+                              ? " cal"
+                              : " g"}
+                            {target != null &&
+                              nutritionTrendsMetric === "calories" &&
+                              ` (target: ${target.toLocaleString()})`}
                           </p>
                         );
                       })()}
@@ -1092,7 +1342,10 @@ function NutritionDashboardContent() {
                   <span className="fc-text-subtle font-normal ml-1 text-sm">
                     ·{" "}
                     {Math.round(
-                      nutritionGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / nutritionGoals.length
+                      nutritionGoals.reduce(
+                        (s, g) => s + (g.progress_percentage ?? 0),
+                        0,
+                      ) / nutritionGoals.length,
                     )}
                     % adherence
                   </span>

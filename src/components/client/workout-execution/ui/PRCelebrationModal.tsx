@@ -2,32 +2,19 @@
 
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, Sparkles, Zap } from "lucide-react";
+import { Sparkles, Zap } from "lucide-react";
 import {
   fireCelebrationConfettiBurst,
   PR_CELEBRATION_CONFETTI_COLORS,
 } from "@/lib/celebrationConfetti";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-
-export interface PRDetectedPayload {
-  type: "weight" | "reps";
-  exercise_name: string;
-  new_value: number;
-  previous_value: number | null;
-  unit: string;
-  /** Logged set weight (kg); included by log-set API for celebration UI */
-  weight_kg?: number;
-  /** Logged set reps; included by log-set API for celebration UI */
-  reps?: number;
-  /** Optional line under exercise name, e.g. "Straight Set · Barbell" */
-  context_subtitle?: string;
-}
+import type { PrDetectedPayload } from "@/lib/prService";
 
 interface PRCelebrationModalProps {
   visible: boolean;
   onClose: () => void;
-  pr: PRDetectedPayload | null;
+  pr: PrDetectedPayload | null;
   /** Retained for API compatibility; not used for visuals. */
   bodyWeightKg?: number | null;
 }
@@ -50,6 +37,35 @@ const AMBIENT_STYLE: React.CSSProperties = {
 
 /** Confetti-only beat before the card mounts (ms). */
 const CONFETTI_LEAD_MS = 1500;
+
+function formatPct(p: number | null | undefined): string | null {
+  if (p == null || !Number.isFinite(p)) return null;
+  return `${p >= 0 ? "+" : ""}${p.toFixed(1)}%`;
+}
+
+function trimNum(v: number): string {
+  const r = Math.round(v * 1000) / 1000;
+  if (Number.isInteger(r)) return String(r);
+  return r.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatVolumePreviousBest(se: NonNullable<PrDetectedPayload["strength_endurance"]>): string {
+  const prevVol = se.previous_volume;
+  const pw = se.previous_weight;
+  const pr = se.previous_reps;
+  if (prevVol <= 0) return "—";
+  if (
+    pw != null &&
+    pr != null &&
+    Number.isFinite(pw) &&
+    Number.isFinite(pr) &&
+    pw > 0 &&
+    pr > 0
+  ) {
+    return `${trimNum(pw)} kg × ${pr} (${trimNum(prevVol)} vol)`;
+  }
+  return `${trimNum(prevVol)} vol`;
+}
 
 function PRCelebrationContent({
   visible,
@@ -88,43 +104,19 @@ function PRCelebrationContent({
 
   if (!visible || !pr) return null;
 
-  const improvement =
-    pr.previous_value != null && pr.previous_value > 0
-      ? pr.new_value - pr.previous_value
-      : null;
+  const ms = pr.max_strength;
+  const se = pr.strength_endurance;
+  /** Dual PR on one set: celebrate max strength only. */
+  const showMaxStrength = !!ms;
+  const showVolume = !!se && !ms;
 
-  const improvementPct =
-    improvement != null &&
-    pr.previous_value != null &&
-    pr.previous_value > 0
-      ? (improvement / pr.previous_value) * 100
-      : null;
+  const title = showMaxStrength
+    ? "New Max Strength PR"
+    : showVolume
+      ? "New Volume PR"
+      : "New PR";
 
-  const prevDisplay =
-    pr.type === "weight" && pr.previous_value != null && pr.previous_value > 0
-      ? `${pr.previous_value} ${pr.unit}`
-      : pr.type === "reps" && pr.previous_value != null && pr.previous_value > 0
-        ? `${pr.previous_value} reps`
-        : null;
-  const newDisplay =
-    pr.type === "weight"
-      ? `${pr.new_value} ${pr.unit}`
-      : `${pr.new_value} reps`;
-
-  const contextLine =
-    pr.context_subtitle ??
-    (pr.type === "weight" ? "Weight PR" : "Reps PR");
-
-  const showImprovement =
-    improvement != null && improvement > 0 && improvementPct != null;
-  const showFirstPr =
-    pr.previous_value == null || pr.previous_value === 0;
-
-  const pillText = showImprovement
-    ? pr.type === "weight"
-      ? `+${improvement!.toFixed(1)} ${pr.unit} · +${improvementPct!.toFixed(1)}%`
-      : `+${improvement} reps · +${improvementPct!.toFixed(1)}%`
-    : null;
+  const headlineEmoji = showMaxStrength ? "🏆" : showVolume ? "🔥" : "🏆";
 
   return (
     <div
@@ -145,7 +137,7 @@ function PRCelebrationContent({
       {cardRevealed && (
       <div
         className="relative z-[2] w-full pointer-events-none flex flex-col items-center justify-center min-h-0 animate-in fade-in zoom-in-95 duration-300"
-        style={{ maxWidth: 420 }}
+        style={{ maxWidth: 440 }}
       >
         <div className="pointer-events-auto w-full rounded-2xl p-[2px] pr-celebration-gradient-border">
           <div
@@ -156,7 +148,6 @@ function PRCelebrationContent({
               boxShadow: CARD_BOX_SHADOW,
             }}
           >
-            {/* Base + layered backgrounds */}
             <div
               className="absolute inset-0 bg-gradient-to-b from-gray-900/95 to-black/95"
               aria-hidden
@@ -184,12 +175,12 @@ function PRCelebrationContent({
             <div className="relative z-[3] p-4 text-center overflow-y-auto max-h-[90vh]">
               <h2
                 id="pr-celebration-title"
-                className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 mb-3 tracking-tight"
+                className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 mb-2 tracking-tight"
                 style={{
                   filter: "drop-shadow(0 0 12px rgba(250,204,21,0.35))",
                 }}
               >
-                NEW PR!
+                {headlineEmoji} {title}
               </h2>
 
               <div className="flex justify-center mb-3">
@@ -200,48 +191,65 @@ function PRCelebrationContent({
                   }}
                   aria-hidden
                 >
-                  🏆
+                  {showVolume ? "🔥" : "🏆"}
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-white mb-1 px-0.5 leading-tight">
+              <h3 className="text-lg font-bold text-white mb-3 px-0.5 leading-tight">
                 {pr.exercise_name}
               </h3>
-              <p className="text-xs text-gray-400 mb-4 px-0.5">{contextLine}</p>
 
-              <div className="flex items-baseline justify-center gap-2 sm:gap-3 mb-3 w-full px-1">
-                <span className="flex-1 min-w-0 text-right text-lg text-gray-400 tabular-nums truncate">
-                  {prevDisplay ?? "—"}
-                </span>
-                <span className="pr-celebration-arrow-animated inline-flex text-cyan-400 shrink-0">
-                  <ArrowRight className="w-6 h-6" strokeWidth={2.5} aria-hidden />
-                </span>
-                <span className="flex-1 min-w-0 text-left text-2xl font-bold text-white tabular-nums truncate">
-                  {newDisplay}
-                </span>
-              </div>
-
-              {showImprovement && pillText && (
-                <div className="flex justify-center mb-3">
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-400",
-                    )}
-                  >
-                    {pillText}
-                  </Badge>
+              {showMaxStrength && ms && (
+                <div className="mb-3">
+                  <p className="text-4xl font-bold text-white tabular-nums mb-2">
+                    {ms.weight} kg
+                  </p>
+                  {formatPct(ms.improvement_pct) && ms.previous > 0 ? (
+                    <p className="text-sm text-gray-400">
+                      Previous: {ms.previous} kg · {formatPct(ms.improvement_pct)}
+                    </p>
+                  ) : ms.previous <= 0 ? (
+                    <div className="flex justify-center mt-2">
+                      <Badge
+                        variant="outline"
+                        className="inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400"
+                      >
+                        First max-strength PR on this lift
+                      </Badge>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
-              {showFirstPr && (
-                <div className="flex justify-center mb-3">
-                  <Badge
-                    variant="outline"
-                    className="inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-400"
-                  >
-                    First PR on this lift!
-                  </Badge>
+              {showVolume && se && (
+                <div className="mb-3">
+                  <p className="text-4xl font-bold text-white tabular-nums mb-2">
+                    {se.weight} kg × {se.reps}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Previous best: {formatVolumePreviousBest(se)}
+                  </p>
+                  {formatPct(se.improvement_pct) && se.previous_volume > 0 ? (
+                    <div className="flex justify-center mt-2">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400",
+                        )}
+                      >
+                        {formatPct(se.improvement_pct)}
+                      </Badge>
+                    </div>
+                  ) : se.previous_volume <= 0 ? (
+                    <div className="flex justify-center mt-2">
+                      <Badge
+                        variant="outline"
+                        className="inline-flex rounded-full border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400"
+                      >
+                        First volume PR on this lift
+                      </Badge>
+                    </div>
+                  ) : null}
                 </div>
               )}
 

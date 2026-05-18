@@ -416,9 +416,9 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       const displayValue = formatPersonalRecordCaption(recordType, recordValue, recordUnit ?? null)
       let weight = 0
       let reps = 0
-      if (recordType === 'weight') {
+      if (recordType === 'max_strength' || recordType === 'weight') {
         weight = recordValue
-      } else if (recordType === 'reps') {
+      } else if (recordType === 'strength_endurance' || recordType === 'reps') {
         reps = recordValue
       }
       return {

@@ -9,7 +9,11 @@ import React, { useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { ClientPageShell, Eyebrow, IconButton, SectionHeader } from "@/components/client-ui";
+import {
+  ClientPageShell,
+  Eyebrow,
+  SectionHeader,
+} from "@/components/client-ui";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { HeroWorkoutCard } from "@/components/client/HeroWorkoutCard";
 import { AthleteScoreChip } from "@/components/client/AthleteScoreChip";
@@ -19,8 +23,6 @@ import {
   BarChart3,
   AlertTriangle,
   Flame,
-  Bell,
-  CircleCheck,
 } from "lucide-react";
 import { tierBackdropVariant } from "@/lib/tierBackdrop";
 import { TierBadge, type Tier } from "@/components/ui/TierBadge";
@@ -95,7 +97,8 @@ export default function ClientDashboard() {
   const dashboardData = pageData?.dashboard ?? null;
   const athleteScore = pageData?.athleteScore ?? null;
   const hasCheckInToday = pageData?.hasCheckInToday ?? null;
-  const hasScheduledCheckInThisPeriod = pageData?.hasScheduledCheckInThisPeriod ?? false;
+  const hasScheduledCheckInThisPeriod =
+    pageData?.hasScheduledCheckInThisPeriod ?? false;
   const scoreError = pageData?.scoreError ?? null;
   const dailyDoneToday = hasCheckInToday === true;
   const monthlyDoneThisCycle = hasScheduledCheckInThisPeriod;
@@ -103,16 +106,14 @@ export default function ClientDashboard() {
 
   const userName = dashboardData?.firstName || profile?.first_name || "there";
   const streak = dashboardData?.streak ?? 0;
-  const weeklyProgress = dashboardData?.weeklyProgress ?? { current: 0, goal: 0 };
+  const weeklyProgress = dashboardData?.weeklyProgress ?? {
+    current: 0,
+    goal: 0,
+  };
   const todaysWorkout = dashboardData?.todaysWorkout;
   const programProgressData = dashboardData?.programProgress;
   const weekTotal = programProgressData?.totalWeeks;
   const eyebrowText = greetingEyebrowText(loading, todaysWorkout, weekTotal);
-
-  /** TODO(product): wire to real unread state when notifications backend exists. */
-  const hasUnreadNotifications = false;
-  /** TODO(product): `/client/notifications` route — navigate home until page exists. */
-  const notificationsHref = "/client";
 
   const getAvatarUrl = () => {
     if (dashboardData?.avatarUrl) return dashboardData.avatarUrl;
@@ -122,19 +123,17 @@ export default function ClientDashboard() {
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "User"}`;
   };
 
-  const streakDisp =
-    getWorkoutStreakDisplay(streak) ?? {
-      tierKey: "starting" as const,
-      label: "Starting",
-      flames: "🔥",
-      flameClass: "text-amber-500/60 text-sm",
-      accentClass: "text-amber-500/80",
-      cardBorderClass: "border-l-amber-500/45",
-      cardBgClass: "bg-amber-500/5 dark:bg-amber-950/20",
-      pulseClass: "",
-    };
-  const streakSub =
-    streak === 0 ? "Starting today" : streakDisp.label;
+  const streakDisp = getWorkoutStreakDisplay(streak) ?? {
+    tierKey: "starting" as const,
+    label: "Starting",
+    flames: "🔥",
+    flameClass: "text-amber-500/60 text-sm",
+    accentClass: "text-amber-500/80",
+    cardBorderClass: "border-l-amber-500/45",
+    cardBgClass: "bg-amber-500/5 dark:bg-amber-950/20",
+    pulseClass: "",
+  };
+  const streakSub = streak === 0 ? "Starting today" : streakDisp.label;
 
   const programPercent =
     programProgressData && programProgressData.totalSlots > 0
@@ -180,12 +179,20 @@ export default function ClientDashboard() {
       <AnimatedBackground>
         <ClientPageShell
           className="max-w-lg px-0 pb-[var(--fc-bottom-safe-area)] pt-6 overflow-x-visible"
-          backdrop={tierBackdropVariant(athleteScore?.tier)}
+          backdrop={tierBackdropVariant(
+            !pageData?.athleteScore ||
+              pageData?.dashboard?.athleteScoreChipState === "paused"
+              ? undefined
+              : pageData?.athleteScore?.tier,
+          )}
         >
           {loading ? (
             <>
               <header className="mb-6 flex items-center justify-between px-5">
-                <Skeleton variant="circular" className="h-[38px] w-[38px] shrink-0" />
+                <Skeleton
+                  variant="circular"
+                  className="h-[38px] w-[38px] shrink-0"
+                />
                 <div className="flex gap-2.5">
                   <Skeleton variant="circular" className="h-[38px] w-[38px]" />
                   <Skeleton variant="circular" className="h-[38px] w-[38px]" />
@@ -214,7 +221,7 @@ export default function ClientDashboard() {
           ) : (
             <>
               {/* Topbar — mockup lines 163–167, 1263–1272 */}
-              <header className="mb-0 flex items-center justify-between px-5 pt-0">
+              <header className="mb-0 flex items-center px-5 pt-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -233,41 +240,12 @@ export default function ClientDashboard() {
                     className="h-full w-full object-cover"
                   />
                 </button>
-                <div className="flex items-center gap-2.5">
-                  <IconButton
-                    size="md"
-                    variant="ghost"
-                    className="btn-ghost-icon shrink-0 border-transparent"
-                    aria-label="Daily check-in"
-                    onClick={() => {
-                      window.location.href = "/client/check-ins";
-                    }}
-                  >
-                    <CircleCheck className="h-5 w-5 fc-text-dim" strokeWidth={1.6} />
-                  </IconButton>
-                  <IconButton
-                    size="md"
-                    variant="ghost"
-                    className="btn-ghost-icon shrink-0 border-transparent"
-                    aria-label="Notifications"
-                    showDot={hasUnreadNotifications}
-                    onClick={() => {
-                      window.location.href = notificationsHref;
-                    }}
-                  >
-                    <Bell className="h-5 w-5 fc-text-dim" strokeWidth={1.5} />
-                  </IconButton>
-                </div>
               </header>
 
               {/* Greeting — mockup .greeting lines 198–242, 1275–1279 */}
               <div className="px-5 pb-5 pt-5">
                 {eyebrowText ? (
-                  <Eyebrow
-                    tone="lime"
-                    dashboardEyebrow
-                    className="mb-2.5"
-                  >
+                  <Eyebrow tone="lime" dashboardEyebrow className="mb-2.5">
                     {eyebrowText}
                   </Eyebrow>
                 ) : null}
@@ -290,7 +268,10 @@ export default function ClientDashboard() {
                     </p>
                   </div>
                   <div className="max-[360px]:ml-auto">
-                    <AthleteScoreChip athleteScore={scoreError ? null : athleteScore} />
+                    <AthleteScoreChip
+                      athleteScore={scoreError ? null : athleteScore}
+                      chipState={dashboardData?.athleteScoreChipState}
+                    />
                   </div>
                 </div>
               </div>
@@ -298,7 +279,9 @@ export default function ClientDashboard() {
               <HeroWorkoutCard
                 todaysWorkout={todaysWorkout}
                 programProgress={dashboardData?.programProgress ?? null}
-                activeProgramPauseStatus={dashboardData?.activeProgramPauseStatus ?? null}
+                activeProgramPauseStatus={
+                  dashboardData?.activeProgramPauseStatus ?? null
+                }
               />
 
               <DailyCheckInHeroCard
@@ -335,7 +318,9 @@ export default function ClientDashboard() {
                       />
                       {streak}
                     </div>
-                    <p className="mt-1 text-[10.5px] fc-text-subtle">{streakSub}</p>
+                    <p className="mt-1 text-[10.5px] fc-text-subtle">
+                      {streakSub}
+                    </p>
                   </div>
                   <div className="rounded-[14px] border border-[var(--fc-glass-border)] bg-[var(--fc-surface-card)] p-3 text-left">
                     <Eyebrow tone="subtle" density="statStrip">
@@ -357,7 +342,9 @@ export default function ClientDashboard() {
                         /{weeklyProgress.goal || 0}
                       </span>
                     </div>
-                    <p className="mt-1 text-[10.5px] fc-text-subtle">workouts done</p>
+                    <p className="mt-1 text-[10.5px] fc-text-subtle">
+                      workouts done
+                    </p>
                   </div>
                   <div className="rounded-[14px] border border-[var(--fc-glass-border)] bg-[var(--fc-surface-card)] p-3 text-left">
                     <Eyebrow tone="subtle" density="statStrip">
@@ -379,7 +366,9 @@ export default function ClientDashboard() {
                         %
                       </span>
                     </div>
-                    <p className="mt-1 text-[10.5px] fc-text-subtle">{programWeekSub}</p>
+                    <p className="mt-1 text-[10.5px] fc-text-subtle">
+                      {programWeekSub}
+                    </p>
                   </div>
                 </section>
               ) : null}
@@ -414,7 +403,8 @@ export default function ClientDashboard() {
                     <div className="flex flex-col gap-2">
                       {dashboardData.highlights.latestAchievement != null ? (
                         (() => {
-                          const ach = dashboardData.highlights.latestAchievement!;
+                          const ach =
+                            dashboardData.highlights.latestAchievement!;
                           const rawTier = ach.tier;
                           const mappedTier = achievementTier(rawTier);
                           if (
@@ -446,7 +436,8 @@ export default function ClientDashboard() {
                                 <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13.5px] font-semibold leading-tight fc-text-primary">
                                   <span
                                     style={{
-                                      fontFamily: "var(--f-headline, var(--font-body))",
+                                      fontFamily:
+                                        "var(--f-headline, var(--font-body))",
                                     }}
                                   >
                                     {ach.name}
@@ -457,7 +448,9 @@ export default function ClientDashboard() {
                                       <TierBadge tier={mappedTier} />
                                     </>
                                   ) : rawTier ? (
-                                    <span className="fc-text-subtle">· {rawTier}</span>
+                                    <span className="fc-text-subtle">
+                                      · {rawTier}
+                                    </span>
                                   ) : null}
                                 </div>
                                 <p className="mt-0.5 text-[11px] fc-text-subtle">
@@ -495,7 +488,8 @@ export default function ClientDashboard() {
                             <p
                               className="text-[13.5px] font-semibold leading-tight fc-text-primary"
                               style={{
-                                fontFamily: "var(--f-headline, var(--font-body))",
+                                fontFamily:
+                                  "var(--f-headline, var(--font-body))",
                               }}
                             >
                               {dashboardData.highlights.prsThisMonth} PR
@@ -537,14 +531,19 @@ export default function ClientDashboard() {
                             <p
                               className="text-[13.5px] font-semibold leading-tight fc-text-primary"
                               style={{
-                                fontFamily: "var(--f-headline, var(--font-body))",
+                                fontFamily:
+                                  "var(--f-headline, var(--font-body))",
                               }}
                             >
-                              #{dashboardData.highlights.bestLeaderboardRank.rank}{" "}
+                              #
+                              {
+                                dashboardData.highlights.bestLeaderboardRank
+                                  .rank
+                              }{" "}
                               ·{" "}
                               {dashboardData.highlights.bestLeaderboardRank
-                                .exerciseName ?? "Leaderboard"}
-                              {" "}leaderboard
+                                .exerciseName ?? "Leaderboard"}{" "}
+                              leaderboard
                             </p>
                             <p className="mt-0.5 text-[11px] fc-text-subtle">
                               Top of your cohort
@@ -555,7 +554,6 @@ export default function ClientDashboard() {
                     </div>
                   </section>
                 )}
-
             </>
           )}
         </ClientPageShell>

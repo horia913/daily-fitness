@@ -112,6 +112,17 @@ export interface SaveWorkoutTemplateFormData {
   difficulty_level: string;
 }
 
+export type SaveWorkoutTemplateProgress = {
+  phase: "template" | "delete" | "block";
+  current: number;
+  total: number;
+};
+
+/** Stable JSON for comparing exercise lists (skip block DB work when unchanged). */
+export function serializeExercisesForSaveCompare(exercises: unknown[]): string {
+  return JSON.stringify(exercises);
+}
+
 export interface SaveWorkoutTemplateParams {
   supabase: SupabaseClient;
   userId: string;
@@ -119,6 +130,10 @@ export interface SaveWorkoutTemplateParams {
   exercises: any[];
   template?: any;
   generateBlockName: (exerciseIds: string[], exerciseType: string) => string;
+  /** When false, only workout_templates row is updated (e.g. title-only edit). Default true. */
+  saveBlocks?: boolean;
+  /** Optional progress for UI (sequential save — one block at a time). */
+  onProgress?: (progress: SaveWorkoutTemplateProgress) => void;
 }
 
 export interface SaveWorkoutTemplateResult {
@@ -130,7 +145,16 @@ export interface SaveWorkoutTemplateResult {
 export async function saveWorkoutTemplate(
   params: SaveWorkoutTemplateParams
 ): Promise<SaveWorkoutTemplateResult> {
-  const { supabase, userId, formData, exercises, template, generateBlockName } = params;
+  const {
+    supabase,
+    userId,
+    formData,
+    exercises,
+    template,
+    generateBlockName,
+    saveBlocks = true,
+    onProgress,
+  } = params;
 
   try {
     if (!formData.name || formData.name.trim() === "") {
@@ -153,6 +177,8 @@ export async function saveWorkoutTemplate(
     };
 
     let savedTemplateId: string;
+
+    onProgress?.({ phase: "template", current: 1, total: 1 });
 
     if (template) {
       const { data, error } = await supabase
@@ -184,17 +210,30 @@ export async function saveWorkoutTemplate(
 
     // Save workout blocks and exercises using SMART UPDATE strategy
     // This preserves block IDs to maintain referential integrity with historical workout data
-    if (savedTemplateId) {
+    if (savedTemplateId && saveBlocks) {
       console.log(
         "🔍 Saving blocks and exercises for template (SMART UPDATE):",
         savedTemplateId,
       );
 
-      // Get existing blocks for this template (skip on create — no rows yet)
-      const existingBlocks = template
-        ? await WorkoutBlockService.getWorkoutBlocks(savedTemplateId)
-        : [];
-      const existingBlockIds = new Set(existingBlocks.map((b) => b.id));
+      // IDs only — full getWorkoutBlocks enrichment is expensive and unnecessary for save.
+      const { data: existingRows, error: existingRowsError } = template
+        ? await supabase
+            .from("workout_set_entries")
+            .select("id, set_type")
+            .eq("template_id", savedTemplateId)
+        : { data: [] as { id: string; set_type: string }[], error: null };
+
+      if (existingRowsError) {
+        throw existingRowsError;
+      }
+
+      const existingBlockIds = new Set(
+        (existingRows ?? []).map((row) => row.id),
+      );
+      const existingSetTypeById = new Map(
+        (existingRows ?? []).map((row) => [row.id, row.set_type as string]),
+      );
       const newExerciseIds = new Set(
         exercises
           .map((e) => e.id)
@@ -202,15 +241,24 @@ export async function saveWorkoutTemplate(
       );
 
       // Delete blocks that were removed (exist in DB but not in new exercises) in parallel
-      const blocksToDelete = existingBlocks.filter(
-        (block) => !newExerciseIds.has(block.id),
+      const blocksToDelete = (existingRows ?? []).filter(
+        (row) => !newExerciseIds.has(row.id),
       );
-      if (blocksToDelete.length > 0) {
-        await Promise.all(
-          blocksToDelete.map((block) =>
-            WorkoutBlockService.deleteWorkoutBlock(block.id),
-          ),
+      // One delete at a time — parallel deletes overload hosted Supabase (500/504).
+      for (let d = 0; d < blocksToDelete.length; d++) {
+        onProgress?.({
+          phase: "delete",
+          current: d + 1,
+          total: blocksToDelete.length,
+        });
+        const deleted = await WorkoutBlockService.deleteWorkoutBlock(
+          blocksToDelete[d].id,
         );
+        if (!deleted) {
+          throw new Error(
+            `Failed to remove exercise block ${d + 1} of ${blocksToDelete.length}. Try again in a moment.`,
+          );
+        }
       }
 
       // Process each exercise: UPDATE if block exists, CREATE if new
@@ -229,11 +277,12 @@ export async function saveWorkoutTemplate(
             // UPDATE existing block (preserves block ID for referential integrity)
             console.log(`🔄 Updating existing block: ${exercise.id}`);
 
-            // Clear ALL child rows for this set entry in one transaction (RPC),
-            // then reinsert from form. Type-specific delete missed rows on type
-            // changes; timeout-based delete could leave stale workout_set_entry_exercises.
-            await WorkoutBlockService.deleteAllRelatedDataForSetEntryStrict(
+            // Clear child rows before re-insert. Same type → one table; type change → all tables.
+            // Avoids delete_workout_set_entry_children RPC (statement timeout on hosted DB).
+            await WorkoutBlockService.clearChildRowsForSave(
               exercise.id,
+              exerciseType,
+              existingSetTypeById.get(exercise.id),
             );
 
             // Collect exercise IDs for block name generation
@@ -1150,14 +1199,16 @@ export async function saveWorkoutTemplate(
           }
         };
 
-        // New templates: blocks are independent — save in parallel
-        if (!template) {
-          await Promise.all(
-            exercises.map((_, i) => processExerciseAtIndex(i)),
-          );
-        } else {
-          for (let i = 0; i < exercises.length; i++) {
-            await processExerciseAtIndex(i);
+        // Sequential saves: hosted Supabase times out with concurrent block writes.
+        for (let i = 0; i < exercises.length; i++) {
+          onProgress?.({
+            phase: "block",
+            current: i + 1,
+            total: exercises.length,
+          });
+          await processExerciseAtIndex(i);
+          if (i < exercises.length - 1) {
+            await new Promise((r) => setTimeout(r, 200));
           }
         }
         console.log(
@@ -1167,10 +1218,31 @@ export async function saveWorkoutTemplate(
         console.log("🔍 No exercises to save");
       }
 
-      await warnIfAnySetEntryMissingExercises(supabase, savedTemplateId);
+      void warnIfAnySetEntryMissingExercises(supabase, savedTemplateId);
+    } else if (savedTemplateId && !saveBlocks) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          "[saveWorkoutTemplate] Skipping block save — exercises unchanged:",
+          savedTemplateId,
+        );
+      }
     }
     return { success: true, templateId: savedTemplateId };
-  } catch (err) {
+  } catch (err: unknown) {
+    const code =
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      typeof (err as { code: unknown }).code === "string"
+        ? (err as { code: string }).code
+        : "";
+    if (code === "57014") {
+      return {
+        success: false,
+        error:
+          "Save timed out — the database is busy. Wait a minute, refresh, and try again without tapping Update multiple times.",
+      };
+    }
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
   }

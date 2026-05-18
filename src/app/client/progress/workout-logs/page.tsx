@@ -16,6 +16,127 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
 
+const CYAN_FREQ = "#4FE3E8";
+
+function WorkoutFrequencyBars({ clientId }: { clientId: string }) {
+  const [weekCounts, setWeekCounts] = useState<{ week: string; count: number }[]>(
+    [],
+  );
+  const [loadingBars, setLoadingBars] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const fiveWeeksAgo = new Date();
+        fiveWeeksAgo.setDate(fiveWeeksAgo.getDate() - 35);
+        const { data: workoutLogs, error } = await supabase
+          .from("workout_logs")
+          .select("completed_at")
+          .eq("client_id", clientId)
+          .not("completed_at", "is", null)
+          .gte("completed_at", fiveWeeksAgo.toISOString())
+          .order("completed_at", { ascending: false });
+        if (error || cancelled) return;
+        const weekGroups = new Map<string, number>();
+        const now = new Date();
+        for (let i = 4; i >= 0; i--) {
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - (i * 7 + now.getDay() - 1));
+          weekStart.setHours(0, 0, 0, 0);
+          weekGroups.set(weekStart.toISOString().split("T")[0], 0);
+        }
+        workoutLogs?.forEach((log: { completed_at: string }) => {
+          const logDate = new Date(log.completed_at);
+          const ws = new Date(logDate);
+          ws.setDate(logDate.getDate() - logDate.getDay() + 1);
+          ws.setHours(0, 0, 0, 0);
+          const weekKey = ws.toISOString().split("T")[0];
+          if (weekGroups.has(weekKey)) {
+            weekGroups.set(weekKey, (weekGroups.get(weekKey) || 0) + 1);
+          }
+        });
+        const arr = Array.from(weekGroups.entries())
+          .map(([date, count]) => ({
+            week: new Date(date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            }),
+            count,
+          }))
+          .slice(0, 5);
+        if (!cancelled) setWeekCounts(arr);
+      } finally {
+        if (!cancelled) setLoadingBars(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
+  const maxC = Math.max(...weekCounts.map((w) => w.count), 1);
+  const barMaxPx = 56;
+
+  return (
+    <section className="mb-4 mt-2">
+      <div className={ps.psMonthHero}>
+        <div className="relative z-[1] border-t pt-2" style={{ borderColor: "var(--ps-line-2)", paddingTop: 8 }}>
+          <p
+            className={cn(ps.psFontMono, "mb-2 text-[9px] uppercase")}
+            style={{ color: "var(--ps-t3)", letterSpacing: "0.16em" }}
+          >
+            Workouts per week (last 5)
+          </p>
+          <div className="flex justify-between gap-1.5">
+            {weekCounts.map((wk, i) => {
+              const hPx = loadingBars
+                ? 4
+                : Math.max(4, (wk.count / maxC) * barMaxPx);
+              const countDisplay = loadingBars ? "—" : String(wk.count);
+              const labelNum =
+                wk.count === 0 ? "var(--ps-t4)" : "var(--ps-t1)";
+              return (
+                <div
+                  key={wk.week + String(i)}
+                  className="flex min-w-0 flex-1 flex-col items-center"
+                >
+                  <span
+                    className={cn(
+                      ps.psFontDisplay,
+                      "mb-1 text-sm font-bold tabular-nums",
+                    )}
+                    style={{ color: labelNum }}
+                  >
+                    {countDisplay}
+                  </span>
+                  <div className="flex h-[72px] w-full flex-col justify-end">
+                    <div
+                      className="w-full rounded-t-[6px] transition-opacity"
+                      style={{
+                        height: `${hPx}px`,
+                        minHeight: 4,
+                        opacity: wk.count > 0 ? 0.85 : 0.35,
+                        background: `linear-gradient(180deg, ${CYAN_FREQ} 0%, #34A8AD 100%)`,
+                      }}
+                    />
+                  </div>
+                  <span
+                    className={cn(ps.psFontMono, "mt-1 text-[9px]")}
+                    style={{ color: "var(--ps-t3)" }}
+                  >
+                    {wk.week}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 interface WorkoutLog {
   id: string;
   client_id: string;
@@ -449,6 +570,8 @@ export default function WorkoutLogsPage() {
               title="Workout history"
               subtitle="Every session you've logged"
             />
+
+            {user?.id ? <WorkoutFrequencyBars clientId={user.id} /> : null}
 
             {workoutLogs.length > 0 && (
               <section className="mb-3 mt-4">

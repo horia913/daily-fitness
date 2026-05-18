@@ -21,7 +21,7 @@ export default function SideNav() {
     "U";
   const profileHref = pathname.startsWith("/coach")
     ? "/coach/profile"
-    : "/client/profile";
+    : "/client/me";
 
   return (
     <aside className={styles.root} aria-label="Main navigation">

@@ -21,17 +21,15 @@ import {
   ArrowDownWideNarrow,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  computeClientAttention,
-} from "@/lib/coachClientAttention";
 import { cn } from "@/lib/utils";
 import { withTimeout } from "@/lib/withTimeout";
 import { fetchApi } from "@/lib/apiClient";
 import type { Client } from "./coachClientsTypes";
 import {
   coachClientAvatarSeverity,
-  coachClientSeverityTagLabel,
-  coachClientVisualTier,
+  coachClientListVisualTierFromTraining,
+  coachClientNeedsTrainingAttention,
+  coachClientTrainingAttentionSortKey,
 } from "./coachClientsUtils";
 import { CoachClientListRow } from "./CoachClientListRow";
 import { CoachClientGridCard } from "./CoachClientGridCard";
@@ -63,13 +61,8 @@ function readInitialViewMode(): ViewMode {
   return window.matchMedia("(max-width: 767px)").matches ? "list" : "grid";
 }
 
-function getAttention(client: Client) {
-  return computeClientAttention(client.status, client.metrics);
-}
-
 function needsAttention(client: Client): boolean {
-  const { level } = getAttention(client);
-  return level === "urgent" || level === "warning" || level === "inactive";
+  return coachClientNeedsTrainingAttention(client.trainingStatus);
 }
 
 function ClientManagementContent() {
@@ -89,6 +82,10 @@ function ClientManagementContent() {
 
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortWrapRef = useRef<HTMLDivElement>(null);
+
+  const patchClient = useCallback((clientId: string, patch: Partial<Client>) => {
+    setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, ...patch } : c)));
+  }, []);
 
   useEffect(() => {
     setViewMode(readInitialViewMode());
@@ -220,9 +217,9 @@ function ClientManagementContent() {
         case "workouts":
           return b.metrics.workoutsThisWeek - a.metrics.workoutsThisWeek;
         case "needsAttention": {
-          const aNeeds = needsAttention(a);
-          const bNeeds = needsAttention(b);
-          if (aNeeds !== bNeeds) return aNeeds ? -1 : 1;
+          const ak = coachClientTrainingAttentionSortKey(a.trainingStatus);
+          const bk = coachClientTrainingAttentionSortKey(b.trainingStatus);
+          if (ak !== bk) return ak - bk;
           const aDate2 = a.metrics.lastActive || "";
           const bDate2 = b.metrics.lastActive || "";
           return bDate2.localeCompare(aDate2);
@@ -464,42 +461,18 @@ function ClientManagementContent() {
           ) : viewMode === "grid" ? (
             <div className={styles.gridWrap}>
               {filteredClients.map((client) => {
-                const attention = getAttention(client);
-                const tier = coachClientVisualTier(client.status, attention.level, client.metrics);
-                const avatarSev = coachClientAvatarSeverity(tier);
-                const tagLabel = coachClientSeverityTagLabel(tier, attention, client.metrics);
                 const act = formatRelativeTime(client.metrics.lastActive);
                 const chk = formatRelativeTime(client.metrics.lastCheckinDate);
-                const weekLabel =
-                  client.metrics.programCurrentWeek != null && client.metrics.programDurationWeeks != null
-                    ? `Week ${client.metrics.programCurrentWeek} of ${client.metrics.programDurationWeeks}`
-                    : null;
-                const chip =
-                  client.metrics.activeProgramName != null
-                    ? weekLabel
-                      ? `${client.metrics.activeProgramName} · ${weekLabel}`
-                      : client.metrics.activeProgramName
-                    : null;
                 return (
                   <CoachClientGridCard
                     key={client.id}
+                    client={client}
                     href={`/coach/clients/${client.id}`}
-                    name={client.name}
-                    email={client.email}
-                    initialLetter={client.name.charAt(0).toUpperCase()}
-                    avatarSev={avatarSev}
-                    tier={tier}
-                    tagLabel={tagLabel}
                     lastActivityLabel={act.text}
                     lastActivityColor={act.color}
                     lastCheckinLabel={chk.text}
                     lastCheckinColor={chk.color}
-                    programName={client.metrics.activeProgramName}
-                    mealPct={client.metrics.mealCompliance7dPct}
-                    workoutsWeek={client.metrics.workoutsThisWeek}
-                    checkinStreak={client.metrics.checkinStreak}
-                    subscriptionExpiringSoon={client.metrics.subscriptionExpiringSoon}
-                    programChipLabel={chip}
+                    onPatch={(patch) => patchClient(client.id, patch)}
                   />
                 );
               })}
@@ -507,10 +480,11 @@ function ClientManagementContent() {
           ) : (
             <div className={styles.listCol}>
               {filteredClients.map((client) => {
-                const attention = getAttention(client);
-                const tier = coachClientVisualTier(client.status, attention.level, client.metrics);
+                const tier = coachClientListVisualTierFromTraining(
+                  client.status,
+                  client.trainingStatus,
+                );
                 const avatarSev = coachClientAvatarSeverity(tier);
-                const tagLabel = coachClientSeverityTagLabel(tier, attention, client.metrics);
                 const act = formatMetaPart(client.metrics.lastActive, "Never trained");
                 const chk = formatMetaPart(client.metrics.lastCheckinDate, "Never checked in");
                 const metaNeverOnly = !client.metrics.lastActive && !client.metrics.lastCheckinDate;
@@ -519,19 +493,17 @@ function ClientManagementContent() {
                 return (
                   <CoachClientListRow
                     key={client.id}
+                    client={client}
                     href={`/coach/clients/${client.id}`}
-                    name={client.name}
-                    initialLetter={client.name.charAt(0).toUpperCase()}
-                    avatarSev={avatarSev}
                     tier={tier}
-                    tagLabel={tagLabel}
+                    avatarSev={avatarSev}
                     activityText={act.text}
                     activityColor={act.color}
                     checkinText={chk.text}
                     checkinColor={chk.color}
-                    programName={client.metrics.activeProgramName}
                     weekShort={weekShort}
                     metaNeverOnly={metaNeverOnly}
+                    onPatch={(patch) => patchClient(client.id, patch)}
                   />
                 );
               })}

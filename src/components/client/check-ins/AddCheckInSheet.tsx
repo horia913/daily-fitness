@@ -9,7 +9,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Calendar, Ruler, Accessibility, ImageIcon, Scale, ChevronRight } from "lucide-react";
+import {
+  Calendar,
+  Ruler,
+  Accessibility,
+  ImageIcon,
+  Scale,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import checkinSuiteStyles from "@/components/client/check-ins/checkinSuite/checkinSuiteV1.module.css";
 
@@ -73,14 +80,24 @@ function OptionRow({
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold" style={{ color: "var(--cs-t1)" }}>
+        <span
+          className="block text-[13px] font-semibold"
+          style={{ color: "var(--cs-t1)" }}
+        >
           {title}
         </span>
-        <span className="mt-0.5 block text-[11px] leading-snug" style={{ color: "var(--cs-t3)" }}>
+        <span
+          className="mt-0.5 block text-[11px] leading-snug"
+          style={{ color: "var(--cs-t3)" }}
+        >
           {subtitle}
         </span>
       </span>
-      <ChevronRight className="h-[13px] w-[13px] shrink-0" style={{ color: "var(--cs-t4)" }} aria-hidden />
+      <ChevronRight
+        className="h-[13px] w-[13px] shrink-0"
+        style={{ color: "var(--cs-t4)" }}
+        aria-hidden
+      />
     </button>
   );
 }
@@ -112,15 +129,26 @@ export function AddCheckInSheet({
             paddingBottom: "max(28px, env(safe-area-inset-bottom, 0px))",
           }}
         >
-          <div className="mx-auto mb-3.5 h-1 w-10 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} aria-hidden />
+          <div
+            className="mx-auto mb-3.5 h-1 w-10 rounded-full"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+            aria-hidden
+          />
 
-          <DialogTitle className={cn(checkinSuiteStyles.fontHeadline, "px-1 pb-2 text-[17px] font-bold")} style={{ color: "var(--cs-t1)" }}>
+          <DialogTitle
+            className={cn(
+              checkinSuiteStyles.fontHeadline,
+              "px-1 pb-2 text-[17px] font-bold",
+            )}
+            style={{ color: "var(--cs-t1)" }}
+          >
             Add check-in
           </DialogTitle>
 
           <DialogDescription className="sr-only">
-            Pick a type of check-in or log to open. Options include scheduled check-in, body measurements, mobility,
-            progress photos, or quick weight.
+            Pick a type of check-in or log to open. Options include scheduled
+            check-in, body measurements, mobility, progress photos, or quick
+            weight.
           </DialogDescription>
 
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain pb-2">
@@ -131,7 +159,10 @@ export function AddCheckInSheet({
                 onOpenChange(false);
                 go("/client/check-ins/weekly");
               }}
-              iconWrapStyle={{ background: "var(--cs-cyan-soft)", color: "var(--cs-cyan)" }}
+              iconWrapStyle={{
+                background: "var(--cs-cyan-soft)",
+                color: "var(--cs-cyan)",
+              }}
               icon={<Calendar className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
@@ -141,7 +172,10 @@ export function AddCheckInSheet({
                 onOpenChange(false);
                 go("/client/progress/body-metrics?from=check-ins");
               }}
-              iconWrapStyle={{ background: "var(--cs-warning-soft)", color: "var(--cs-warning)" }}
+              iconWrapStyle={{
+                background: "var(--cs-warning-soft)",
+                color: "var(--cs-warning)",
+              }}
               icon={<Ruler className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
@@ -151,7 +185,10 @@ export function AddCheckInSheet({
                 onOpenChange(false);
                 go("/client/progress/mobility?from=check-ins");
               }}
-              iconWrapStyle={{ background: "var(--cs-orange-soft)", color: "var(--cs-orange)" }}
+              iconWrapStyle={{
+                background: "var(--cs-orange-soft)",
+                color: "var(--cs-orange)",
+              }}
               icon={<Accessibility className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
@@ -161,7 +198,10 @@ export function AddCheckInSheet({
                 onOpenChange(false);
                 go("/client/progress/body-metrics?from=check-ins&tab=photos");
               }}
-              iconWrapStyle={{ background: "var(--cs-purple-soft)", color: "var(--cs-purple)" }}
+              iconWrapStyle={{
+                background: "var(--cs-purple-soft)",
+                color: "var(--cs-purple)",
+              }}
               icon={<ImageIcon className="h-4 w-4" strokeWidth={2} />}
             />
             <OptionRow
@@ -171,14 +211,20 @@ export function AddCheckInSheet({
                 onOpenChange(false);
                 onQuickWeight();
               }}
-              iconWrapStyle={{ background: "var(--cs-good-soft)", color: "var(--cs-good)" }}
+              iconWrapStyle={{
+                background: "var(--cs-good-soft)",
+                color: "var(--cs-good)",
+              }}
               icon={<Scale className="h-4 w-4" strokeWidth={2} />}
             />
           </div>
 
           <button
             type="button"
-            className={cn(checkinSuiteStyles.fontBody, "mt-1 w-full rounded-[13px] border py-3 text-sm font-medium transition-colors")}
+            className={cn(
+              checkinSuiteStyles.fontBody,
+              "mt-1 w-full rounded-[13px] border py-3 text-sm font-medium transition-colors",
+            )}
             style={{
               borderColor: "var(--cs-line)",
               background: "transparent",

@@ -26,11 +26,12 @@ function prLinePredicate(
       const rt = String(pr.record_type ?? "");
       const val = Number(pr.record_value);
       if (!Number.isFinite(val)) continue;
-      if (rt === "weight" || rt.includes("rm")) {
+      if (rt === "max_strength" || rt === "weight") {
         if (Math.abs(val - weight) < 0.05) return true;
       }
-      if (rt === "reps") {
-        if (Math.abs(val - reps) < 0.5 && weight > 0) return true;
+      if (rt === "strength_endurance") {
+        const vol = weight * reps;
+        if (Math.abs(val - vol) < 0.15) return true;
       }
     }
     return false;

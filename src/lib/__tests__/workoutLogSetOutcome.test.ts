@@ -1,5 +1,6 @@
 import {
   consolidateRowOutcome,
+  isSetOnTarget,
   repsOutcome,
   rpeVsPrescribedRirOutcome,
   weightOutcome,
@@ -31,5 +32,48 @@ describe("workoutLogSetOutcome", () => {
   it("consolidateRowOutcome picks worst signal", () => {
     expect(consolidateRowOutcome("hit", "hit", "flag")).toBe("flag");
     expect(consolidateRowOutcome("miss", "hit", "hit")).toBe("miss");
+  });
+
+  it("isSetOnTarget: hit / under / over count as on-target; miss and flag do not", () => {
+    expect(
+      isSetOnTarget({
+        actualReps: 10,
+        prescribedReps: 10,
+        actualWeightKg: 100,
+        prescribedWeightKg: 100,
+        actualRpe: 8,
+        prescribedRir: 8,
+      })
+    ).toBe(true);
+    expect(
+      isSetOnTarget({
+        actualReps: 8,
+        prescribedReps: 10,
+        actualWeightKg: 100,
+        prescribedWeightKg: 100,
+        actualRpe: 8,
+        prescribedRir: 8,
+      })
+    ).toBe(true);
+    expect(
+      isSetOnTarget({
+        actualReps: 5,
+        prescribedReps: 10,
+        actualWeightKg: 100,
+        prescribedWeightKg: 100,
+        actualRpe: 8,
+        prescribedRir: 8,
+      })
+    ).toBe(false);
+    expect(
+      isSetOnTarget({
+        actualReps: 10,
+        prescribedReps: 10,
+        actualWeightKg: 100,
+        prescribedWeightKg: 100,
+        actualRpe: 10,
+        prescribedRir: 8,
+      })
+    ).toBe(false);
   });
 });

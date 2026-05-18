@@ -62,8 +62,7 @@ export function QuickLogRow({
         console.error('[QuickLogRow] log-set failed', data)
         return
       }
-      const pr = data.pr as { any_weight_pr?: boolean; any_volume_pr?: boolean } | undefined
-      const isPR = !!(pr?.any_weight_pr || pr?.any_volume_pr || data.pr_detected)
+      const isPR = !!data.pr_detected
       onLogged({ isPR })
       setReps('')
       setWeight('')

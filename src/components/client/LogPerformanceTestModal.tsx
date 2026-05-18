@@ -1,10 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { X, Save, Timer, Activity } from "lucide-react";
-import { createPerformanceTest, TestType } from "@/lib/performanceTestService";
+import { X, Save } from "lucide-react";
+import {
+  calculateRecoveryScore,
+  createPerformanceTest,
+  validatePerformanceTest,
+  type TestType,
+} from "@/lib/performanceTestService";
 
 interface LogPerformanceTestModalProps {
   open: boolean;
@@ -14,6 +18,22 @@ interface LogPerformanceTestModalProps {
   onSuccess: () => void;
 }
 
+function parseRunTime(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes(":")) {
+    const parts = trimmed.split(":").map((p) => parseInt(p, 10));
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+
+  const seconds = parseInt(trimmed, 10);
+  return Number.isNaN(seconds) ? null : seconds;
+}
+
 export function LogPerformanceTestModal({
   open,
   clientId,
@@ -21,303 +41,318 @@ export function LogPerformanceTestModal({
   onClose,
   onSuccess,
 }: LogPerformanceTestModalProps) {
-  // 1km Run fields
-  const [minutes, setMinutes] = useState("");
-  const [seconds, setSeconds] = useState("");
-
-  // Step Test fields
-  const [heartRatePre, setHeartRatePre] = useState("");
-  const [heartRate1Min, setHeartRate1Min] = useState("");
-  const [heartRate2Min, setHeartRate2Min] = useState("");
-  const [heartRate3Min, setHeartRate3Min] = useState("");
-
-  // Common fields
+  const [testedAt, setTestedAt] = useState("");
+  const [runTime, setRunTime] = useState("");
+  const [hrPre, setHrPre] = useState("");
+  const [hr1min, setHr1min] = useState("");
+  const [hr2min, setHr2min] = useState("");
+  const [hr3min, setHr3min] = useState("");
+  const [perceivedEffort, setPerceivedEffort] = useState("");
+  const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const calculateRecoveryScore = () => {
-    if (!heartRatePre || !heartRate1Min || !heartRate2Min || !heartRate3Min) {
-      return null;
-    }
+  useEffect(() => {
+    if (!open) return;
+    setTestedAt(new Date().toISOString().split("T")[0]);
+    setRunTime("");
+    setHrPre("");
+    setHr1min("");
+    setHr2min("");
+    setHr3min("");
+    setPerceivedEffort("");
+    setConditions("");
+    setNotes("");
+    setError("");
+  }, [open, testType]);
 
-    const pre = parseInt(heartRatePre);
-    const min1 = parseInt(heartRate1Min);
-    const min2 = parseInt(heartRate2Min);
-    const min3 = parseInt(heartRate3Min);
-
-    const score = min1 + min2 + min3 - 3 * pre;
-    return score;
-  };
+  if (!open) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
+    const tested_at = testedAt || new Date().toISOString().split("T")[0];
+
+    let payload: Parameters<typeof createPerformanceTest>[0];
+
+    if (testType === "1km_run") {
+      const time_seconds = parseRunTime(runTime);
+      if (time_seconds == null) {
+        setError("Enter a valid time (e.g. 5:30 for 5 minutes 30 seconds)");
+        return;
+      }
+
+      payload = {
+        client_id: clientId,
+        tested_at,
+        test_type: "1km_run",
+        time_seconds,
+        notes: notes.trim() || null,
+        conditions: conditions.trim() || null,
+        perceived_effort: perceivedEffort ? parseInt(perceivedEffort, 10) : null,
+        tested_by: null,
+      };
+    } else {
+      const heart_rate_pre = parseInt(hrPre, 10);
+      const heart_rate_1min = parseInt(hr1min, 10);
+      const heart_rate_2min = parseInt(hr2min, 10);
+      const heart_rate_3min = parseInt(hr3min, 10);
+
+      if (
+        [heart_rate_pre, heart_rate_1min, heart_rate_2min, heart_rate_3min].some(
+          (n) => Number.isNaN(n)
+        )
+      ) {
+        setError("Enter all heart rate values (pre-exercise and 1, 2, 3 min recovery)");
+        return;
+      }
+
+      const recovery_score = calculateRecoveryScore(
+        heart_rate_pre,
+        heart_rate_1min,
+        heart_rate_2min,
+        heart_rate_3min
+      );
+
+      payload = {
+        client_id: clientId,
+        tested_at,
+        test_type: "step_test",
+        heart_rate_pre,
+        heart_rate_1min,
+        heart_rate_2min,
+        heart_rate_3min,
+        recovery_score,
+        notes: notes.trim() || null,
+        conditions: conditions.trim() || null,
+        perceived_effort: perceivedEffort ? parseInt(perceivedEffort, 10) : null,
+        tested_by: null,
+      };
+    }
+
+    const validation = validatePerformanceTest(payload);
+    if (!validation.valid) {
+      setError(validation.errors[0] ?? "Invalid test data");
+      return;
+    }
+
     setSaving(true);
-
     try {
-      let result;
-
-      if (testType === "1km_run") {
-        if (!minutes || !seconds) {
-          setError("Please enter time for 1km run");
-          setSaving(false);
-          return;
-        }
-
-        const totalSeconds = parseInt(minutes) * 60 + parseInt(seconds);
-
-        result = await createPerformanceTest({
-          client_id: clientId,
-          test_type: testType,
-          tested_at: new Date().toISOString().split("T")[0],
-          time_seconds: totalSeconds,
-          notes: notes || null,
-        });
-      } else {
-        if (!heartRatePre || !heartRate1Min || !heartRate2Min || !heartRate3Min) {
-          setError("Please enter all heart rate measurements");
-          setSaving(false);
-          return;
-        }
-
-        const recoveryScore = calculateRecoveryScore();
-
-        result = await createPerformanceTest({
-          client_id: clientId,
-          test_type: testType,
-          tested_at: new Date().toISOString().split("T")[0],
-          heart_rate_pre: parseInt(heartRatePre),
-          heart_rate_1min: parseInt(heartRate1Min),
-          heart_rate_2min: parseInt(heartRate2Min),
-          heart_rate_3min: parseInt(heartRate3Min),
-          recovery_score: recoveryScore,
-          notes: notes || null,
-        });
+      const result = await createPerformanceTest(payload);
+      if (!result) {
+        setError("Failed to save test. Please try again.");
+        return;
       }
-
-      if (result) {
-        onSuccess();
-        onClose();
-      } else {
-        setError("Failed to save test");
-      }
+      onSuccess();
+      onClose();
     } catch (err) {
-      console.error("Error saving test:", err);
+      console.error("Error saving performance test:", err);
       setError("Failed to save test. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  const recoveryScore = calculateRecoveryScore();
+  const labelClass = "block text-sm font-medium mb-2 fc-text-primary";
+  const inputClass =
+    "w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]";
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="log-performance-test-title"
     >
-      <DialogContent
-        showCloseButton={false}
-        className="flex w-[calc(100vw-2rem)] max-w-[500px] flex-col gap-0 overflow-hidden p-0 top-[6vh] max-h-[88vh] translate-y-0 sm:rounded-2xl"
-      >
-        <div className="w-full max-h-[88vh] fc-modal fc-card overflow-hidden flex flex-col min-h-0">
-          {/* Header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-5 border-b border-[color:var(--fc-glass-border)] shrink-0">
-            <div className="flex items-center gap-3 min-w-0 pr-2">
-              <div className="fc-icon-tile fc-icon-neutral shrink-0">
-                {testType === "1km_run" ? (
-                  <Timer className="w-5 h-5" aria-hidden />
-                ) : (
-                  <Activity className="w-5 h-5" aria-hidden />
-                )}
-              </div>
-              <div className="min-w-0">
-                <span className="fc-pill fc-pill-glass fc-text-neutral">
-                  Performance test
-                </span>
-                <DialogTitle className="text-2xl font-bold fc-text-primary mt-2">
-                  {testType === "1km_run" ? "Log 1km Run" : "Log Step Test"}
-                </DialogTitle>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="p-2 rounded-full fc-btn fc-btn-ghost shrink-0"
+      <div className="w-full max-w-[500px] max-h-[88vh] fc-modal fc-card overflow-hidden flex flex-col">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[color:var(--fc-glass-border)] px-6 py-5">
+          <div>
+            <span className="fc-pill fc-pill-glass fc-text-habits">Performance</span>
+            <h2
+              id="log-performance-test-title"
+              className="text-2xl font-bold fc-text-primary mt-2"
             >
-              <X className="w-6 h-6" aria-hidden />
-            </button>
+              Log {testType === "1km_run" ? "1km run" : "step test"}
+            </h2>
           </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
-            <form id="log-performance-test-form" onSubmit={handleSubmit} className="space-y-6 mt-6">
-              {testType === "1km_run" ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 fc-text-primary">
-                      Time <span className="fc-text-error">*</span>
-                    </label>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <input
-                          type="number"
-                          min="0"
-                          value={minutes}
-                          onChange={(e) => setMinutes(e.target.value)}
-                          placeholder="Minutes"
-                          className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                          required
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="59"
-                          value={seconds}
-                          onChange={(e) => setSeconds(e.target.value)}
-                          placeholder="Seconds"
-                          className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs mt-2 fc-text-subtle">Enter your 1km run time</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 fc-text-primary">
-                      Pre-Test Heart Rate (bpm) <span className="fc-text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="40"
-                      max="200"
-                      value={heartRatePre}
-                      onChange={(e) => setHeartRatePre(e.target.value)}
-                      placeholder="Before exercise"
-                      className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 fc-text-primary">
-                      Heart Rate at 1 min (bpm) <span className="fc-text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="40"
-                      max="200"
-                      value={heartRate1Min}
-                      onChange={(e) => setHeartRate1Min(e.target.value)}
-                      placeholder="After 1 minute"
-                      className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 fc-text-primary">
-                      Heart Rate at 2 min (bpm) <span className="fc-text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="40"
-                      max="200"
-                      value={heartRate2Min}
-                      onChange={(e) => setHeartRate2Min(e.target.value)}
-                      placeholder="After 2 minutes"
-                      className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 fc-text-primary">
-                      Heart Rate at 3 min (bpm) <span className="fc-text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="40"
-                      max="200"
-                      value={heartRate3Min}
-                      onChange={(e) => setHeartRate3Min(e.target.value)}
-                      placeholder="After 3 minutes"
-                      className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
-                      required
-                    />
-                  </div>
-
-                  {recoveryScore !== null && (
-                    <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-status-success)]">
-                      <p className="text-sm font-medium fc-text-success">
-                        Recovery score: {recoveryScore}
-                      </p>
-                      <p className="text-xs mt-1 fc-text-subtle">Lower is better</p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium mb-2 fc-text-primary">
-                  Notes (optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any notes about this test..."
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error">
-                  {error}
-                </div>
-              )}
-            </form>
-          </div>
-
-          {/* Footer */}
-          <div className="flex-shrink-0 px-6 py-4 flex gap-3 border-t border-[color:var(--fc-glass-border)]">
-            <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost">
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="log-performance-test-form"
-              disabled={saving}
-              className="flex-1 fc-btn fc-btn-primary fc-press"
-            >
-              {saving ? (
-                <>
-                  <div
-                    className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
-                    aria-hidden
-                  />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" aria-hidden />
-                  Save Test
-                </>
-              )}
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] min-w-[44px] p-2 rounded-full fc-btn fc-btn-ghost flex items-center justify-center"
+            aria-label="Close"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+            <div>
+              <label className={labelClass} htmlFor="tested-at">
+                Test date
+              </label>
+              <input
+                id="tested-at"
+                type="date"
+                value={testedAt}
+                onChange={(e) => setTestedAt(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
+
+            {testType === "1km_run" ? (
+              <div>
+                <label className={labelClass} htmlFor="run-time">
+                  Time (MM:SS) <span className="fc-text-error">*</span>
+                </label>
+                <input
+                  id="run-time"
+                  type="text"
+                  value={runTime}
+                  onChange={(e) => setRunTime(e.target.value)}
+                  placeholder="e.g. 5:30"
+                  className={inputClass}
+                  required
+                  autoFocus
+                />
+                <p className="text-xs fc-text-dim mt-1">Minutes and seconds, e.g. 5:30</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass} htmlFor="hr-pre">
+                    Pre HR (BPM) <span className="fc-text-error">*</span>
+                  </label>
+                  <input
+                    id="hr-pre"
+                    type="number"
+                    value={hrPre}
+                    onChange={(e) => setHrPre(e.target.value)}
+                    className={inputClass}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="hr-1min">
+                    1 min (BPM) <span className="fc-text-error">*</span>
+                  </label>
+                  <input
+                    id="hr-1min"
+                    type="number"
+                    value={hr1min}
+                    onChange={(e) => setHr1min(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="hr-2min">
+                    2 min (BPM) <span className="fc-text-error">*</span>
+                  </label>
+                  <input
+                    id="hr-2min"
+                    type="number"
+                    value={hr2min}
+                    onChange={(e) => setHr2min(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="hr-3min">
+                    3 min (BPM) <span className="fc-text-error">*</span>
+                  </label>
+                  <input
+                    id="hr-3min"
+                    type="number"
+                    value={hr3min}
+                    onChange={(e) => setHr3min(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className={labelClass} htmlFor="perceived-effort">
+                Perceived effort (1–10)
+              </label>
+              <input
+                id="perceived-effort"
+                type="number"
+                min={1}
+                max={10}
+                value={perceivedEffort}
+                onChange={(e) => setPerceivedEffort(e.target.value)}
+                placeholder="Optional"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="conditions">
+                Conditions
+              </label>
+              <input
+                id="conditions"
+                type="text"
+                value={conditions}
+                onChange={(e) => setConditions(e.target.value)}
+                placeholder="Optional (e.g. hot weather)"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="notes">
+                Notes
+              </label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional"
+                rows={3}
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error text-sm">
+                {error}
+              </div>
+            )}
+          </form>
+        </div>
+
+        <div className="flex-shrink-0 border-t border-[color:var(--fc-glass-border)] px-6 py-4 flex gap-3">
+          <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost min-h-[44px]">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-1 fc-btn fc-btn-primary fc-press min-h-[44px]"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save test
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,121 +1,77 @@
 /**
- * Android Gentle Fix
- * Minimal, targeted fixes for Android rendering issues
+ * Android Gentle Fix — legacy mitigations for Chrome/WebView quirks (text scaling,
+ * touch scrolling). Bottom nav DOM was refactored to `[data-fc-bottom-nav].fc-bottom-nav-float`;
+ * older `nav.fixed.bottom-0` selectors never matched.
+ *
+ * Disposition (Phase 1): **(a) + (b)** — update selectors to the current shell; run only on
+ * Android **and** viewports under 1024px so desktop coach/client shells (no bottom nav) are
+ * untouched. Heavy debug UI/logging removed to avoid console noise.
+ *
+ * TODO(Horica): Re-verify on a physical Android device after nav refactors; CSS in
+ * `android-fixes.css` + `globals.css` already pins the floating nav.
  */
 
-export const applyAndroidGentleFix = () => {
-  if (typeof window === 'undefined') return
-
-  // Check if we're on Android
-  const isAndroid = /Android/i.test(navigator.userAgent)
-  if (!isAndroid) {
-    console.log('🖥️ Not Android device, skipping Android fixes')
-    return
-  }
-
-  console.log('🤖 Applying Android Gentle Fix')
-
-  // Only apply minimal, safe fixes
-  const applyGentleFixes = () => {
-    // Fix body rendering
-    ;(document.body.style as any).webkitTextSizeAdjust = '100%'
-    ;(document.body.style as any).webkitFontSmoothing = 'antialiased'
-    
-    // Fix scrolling
-    ;(document.documentElement.style as any).webkitOverflowScrolling = 'touch'
-    ;(document.body.style as any).webkitOverflowScrolling = 'touch'
-    
-    // Add Android-specific class to body (should already be there from MobileCompatibilityProvider)
-    if (!document.body.classList.contains('android-device')) {
-      document.body.classList.add('android-device')
-    }
-    
-    // Apply targeted fixes for specific issues
-    setTimeout(() => {
-      // Fix main content padding to account for bottom nav
-      const main = document.querySelector('main')
-      if (main) {
-        const mainElement = main as HTMLElement
-        mainElement.style.paddingBottom = '80px'
-        console.log('✅ Main content padding fixed')
-      }
-      
-      // Fix bottom navigation positioning - Targeted approach
-      const bottomNav = document.querySelector('nav.fixed.bottom-0')
-      if (bottomNav) {
-        const navElement = bottomNav as HTMLElement
-        
-        console.log('🔧 Applying targeted bottom navigation fix...')
-        
-        // Ensure fixed positioning with proper specificity
-        navElement.style.setProperty('position', 'fixed', 'important')
-        navElement.style.setProperty('bottom', '0', 'important')
-        navElement.style.setProperty('left', '0', 'important')
-        navElement.style.setProperty('right', '0', 'important')
-        navElement.style.setProperty('z-index', '10000', 'important')
-        navElement.style.setProperty('width', '100%', 'important')
-        
-        console.log('✅ Bottom navigation positioning confirmed via JavaScript')
-        
-        // Also fix inner containers if needed
-        const innerContainer = navElement.querySelector('div')
-        if (innerContainer) {
-          const innerElement = innerContainer as HTMLElement
-          const computedStyle = window.getComputedStyle(innerElement)
-          
-          // Only fix if the inner container is broken (flex-direction is column instead of row)
-          if (computedStyle.flexDirection === 'column') {
-            console.log('🔧 Bottom navigation is vertical, forcing horizontal...')
-            innerElement.style.display = 'flex'
-            innerElement.style.flexDirection = 'row'
-            innerElement.style.alignItems = 'center'
-            innerElement.style.justifyContent = 'space-between'
-            innerElement.style.height = '100%'
-            innerElement.style.width = '100%'
-            innerElement.style.padding = '0 8px'
-            innerElement.style.maxWidth = 'none'
-            innerElement.style.margin = '0 auto'
-          } else {
-            console.log('✅ Bottom navigation is already horizontal')
-          }
-        }
-      }
-      
-      console.log('✅ Android gentle fixes applied')
-      
-      // Add visual indicator
-      const indicator = document.createElement('div')
-      indicator.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: #10b981;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 11px;
-        z-index: 99999;
-        font-family: monospace;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      `
-      indicator.textContent = '🤖 Android Fixed'
-      document.body.appendChild(indicator)
-      
-      // Remove indicator after 3 seconds
-      setTimeout(() => {
-        if (indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator)
-        }
-      }, 3000)
-    }, 500)
-    
-    console.log('✅ Android gentle fixes applied')
-  }
-
-  // Apply fixes when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyGentleFixes)
-  } else {
-    applyGentleFixes()
-  }
+function queryBottomNav(): HTMLElement | null {
+  const el = document.querySelector(
+    "[data-fc-bottom-nav].fc-bottom-nav-float"
+  ) as HTMLElement | null;
+  if (el) return el;
+  return document.querySelector("nav.fc-bottom-nav-float") as HTMLElement | null;
 }
+
+export const applyAndroidGentleFix = () => {
+  if (typeof window === "undefined") return;
+
+  if (window.innerWidth >= 1024) {
+    return;
+  }
+
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (!isAndroid) {
+    return;
+  }
+
+  const applyGentleFixes = () => {
+    document.documentElement.style.setProperty("-webkit-text-size-adjust", "100%");
+    document.body.style.setProperty("-webkit-text-size-adjust", "100%");
+    document.body.style.setProperty("-webkit-font-smoothing", "antialiased");
+    document.documentElement.style.setProperty(
+      "-webkit-overflow-scrolling",
+      "touch"
+    );
+    document.body.style.setProperty("-webkit-overflow-scrolling", "touch");
+
+    if (!document.body.classList.contains("android-device")) {
+      document.body.classList.add("android-device");
+    }
+
+    window.setTimeout(() => {
+      const bottomNav = queryBottomNav();
+      if (!bottomNav) {
+        return;
+      }
+
+      bottomNav.style.setProperty("position", "fixed", "important");
+      bottomNav.style.setProperty("z-index", "10000", "important");
+      bottomNav.style.setProperty("transform", "none", "important");
+
+      const inner = bottomNav.querySelector(".fc-bottom-nav-inner") as HTMLElement | null;
+      if (inner) {
+        const computedStyle = window.getComputedStyle(inner);
+        if (computedStyle.flexDirection === "column") {
+          inner.style.display = "flex";
+          inner.style.flexDirection = "row";
+          inner.style.alignItems = "center";
+          inner.style.justifyContent = "space-between";
+          inner.style.width = "100%";
+        }
+      }
+    }, 300);
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyGentleFixes, { once: true });
+  } else {
+    applyGentleFixes();
+  }
+};

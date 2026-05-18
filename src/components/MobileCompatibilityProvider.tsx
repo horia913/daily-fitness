@@ -23,20 +23,16 @@ export default function MobileCompatibilityProvider() {
       // Apply appropriate device classes
       if (isAndroid) {
         body.classList.add('android-device')
-        console.log('🤖 Android device detected - applied android-device class')
       } else if (isIOS) {
         body.classList.add('ios-device')
-        console.log('🍎 iOS device detected - applied ios-device class')
       }
       
       if (isMobile) {
         body.classList.add('mobile-device')
-        console.log('📱 Mobile device detected - applied mobile-device class')
       }
       
       if (isTouchDevice) {
         body.classList.add('touch-device')
-        console.log('👆 Touch device detected - applied touch-device class')
       }
     }
     
@@ -46,9 +42,6 @@ export default function MobileCompatibilityProvider() {
     // Apply gentle Android fix ONLY on Android devices
     if (isAndroid) {
       applyAndroidGentleFix()
-      console.log('📱 Mobile compatibility initialized with Android fixes')
-    } else {
-      console.log('📱 Mobile compatibility initialized (non-Android device)')
     }
   }, [])
 

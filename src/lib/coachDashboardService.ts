@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { CoachAthleteScoreSummary } from '@/types/coachAthleteScore';
 import { supabase } from './supabase';
 import { dbToUiScale } from './wellnessService';
 import { computeCurrentProgramWeekForAssignment } from '@/lib/programWeekCalendar';
@@ -146,7 +147,7 @@ export interface ClientSummary {
   latestSleep: number | null;
   latestStress: number | null;
   latestSoreness: number | null;
-  athleteScore: number | null;
+  athleteScore: CoachAthleteScoreSummary | null;
   hasActiveProgram: boolean;
   hasActiveMealPlan: boolean;
   /** Coach-managed progression: week complete, awaiting coach review */
@@ -259,7 +260,7 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', allClientIds).order('log_date', { ascending: false }),
       db.from('program_assignments').select('client_id, id, program_id, start_date, duration_weeks, progression_mode, pause_status, paused_at, pause_accumulated_days, timezone_snapshot').in('client_id', activeClientIds).eq('status', 'active').order('updated_at', { ascending: false }),
       db.from('meal_plan_assignments').select('client_id').in('client_id', activeClientIds).eq('is_active', true),
-      db.from('athlete_scores').select('client_id, score').in('client_id', activeClientIds).order('calculated_at', { ascending: false }),
+      db.from('athlete_scores').select('client_id, score, tier').in('client_id', activeClientIds).order('calculated_at', { ascending: false }),
       db.from('workout_assignments').select('id, client_id, scheduled_date, status').in('client_id', activeClientIds).gte('scheduled_date', sevenDaysAgoStr).lte('scheduled_date', todayStr).in('status', ['assigned', 'in_progress']),
       db.from('clients').select('client_id, created_at').in('client_id', activeClientIds),
       db.from('daily_wellness_logs').select('client_id, log_date').in('client_id', activeClientIds).order('log_date', { ascending: false }),
@@ -412,10 +413,10 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
     }
 
     const activeMealPlanSet = new Set((activeMealPlans || []).map((m) => m.client_id));
-    const athleteScoreMap = new Map<string, number>();
-    (athleteScores || []).forEach((s) => {
+    const athleteScoreMap = new Map<string, { score: number; tier: string }>();
+    (athleteScores || []).forEach((s: { client_id: string; score: number; tier: string }) => {
       if (!athleteScoreMap.has(s.client_id)) {
-        athleteScoreMap.set(s.client_id, s.score);
+        athleteScoreMap.set(s.client_id, { score: s.score, tier: s.tier });
       }
     });
     const clientCreatedAtMap = new Map<string, string>();
@@ -779,7 +780,15 @@ export async function getMorningBriefing(coachId: string, supabaseClient?: Supab
         latestSleep,
         latestStress,
         latestSoreness,
-        athleteScore: athleteScoreMap.get(clientId) || null,
+        athleteScore: (() => {
+          const entry = athleteScoreMap.get(clientId);
+          if (!entry) return null;
+          return {
+            score: entry.score,
+            tier: entry.tier,
+            paused: program?.pause_status === 'paused',
+          };
+        })(),
         hasActiveProgram: !!program,
         hasActiveMealPlan: activeMealPlanSet.has(clientId),
         weekReviewNeeded: reviewWeek != null,

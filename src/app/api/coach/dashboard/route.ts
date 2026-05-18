@@ -9,7 +9,12 @@
  */
 
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import type { CoachAthleteScoreSummary } from '@/types/coachAthleteScore'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET() {
   try {
@@ -81,6 +86,38 @@ export async function GET() {
       clients.filter((c: { checked_in_today?: boolean }) => c.checked_in_today).map((c: { client_id: string }) => c.client_id)
     )
 
+    const clientIds = clients.map((c: { client_id: string }) => c.client_id as string)
+
+    const latestByClient = new Map<string, { score: number; tier: string }>()
+    const pausedClients = new Set<string>()
+
+    if (clientIds.length > 0 && supabaseServiceKey) {
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+      const [{ data: scoreRows }, { data: assignments }] = await Promise.all([
+        supabaseAdmin
+          .from('athlete_scores')
+          .select('client_id, score, tier, calculated_at')
+          .in('client_id', clientIds)
+          .order('calculated_at', { ascending: false }),
+        supabaseAdmin
+          .from('program_assignments')
+          .select('client_id, pause_status')
+          .in('client_id', clientIds)
+          .eq('status', 'active'),
+      ])
+
+      for (const row of scoreRows ?? []) {
+        if (!latestByClient.has(row.client_id)) {
+          latestByClient.set(row.client_id, { score: row.score, tier: row.tier })
+        }
+      }
+      for (const a of assignments ?? []) {
+        if (a.pause_status === 'paused') {
+          pausedClients.add(a.client_id)
+        }
+      }
+    }
+
     const clientSummaries = clients.map((c: {
       client_id: string
       first_name?: string
@@ -95,7 +132,17 @@ export async function GET() {
       trained_today?: boolean
       checked_in_today?: boolean
       has_active_meal_plan?: boolean
-    }) => ({
+    }) => {
+      const scoreEntry = latestByClient.get(c.client_id)
+      const athleteScore: CoachAthleteScoreSummary | null = scoreEntry
+        ? {
+            score: scoreEntry.score,
+            tier: scoreEntry.tier,
+            paused: pausedClients.has(c.client_id),
+          }
+        : null
+
+      return {
       clientId: c.client_id,
       firstName: c.first_name ?? '',
       lastName: c.last_name ?? '',
@@ -110,10 +157,11 @@ export async function GET() {
       latestSleep: null as number | null,
       latestStress: null as number | null,
       latestSoreness: null as number | null,
-      athleteScore: null as number | null,
+      athleteScore,
       hasActiveProgram: !!c.active_program_name,
       hasActiveMealPlan: c.has_active_meal_plan ?? false,
-    }))
+    }
+    })
 
     const briefing = {
       totalClients,

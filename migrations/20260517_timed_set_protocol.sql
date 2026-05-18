@@ -1,5 +1,8 @@
 -- timed_set protocol: prescription on workout_set_entries (duration_seconds = work time),
 -- logging via workout_set_logs.actual_duration_seconds.
+--
+-- Prerequisite: run 20260517_timed_set_enum_value.sql first (enum label must commit
+-- before this file — see PostgreSQL 55P04).
 
 BEGIN;
 

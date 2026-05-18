@@ -25,6 +25,8 @@ type PatchBody = {
   day_type?: 'workout' | 'rest' | 'assessment'
   name?: string | null
   reset_to_template?: boolean
+  /** When not resetting to master, optional day flag for this snapshot row. */
+  is_optional?: boolean
 }
 
 export async function PATCH(request: NextRequest, ctx: RouteCtx) {
@@ -93,11 +95,12 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     let is_customized: boolean
     let day_type: string
     let name: string
+    let is_optional: boolean
 
     if (body.reset_to_template) {
       const { data: ps, error: psErr } = await supabaseAdmin
         .from('program_schedule')
-        .select('template_id')
+        .select('template_id, is_optional')
         .eq('program_id', assignment.program_id)
         .eq('week_number', weekNum)
         .eq('day_number', programDay)
@@ -109,6 +112,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
       }
 
       workout_template_id = ps?.template_id ?? null
+      is_optional = Boolean((ps as { is_optional?: boolean | null })?.is_optional)
       is_customized = false
       day_type = workout_template_id ? 'workout' : 'rest'
       const defaultName =
@@ -135,6 +139,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
       if (wantsRest) {
         workout_template_id = null
         day_type = 'rest'
+        is_optional = false
         is_customized = body.is_customized !== undefined ? Boolean(body.is_customized) : true
         name =
           typeof body.name === 'string' && body.name.trim().length > 0
@@ -166,6 +171,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
         workout_template_id = tid
         is_customized = body.is_customized !== undefined ? Boolean(body.is_customized) : true
         day_type = body.day_type === 'assessment' ? 'assessment' : 'workout'
+        is_optional = body.is_optional ?? false
         name =
           typeof body.name === 'string' && body.name.trim().length > 0
             ? body.name.trim()
@@ -180,6 +186,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
         is_customized,
         day_type,
         name,
+        is_optional,
         updated_at: new Date().toISOString(),
       })
       .eq('id', snapshotRowId)

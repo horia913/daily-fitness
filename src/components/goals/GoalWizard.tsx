@@ -32,7 +32,12 @@ export interface GoalWizardProps {
   initialCategory?: GoalWizardCategory | null;
 }
 
-export function GoalWizard({ open, onClose, onSuccess, initialCategory = null }: GoalWizardProps) {
+export function GoalWizard({
+  open,
+  onClose,
+  onSuccess,
+  initialCategory = null,
+}: GoalWizardProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [step, setStep] = useState<0 | 1>(0);
@@ -88,7 +93,8 @@ export function GoalWizard({ open, onClose, onSuccess, initialCategory = null }:
       if (!result.ok) {
         console.error("[GoalWizard] create failed:", result.error);
         addToast({
-          title: result.error.message || "Could not create goal. Please try again.",
+          title:
+            result.error.message || "Could not create goal. Please try again.",
           variant: "destructive",
         });
         return;
@@ -133,12 +139,23 @@ export function GoalWizard({ open, onClose, onSuccess, initialCategory = null }:
               {step === 0 ? "New goal" : categoryLabel}
             </DialogTitle>
             {step === 1 ? (
-              <p className="text-xs fc-text-dim mt-1">Fill in the details below.</p>
+              <p className="text-xs fc-text-dim mt-1">
+                Fill in the details below.
+              </p>
             ) : (
-              <p className="text-xs fc-text-dim mt-1">Pick a category to continue.</p>
+              <p className="text-xs fc-text-dim mt-1">
+                Pick a category to continue.
+              </p>
             )}
           </div>
-          <Button type="button" variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={handleClose} aria-label="Close">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-8 w-8"
+            onClick={handleClose}
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -146,13 +163,29 @@ export function GoalWizard({ open, onClose, onSuccess, initialCategory = null }:
         {step === 0 ? (
           <CategoryPicker onPick={handlePickCategory} />
         ) : category === "body_composition" ? (
-          <BodyCompositionForm onSubmit={handlePayload} onBack={handleBackToCategories} submitting={submitting} />
+          <BodyCompositionForm
+            onSubmit={handlePayload}
+            onBack={handleBackToCategories}
+            submitting={submitting}
+          />
         ) : category === "performance" ? (
-          <PerformanceForm onSubmit={handlePayload} onBack={handleBackToCategories} submitting={submitting} />
+          <PerformanceForm
+            onSubmit={handlePayload}
+            onBack={handleBackToCategories}
+            submitting={submitting}
+          />
         ) : category === "outcome" ? (
-          <OutcomeForm onSubmit={handlePayload} onBack={handleBackToCategories} submitting={submitting} />
+          <OutcomeForm
+            onSubmit={handlePayload}
+            onBack={handleBackToCategories}
+            submitting={submitting}
+          />
         ) : category === "nutrition" ? (
-          <NutritionForm onSubmit={handlePayload} onBack={handleBackToCategories} submitting={submitting} />
+          <NutritionForm
+            onSubmit={handlePayload}
+            onBack={handleBackToCategories}
+            submitting={submitting}
+          />
         ) : null}
       </DialogContent>
     </Dialog>

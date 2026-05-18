@@ -39,6 +39,60 @@ interface Meal {
   meal_items?: MealItem[];
 }
 
+const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+type MealType = (typeof MEAL_TYPES)[number];
+
+function isLegacyCompositeMealId(mealId: string): boolean {
+  const firstDash = mealId.indexOf("-");
+  if (firstDash <= 0) return false;
+  const prefix = mealId.substring(0, firstDash);
+  return (MEAL_TYPES as readonly string[]).includes(prefix);
+}
+
+function mapFoodRowsToMealItems(
+  mealId: string,
+  rows: Array<{
+    id: string;
+    quantity: number | string;
+    unit?: string | null;
+    foods?: {
+      name?: string;
+      serving_size?: number;
+      serving_unit?: string;
+      calories_per_serving?: number;
+      protein?: number;
+      carbs?: number;
+      fat?: number;
+    } | Array<{
+      name?: string;
+      serving_size?: number;
+      serving_unit?: string;
+      calories_per_serving?: number;
+      protein?: number;
+      carbs?: number;
+      fat?: number;
+    }> | null;
+    order_index?: number | null;
+  }>
+): MealItem[] {
+  return rows.map((item, index) => {
+    const food = Array.isArray(item.foods) ? item.foods[0] : item.foods;
+    const servingSize = food?.serving_size || 100;
+    return {
+      id: item.id,
+      meal_id: mealId,
+      food_name: food?.name || "Unknown Food",
+      quantity: Number(item.quantity),
+      unit: item.unit || food?.serving_unit || "g",
+      calories_per_unit: (food?.calories_per_serving || 0) / servingSize,
+      protein_per_unit: (food?.protein || 0) / servingSize,
+      carbs_per_unit: (food?.carbs || 0) / servingSize,
+      fat_per_unit: (food?.fat || 0) / servingSize,
+      order_index: item.order_index ?? index,
+    };
+  });
+}
+
 /** Badge surface + border from design tokens (no raw Tailwind palette). */
 function getMealTypeBadgeClasses(mealType: string): string {
   switch (mealType) {
@@ -89,6 +143,179 @@ export default function MealDetailPage() {
     loadMeal();
   }, [mealId, user?.id, authLoading]);
 
+  const loadMealByUuid = async (id: string, clientId: string) => {
+    const { data: mealRow, error: mealError } = await supabase
+      .from("meals")
+      .select("id, meal_plan_id, name, meal_type, order_index, notes")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (mealError) throw mealError;
+    if (!mealRow) return;
+
+    const mealType = mealRow.meal_type as MealType;
+    if (!(MEAL_TYPES as readonly string[]).includes(mealType)) {
+      throw new Error("Invalid meal type");
+    }
+
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("meal_plan_assignments")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("meal_plan_id", mealRow.meal_plan_id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (assignmentError) throw assignmentError;
+    if (!assignment) {
+      throw new Error("No active meal plan assignment found");
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const { data: completion } = await supabase
+      .from("meal_completions")
+      .select("meal_option_id")
+      .eq("client_id", clientId)
+      .eq("meal_id", id)
+      .eq("date", today)
+      .maybeSingle();
+
+    const { data: options } = await supabase
+      .from("meal_options")
+      .select("id, name, order_index")
+      .eq("meal_id", id)
+      .order("order_index", { ascending: true });
+
+    const { data: foodRows, error: foodError } = await supabase
+      .from("meal_food_items")
+      .select(
+        `
+        id,
+        quantity,
+        unit,
+        meal_option_id,
+        foods(name, serving_size, serving_unit, calories_per_serving, protein, carbs, fat)
+      `
+      )
+      .eq("meal_id", id);
+
+    if (foodError) throw foodError;
+
+    const allItems = foodRows ?? [];
+    const loggedOptionId = completion?.meal_option_id ?? null;
+    const hasOptions = (options?.length ?? 0) > 0;
+
+    let itemsForDisplay = allItems;
+    if (hasOptions) {
+      if (loggedOptionId) {
+        itemsForDisplay = allItems.filter(
+          (row) => row.meal_option_id === loggedOptionId
+        );
+      } else if (options?.[0]?.id) {
+        itemsForDisplay = allItems.filter(
+          (row) => row.meal_option_id === options[0].id
+        );
+      } else {
+        itemsForDisplay = [];
+      }
+    } else {
+      itemsForDisplay = allItems.filter((row) => !row.meal_option_id);
+    }
+
+    const mealItems = mapFoodRowsToMealItems(id, itemsForDisplay);
+
+    setMeal({
+      id: mealRow.id,
+      meal_plan_id: mealRow.meal_plan_id,
+      name: mealRow.name,
+      meal_type: mealType,
+      order_index: mealRow.order_index ?? 0,
+      notes: mealRow.notes ?? undefined,
+      meal_items: mealItems,
+    });
+  };
+
+  const loadLegacyCompositeMeal = async (compositeId: string, clientId: string) => {
+    const firstDashIndex = compositeId.indexOf("-");
+    if (firstDashIndex === -1) {
+      throw new Error("Invalid meal ID format");
+    }
+
+    const mealType = compositeId.substring(0, firstDashIndex) as MealType;
+    const mealPlanId = compositeId.substring(firstDashIndex + 1);
+
+    if (!(MEAL_TYPES as readonly string[]).includes(mealType)) {
+      throw new Error("Invalid meal type");
+    }
+
+    const { data: assignmentData, error: assignmentError } = await supabase
+      .from("meal_plan_assignments")
+      .select("meal_plan_id")
+      .eq("client_id", clientId)
+      .eq("is_active", true)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (assignmentError) {
+      console.error("Error loading meal plan assignment:", assignmentError);
+    }
+
+    const targetMealPlanId = assignmentData?.meal_plan_id || mealPlanId;
+    if (!targetMealPlanId) {
+      throw new Error("No active meal plan assignment found");
+    }
+
+    const { data: mealPlanItems, error: itemsError } = await supabase
+      .from("meal_plan_items")
+      .select(
+        `
+        *,
+        food:foods(*)
+      `
+      )
+      .eq("meal_plan_id", targetMealPlanId)
+      .eq("meal_type", mealType);
+
+    if (itemsError) throw itemsError;
+    if (!mealPlanItems || mealPlanItems.length === 0) return;
+
+    const servingSize = mealPlanItems[0]?.food?.serving_size || 100;
+    const mealItems: MealItem[] = mealPlanItems.map((item: {
+      id: string;
+      quantity: number;
+      order_index?: number | null;
+      food?: {
+        name?: string;
+        serving_unit?: string;
+        calories_per_serving?: number;
+        protein?: number;
+        carbs?: number;
+        fat?: number;
+      } | null;
+    }) => ({
+      id: item.id,
+      meal_id: compositeId,
+      food_name: item.food?.name || "Unknown Food",
+      quantity: item.quantity,
+      unit: item.food?.serving_unit || "g",
+      calories_per_unit: (item.food?.calories_per_serving || 0) / servingSize,
+      protein_per_unit: (item.food?.protein || 0) / servingSize,
+      carbs_per_unit: (item.food?.carbs || 0) / servingSize,
+      fat_per_unit: (item.food?.fat || 0) / servingSize,
+      order_index: item.order_index || 0,
+    }));
+
+    setMeal({
+      id: compositeId,
+      meal_plan_id: targetMealPlanId,
+      name: mealType.charAt(0).toUpperCase() + mealType.slice(1),
+      meal_type: mealType,
+      order_index: 0,
+      meal_items: mealItems,
+    });
+  };
+
   const loadMeal = async () => {
     try {
       setLoading(true);
@@ -100,98 +327,12 @@ export default function MealDetailPage() {
 
       await withTimeout(
         (async () => {
-      // Parse meal ID - format is "mealType-meal_plan_id" (e.g., "breakfast-c034da40-3956-44f8-b157-69ed2da6ccf9")
-      // UUIDs have a fixed format with 5 parts separated by dashes: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-      // So we need to find where the meal type ends (first dash) and the UUID starts (next dash)
-      const firstDashIndex = mealId.indexOf("-");
-      if (firstDashIndex === -1) {
-        throw new Error("Invalid meal ID format");
-      }
-
-      const mealType = mealId.substring(0, firstDashIndex) as
-        | "breakfast"
-        | "lunch"
-        | "dinner"
-        | "snack";
-      const mealPlanId = mealId.substring(firstDashIndex + 1); // Everything after first dash is the UUID
-
-      // Validate meal type
-      if (!["breakfast", "lunch", "dinner", "snack"].includes(mealType)) {
-        throw new Error("Invalid meal type");
-      }
-
-      // Load meal plan assignment to get meal_plan_id (fallback if mealPlanId from URL is invalid)
-      // Use limit(1) instead of single() in case there are multiple assignments
-      const { data: assignmentData, error: assignmentError } = await supabase
-        .from("meal_plan_assignments")
-        .select("meal_plan_id")
-        .eq("client_id", user.id)
-        .eq("is_active", true)
-        .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (assignmentError) {
-        console.error("Error loading meal plan assignment:", assignmentError);
-        // Don't throw, try to use mealPlanId from URL
-      }
-
-      // Use meal_plan_id from assignment as it's the source of truth
-      const targetMealPlanId = assignmentData?.meal_plan_id || mealPlanId;
-
-      if (!targetMealPlanId) {
-        throw new Error("No active meal plan assignment found");
-      }
-
-      // Load meal_plan_items for this meal type and meal plan
-      const { data: mealPlanItems, error: itemsError } = await supabase
-        .from("meal_plan_items")
-        .select(
-          `
-          *,
-          food:foods(*)
-        `
-        )
-        .eq("meal_plan_id", targetMealPlanId)
-        .eq("meal_type", mealType);
-
-      if (itemsError) {
-        console.error("Error loading meal plan items:", itemsError);
-        throw itemsError;
-      }
-
-      if (!mealPlanItems || mealPlanItems.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // Construct meal items from meal_plan_items
-      const servingSize = mealPlanItems[0]?.food?.serving_size || 100;
-      const mealItems: MealItem[] = mealPlanItems.map((item: any) => ({
-        id: item.id,
-        meal_id: mealId,
-        food_name: item.food?.name || "Unknown Food",
-        quantity: item.quantity,
-        unit: item.food?.serving_unit || "g",
-        calories_per_unit: (item.food?.calories_per_serving || 0) / servingSize,
-        protein_per_unit: (item.food?.protein || 0) / servingSize,
-        carbs_per_unit: (item.food?.carbs || 0) / servingSize,
-        fat_per_unit: (item.food?.fat || 0) / servingSize,
-        order_index: item.order_index || 0,
-      }));
-
-      // Construct meal object
-      const constructedMeal: Meal = {
-        id: mealId,
-        meal_plan_id: targetMealPlanId,
-        name: mealType.charAt(0).toUpperCase() + mealType.slice(1),
-        meal_type: mealType,
-        order_index: 0,
-        meal_items: mealItems,
-      };
-
-      setMeal(constructedMeal);
-      })(),
+          if (isLegacyCompositeMealId(mealId)) {
+            await loadLegacyCompositeMeal(mealId, user.id);
+          } else {
+            await loadMealByUuid(mealId, user.id);
+          }
+        })(),
         30000,
         "timeout"
       );

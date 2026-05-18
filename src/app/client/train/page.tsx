@@ -49,7 +49,6 @@ import {
   Check,
   MessageSquare,
   X,
-  Bell,
   Target,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -462,7 +461,7 @@ export default function TrainPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         <ClientPageShell className="max-w-lg px-0 pb-[var(--fc-bottom-safe-area)] pt-6">
-          <header className="mb-2 flex items-center justify-between px-5 pt-0">
+          <header className="mb-2 flex items-center px-5 pt-0">
             <button
               type="button"
               onClick={() => {
@@ -481,17 +480,6 @@ export default function TrainPage() {
                 className="h-full w-full object-cover"
               />
             </button>
-            <IconButton
-              size="md"
-              variant="ghost"
-              className="btn-ghost-icon shrink-0 border-transparent"
-              aria-label="Notifications"
-              onClick={() => {
-                window.location.href = "/client";
-              }}
-            >
-              <Bell className="h-5 w-5 fc-text-dim" strokeWidth={1.5} />
-            </IconButton>
           </header>
           <header className="mb-6 px-5">
             <h1

@@ -149,11 +149,14 @@
 
   /* Clears floating bottom nav on mobile; tighter on desktop (matches Tailwind lg) */
   --fc-bottom-safe-area: 8rem;
+  /* FAB sits above nav on mobile; desktop uses a fixed offset (no floating nav). */
+  --fc-fab-bottom: calc(0.9 * var(--fc-bottom-safe-area, 8rem));
 }
 
 @media (min-width: 1024px) {
   :root {
     --fc-bottom-safe-area: 2rem;
+    --fc-fab-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   }
 }
 

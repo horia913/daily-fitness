@@ -152,6 +152,8 @@ export type PrescribedSetReference = {
   /** @deprecated use prescribedRir for display; kept for older payloads */
   prescribedRpe?: number | null;
   outcome?: "hit" | "under" | "over" | "miss" | "flag" | "neutral";
+  /** Rest-pause continuation etc.: show badge, do not treat as a graded set row. */
+  informationalRowBadge?: string | null;
   /** Superset / multi-segment prescribed cell (each segment: weight × reps @ RIR). */
   prescribedParts?: Array<{
     weightKg: number | null;
